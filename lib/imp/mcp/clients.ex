@@ -39,7 +39,10 @@ defmodule Imp.MCP.Clients do
     GenServer.start(__MODULE__, opts)
   end
 
-  @type replacement :: ((-> term()) -> {:ok, pid()} | {:error, term()})
+  # How a server's retired connection is replaced, and how long it is given to
+  # finish the request it is inside before it is killed.
+  @type replacement ::
+          {((-> term()) -> {:ok, pid()} | {:error, term()}), grace :: non_neg_integer()}
 
   @spec adopt(pid(), [client_entry()], %{optional(term()) => replacement()}) :: :ok
   def adopt(bridge, clients, replacements \\ %{})
@@ -286,35 +289,37 @@ defmodule Imp.MCP.Clients do
     state = %{state | clients: clients}
 
     case {server, Map.fetch(state.replacements, server)} do
+      # A client that is no longer the bridge's, or of a server whose calls
+      # are not lent (only HTTP ones are), has no known bound on its request.
       {nil, _} ->
-        close_after_request(client)
+        Process.exit(client, :kill)
         state
 
       {_server, :error} ->
-        close_after_request(client)
+        Process.exit(client, :kill)
         answer_if_gone(state, server)
 
-      {server, {:ok, redial}} ->
+      {server, {:ok, {redial, grace}}} ->
         bridge = self()
 
         dialer =
           spawn_link(fn ->
             Process.flag(:trap_exit, true)
-            dial_replacement(bridge, server, client, redial)
+            dial_replacement(bridge, server, client, redial, grace)
           end)
 
         %{state | replacing: Map.put(state.replacing, dialer, server)}
     end
   end
 
-  defp dial_replacement(bridge, server, retired, redial) do
+  defp dial_replacement(bridge, server, retired, redial, grace) do
     # The replacement function takes the server's origin into the trusted
     # origins for this process before it calls back to close the retired
     # client, which held it until then.
     close = fn ->
       unless Process.get(:retired_closed) do
         Process.put(:retired_closed, true)
-        close_after_request(retired)
+        close_after_request(retired, grace)
       end
     end
 
@@ -391,18 +396,19 @@ defmodule Imp.MCP.Clients do
     :ok
   end
 
-  # How long a retired client is given to finish the request it is inside
-  # before it is killed. Imp does not set ExMCP's HTTP `request_timeout`, so a
-  # request ends within ExMCP's default of 30 s; the rest is margin.
-  @retired_grace 35_000
-
-  # Stops the client once the request it is inside, if any, is done: a stop is
-  # handled after the client's current callback returns. A client still busy
-  # after `@retired_grace` is killed.
-  defp close_after_request(client) do
+  # Closes the client once the request it is inside, if any, is done: the
+  # client handles the disconnect after its current callback returns. A
+  # disconnect rather than a bare stop, because it closes the transport, and an
+  # HTTP+SSE client's GET stream is a process of its own that a stop leaves
+  # running. A request an HTTP+SSE client posts from a process of its own is
+  # not waited for, and is not ended by the close either; it ends within the
+  # same bounds. A client still busy after `grace`, which the import sets
+  # longer than its request can take, is killed.
+  defp close_after_request(client, grace) do
     spawn(fn ->
       try do
-        GenServer.stop(client, :normal, @retired_grace)
+        GenServer.call(client, :disconnect, grace)
+        GenServer.stop(client, :normal, grace)
       catch
         :exit, _reason -> Process.exit(client, :kill)
       end

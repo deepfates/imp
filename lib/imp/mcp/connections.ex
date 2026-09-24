@@ -205,6 +205,12 @@ defmodule Imp.MCP.Connections do
     :pool_size
   ]
 
+  # ExMCP 1.5.0's own defaults for an HTTP connection, set explicitly so the
+  # bound on a request can be read from the options it was dialed with.
+  @http_dns_timeout 1_000
+  @http_connect_timeout 5_000
+  @http_request_timeout 30_000
+
   @doc """
   Connects authorized servers and imports all discovered tools.
 
@@ -597,26 +603,38 @@ defmodule Imp.MCP.Connections do
   # connection connected. The bridge's dialing process holds the origin in the
   # trusted origins before the retired client, which held it, is closed, and
   # the replacement holds it for its own life after.
+  #
+  # Each comes with how long a retired connection is given to finish the
+  # request it is inside before it is killed: longer than that request can
+  # take as the connection bounds it.
   defp replacements(connected, opts) do
     for {index, server, _pooled, options} <- connected, pooled?(server), into: %{} do
-      {index,
-       fn close_retired ->
-         :ok = trust(options, self())
-         close_retired.()
+      {index, {redial(server, options, opts), request_bound(options) + 1_000}}
+    end
+  end
 
-         with {:ok, client} <- dial(options, timeout(opts)),
-              :ok <- trust(options, client) do
-           {:ok, client}
-         else
-           {:unreachable, reason} ->
-             Logger.warning(
-               "MCP server #{inspect(server_name(server))} lost a connection that could " <>
-                 "not be replaced: #{inspect(shorten(reason))}"
-             )
+  defp request_bound(options) do
+    Keyword.fetch!(options, :dns_timeout_ms) + Keyword.fetch!(options, :timeout) +
+      Keyword.fetch!(options, :request_timeout)
+  end
 
-             {:error, reason}
-         end
-       end}
+  defp redial(server, options, opts) do
+    fn close_retired ->
+      :ok = trust(options, self())
+      close_retired.()
+
+      with {:ok, client} <- dial(options, timeout(opts)),
+           :ok <- trust(options, client) do
+        {:ok, client}
+      else
+        {:unreachable, reason} ->
+          Logger.warning(
+            "MCP server #{inspect(server_name(server))} lost a connection that could " <>
+              "not be replaced: #{inspect(shorten(reason))}"
+          )
+
+          {:error, reason}
+      end
     end
   end
 
@@ -1116,7 +1134,6 @@ defmodule Imp.MCP.Connections do
           command: [command | args],
           cd: Keyword.get(opts, :cwd, File.cwd!()),
           env: env,
-          default_timeout: timeout(opts),
           era_probe_timeout: timeout(opts),
           handshake_timeout: timeout(opts),
           health_check_interval: nil,
@@ -1136,7 +1153,17 @@ defmodule Imp.MCP.Connections do
           # (Scry answers 403). No `Origin` header is sent.
           security: %{origin: nil},
           use_sse: type == "sse",
-          default_timeout: timeout(opts),
+          # ExMCP bounds each HTTP request by these, apart from how long the
+          # caller waits: resolving the name, connecting (ExMCP reads the
+          # connect bound from `:timeout`, which is also the client's wait for
+          # a request made without one; Imp passes one on every request), and
+          # the request itself. The request bound is the host's `:timeout`, so
+          # a call it allows is not cut off by ExMCP's own 30 s default, and
+          # never less than that default: a request its caller stopped waiting
+          # for is left to finish on the server (see `Imp.MCP.Clients`).
+          dns_timeout_ms: @http_dns_timeout,
+          timeout: @http_connect_timeout,
+          request_timeout: max(timeout(opts), @http_request_timeout),
           era_probe_timeout: timeout(opts),
           handshake_timeout: timeout(opts),
           health_check_interval: nil,

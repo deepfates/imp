@@ -74,9 +74,16 @@ User-visible changes to Imp are recorded here.
   sends it several calls at once, and another connection would be another
   server process. The extra connections are dialed at once, so a server costs
   the import at most about three `:timeout`s. A connection whose call timed
-  out, or whose caller died during the call, is closed and replaced in the
-  background rather than lent again while ExMCP still waits on that request;
+  out, or whose caller died during the call, is replaced in the background
+  rather than lent again while ExMCP still waits on that request, and is
+  closed once that request is done, so the server finishes what it was doing;
   a replacement that cannot be dialed leaves the server a connection fewer.
+
+- An HTTP MCP call can take as long as the import's `:timeout` allows. ExMCP
+  ended every HTTP request at its own 30 s default whatever `:timeout` said,
+  so a call to a tool that takes 33 s failed at about 30 s under
+  `timeout: 45_000`. ExMCP's `request_timeout` is now the import's `:timeout`,
+  and never less than 30 s.
 
 - A caller of `Imp.MCP.connect/2` that dies while its import is connecting no
   longer leaves the connections already made open, each holding its server's

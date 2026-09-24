@@ -86,6 +86,22 @@ defmodule Imp.MCPConnectionPoolTest do
     defp answered?(seen, answered), do: seen < answered
   end
 
+  # A legacy server with the HTTP+SSE stream: it does not know ExMCP's opening
+  # probe, so a `type: "sse"` client settles on the legacy era and keeps a GET
+  # stream open, and each request is then posted from a process of its own.
+  defmodule LegacySSE do
+    @behaviour Plug
+    def init(opts), do: ExMCP.HttpPlug.init(Keyword.put(opts, :legacy_http_sse, true))
+
+    def call(conn, opts) do
+      {:ok, body, conn} = Plug.Conn.read_body(conn)
+
+      if body =~ "server/discover",
+        do: Plug.Conn.send_resp(conn, 404, "unknown method"),
+        else: ExMCP.HttpPlug.call(Plug.Conn.assign(conn, :raw_body, body), opts)
+    end
+  end
+
   defp server(plug \\ ExMCP.HttpPlug) do
     {:ok, socket} = :gen_tcp.listen(0, [:binary, active: false])
     {:ok, port} = :inet.port(socket)
@@ -314,6 +330,83 @@ defmodule Imp.MCPConnectionPoolTest do
       assert eventually(fn ->
                :ets.lookup(:pool_test_writes, "orphaned") == [{"orphaned", :finished}]
              end)
+    end
+
+    # The request is out on a process of the client's own, the stop does not
+    # wait for it, and the client's GET stream is a process that a stop does
+    # not end: the connection is closed, which ends the stream.
+    test "on an HTTP+SSE connection still finishes, and the connection's stream ends" do
+      descriptor = %{server(LegacySSE) | "type" => "sse"}
+      {imported, tools} = tools(descriptor, pool_size: 1, timeout: 300)
+      [client] = Imp.MCP.Clients.client_pids(imported_bridge(imported))
+      stream = :sys.get_state(client).transport_state.sse_pid
+      assert is_pid(stream)
+
+      assert {:error, %CallFailure{outcome: :unknown}} =
+               Imp.Tool.call(tools["write"], %{"tag" => "over sse"})
+
+      assert Imp.Tool.call(tools["fast"], %{}) == "fast done"
+
+      assert eventually(fn ->
+               :ets.lookup(:pool_test_writes, "over sse") == [{"over sse", :finished}]
+             end)
+
+      assert eventually(fn -> not Process.alive?(client) end)
+      assert eventually(fn -> not Process.alive?(stream) end), "the retired stream outlived it"
+    end
+  end
+
+  # The host's `:timeout` is how long a call may take. ExMCP bounds each HTTP
+  # request by its own `request_timeout` (30 s unless set), so a host that
+  # allows longer must have it reach ExMCP, on every connection it dials:
+  # the first, the extras, and a replacement.
+  describe "a host's timeout" do
+    test "bounds every pooled connection's HTTP requests" do
+      {imported, tools} = tools(server(), pool_size: 2, timeout: 45_000)
+      bridge = imported_bridge(imported)
+
+      # A replacement: the borrower of the only free connection dies mid-call.
+      {:ok, borrower} = Task.start(fn -> Imp.Tool.call(tools["slow"], %{}) end)
+      Process.sleep(200)
+      Process.exit(borrower, :kill)
+      assert Imp.Tool.call(tools["fast"], %{}) == "fast done"
+      assert eventually(fn -> map_size(:sys.get_state(bridge).replacing) == 0 end)
+
+      clients = Imp.MCP.Clients.client_pids(bridge)
+      assert length(clients) == 2
+
+      for client <- clients do
+        assert :sys.get_state(client).transport_state.timeouts.request == 45_000
+      end
+    end
+
+    test "below ExMCP's own request bound leaves that bound in place" do
+      {imported, _tools} = tools(server(), pool_size: 1, timeout: 300)
+      [client] = Imp.MCP.Clients.client_pids(imported_bridge(imported))
+      assert :sys.get_state(client).transport_state.timeouts.request == 30_000
+    end
+
+    test "of 300 ms is when a slow call is answered, as unknown" do
+      {_imported, tools} = tools(server(), pool_size: 1, timeout: 300)
+
+      {elapsed, result} = ms(fn -> Imp.Tool.call(tools["slow"], %{}) end)
+      assert {:error, %CallFailure{outcome: :unknown}} = result
+      assert elapsed in 300..1_000
+      assert Imp.Tool.call(tools["fast"], %{}) == "fast done"
+    end
+
+    # A retired connection is closed after its request, and killed only when
+    # the request has had longer than it could possibly take: resolving the
+    # name, connecting and the request itself, as that connection is bounded.
+    test "sets how long a retired connection's request is given" do
+      {imported, _tools} = tools(server(), pool_size: 1, timeout: 45_000)
+      bridge = imported_bridge(imported)
+      [client] = Imp.MCP.Clients.client_pids(bridge)
+      transport = :sys.get_state(client).transport_state
+      %{0 => {_redial, grace}} = :sys.get_state(bridge).replacements
+
+      assert grace >
+               transport.dns_timeout_ms + transport.timeouts.connect + transport.timeouts.request
     end
   end
 
