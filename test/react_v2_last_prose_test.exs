@@ -187,7 +187,7 @@ defmodule ReActV2LastProseTest do
     assert note =~ "Last one."
   end
 
-  test "a step that calls nothing and says nothing takes the same last request" do
+  test "a step that calls nothing and says nothing is an empty answer, with no further request" do
     owner = self()
     counter = :counters.new(1, [])
 
@@ -204,14 +204,10 @@ defmodule ReActV2LastProseTest do
     program = Imp.react_v2("intent -> answer", [look()], lm: lm)
 
     assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
-    assert Imp.get(prediction, :answer) == "Said at last."
-    assert Imp.get(prediction, :termination_reason) == :last_prose
-    assert Imp.get(prediction, :termination_cause) == :empty_completion
-
-    [{_first, first_opts}, {_last, last_opts}] = requests(2)
-    assert first_opts[:tool_choice] == "auto"
-    assert last_opts[:tool_choice] == "none"
-    assert last_opts[:tools] == first_opts[:tools]
+    assert Imp.get(prediction, :answer) == nil
+    assert Imp.get(prediction, :termination_reason) == :answered
+    assert [{_only, _opts}] = requests(1)
+    refute_received {:request, 2, _, _}
   end
 
   test "a deadline that has already passed makes no last request" do

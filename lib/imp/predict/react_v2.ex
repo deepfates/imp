@@ -35,9 +35,13 @@ defmodule Imp.Predict.ReActV2 do
 
   A turn is interrupted when it reaches `max_iters`, when a step's request
   fails (`:prediction_error`, `:parse_error`), or when a step calls no tool and
-  gives no answer (`:empty_completion` for a step that says nothing,
-  `:invalid_answer` for prose the text output does not accept, and
-  `:empty_tool_calls` for a signature with `submit`).
+  gives no answer (`:invalid_answer` for prose the text output does not
+  accept, and `:empty_tool_calls` for a signature with `submit`).
+
+  With one text output, a step that calls no tool and says nothing is not an
+  interruption: it is an empty answer, and the turn ends there
+  (`termination_reason: :answered`). Saying nothing is how a model declines
+  to answer, and asking it again would make declining cost a second request.
 
   With one text output, every interruption takes the same path: one more
   request with `tool_choice: "none"`, so the model can only write text, and
@@ -940,7 +944,7 @@ defmodule Imp.Predict.ReActV2 do
       {:ok, Imp.Prediction.to_map(parsed)}
     else
       :submit -> {:none, :empty_tool_calls}
-      {:prose, _nothing} -> {:none, :empty_completion}
+      {:prose, _nothing} -> {:ok, %{hd(signature.outputs).name => nil}}
       {:error, _reason} -> {:none, :invalid_answer}
     end
   end
