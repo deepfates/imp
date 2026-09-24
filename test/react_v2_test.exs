@@ -82,8 +82,8 @@ defmodule ReActV2Test do
           {{:error, error}, :required}
 
         :required ->
-          if Keyword.get(opts, :required_returns_prose, false) do
-            response = prose_response(model, messages, "I will submit Paris now.")
+          if Keyword.get(opts, :required_returns_text, false) do
+            response = text_response(model, messages, "I will submit Paris now.")
             {{:ok, response}, :corrective}
           else
             response =
@@ -129,9 +129,9 @@ defmodule ReActV2Test do
       end)
     end
 
-    defp prose_response(model, messages, text) do
+    defp text_response(model, messages, text) do
       %ReqLLM.Response{
-        id: "resp_prose",
+        id: "resp_text",
         model: to_string(model),
         context: ReqLLM.Context.new(messages),
         message: ReqLLM.Context.assistant(Jason.encode!(%{next_thought: text, tool_calls: []})),
@@ -467,7 +467,7 @@ defmodule ReActV2Test do
         req_module: RequiredOnlyToolStub,
         state: state,
         test_pid: self(),
-        required_returns_prose: true,
+        required_returns_text: true,
         cache: false
       )
 
@@ -532,7 +532,7 @@ defmodule ReActV2Test do
         req_module: RequiredOnlyToolStub,
         state: state,
         test_pid: self(),
-        required_returns_prose: true,
+        required_returns_text: true,
         extraction_fails: true,
         cache: false
       )

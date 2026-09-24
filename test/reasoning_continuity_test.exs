@@ -208,7 +208,7 @@ defmodule ReasoningContinuityTest do
   # The saved history is then resumed by a fresh program after a JSON round
   # trip, and every recorded assistant turn keeps its reasoning on the wire.
   defp assert_continuity(provider, field, value) do
-    {lm, counter} = scripted_lm(provider, field, value, [:lookup, :prose, :prose])
+    {lm, counter} = scripted_lm(provider, field, value, [:lookup, :text, :text])
 
     lookup = lookup_tool()
     program = Imp.react_v2("question -> answer", [lookup], lm: lm, max_iters: 4)
@@ -254,7 +254,7 @@ defmodule ReasoningContinuityTest do
   # the answer's text; the assistant turn that made it keeps its reasoning.
   defp assert_submit_continuity(provider, field, value) do
     submit = {:submit, %{"answer" => "done", "source" => "fixture"}}
-    {lm, _counter} = scripted_lm(provider, field, value, [:lookup, submit, :prose])
+    {lm, _counter} = scripted_lm(provider, field, value, [:lookup, submit, :text])
 
     lookup = lookup_tool()
     program = Imp.react_v2("question -> answer, source", [lookup], lm: lm, max_iters: 4)
@@ -309,7 +309,7 @@ defmodule ReasoningContinuityTest do
           case Enum.at(script, count - 1) do
             :lookup -> {"tool_calls", tool_message(count, "lookup", %{"query" => "fixture"})}
             {:submit, arguments} -> {"tool_calls", tool_message(count, "submit", arguments)}
-            :prose -> {"stop", %{"role" => "assistant", "content" => "done"}}
+            :text -> {"stop", %{"role" => "assistant", "content" => "done"}}
           end
 
         {200,

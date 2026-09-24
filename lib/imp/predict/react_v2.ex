@@ -584,7 +584,7 @@ defmodule Imp.Predict.ReActV2 do
           incomplete_prediction(
             history,
             termination,
-            %{initial: initial_error, last_prose: reason},
+            %{initial: initial_error, last_text: reason},
             cause
           )
       end
