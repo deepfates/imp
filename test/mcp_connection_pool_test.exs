@@ -182,6 +182,144 @@ defmodule Imp.MCPConnectionPoolTest do
     assert Imp.Tool.call(tools["fast"], %{}) == "fast done"
   end
 
+  # Each pooled connection holds its server's origin in `Imp.MCP.Trust` for as
+  # long as it lives, so the origin stays trusted while any of them is open.
+  test "the origin stays trusted while any pooled connection to it is open" do
+    descriptor = server()
+    origin = String.replace(descriptor["url"], "/mcp", "")
+    {imported, tools} = tools(descriptor, pool_size: 2)
+    [first, second] = Imp.MCP.Clients.client_pids(imported_bridge(imported))
+
+    monitor = Process.monitor(first)
+    Process.exit(first, :kill)
+    assert_receive {:DOWN, ^monitor, :process, _pid, _reason}
+    Process.sleep(100)
+
+    assert origin in trusted_origins()
+    assert Process.alive?(second)
+    assert Imp.Tool.call(tools["fast"], %{}) == "fast done"
+  end
+
+  # A stdio server takes calls to one connection at once: ExMCP writes each
+  # request to the pipe and matches the answers by id. Each further connection
+  # would be another server process with state of its own, so a stdio server
+  # has one, whatever `pool_size` says, and its calls go straight to it.
+  describe "a stdio server" do
+    @stdio """
+    import json, os, sys, threading, time
+    with open(os.environ["POOL_PID_FILE"], "a") as f:
+        f.write(str(os.getpid()) + "\\n")
+    lock = threading.Lock()
+    def out(r):
+        with lock:
+            sys.stdout.write(json.dumps(r) + "\\n")
+            sys.stdout.flush()
+    def slow(i):
+        time.sleep(1.5)
+        out({"jsonrpc": "2.0", "id": i, "result": {"content": [{"type": "text", "text": "slow done"}]}})
+    for line in sys.stdin:
+        q = json.loads(line)
+        m = q.get("method")
+        if m == "initialize":
+            out({"jsonrpc": "2.0", "id": q["id"], "result": {"protocolVersion": "2025-03-26", "capabilities": {"tools": {}}, "serverInfo": {"name": "s", "version": "1"}}})
+        elif m == "tools/list":
+            out({"jsonrpc": "2.0", "id": q["id"], "result": {"tools": [{"name": n, "description": n, "inputSchema": {"type": "object"}} for n in ["slow", "fast"]]}})
+        elif m == "tools/call":
+            if q["params"]["name"] == "slow":
+                threading.Thread(target=slow, args=(q["id"],)).start()
+            else:
+                out({"jsonrpc": "2.0", "id": q["id"], "result": {"content": [{"type": "text", "text": "fast done"}]}})
+        elif q.get("id") is not None:
+            out({"jsonrpc": "2.0", "id": q["id"], "error": {"code": -32601, "message": "not found"}})
+    """
+
+    setup do
+      dir = Path.join(System.tmp_dir!(), "imp-pool-stdio-#{System.unique_integer([:positive])}")
+      File.mkdir_p!(dir)
+      on_exit(fn -> File.rm_rf(dir) end)
+      script = Path.join(dir, "server.py")
+      File.write!(script, @stdio)
+      pid_file = Path.join(dir, "pids")
+      python = System.find_executable("python3") || raise "python3 required for this test"
+
+      descriptor = %{
+        "name" => "stdio",
+        "type" => "stdio",
+        "command" => python,
+        "args" => [script],
+        "env" => [%{"name" => "POOL_PID_FILE", "value" => pid_file}]
+      }
+
+      %{descriptor: descriptor, pid_file: pid_file}
+    end
+
+    test "answers a quick call during a slow one on its one connection", %{descriptor: d} do
+      {_imported, tools} = tools(d, timeout: 10_000)
+
+      slow = Task.async(fn -> Imp.Tool.call(tools["slow"], %{}) end)
+      Process.sleep(200)
+
+      {elapsed, result} = ms(fn -> Imp.Tool.call(tools["fast"], %{}) end)
+      assert result == "fast done"
+      assert elapsed < 500, "the quick call waited #{elapsed} ms"
+      assert Task.await(slow, 5_000) == "slow done"
+    end
+
+    test "is one server process whatever pool_size says", %{descriptor: d, pid_file: pid_file} do
+      {imported, _tools} = tools(d, pool_size: 3, timeout: 10_000)
+
+      assert [_one] = Imp.MCP.Clients.client_pids(imported_bridge(imported))
+      assert [_one] = pid_file |> File.read!() |> String.split("\n", trim: true)
+    end
+
+    # The import's own time limit is a backstop for its helper wedging; the
+    # caller's `:authorize` runs in that helper. A connection already made when
+    # the helper is abandoned is closed with it, and so is its server process.
+    test "an import abandoned after connecting it leaves no server running",
+         %{descriptor: d, pid_file: pid_file} do
+      wedged = %{d | "name" => "wedged"}
+      parent = self()
+
+      authorize = fn
+        %{"name" => "wedged"} ->
+          send(parent, :wedged)
+          Process.sleep(:infinity)
+
+        _descriptor ->
+          :ok
+      end
+
+      task =
+        Task.async(fn -> Imp.MCP.connect([d, wedged], authorize: authorize, timeout: 500) end)
+
+      assert_receive :wedged, 10_000
+      [os_pid] = pid_file |> File.read!() |> String.split("\n", trim: true)
+      assert {:error, :mcp_import_timeout} = Task.await(task, 30_000)
+
+      assert eventually(fn -> not os_alive?(os_pid) end),
+             "the stdio server #{os_pid} outlived the abandoned import"
+    end
+  end
+
+  defp os_alive?(os_pid),
+    do: match?({_, 0}, System.cmd("kill", ["-0", os_pid], stderr_to_stdout: true))
+
+  defp eventually(check, tries \\ 50) do
+    cond do
+      check.() -> true
+      tries == 0 -> false
+      true -> Process.sleep(100) && eventually(check, tries - 1)
+    end
+  end
+
+  defp trusted_origins do
+    case Application.get_env(:ex_mcp, :security) do
+      security when is_list(security) -> Keyword.get(security, :trusted_origins, [])
+      security when is_map(security) -> Map.get(security, :trusted_origins, [])
+      _unset -> []
+    end
+  end
+
   test "pool_size must be a positive integer" do
     assert_raise ArgumentError, ~r/pool_size/, fn ->
       Imp.MCP.connect([server()], trusted_servers: [server()], pool_size: 0)

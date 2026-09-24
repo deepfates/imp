@@ -63,13 +63,16 @@ User-visible changes to Imp are recorded here.
   `handle_info/2` needs a clause for it.
 
 - `Imp.MCP.connect/2` takes `pool_size:` (1 by default): that many
-  connections are opened to each server, and each tool call borrows an idle
-  one for the length of the call, so up to `pool_size` calls to one server run
-  at once. One ExMCP client sends one request at a time, so without it a quick
-  call waits behind a slow one to the same server. A call that finds every
-  connection busy until its `:timeout` fails as `:not_sent`
-  (`reason: :no_idle_connection`), and a call on a closed import fails as
-  `:not_sent` with `reason: :not_connected` rather than a process exit.
+  connections are opened to each `http` or `sse` server, and each tool call
+  borrows an idle one for the length of the call, so up to `pool_size` calls to
+  one server run at once. One ExMCP client sends one HTTP request at a time, so
+  without it a quick call waits behind a slow one to the same server. A call
+  that finds every connection busy until its `:timeout` fails as `:not_sent`
+  (`reason: :no_idle_connection`), and a call on a closed HTTP import fails as
+  `:not_sent` with `reason: :not_connected` rather than a process exit. A
+  `stdio` server keeps one connection whatever `pool_size` says: ExMCP already
+  sends it several calls at once, and another connection would be another
+  server process.
 
 - `Imp.Run.start/3` takes `admission: {pool, limit}`: the run holds a place in
   the host's named pool instead of the machine-wide `:async_max_workers` pool,

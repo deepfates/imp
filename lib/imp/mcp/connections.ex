@@ -117,17 +117,26 @@ defmodule Imp.MCP.Connections do
 
   ## Calls to one server at once
 
-  One ExMCP client sends one request at a time: over HTTP it makes the POST
-  from inside its own process, so a quick call made while a slow one is out
-  waits for the slow one to answer. `pool_size:` (1 by default) opens that many
-  connections to each server, and each tool call borrows an idle one for the
-  length of the call, so up to `pool_size` calls to one server run at once. A
-  host sets it from how many of its own calls can be out together. A call that
-  finds every connection busy waits for one, and if none comes free within
-  `:timeout` it fails as `:not_sent` (`Imp.MCP.CallFailure`): nothing was sent.
+  `pool_size:` (1 by default) is how many connections Imp opens to each
+  `http` or `sse` server. An ExMCP client sends one HTTP request at a time,
+  making the POST from inside its own process, so a quick call made while a
+  slow one is out on the same connection waits for the slow one to answer.
+  With a pool each tool call borrows an idle connection for the length of the
+  call, so up to `pool_size` calls to one server run at once. A host sets it
+  from how many of its own calls can be out together. A call that finds every
+  connection busy waits for one, and if none comes free within `:timeout` it
+  fails as `:not_sent` (`Imp.MCP.CallFailure`): nothing was sent.
+
   The first connection to a server decides whether the server is reachable and
-  lists its tools; one of the others that cannot be opened leaves the server
-  with fewer connections and is logged.
+  lists its tools. The others are dialed the way the first connected, each
+  holds the server's origin in the trusted origins for as long as it lives,
+  and one that cannot be opened leaves the server with fewer connections and
+  is logged.
+
+  A `stdio` server has one connection whatever `pool_size` says. ExMCP writes
+  each request to its pipe and matches answers by id, so calls to it already
+  run at once over that connection, and they go straight to it. A second
+  connection would be a second server process with state of its own.
 
   ## What a tool is named
 
@@ -263,8 +272,9 @@ defmodule Imp.MCP.Connections do
     ref = make_ref()
     # Every dial is bounded on its own inside `dial/2`. This budget is only the
     # backstop for the helper itself wedging around them, so it has to cover the
-    # whole list dialed in turn, `pool_size` dials per server.
-    timeout = timeout(opts) * pool_size(opts) * max(length(servers), 1) + 5_000
+    # whole list dialed in turn: per server the first dial, the one retry
+    # `dial_http_fallback/2` may make, and `pool_size - 1` more.
+    timeout = timeout(opts) * (pool_size(opts) + 1) * max(length(servers), 1) + 5_000
 
     {pid, mon} =
       spawn_monitor(fn ->
@@ -428,6 +438,16 @@ defmodule Imp.MCP.Connections do
     mon = Process.monitor(pid)
 
     receive do
+      {^ref, {:ok, client} = outcome} ->
+        Process.demonitor(mon, [:flush])
+        # The dial process unlinked the client before answering, so this link
+        # is the client's only one until the import adopts it. It is how
+        # `abandon/1` finds the client when the import is given up after this
+        # dial. This process traps exits, so a client already gone arrives as
+        # an `EXIT` here rather than raising.
+        Process.link(client)
+        outcome
+
       {^ref, outcome} ->
         Process.demonitor(mon, [:flush])
         outcome
@@ -573,7 +593,7 @@ defmodule Imp.MCP.Connections do
     case list_tools(client, opts) do
       {:ok, response} ->
         case tool_schemas(response) do
-          {:ok, schemas} -> attach_client_runs(schemas, index, server, opts)
+          {:ok, schemas} -> attach_client_runs(schemas, index, client, server, opts)
           {:error, reason} -> {:error, {:mcp_tools_list_failed, server_name(server), reason}}
         end
 
@@ -627,8 +647,9 @@ defmodule Imp.MCP.Connections do
     if String.length(text) > 120, do: String.slice(text, 0, 119) <> "…", else: text
   end
 
-  defp attach_client_runs(schemas, index, server, opts) do
+  defp attach_client_runs(schemas, index, client, server, opts) do
     bridge = Keyword.fetch!(opts, :bridge)
+    pooled? = pooled?(server)
 
     schemas =
       schemas
@@ -652,22 +673,30 @@ defmodule Imp.MCP.Connections do
             }
           })
 
-        Map.put(schema, "run", fn arguments ->
-          case Imp.MCP.Clients.checkout(bridge, index, timeout(opts)) do
-            {:ok, client} ->
-              try do
-                call_tool(client, name, arguments, server, opts)
-              after
-                Imp.MCP.Clients.checkin(bridge, client)
-              end
+        Map.put(schema, "run", fn
+          arguments when not pooled? ->
+            call_tool(client, name, arguments, server, opts)
 
-            {:error, reason} ->
-              {:error, CallFailure.returned(server_name(server), name, reason)}
-          end
+          arguments ->
+            borrowed_call(bridge, index, name, arguments, server, opts)
         end)
       end)
 
     {:ok, Enum.map(schemas, &{server, &1})}
+  end
+
+  defp borrowed_call(bridge, index, name, arguments, server, opts) do
+    case Imp.MCP.Clients.checkout(bridge, index, timeout(opts)) do
+      {:ok, client} ->
+        try do
+          call_tool(client, name, arguments, server, opts)
+        after
+          Imp.MCP.Clients.checkin(bridge, client)
+        end
+
+      {:error, reason} ->
+        {:error, CallFailure.returned(server_name(server), name, reason)}
+    end
   end
 
   defp call_tool(client, name, arguments, server, opts) do
@@ -1170,7 +1199,11 @@ defmodule Imp.MCP.Connections do
 
   defp pool_size(opts), do: Keyword.get(opts, :pool_size, 1)
 
-  defp extra_connections(_server, opts), do: pool_size(opts) - 1
+  # Only HTTP connections are pooled; see "Calls to one server at once".
+  defp extra_connections(server, opts),
+    do: if(pooled?(server), do: pool_size(opts) - 1, else: 0)
+
+  defp pooled?(server), do: server_type(server) in ["http", "sse"]
 
   defp timeout(opts), do: Keyword.get(opts, :timeout, 30_000)
   defp result_mode(opts), do: Keyword.get(opts, :result_mode, :text)
