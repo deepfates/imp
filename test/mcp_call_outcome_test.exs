@@ -378,6 +378,41 @@ defmodule Imp.MCPCallOutcomeTest do
       Imp.Run.cancel(run)
     end
 
+    # A terminal tool has run by the time `finish_on` reads its result, so
+    # outputs that do not fit the signature do not make the call a refusal.
+    test "a terminal tool whose finish_on outputs do not fit still ran" do
+      reply = Imp.Tool.new(:reply, "reply", fn _arguments -> "sent" end)
+
+      lm =
+        Imp.LM.Static.new(
+          handler: fn messages, _opts ->
+            if List.last(messages)[:role] == :tool,
+              do: "gave up",
+              else: %{
+                next_thought: "reply",
+                tool_calls: [%{id: "call-1", name: "reply", arguments: %{}}]
+              }
+          end
+        )
+
+      program =
+        Imp.react_v2("question -> answer", [reply],
+          lm: lm,
+          max_iters: 2,
+          finish_on: %{reply: fn _arguments, _result, _inputs -> {:finish, %{}} end}
+        )
+
+      owner = self()
+
+      {:ok, run} =
+        Imp.Run.start(program, %{question: "q"}, event_sink: &send(owner, {:event, &1}))
+
+      assert_receive {:event, %{kind: :tool_result} = event}, 5_000
+      assert {:error, {:missing_output_fields, _}} = event.error
+      assert event.metadata.outcome == :result
+      Imp.Run.cancel(run)
+    end
+
     test "an MCP call failure serializes with its outcome beside the untouched reason" do
       failure = CallFailure.returned("kite", "reply", :timeout)
 
