@@ -850,6 +850,13 @@ defmodule Imp.MCP.Connections do
   end
 
   defp borrowed_call(bridge, index, name, arguments, server, opts) do
+    # The meta is made here, in the process making the call, which is what a
+    # `:call_meta` function of the server alone can know the call from; the
+    # request itself is made from a process of its own (`await_call/5`). Made
+    # before the checkout, a callback that raises holds no connection.
+    meta = call_meta(server, opts)
+    opts = Keyword.put(opts, :call_meta, fn _server -> meta end)
+
     case Imp.MCP.Clients.checkout(bridge, index, timeout(opts)) do
       {:ok, client} ->
         result =

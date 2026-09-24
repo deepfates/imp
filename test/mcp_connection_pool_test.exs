@@ -365,6 +365,23 @@ defmodule Imp.MCPConnectionPoolTest do
              end)
     end
 
+    # `:call_meta` is a function of the server alone, so what it knows of the
+    # call it knows from the process making it (a turn's id in its process
+    # dictionary, say). It runs there, however the call is carried.
+    test "has its meta made in the process that makes the call" do
+      test = self()
+
+      call_meta = fn _server ->
+        send(test, {:meta_made_in, self()})
+        %{"progressToken" => "progress"}
+      end
+
+      {_imported, tools} = tools(server(), pool_size: 1, timeout: 5_000, call_meta: call_meta)
+      assert Imp.Tool.call(tools["fast"], %{}) == "fast done"
+      assert_received {:meta_made_in, maker}
+      assert maker == self()
+    end
+
     test "runs on past the caller's timeout and finishes on the server" do
       call_meta = fn _server -> %{"progressToken" => "progress"} end
       {_imported, tools} = tools(server(), pool_size: 1, timeout: 300, call_meta: call_meta)

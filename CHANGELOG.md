@@ -117,6 +117,7 @@ User-visible changes to Imp are recorded here.
   300 ms timeout never finished. The caller is still answered at its
   `:timeout`, `:unknown` with `reason: :timeout` (formerly a process exit
   for a plain request), and the request runs on to the connection's limit.
+  `:call_meta` is still called in the process that makes the call.
 
 - An HTTP MCP call can take as long as the import's `:timeout` allows. ExMCP
   ended every HTTP request at its own 30 s default whatever `:timeout` said,
