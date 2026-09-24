@@ -11,10 +11,10 @@ defmodule Imp.Adapter.Chat do
   field wins. A completion that does not cover every output field is a parse
   error rather than a partial prediction.
 
-  One signature-declared exception: `signature.metadata[:prose_step]` names an
+  One signature-declared exception: `signature.metadata[:text_step]` names an
   output field that takes a completion carrying no marker at all. A native tool
   loop asks for a thought and tool calls, and a model that answers a step in
-  plain prose with no tool call has said something and called nothing — the
+  plain text with no tool call has said something and called nothing — the
   plain reading of that completion, not a format failure worth a second LM call
   through `Imp.Adapter.JSON`. Remaining outputs take their declared defaults, so
   the signature says what an unanswered field means. The exception is narrow on
@@ -882,69 +882,69 @@ defmodule Imp.Adapter.Chat do
       "there is no tool named frobnicate."
   """
   @spec tool_error_text(term()) :: String.t()
-  def tool_error_text(reason), do: error_prose(reason)
+  def tool_error_text(reason), do: error_text(reason)
 
-  defp error_prose(%Imp.MCP.CallFailure{} = failure), do: Imp.MCP.failure_text(failure)
+  defp error_text(%Imp.MCP.CallFailure{} = failure), do: Imp.MCP.failure_text(failure)
 
-  defp error_prose({kind, _detail} = reason) when kind in [:mcp_tool_error, :json_rpc_error],
+  defp error_text({kind, _detail} = reason) when kind in [:mcp_tool_error, :json_rpc_error],
     do: Imp.MCP.failure_text(reason)
 
-  defp error_prose({:unknown_tool, name}), do: "there is no tool named #{name}."
+  defp error_text({:unknown_tool, name}), do: "there is no tool named #{name}."
 
-  defp error_prose({:malformed_tool_call, _received}), do: "the tool call could not be read."
+  defp error_text({:malformed_tool_call, _received}), do: "the tool call could not be read."
 
-  defp error_prose({:tool_denied, name}), do: "#{name} is not allowed."
+  defp error_text({:tool_denied, name}), do: "#{name} is not allowed."
 
-  defp error_prose({:missing_required, keys}) when is_list(keys),
+  defp error_text({:missing_required, keys}) when is_list(keys),
     do: "missing required arguments: " <> Enum.map_join(keys, ", ", &to_string/1)
 
-  defp error_prose({:schema_validation, errors}) when is_list(errors) do
+  defp error_text({:schema_validation, errors}) when is_list(errors) do
     "invalid arguments: " <>
       Enum.map_join(errors, "; ", fn error ->
         "#{fetch_field(error, :field)} #{fetch_field(error, :message)}"
       end)
   end
 
-  defp error_prose({:tool_authorization_denied, name, :client_denied}),
+  defp error_text({:tool_authorization_denied, name, :client_denied}),
     do: "#{name} was not allowed; the person declined it."
 
-  defp error_prose({:tool_authorization_denied, name, reason}),
-    do: "#{name} was not allowed: #{error_prose(reason)}"
+  defp error_text({:tool_authorization_denied, name, reason}),
+    do: "#{name} was not allowed: #{error_text(reason)}"
 
   # An exit stops the tool wherever it was, which may be after its effect.
-  defp error_prose({:tool_error, name, {:exit, reason}}),
-    do: "#{name} #{tool_exit_prose(reason)}, so it may have been carried out."
+  defp error_text({:tool_error, name, {:exit, reason}}),
+    do: "#{name} #{tool_exit_text(reason)}, so it may have been carried out."
 
-  defp error_prose({:tool_error, name, {:throw, _value}}),
+  defp error_text({:tool_error, name, {:throw, _value}}),
     do: "#{name} failed: it threw instead of returning."
 
-  defp error_prose({:tool_error, name, message}), do: "#{name} failed: #{error_prose(message)}"
+  defp error_text({:tool_error, name, message}), do: "#{name} failed: #{error_text(message)}"
 
   # A failed submit is the one tool error the model is expected to act on, so it
   # says what is wrong with the call rather than naming an internal term.
-  defp error_prose({:missing_output_fields, names}) when is_list(names),
+  defp error_text({:missing_output_fields, names}) when is_list(names),
     do: "submit is missing: " <> Enum.map_join(names, ", ", &to_string/1)
 
-  defp error_prose({:invalid_submit_outputs, reason}),
-    do: "submit outputs were not accepted: #{error_prose(reason)}"
+  defp error_text({:invalid_submit_outputs, reason}),
+    do: "submit outputs were not accepted: #{error_text(reason)}"
 
-  defp error_prose({:invalid_submit_arguments, _arguments}), do: "submit needs a map of outputs"
+  defp error_text({:invalid_submit_arguments, _arguments}), do: "submit needs a map of outputs"
 
-  defp error_prose(reason) when is_binary(reason), do: reason
+  defp error_text(reason) when is_binary(reason), do: reason
 
-  defp error_prose(reason) when is_atom(reason),
+  defp error_text(reason) when is_atom(reason),
     do: reason |> Atom.to_string() |> String.replace("_", " ")
 
-  defp error_prose(reason) when is_exception(reason), do: Exception.message(reason)
+  defp error_text(reason) when is_exception(reason), do: Exception.message(reason)
 
   # Adapters and tools carry structured failures as a map keyed on :reason. The
   # reason is the sentence; a :limit is the number the reader needs with it.
-  defp error_prose(reason) when is_map(reason) and not is_struct(reason) do
+  defp error_text(reason) when is_map(reason) and not is_struct(reason) do
     case fetch_either(reason, :reason) do
       {:ok, value} ->
         case fetch_either(reason, :limit) do
-          {:ok, limit} -> "#{error_prose(value)} (limit #{format_value(limit)})"
-          :error -> error_prose(value)
+          {:ok, limit} -> "#{error_text(value)} (limit #{format_value(limit)})"
+          :error -> error_text(value)
         end
 
       :error ->
@@ -952,11 +952,11 @@ defmodule Imp.Adapter.Chat do
     end
   end
 
-  defp error_prose(reason), do: inspect(reason, limit: 20)
+  defp error_text(reason), do: inspect(reason, limit: 20)
 
-  defp tool_exit_prose({reason, {GenServer, :call, _args}}), do: tool_exit_prose(reason)
-  defp tool_exit_prose(:timeout), do: "timed out"
-  defp tool_exit_prose(_reason), do: "stopped before answering"
+  defp tool_exit_text({reason, {GenServer, :call, _args}}), do: tool_exit_text(reason)
+  defp tool_exit_text(:timeout), do: "timed out"
+  defp tool_exit_text(_reason), do: "stopped before answering"
 
   defp fetch_either(map, key) do
     case Map.fetch(map, key) do
@@ -1414,29 +1414,29 @@ defmodule Imp.Adapter.Chat do
   #   * only headers naming an output field count, the first occurrence wins,
   #     and the name must match exactly: no downcasing, no `name:` label lines.
   # A completion carrying no marker at all is the whole answer for a signature
-  # that declared a prose field, and marker parsing otherwise.
+  # that declared a text-step field, and marker parsing otherwise.
   defp parse_fields(signature, text) do
-    case prose_step_field(signature, text) do
+    case text_step_field(signature, text) do
       {:ok, name} -> %{name => String.trim(text)}
       :error -> parse_marker_sections(signature, text)
     end
   end
 
-  # `signature.metadata[:prose_step]` names the output field that takes a
+  # `signature.metadata[:text_step]` names the output field that takes a
   # marker-free completion. Only a completion with no `[[ ## field ## ]]` line
   # anywhere qualifies: a partially marked completion is still a parse failure,
   # so a model that half-followed the format is not silently reinterpreted.
   # Native tool calls never reach here — a completion that carried them is a
   # map, not text.
-  defp prose_step_field(signature, text) do
+  defp text_step_field(signature, text) do
     with name when not is_nil(name) <-
-           Map.get(signature.metadata, :prose_step, Map.get(signature.metadata, "prose_step")),
+           Map.get(signature.metadata, :text_step, Map.get(signature.metadata, "text_step")),
          field when not is_nil(field) <- output_field(signature, name),
          true <- String.trim(text) != "",
          true <- marker_free?(text) do
       {:ok, field.name}
     else
-      _no_prose_step -> :error
+      _no_text_step -> :error
     end
   end
 

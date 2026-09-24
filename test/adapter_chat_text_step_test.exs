@@ -1,9 +1,9 @@
-defmodule AdapterChatProseStepTest do
+defmodule AdapterChatTextStepTest do
   use ExUnit.Case, async: true
 
   # A native tool loop asks a step for a thought and tool calls. A model that
   # answers in plain prose and calls nothing has said something and called
-  # nothing; `signature.metadata[:prose_step]` says which output that prose is.
+  # nothing; `signature.metadata[:text_step]` says which output that prose is.
   # Without that metadata a marker-free completion is still a parse failure, so
   # `Imp.Predict`'s JSON-adapter fallback still rescues an ordinary program.
 
@@ -17,7 +17,7 @@ defmodule AdapterChatProseStepTest do
           :output
         )
       ],
-      metadata: %{prose_step: :next_thought}
+      metadata: %{text_step: :next_thought}
     }
   end
 

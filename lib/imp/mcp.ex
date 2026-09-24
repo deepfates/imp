@@ -94,7 +94,7 @@ defmodule Imp.MCP do
   def failure_text({:mcp_tool_error, envelope}), do: error_result_text(envelope)
 
   def failure_text(%Imp.MCP.CallFailure{reason: {:exit, exit_reason}}),
-    do: "no answer came back; " <> exit_prose(exit_reason)
+    do: "no answer came back; " <> exit_text(exit_reason)
 
   def failure_text(%Imp.MCP.CallFailure{outcome: outcome, reason: reason}) do
     case {json_rpc_message(reason), outcome} do
@@ -159,7 +159,7 @@ defmodule Imp.MCP do
 
   defp json_rpc_message(%{"message" => message} = error)
        when is_binary(message) and message != "",
-       do: {:ok, message <> json_rpc_type_prose(Map.get(error, "data"))}
+       do: {:ok, message <> json_rpc_type_text(Map.get(error, "data"))}
 
   defp json_rpc_message(%{message: message, code: code})
        when is_binary(message) and message != "" and is_integer(code),
@@ -167,10 +167,10 @@ defmodule Imp.MCP do
 
   defp json_rpc_message(_reason), do: :error
 
-  defp json_rpc_type_prose(%{"type" => "handler_start_failed"}),
+  defp json_rpc_type_text(%{"type" => "handler_start_failed"}),
     do: "; the server could not start the tool."
 
-  defp json_rpc_type_prose(_data), do: ""
+  defp json_rpc_type_text(_data), do: ""
 
   # The ways ExMCP reports a tool call that got no answer. Which of them were
   # never sent is `Imp.MCP.CallFailure`'s decision; these are the words.
@@ -190,10 +190,10 @@ defmodule Imp.MCP do
 
   # The exit of a call to the client process names its pid and arguments; none
   # of that is for the reader.
-  defp exit_prose({reason, {GenServer, :call, _args}}), do: exit_prose(reason)
-  defp exit_prose(:timeout), do: no_answer_reason(:timeout)
-  defp exit_prose(:noproc), do: no_answer_reason(:not_connected)
-  defp exit_prose(_reason), do: no_answer_reason(:closed)
+  defp exit_text({reason, {GenServer, :call, _args}}), do: exit_text(reason)
+  defp exit_text(:timeout), do: no_answer_reason(:timeout)
+  defp exit_text(:noproc), do: no_answer_reason(:not_connected)
+  defp exit_text(_reason), do: no_answer_reason(:closed)
 
   @doc false
   def json_rpc_result(%{"error" => error}), do: {:error, {:json_rpc_error, error}}

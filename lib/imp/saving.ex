@@ -239,7 +239,7 @@ defmodule Imp.Saving do
       "react" => dump(react.react),
       "tools" => dump_tools(Map.delete(react.tools, :submit), "ReActV2"),
       "max_iters" => react.max_iters,
-      "last_prose_note" => react.last_prose_note,
+      "last_text_note" => react.last_text_note,
       "finish_on" => dump_finish_on(react.finish_on),
       "tool_policy" => dump_tool_policy(react.tool_policy, "ReActV2 tool policy")
     }
@@ -573,7 +573,7 @@ defmodule Imp.Saving do
       react: require_predict!(load(state["react"]), "ReActV2"),
       tools: Imp.Predict.ReActV2.put_submit(tools, signature),
       max_iters: require_non_negative_integer!(state["max_iters"], "ReActV2 max_iters"),
-      last_prose_note: load_react_v2_last_prose_note!(state["last_prose_note"]),
+      last_text_note: load_react_v2_last_text_note!(state["last_text_note"]),
       finish_on: load_finish_on!(state["finish_on"]),
       tool_policy: load_tool_policy!(state["tool_policy"], "ReActV2 tool policy")
     }
@@ -1154,11 +1154,11 @@ defmodule Imp.Saving do
   defp load_finish_on!(other),
     do: raise(ArgumentError, "invalid saved ReActV2 finish_on: #{inspect(other)}")
 
-  defp load_react_v2_last_prose_note!(nil), do: nil
-  defp load_react_v2_last_prose_note!(note) when is_binary(note), do: note
+  defp load_react_v2_last_text_note!(nil), do: nil
+  defp load_react_v2_last_text_note!(note) when is_binary(note), do: note
 
-  defp load_react_v2_last_prose_note!(other),
-    do: raise(ArgumentError, "invalid saved ReActV2 last_prose_note: #{inspect(other)}")
+  defp load_react_v2_last_text_note!(other),
+    do: raise(ArgumentError, "invalid saved ReActV2 last_text_note: #{inspect(other)}")
 
   defp dump_react_mode!(:provider_native), do: "provider_native"
   defp dump_react_mode!(:dspy_3_2_1), do: "dspy_3_2_1"

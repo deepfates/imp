@@ -8,7 +8,7 @@ defmodule Imp.LM do
   request options with the tool definitions removed, and `:tools_hash`, the
   SHA-256 of the canonical JSON of those definitions, or `nil` when the request
   offered no tools. The definitions themselves are emitted once per run per
-  distinct hash, as a `:tools_offered` event whose input is the tool list as
+  distinct hash, as a `:tools_sent` event whose input is the tool list as
   sent. Between the two, a recorded request can be reproduced without repeating
   a roster on every call. Both are redacted like every other event. A request
   made with `generate/3`'s `:purpose` carries it in the request event's
@@ -121,8 +121,8 @@ defmodule Imp.LM do
       # The definitions are the largest and least variable part of a request, so
       # they are recorded once per roster rather than once per call, and every
       # request names the roster it was sent by its hash.
-      if hash && Imp.Run.first_seen?({:tools_offered, hash}) do
-        Imp.Run.emit(:tools_offered,
+      if hash && Imp.Run.first_seen?({:tools_sent, hash}) do
+        Imp.Run.emit(:tools_sent,
           component: lm_name(lm),
           input: tools,
           metadata: %{tools_hash: hash}

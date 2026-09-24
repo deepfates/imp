@@ -413,15 +413,15 @@ defmodule Imp.Observability do
 
   # The termination reasons of a run that ended with its outputs. ReAct and
   # ReActV2 end with `:submit`, `:forced_submit` or `:direct`; ReActV2 also
-  # ends with prose (`:answered`), the text of the last request of an
-  # interrupted turn (`:last_prose`) and a terminal tool (`:finished_by_tool`).
+  # ends with text and no tool call (`:answered`), the text of the last request of an
+  # interrupted turn (`:last_text`) and a terminal tool (`:finished_by_tool`).
   # Every other reason names why a run stopped without them.
   @complete_terminations [
     :submit,
     :forced_submit,
     :direct,
     :answered,
-    :last_prose,
+    :last_text,
     :finished_by_tool,
     nil
   ]

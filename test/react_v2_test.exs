@@ -610,7 +610,7 @@ defmodule ReActV2Test do
                Imp.call(program, Map.put(%{question: "q"}, max_iters_key, 1))
 
       assert Imp.get(prediction, :answer) == "last words"
-      assert Imp.get(prediction, :termination_reason) == :last_prose
+      assert Imp.get(prediction, :termination_reason) == :last_text
       assert Imp.get(prediction, :termination_cause) == :max_iters
       assert_received {:lm_call, _normal_opts}
       assert_received {:lm_call, _forced_opts}
@@ -720,7 +720,7 @@ defmodule ReActV2Test do
              |> Imp.call(%{question: "next", history: history})
 
     assert Imp.get(prediction, :answer) == "continued"
-    assert Imp.get(prediction, :termination_reason) == :last_prose
+    assert Imp.get(prediction, :termination_reason) == :last_text
     assert %Imp.History{messages: [prior, current]} = Imp.get(prediction, :history)
     assert prior.question == "prior"
     assert current.answer == "continued"

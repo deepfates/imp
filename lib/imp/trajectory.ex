@@ -32,7 +32,7 @@ defmodule Imp.Trajectory do
     :run_cancelled,
     :model_request,
     :model_response,
-    :tools_offered,
+    :tools_sent,
     :tool_call,
     :tool_result,
     :reasoning,
