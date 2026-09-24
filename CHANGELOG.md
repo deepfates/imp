@@ -25,6 +25,15 @@ User-visible changes to Imp are recorded here.
   written with a `/` path, and retry once with the standard `initialize`
   handshake when ExMCP's `server/discover` probe gets a 4xx other than 401.
   Servers such as Scry answer only these ways.
+- When a stdio MCP server exits on its own, the rest of its process group gets
+  SIGKILL half a second later, so a child that ignores SIGTERM does not outlive
+  it.
+- A tool's name keeps the type it was given. `Imp.Tool.new/4` no longer turns a
+  string into an atom that happens to exist, and tools imported from an MCP
+  server are always named by the server's string. Lookups (`resolve_name/2`,
+  tool policies) already compare names by text; code that matched an imported
+  tool's name against an atom matches the string now.
+- `Imp.Predict.ReActV2.new/3` documents its options.
 - `Imp.MCP.OAuth.begin/3` runs its own browser flow on ExMCP's public OAuth
   functions. Its `:flow` option is replaced by `:client_registration`
   (`:auto`, `{:pre_registered, client_id, client_secret}` or `{:cimd, url}`);

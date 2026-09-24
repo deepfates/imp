@@ -138,10 +138,40 @@ Version `0.5.0` changes how Imp is installed and one `Imp.MCP.OAuth` option;
 see the
 [release notes](RELEASE_NOTES.md) when upgrading from `0.4.0`.
 
-ExMCP and erlexec are declared `runtime: false`, so an OTP release that uses
-`Imp.ACP` or `Imp.MCP` must list `applications: [ex_mcp: :load, erlexec: :load]`
-in its release definition; see
+ExMCP and erlexec are declared `runtime: false`: ordinary Imp startup does not
+start them. An OTP release that uses `Imp.ACP` or `Imp.MCP` lists them in
+`:load` mode, so they are bundled and started only when a protocol entry point
+needs them:
+
+```elixir
+def project do
+  [
+    app: :my_app,
+    version: "0.1.0",
+    elixir: "~> 1.19",
+    deps: [{:imp, "~> 0.5"}],
+    releases: [
+      my_app: [
+        applications: [ex_mcp: :load, erlexec: :load]
+      ]
+    ]
+  ]
+end
+```
+
+Without `erlexec: :load`, the first stdio MCP connection in the release fails
+with `{:spawn_failed, {:erlexec, ...}}`. See
 [protocol runtime in releases](docs/PRODUCTION_OPERATIONS.md#protocol-runtime-in-releases).
+
+`mix hex.audit` in a project that depends on Imp reports two advisories against
+cowlib, which arrives through ExMCP's HTTP server. Neither has a fixed cowlib
+release. EEF-CVE-2026-43966 (response splitting) is fixed one layer up, in
+cowboy 2.16.0 and later (a fresh `mix deps.get` resolves 2.19.0), which
+refuses header values containing CR or LF.
+EEF-CVE-2026-43969 is in cowlib's client-side Cookie encoder, which nothing in
+Imp's dependency tree calls. Imp's own gate ignores both, with what was
+checked, in
+[`.audit_ignore`](https://github.com/deepfates/imp/blob/main/.audit_ignore).
 
 Imp is MIT licensed (`LICENSE`); `NOTICE` records the upstream DSPy code two
 modules are ported from.

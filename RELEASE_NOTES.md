@@ -49,6 +49,9 @@ Ordinary Imp startup starts no protocol endpoint.
   `client_registration: {:pre_registered, client_id, client_secret}` with
   `client_issuer:` naming the authorization server it belongs to. A server
   with no OAuth metadata at all is refused instead of given guessed endpoints.
+- An `Imp.Tool` named with a string keeps the string, and tools imported from
+  an MCP server are named by the server's string. Code that compared an
+  imported tool's `name` to an atom compares it to the string.
 - For a signature with one `:string` output, `ReActV2` offers no `submit`
   tool, and a step answered in prose with no tool call ends the turn. Code that
   matches on `termination_reason` meets three new values: `:answered`,

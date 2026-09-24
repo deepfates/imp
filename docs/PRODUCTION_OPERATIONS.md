@@ -171,7 +171,9 @@ headers, environment and working-directory claims remain untrusted input.
 A stdio server runs as the leader of its own process group. Closing its
 connection, or the death of the process that owns the connection, sends the
 group SIGTERM and then SIGKILL one second later, so a server that ignores EOF
-and SIGTERM, and any children it started, end with it. A descendant that starts
+and SIGTERM, and any children it started, end with it. When the server exits
+on its own, what is left of its group gets SIGKILL half a second later. A
+descendant that starts
 its own session (`setsid`) leaves the group and is not reached. The server
 starts with only `HOME`, `LANG`, `LOGNAME`, `PATH`, `SHELL`, `TEMP`, `TMP`,
 `TMPDIR`, `TZ`, `USER`, the certificate-path variables and `LC_*` from the host,
@@ -182,7 +184,10 @@ ExMCP refuses credential headers to any HTTP origin not in its VM-wide
 `config :ex_mcp, :security, trusted_origins: [...]`. While a connection to an
 authorized remote server is open, Imp adds that server's exact origin
 (`scheme://host:port`) to the list and removes it when the last connection to it
-closes; origins the host configured itself are left alone. For that time any
+closes; origins the host configured itself are left alone. If the process that
+keeps this list crashes, its restart removes every origin it had added, so
+open connections to those servers are refused until they reconnect rather than
+trusted with nothing tracking them. For that time any
 ExMCP client in the VM may send credentials to that one origin, and to no
 other. No `Origin` header is sent, and a URL written with a `/` path is posted to
 at `/`.
