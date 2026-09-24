@@ -4,6 +4,14 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+- The last request of an interrupted one-text-output turn no longer says
+  `tool_choice: "none"`. It is a step like any other, with the same tools and
+  `tool_choice: "auto"`. Told "none" while it wanted a tool, a model wrote the
+  call as text in its own tool markup, and that text became the answer. A tool
+  call on that request is still not run and is listed in
+  `unexecuted_tool_calls`; the answer is the completion's text, which may be
+  empty.
+
 - A failed tool call reaches the model as plain text instead of an Elixir
   term. An MCP error result is the text of its content, the tool's own words,
   after `Error: ` unless the text already begins with "error"; a JSON-RPC
@@ -45,8 +53,7 @@ User-visible changes to Imp are recorded here.
   declines to answer.
 - An interrupted turn of a one-text-output signature (the step limit, a
   failed request, prose the output does not accept) makes one more
-  request with the same tools as every step and `tool_choice: "none"`, so the
-  model can only write text, and that text is the answer, with `termination_reason: :last_prose`
+  request with the same tools as every step, and its text is the answer, with `termination_reason: :last_prose`
   and `termination_cause` naming the interruption (`:max_iters`,
   `:prediction_error`, `:parse_error`, `:invalid_answer`). A completion that says nothing is an empty answer rather
   than an error. A tool call the model makes on that request anyway is not
