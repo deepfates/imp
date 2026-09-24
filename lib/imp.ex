@@ -279,6 +279,10 @@ defmodule Imp do
   process. A slow sink delays its own later events and delivery barriers, but it
   cannot delay `cancel_run/3` or owner-death cleanup. Event sinks should normally
   forward events to their host mailbox and return promptly.
+
+  Pass `admission: {pool, limit}` to count the run in a pool the host names,
+  with its own limit; a full pool returns `{:error, :busy}` at once. See
+  `Imp.Run.start/3`.
   """
   defdelegate start_run(program, inputs, opts \\ []), to: Imp.Run, as: :start
 

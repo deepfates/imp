@@ -4,6 +4,12 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+- `Imp.Run.start/3` takes `admission: {pool, limit}`: the run holds a place in
+  the host's named pool instead of the machine-wide `:async_max_workers` pool,
+  at most `limit` runs hold places in that pool at once, and a full pool
+  returns `{:error, :busy}` without waiting. Runs started without it wait for
+  the machine-wide pool as before.
+
 - An MCP tool call that got no answer from its tool returns
   `{:error, %Imp.MCP.CallFailure{}}` instead of
   `{:mcp_tool_call_failed, server, reason}` or

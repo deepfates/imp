@@ -56,15 +56,41 @@ defmodule Imp.Run do
 
   @type t :: %__MODULE__{task: Task.t(), control: pid(), id: String.t()}
 
-  @doc "Starts an unlinked supervised program run owned by the calling process."
+  @doc """
+  Starts an unlinked supervised program run owned by the calling process.
+
+  By default a run takes a place in the machine-wide pool that all Imp tasks
+  share, bounded by the `:async_max_workers` setting, and `start/3` waits for a
+  place when the pool is full.
+
+  Pass `admission: {pool, limit}` to count the run in a pool the host names
+  instead, such as one per agent: at most `limit` runs hold a place in `pool` at
+  once, and when it is full `start/3` returns `{:error, :busy}` straight away,
+  having stopped the control process it started for the run and started no
+  task. The host keeps its own queue and starts the next run when
+  one of its runs ends. The limit is read on each start, so a host that changes
+  its setting passes the new one. A run in a named pool does not count against
+  the machine-wide pool. Tasks it starts inside itself take places in the
+  machine-wide pool as usual, except a stream the run enumerates itself
+  (`Imp.Tasks.async_stream/3`), which runs one item at a time on the run's own
+  place, as it does for any run.
+  """
   @spec start(struct(), map() | keyword(), keyword()) :: {:ok, t()} | {:error, term()}
   def start(program, inputs, opts \\ []) when is_list(opts) do
     event_sink = Keyword.get(opts, :event_sink, fn _event -> :ok end)
     authorize = Keyword.get(opts, :authorize)
     authorization_timeout = Keyword.get(opts, :authorization_timeout, 30_000)
+    admission = Keyword.get(opts, :admission)
 
     unless is_function(event_sink, 1) do
       raise ArgumentError, ":event_sink must be an arity-1 function"
+    end
+
+    unless is_nil(admission) or
+             match?({_pool, limit} when is_integer(limit) and limit > 0, admission) do
+      raise ArgumentError,
+            ":admission must be {pool, limit} with a positive integer limit, got: " <>
+              inspect(admission)
     end
 
     id = Keyword.get_lazy(opts, :id, &new_id/0)
@@ -85,28 +111,36 @@ defmodule Imp.Run do
              event_sink: event_sink,
              capture: Keyword.take(opts, [:max_events, :max_event_bytes, :max_snapshot_bytes])
            ) do
-      task =
-        Imp.Tasks.async_nolink(fn ->
-          with_context(control, fn ->
-            emit(:run_started, component: program.__struct__, input: inputs)
-            result = Imp.Module.execute(program, inputs, execution)
+      body = fn ->
+        with_context(control, fn ->
+          emit(:run_started, component: program.__struct__, input: inputs)
+          result = Imp.Module.execute(program, inputs, execution)
 
-            case result do
-              {:ok, %Imp.Prediction{} = prediction} -> emit(:run_finished, output: prediction)
-              {:error, {:execution_cancelled, reason}} -> emit(:run_cancelled, error: reason)
-              {:error, reason} -> emit(:run_failed, error: reason)
-              other -> emit(:run_failed, error: {:invalid_result, other})
-            end
+          case result do
+            {:ok, %Imp.Prediction{} = prediction} -> emit(:run_finished, output: prediction)
+            {:error, {:execution_cancelled, reason}} -> emit(:run_cancelled, error: reason)
+            {:error, reason} -> emit(:run_failed, error: reason)
+            other -> emit(:run_failed, error: {:invalid_result, other})
+          end
 
-            result
-          end)
+          result
         end)
+      end
 
-      :ok = Control.attach_task(control, task.pid)
+      case start_task(body, admission) do
+        {:ok, task} ->
+          :ok = Control.attach_task(control, task.pid)
+          {:ok, %__MODULE__{task: task, control: control, id: id}}
 
-      {:ok, %__MODULE__{task: task, control: control, id: id}}
+        {:error, :busy} ->
+          Control.force_stop(control)
+          {:error, :busy}
+      end
     end
   end
+
+  defp start_task(body, nil), do: {:ok, Imp.Tasks.async_nolink(body)}
+  defp start_task(body, {pool, limit}), do: Imp.Tasks.async_nolink_in_pool(body, pool, limit)
 
   @doc "Cancels registered effects before terminating the outer supervised task."
   @spec cancel(t(), term(), timeout()) :: :ok
