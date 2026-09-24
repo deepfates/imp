@@ -263,8 +263,8 @@ defmodule Imp.MCP.Connections do
     ref = make_ref()
     # Every dial is bounded on its own inside `dial/2`. This budget is only the
     # backstop for the helper itself wedging around them, so it has to cover the
-    # whole list dialed in turn.
-    timeout = timeout(opts) * max(length(servers), 1) + 5_000
+    # whole list dialed in turn, `pool_size` dials per server.
+    timeout = timeout(opts) * pool_size(opts) * max(length(servers), 1) + 5_000
 
     {pid, mon} =
       spawn_monitor(fn ->

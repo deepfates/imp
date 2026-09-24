@@ -36,7 +36,26 @@ defmodule Imp.MCPConnectionPoolTest do
       do: {:ok, %{"content" => [%{"type" => "text", "text" => "fast done"}]}, state}
   end
 
-  defp server do
+  # Answers the first connection's handshake and holds every later one, as a
+  # server that takes one session at a time does. Tool requests still answer.
+  defmodule OneSession do
+    @behaviour Plug
+    def init(opts), do: ExMCP.HttpPlug.init(opts)
+
+    def call(conn, opts) do
+      {:ok, body, conn} = Plug.Conn.read_body(conn)
+      handshakes = :persistent_term.get({__MODULE__, :handshakes})
+
+      unless body =~ ~s("tools/) do
+        if :counters.get(handshakes, 1) > 0, do: Process.sleep(:infinity)
+        :counters.add(handshakes, 1, 1)
+      end
+
+      ExMCP.HttpPlug.call(Plug.Conn.assign(conn, :raw_body, body), opts)
+    end
+  end
+
+  defp server(plug \\ ExMCP.HttpPlug) do
     {:ok, socket} = :gen_tcp.listen(0, [:binary, active: false])
     {:ok, port} = :inet.port(socket)
     :gen_tcp.close(socket)
@@ -44,7 +63,7 @@ defmodule Imp.MCPConnectionPoolTest do
 
     {:ok, _} =
       Plug.Cowboy.http(
-        ExMCP.HttpPlug,
+        plug,
         [
           handler: Handler,
           server_info: %{name: "pool", version: "1"},
@@ -151,6 +170,16 @@ defmodule Imp.MCPConnectionPoolTest do
     imported.cleanup.()
     Process.sleep(100)
     refute Enum.any?(bridge_clients, &Process.alive?/1)
+  end
+
+  # Each extra dial is bounded by `:timeout` on its own, so the import as a
+  # whole must allow for `pool_size` of them per server.
+  test "extra connections that never answer cost the server connections, not the import" do
+    :persistent_term.put({OneSession, :handshakes}, :counters.new(1, []))
+    {imported, tools} = tools(server(OneSession), pool_size: 8, timeout: 1_000)
+
+    assert [_one] = Imp.MCP.Clients.client_pids(imported_bridge(imported))
+    assert Imp.Tool.call(tools["fast"], %{}) == "fast done"
   end
 
   test "pool_size must be a positive integer" do
