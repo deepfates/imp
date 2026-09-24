@@ -63,6 +63,16 @@ defmodule Imp.MCP.Connections do
 
       %{"name" => "docs", "type" => "http", "url" => "https://mcp.example.com/mcp"}
 
+  `"sse"` is MCP's deprecated HTTP+SSE transport (protocol 2024-11-05), and its
+  `"url"` is the event stream's, usually ending in `/sse` (a URL without a path
+  means `/sse`; one with a query string is refused). The client GETs that
+  stream, and the server's first event names the URL requests are posted to,
+  headers and all. It works with servers whose posting URL carries the session
+  as `sessionId`, as the TypeScript SDK's and ExMCP's do. It does not work with
+  the Python SDK's SSE servers, which name it `session_id`: ExMCP 1.5 refuses
+  the connection (`missing_session_id`). A server that speaks Streamable HTTP
+  as well is better reached as `"http"`.
+
   Only descriptors the caller authorized are dialed. `trusted_servers:` lists
   them exactly; `authorize:` is a function of the descriptor (and optionally
   a `%{cwd: cwd, server: descriptor}` context) that returns `:ok` or `true` to
@@ -1140,7 +1150,7 @@ defmodule Imp.MCP.Connections do
           reconnect: false
         ]
 
-      type when type in ["http", "sse"] ->
+      "http" ->
         url = required_string!(server, "url")
 
         [
@@ -1152,26 +1162,74 @@ defmodule Imp.MCP.Connections do
           # assert, and a server that allow-lists browser origins refuses it
           # (Scry answers 403). No `Origin` header is sent.
           security: %{origin: nil},
-          use_sse: type == "sse",
-          # ExMCP bounds each HTTP request by these, apart from how long the
-          # caller waits: resolving the name, connecting (ExMCP reads the
-          # connect bound from `:timeout`, which is also the client's wait for
-          # a request made without one; Imp passes one on every request), and
-          # the request itself. The request bound is the host's `:timeout`, so
-          # a call it allows is not cut off by ExMCP's own 30 s default, and
-          # never less than that default: a request its caller stopped waiting
-          # for is left to finish on the server (see `Imp.MCP.Clients`).
-          dns_timeout_ms: @http_dns_timeout,
-          timeout: @http_connect_timeout,
-          request_timeout: max(timeout(opts), @http_request_timeout),
-          era_probe_timeout: timeout(opts),
-          handshake_timeout: timeout(opts),
-          health_check_interval: nil,
-          reconnect: false
-        ] ++ root_endpoint(url)
+          use_sse: false
+        ] ++ http_bounds(opts) ++ root_endpoint(url)
+
+      # MCP's deprecated HTTP+SSE transport (2024-11-05): a GET event stream at
+      # the descriptor's URL, whose `endpoint` event names where requests are
+      # posted. ExMCP's `ExMCP.Transport.HTTP.LegacySSE` takes the server's
+      # origin and the stream's path apart.
+      "sse" ->
+        url = required_string!(server, "url")
+        {origin, path} = sse_url!(url)
+
+        [
+          transport: :sse,
+          url: origin,
+          sse_path: path,
+          headers: headers,
+          stream_handshake_timeout: timeout(opts)
+        ] ++ http_bounds(opts)
 
       type ->
         raise ArgumentError, "unsupported ACP MCP server type: #{inspect(type)}"
+    end
+  end
+
+  # ExMCP bounds each HTTP request by these, apart from how long the caller
+  # waits: resolving the name, connecting (ExMCP reads the connect bound from
+  # `:timeout`, which is also the client's wait for a request made without one;
+  # Imp passes one on every request), and the request itself. The request
+  # bound is the host's `:timeout`, so a call it allows is not cut off by
+  # ExMCP's own 30 s default, and never less than that default: a request its
+  # caller stopped waiting for is left to finish on the server (see
+  # `Imp.MCP.Clients`).
+  defp http_bounds(opts) do
+    [
+      dns_timeout_ms: @http_dns_timeout,
+      timeout: @http_connect_timeout,
+      request_timeout: max(timeout(opts), @http_request_timeout),
+      era_probe_timeout: timeout(opts),
+      handshake_timeout: timeout(opts),
+      health_check_interval: nil,
+      reconnect: false
+    ]
+  end
+
+  # The event stream's URL, as the origin ExMCP posts under and the path it
+  # GETs. A URL without a path is the conventional `/sse`. ExMCP rebuilds the
+  # stream's URL from the two and drops a query string, so one is refused
+  # rather than lost.
+  defp sse_url!(url) do
+    case URI.new(url) do
+      {:ok, %URI{scheme: scheme, host: host, query: nil} = uri}
+      when scheme in ["http", "https"] and is_binary(host) and host != "" ->
+        port = if uri.port in [nil, URI.default_port(scheme)], do: "", else: ":#{uri.port}"
+        host = if String.contains?(host, ":"), do: "[#{host}]", else: host
+
+        path =
+          case uri.path do
+            path when path in [nil, "", "/"] -> "/sse"
+            path -> path
+          end
+
+        {"#{scheme}://#{host}#{port}", path}
+
+      {:ok, %URI{query: query}} when is_binary(query) ->
+        raise ArgumentError, "an sse MCP server url cannot carry a query string"
+
+      _other ->
+        raise ArgumentError, "MCP server url must be an absolute HTTP(S) URL"
     end
   end
 

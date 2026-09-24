@@ -91,6 +91,15 @@ User-visible changes to Imp are recorded here.
   closed once that request is done, so the server finishes what it was doing;
   a replacement that cannot be dialed leaves the server a connection fewer.
 
+- `"type" => "sse"` now means MCP's deprecated HTTP+SSE transport (2024-11-05):
+  the descriptor's `"url"` is the event stream's (`https://host/sse`), and
+  requests go to the URL the server names on it. Before, `sse` was Streamable
+  HTTP with a standing GET stream, so a server that speaks only the old
+  transport answered its first request with 405. It works with servers that
+  name the session `sessionId` (the TypeScript SDK's, ExMCP's), not with the
+  Python SDK's SSE servers (`session_id`), which ExMCP 1.5 refuses. A server
+  that speaks Streamable HTTP is reached as `"http"`.
+
 - An HTTP MCP call can take as long as the import's `:timeout` allows. ExMCP
   ended every HTTP request at its own 30 s default whatever `:timeout` said,
   so a call to a tool that takes 33 s failed at about 30 s under

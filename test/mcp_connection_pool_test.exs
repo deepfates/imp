@@ -86,28 +86,6 @@ defmodule Imp.MCPConnectionPoolTest do
     defp answered?(seen, answered), do: seen < answered
   end
 
-  # A legacy server with the HTTP+SSE stream: it does not know ExMCP's opening
-  # probe, so a `type: "sse"` client settles on the legacy era and keeps a GET
-  # stream open, and each request is then posted from a process of its own.
-  defmodule LegacySSE do
-    @behaviour Plug
-    def init(opts), do: ExMCP.HttpPlug.init(Keyword.put(opts, :legacy_http_sse, true))
-
-    def call(conn, opts) do
-      {:ok, body, conn} = Plug.Conn.read_body(conn)
-
-      # What the writes were when the client ended its session. A server may
-      # end the requests in flight on a session with it, as the Python SDK's
-      # does.
-      if conn.method == "DELETE" and :ets.whereis(:pool_test_writes) != :undefined,
-        do: :ets.insert(:pool_test_writes, {:at_session_end, :ets.tab2list(:pool_test_writes)})
-
-      if body =~ "server/discover",
-        do: Plug.Conn.send_resp(conn, 404, "unknown method"),
-        else: ExMCP.HttpPlug.call(Plug.Conn.assign(conn, :raw_body, body), opts)
-    end
-  end
-
   defp server(plug \\ ExMCP.HttpPlug) do
     {:ok, socket} = :gen_tcp.listen(0, [:binary, active: false])
     {:ok, port} = :inet.port(socket)
@@ -337,55 +315,50 @@ defmodule Imp.MCPConnectionPoolTest do
                :ets.lookup(:pool_test_writes, "orphaned") == [{"orphaned", :finished}]
              end)
     end
-
-    # The request is out on a process of the client's own, the stop does not
-    # wait for it, and the client's GET stream is a process that a stop does
-    # not end: the connection is closed, which ends the stream.
-    test "on an HTTP+SSE connection still finishes, and the connection's stream ends" do
-      descriptor = %{server(LegacySSE) | "type" => "sse"}
-      {imported, tools} = tools(descriptor, pool_size: 1, timeout: 300)
-      [client] = Imp.MCP.Clients.client_pids(imported_bridge(imported))
-      stream = :sys.get_state(client).transport_state.sse_pid
-      assert is_pid(stream)
-
-      assert {:error, %CallFailure{outcome: :unknown}} =
-               Imp.Tool.call(tools["write"], %{"tag" => "over sse"})
-
-      assert Imp.Tool.call(tools["fast"], %{}) == "fast done"
-
-      assert eventually(fn ->
-               :ets.lookup(:pool_test_writes, "over sse") == [{"over sse", :finished}]
-             end)
-
-      assert eventually(fn -> not Process.alive?(client) end)
-      assert eventually(fn -> not Process.alive?(stream) end), "the retired stream outlived it"
-    end
   end
 
-  # ExMCP's disconnect ends an HTTP session with a DELETE, and a server may end
-  # the requests in flight on that session with it. On an HTTP+SSE connection
-  # a request is posted from a process of the client's own, so the client is
-  # free while it is out: the close waits for it before the disconnect.
-  describe "a retired HTTP+SSE connection's session" do
+  # The close reads which requests a client has out from ExMCP's own state
+  # (`Imp.MCP.Clients.requests_out/1`). A state it cannot read makes every
+  # close wait its whole grace, so the reading is checked against the ExMCP
+  # this is built with: an idle client has none out, and one inside a request
+  # has it out.
+  test "the requests a client has out are read from ExMCP's state" do
+    {imported, tools} = tools(server(), pool_size: 1, timeout: 5_000)
+    [client] = Imp.MCP.Clients.client_pids(imported_bridge(imported))
+    assert Imp.MCP.Clients.requests_out(:sys.get_state(client)) == 0
+
+    call_meta = fn _server -> %{"progressToken" => "progress"} end
+    {streamed, streamed_tools} = tools(server(), pool_size: 1, call_meta: call_meta)
+    [streaming] = Imp.MCP.Clients.client_pids(imported_bridge(streamed))
+    slow = Task.async(fn -> Imp.Tool.call(streamed_tools["slow"], %{}) end)
+    Process.sleep(300)
+    assert Imp.MCP.Clients.requests_out(:sys.get_state(streaming)) >= 1
+    assert Task.await(slow, 5_000) == "slow done"
+    assert Imp.MCP.Clients.requests_out(:sys.get_state(streaming)) == 0
+    _ = tools
+  end
+
+  # A request that asks for progress is posted on a stream of its own, and the
+  # client is free while it is out. Closing the client cancels that stream, and
+  # the server ends the tool's handler with it.
+  describe "a retired connection's streamed request" do
     setup do
       :ets.new(:pool_test_writes, [:named_table, :public])
       :ok
     end
 
-    test "is ended only after its request is done" do
-      descriptor = %{server(LegacySSE) | "type" => "sse"}
-      {imported, tools} = tools(descriptor, pool_size: 1, timeout: 300)
-      [client] = Imp.MCP.Clients.client_pids(imported_bridge(imported))
-      assert is_binary(:sys.get_state(client).transport_state.session_id)
+    test "still finishes on the server" do
+      call_meta = fn _server -> %{"progressToken" => "progress"} end
+      {_imported, tools} = tools(server(), pool_size: 1, timeout: 300, call_meta: call_meta)
 
       assert {:error, %CallFailure{outcome: :unknown}} =
-               Imp.Tool.call(tools["write"], %{"tag" => "session"})
+               Imp.Tool.call(tools["write"], %{"tag" => "streamed"})
 
       assert Imp.Tool.call(tools["fast"], %{}) == "fast done"
-      assert eventually(fn -> :ets.lookup(:pool_test_writes, :at_session_end) != [] end)
 
-      [{:at_session_end, writes}] = :ets.lookup(:pool_test_writes, :at_session_end)
-      assert {"session", :finished} in writes, "the session ended with the write in flight"
+      assert eventually(fn ->
+               :ets.lookup(:pool_test_writes, "streamed") == [{"streamed", :finished}]
+             end)
     end
   end
 
