@@ -21,7 +21,8 @@ defmodule Imp.Run do
   before dispatch when that guarantee is needed. `Imp.Run.Event.to_map/1`
   serializes a redacted event. Model request and response observations cover
   `Imp.LM.request/2`; ReActV2 and RLM emit the semantic tool call and result
-  events.
+  events, and each `:tool_result` carries `metadata.outcome`, the call's
+  `Imp.Tool.outcome/1`.
 
   A `:model_request` carries the messages as its input and the rest of the
   request as metadata: `:options`, the request options with the tool
@@ -514,7 +515,7 @@ defmodule Imp.Run.Control do
           error: bounded_error(event.error),
           metadata:
             event.metadata
-            |> Map.take([:model_call_id])
+            |> Map.take([:model_call_id, :outcome])
             |> Map.put(:capture, %{truncated: true, original_bytes: bytes, sha256: digest})
       }
       |> fit_error_summary(max_bytes)

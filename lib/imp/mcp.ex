@@ -21,6 +21,9 @@ defmodule Imp.MCP do
   results become `{:error, {:mcp_tool_error, original_envelope}}` before either
   conversion. The original structured failure and content remain available;
   uncertainty about an effect must not be collapsed into a retryable refusal.
+  A call that got no answer from its tool returns
+  `{:error, %Imp.MCP.CallFailure{}}`, whose `outcome` says whether it was
+  refused, never sent, or sent with no trustworthy answer.
   """
 
   @doc "Connects authorized MCP servers; returns tools with source metadata and cleanup."
@@ -59,17 +62,19 @@ defmodule Imp.MCP do
   An error result (`{:mcp_tool_error, envelope}`) is the text its tool wrote:
   MCP spec, CallToolResult, puts what went wrong in the content, for the model
   to read. Its text items are joined; its structured content stands in as plain
-  data when there is no text. A JSON-RPC error is the server's message. A call
-  that got no answer is one sentence saying so and why. Unless the request was
-  never sent, that sentence says it may have been carried out: a timeout, a
-  closed or failed connection, a broken stream, or a server that stopped
-  waiting for its tool does not say whether the tool ran, and a write that did
-  run must not read as one that did not.
+  data when there is no text. For an `Imp.MCP.CallFailure`, a JSON-RPC error is
+  the server's message, and otherwise the sentence follows its outcome: a
+  refused call says the server refused it, a call that was not sent says so,
+  and a call whose outcome is unknown says it got no answer, why, and that it
+  may have been carried out, because a timeout, a closed or failed connection,
+  a broken stream, or a server that stopped waiting for its tool does not say
+  whether the tool ran, and a write that did run must not read as one that did
+  not.
 
   This is only what is read. The error term itself, which the loop records,
   keeps the whole envelope or reason.
 
-      iex> Imp.MCP.failure_text({:mcp_tool_call_failed, "kite", :timeout})
+      iex> Imp.MCP.failure_text(Imp.MCP.CallFailure.returned("kite", "reply", :timeout))
       "no answer came back; it timed out, so it may have been carried out."
   """
   @may_have_run "so it may have been carried out."
@@ -79,15 +84,24 @@ defmodule Imp.MCP do
 
   def failure_text({:mcp_tool_error, envelope}), do: error_result_text(envelope)
 
-  def failure_text({:mcp_tool_call_failed, _server, reason}) do
-    case json_rpc_message(reason) do
-      {:ok, message} -> message
-      :error -> "no answer came back; " <> no_answer_reason(reason)
+  def failure_text(%Imp.MCP.CallFailure{reason: {:exit, exit_reason}}),
+    do: "no answer came back; " <> exit_prose(exit_reason)
+
+  def failure_text(%Imp.MCP.CallFailure{outcome: outcome, reason: reason}) do
+    case {json_rpc_message(reason), outcome} do
+      {{:ok, message}, _outcome} ->
+        message
+
+      {:error, :refused} ->
+        "the server refused the call."
+
+      {:error, :not_sent} when reason != :not_connected ->
+        "it was not sent, so it was not carried out."
+
+      {:error, _outcome} ->
+        "no answer came back; " <> no_answer_reason(reason)
     end
   end
-
-  def failure_text({:mcp_connection_unavailable, _server, exit_reason}),
-    do: "no answer came back; " <> exit_prose(exit_reason)
 
   def failure_text({:json_rpc_error, error}) do
     case json_rpc_message(error) do
@@ -149,10 +163,8 @@ defmodule Imp.MCP do
 
   defp json_rpc_type_prose(_data), do: ""
 
-  # The ways ExMCP reports a tool call that got no answer. Only a client that
-  # is not connected, or not running, is known not to have sent the request.
-  # ExMCP's other transport failures ("Failed to send request: ...") include
-  # sockets that failed after the request went out, so they read as unknown.
+  # The ways ExMCP reports a tool call that got no answer. Which of them were
+  # never sent is `Imp.MCP.CallFailure`'s decision; these are the words.
   defp no_answer_reason(:not_connected), do: "the connection is not open."
   defp no_answer_reason(:timeout), do: "it timed out, " <> @may_have_run
   defp no_answer_reason(:closed), do: "the connection closed, " <> @may_have_run

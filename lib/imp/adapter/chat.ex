@@ -884,9 +884,7 @@ defmodule Imp.Adapter.Chat do
   @spec tool_error_text(term()) :: String.t()
   def tool_error_text(reason), do: error_prose(reason)
 
-  defp error_prose({kind, _server, _reason} = reason)
-       when kind in [:mcp_tool_call_failed, :mcp_connection_unavailable],
-       do: Imp.MCP.failure_text(reason)
+  defp error_prose(%Imp.MCP.CallFailure{} = failure), do: Imp.MCP.failure_text(failure)
 
   defp error_prose({kind, _detail} = reason) when kind in [:mcp_tool_error, :json_rpc_error],
     do: Imp.MCP.failure_text(reason)

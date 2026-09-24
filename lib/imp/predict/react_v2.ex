@@ -869,6 +869,10 @@ defmodule Imp.Predict.ReActV2 do
 
         {result, error?} ->
           # A terminal tool has already run; the hook only reads what it did.
+          # So the outcome is taken before it: outputs the hook cannot fit make
+          # the result an error, not the call a refusal.
+          outcome = if error?, do: Imp.Tool.outcome(result), else: :result
+
           {result, error?, finished_by} =
             finish_on_result(react, call, result, error?, inputs, finished_by)
 
@@ -879,7 +883,8 @@ defmodule Imp.Predict.ReActV2 do
                 tool_call_id: call.id,
                 tool_name: call.name,
                 output: if(error?, do: nil, else: result),
-                error: if(error?, do: result, else: nil)
+                error: if(error?, do: result, else: nil),
+                metadata: %{outcome: outcome}
               )
           end
 
