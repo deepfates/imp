@@ -102,7 +102,15 @@ defmodule Imp.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      ex_mcp_dependency(),
+      # MCP and ACP wire protocols. Both are started only by the protocol entry
+      # points (`Imp.ACP.*`, a non-empty `Imp.MCP.connect/2`), never by ordinary
+      # Imp boot, so neither is a runtime application here; releases that use
+      # the adapters include them in :load mode (docs/PRODUCTION_OPERATIONS.md).
+      # erlexec owns the process group of each local MCP server
+      # (`Imp.MCP.OwnedStdio`); its application starts a port program, which is
+      # why it is started on the first stdio connection and not at boot.
+      {:ex_mcp, "~> 1.5", runtime: false},
+      {:erlexec, "~> 2.2", runtime: false},
       {:jason, "~> 1.4"},
       {:jaxon, "~> 2.0.8"},
       {:jsv, "~> 0.21"},
@@ -124,33 +132,6 @@ defmodule Imp.MixProject do
     ]
   end
 
-  # Shared fork reference. This fork carries byte-safe stdio,
-  # caller-owned request/subprocess cleanup, ACP delivery barriers,
-  # per-connection HTTP trust propagation, and tool results that survive a
-  # missed output-validation deadline. See its FORK.md for each failure
-  # and retirement condition; do not move this ref independently of consumers.
-  # Protocol adapters start ExMCP explicitly; ordinary prediction and optimizer
-  # processes must neither start protocol services nor acquire their boot output.
-  # Releases using adapters include ex_mcp in :load mode (see operations docs).
-  defp ex_mcp_dependency do
-    bundled = Path.expand("vendor/ex_mcp", __DIR__)
-    override = System.get_env("EX_MCP_PATH")
-
-    cond do
-      File.regular?(Path.join(bundled, "mix.exs")) ->
-        {:ex_mcp, path: bundled, runtime: false}
-
-      is_binary(override) and override != "" ->
-        {:ex_mcp, path: override, runtime: false}
-
-      true ->
-        {:ex_mcp,
-         github: "deepfates/ex_mcp",
-         ref: "6b46670f254846c9d19269def7f6fe3ffa2bea40",
-         runtime: false}
-    end
-  end
-
   defp dialyzer do
     [
       # PLTs live in a stable directory so CI can cache them across runs.
@@ -158,7 +139,7 @@ defmodule Imp.MixProject do
       plt_local_path: "priv/plts/local",
       # Protocol adapters compile against ExMCP even though ordinary Imp boot
       # deliberately does not start it. Dialyzer still needs its contracts.
-      plt_add_apps: [:mix, :ex_unit, :ex_mcp, :plug_cowboy],
+      plt_add_apps: [:mix, :ex_unit, :ex_mcp, :erlexec, :plug_cowboy],
       # Every entry in the ignore file carries a one-line reason.
       ignore_warnings: ".dialyzer_ignore.exs",
       list_unused_filters: true

@@ -10,10 +10,10 @@ defmodule Imp.MCP.OAuth do
   `Authorization` header is materialized only when a connection is built.
   Refreshing happens without the person.
 
-  ExMCP owns the protocol work: protected-resource discovery, authorization
-  server discovery, dynamic client registration, PKCE, callback validation,
-  token exchange and refresh. This module owns where the grant lives, what
-  protects it, and when a header is produced.
+  ExMCP provides the protocol pieces: the hardened metadata fetch, client
+  registration, PKCE, callback validation, token exchange and refresh. Imp
+  walks them in order for a person in a browser (see `begin/3`) and owns where
+  the grant lives, what protects it, and when a header is produced.
 
   ## Using it
 
@@ -114,7 +114,8 @@ defmodule Imp.MCP.OAuth do
   rotating refresh token is redeemed twice.
   """
 
-  alias ExMCP.Authorization.{FullOAuthFlow, OAuthFlow}
+  alias ExMCP.Authorization.OAuthFlow
+  alias Imp.MCP.OAuth.Flow
 
   @format "imp.mcp.oauth.v1"
   @key_info "imp.mcp.oauth.v1 credential key"
@@ -178,7 +179,7 @@ defmodule Imp.MCP.OAuth do
             resource_url: String.t(),
             authorization_url: String.t(),
             redirect_uri: String.t(),
-            flow: ExMCP.Authorization.PendingAuthorization.t(),
+            flow: Imp.MCP.OAuth.Flow.t(),
             listener: pid() | nil,
             state: String.t() | nil
           }
@@ -250,8 +251,12 @@ defmodule Imp.MCP.OAuth do
     * `:redirect_uri` — the host owns the redirect instead. No loopback
       listener is opened; call `complete/2` with the callback parameters.
     * `:scopes` — scopes to request. Defaults to what the resource advertises.
-    * `:flow` — extra `ExMCP.Authorization.FullOAuthFlow` configuration, merged
-      under the values this function computes.
+    * `:client_registration` — how the client is identified to the
+      authorization server. Defaults to `:auto`: dynamic registration when the
+      server offers it. `{:pre_registered, client_id, client_secret}` uses a
+      client registered ahead of time (`client_secret` may be `nil` for a public
+      client); `{:cimd, url}` names a Client ID Metadata Document. See
+      `ExMCP.Authorization.RegistrationPolicy`.
 
   """
   @spec begin(Store.t(), String.t(), keyword()) :: {:ok, Pending.t()} | {:error, term()}
@@ -265,7 +270,7 @@ defmodule Imp.MCP.OAuth do
     with :ok <- ensure_ex_mcp(),
          {:ok, redirect_uri, socket} <- redirect(opts),
          {:ok, flow} <- flow_begin(server_url, redirect_uri, opts, socket),
-         state <- flow.transaction[:state_param],
+         state <- flow.transaction.state_param,
          {:ok, listener} <- start_listener(socket, state, self()) do
       {:ok,
        %Pending{
@@ -334,7 +339,7 @@ defmodule Imp.MCP.OAuth do
     callback_params = Map.new(callback_params, fn {key, value} -> {to_string(key), value} end)
 
     result =
-      with {:ok, token} <- FullOAuthFlow.complete(pending.flow, callback_params),
+      with {:ok, token} <- Flow.complete(pending.flow, callback_params),
            :ok <- write(pending.store, pending.credential, record_from_token(pending, token)) do
         {:ok, pending.credential}
       end
@@ -352,7 +357,7 @@ defmodule Imp.MCP.OAuth do
   @spec cancel(Pending.t()) :: :ok
   def cancel(%Pending{} = pending) do
     stop_listener(pending)
-    FullOAuthFlow.cancel(pending.flow)
+    Flow.cancel(pending.flow)
     :ok
   end
 
@@ -436,7 +441,7 @@ defmodule Imp.MCP.OAuth do
   # -- flow ------------------------------------------------------------------
 
   defp flow_begin(server_url, redirect_uri, opts, socket) do
-    case FullOAuthFlow.begin(flow_config(server_url, redirect_uri, opts)) do
+    case Flow.begin(flow_config(server_url, redirect_uri, opts)) do
       {:ok, flow} ->
         {:ok, flow}
 
@@ -447,17 +452,13 @@ defmodule Imp.MCP.OAuth do
   end
 
   defp flow_config(server_url, redirect_uri, opts) do
-    extra = opts |> Keyword.get(:flow, %{}) |> Map.new()
-
     %{
-      client_registration: :auto,
-      application_type: :native,
+      resource_url: server_url,
+      redirect_uri: redirect_uri,
       scopes: Keyword.get(opts, :scopes, []),
-      protocol_version: ExMCP.protocol_version(),
+      client_registration: Keyword.get(opts, :client_registration, :auto),
       metadata_fetch: [allow_insecure_loopback: loopback?(server_url)]
     }
-    |> Map.merge(extra)
-    |> Map.merge(%{resource_url: server_url, redirect_uri: redirect_uri})
   end
 
   defp loopback?(url) do
@@ -473,11 +474,11 @@ defmodule Imp.MCP.OAuth do
     %{
       "format" => @format,
       "resource_url" => pending.resource_url,
-      "issuer" => flow.authorization_server["issuer"],
-      "client_id" => flow.client_info[:client_id],
-      "client_secret" => flow.client_info[:client_secret],
+      "issuer" => flow.issuer,
+      "client_id" => flow.client[:client_id],
+      "client_secret" => flow.client[:client_secret],
       "token_endpoint" => flow.token_endpoint,
-      "scopes" => granted_scopes(token, flow.config),
+      "scopes" => granted_scopes(token, flow.scopes),
       "access_token" => token_field(token, :access_token),
       "refresh_token" => token_field(token, :refresh_token),
       "expires_at" => expires_at(token)
@@ -593,11 +594,11 @@ defmodule Imp.MCP.OAuth do
     end
   end
 
-  defp granted_scopes(token, config) do
+  defp granted_scopes(token, requested) do
     case token_field(token, :scope) do
       scopes when is_binary(scopes) -> String.split(scopes, " ", trim: true)
       scopes when is_list(scopes) -> scopes
-      _absent -> Map.get(config || %{}, :scopes) || []
+      _absent -> requested
     end
   end
 

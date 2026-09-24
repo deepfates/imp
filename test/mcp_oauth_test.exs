@@ -51,7 +51,14 @@ defmodule Imp.MCPOAuthTest.FakeAuthServer do
       code_grants: 0,
       refresh_grants: 0,
       issued_refresh: nil,
-      issued_access: []
+      issued_access: [],
+      # "o" serves the authorization server as a tenant issuer `origin/o/`, the
+      # way Readwise serves `https://readwise.io/o/`.
+      tenant: nil,
+      # The `resource` the protected-resource document names; nil is this server.
+      resource: nil,
+      token_auth: "client_secret_post",
+      token_requests: []
     }
   end
 
@@ -64,24 +71,49 @@ defmodule Imp.MCPOAuthTest.FakeAuthServer do
   end
 
   get "/.well-known/openid-configuration" do
-    authorization_metadata(conn)
+    authorization_metadata(conn, origin(conn))
   end
 
   get "/.well-known/oauth-authorization-server" do
-    authorization_metadata(conn)
+    authorization_metadata(conn, origin(conn))
+  end
+
+  # A tenant issuer's path-appended locations answer with the host's own
+  # document, whose issuer is the host; only the RFC 8414 location names the
+  # tenant.
+  get "/o/.well-known/openid-configuration" do
+    authorization_metadata(conn, origin(conn))
+  end
+
+  get "/o/.well-known/oauth-authorization-server" do
+    authorization_metadata(conn, origin(conn))
+  end
+
+  get "/.well-known/oauth-authorization-server/o" do
+    authorization_metadata(conn, origin(conn) <> "/o/")
   end
 
   post "/register" do
     json(conn, 201, %{
       "client_id" => "imp-test-client",
       "client_secret" => "imp-test-client-secret",
-      "token_endpoint_auth_method" => "client_secret_post"
+      "token_endpoint_auth_method" => Agent.get(@state, & &1.token_auth)
     })
   end
 
   post "/token" do
     {:ok, body, conn} = Plug.Conn.read_body(conn)
     params = URI.decode_query(body)
+
+    Agent.update(@state, fn state ->
+      request = %{
+        authorization: Plug.Conn.get_req_header(conn, "authorization"),
+        client_secret: params["client_secret"],
+        grant_type: params["grant_type"]
+      }
+
+      Map.update!(state, :token_requests, &(&1 ++ [request]))
+    end)
 
     case params do
       %{"grant_type" => "authorization_code", "code" => "accepted-code", "code_verifier" => v}
@@ -147,25 +179,28 @@ defmodule Imp.MCPOAuthTest.FakeAuthServer do
   defp maybe_put(body, key, value), do: Map.put(body, key, value)
 
   defp protected_resource(conn) do
+    state = Agent.get(@state, & &1)
+    issuer = if state.tenant, do: origin(conn) <> "/#{state.tenant}/", else: origin(conn)
+
     json(conn, 200, %{
-      "resource" => origin(conn) <> "/mcp",
-      "authorization_servers" => [origin(conn)],
+      "resource" => state.resource || origin(conn) <> "/mcp",
+      "authorization_servers" => [issuer],
       "scopes_supported" => ["workspace:read"]
     })
   end
 
-  defp authorization_metadata(conn) do
+  defp authorization_metadata(conn, issuer) do
     origin = origin(conn)
 
     json(conn, 200, %{
-      "issuer" => origin,
+      "issuer" => issuer,
       "authorization_endpoint" => origin <> "/authorize",
       "token_endpoint" => origin <> "/token",
       "registration_endpoint" => origin <> "/register",
       "response_types_supported" => ["code"],
       "grant_types_supported" => ["authorization_code", "refresh_token"],
       "code_challenge_methods_supported" => ["S256"],
-      "token_endpoint_auth_methods_supported" => ["client_secret_post"]
+      "token_endpoint_auth_methods_supported" => [Agent.get(@state, & &1.token_auth)]
     })
   end
 
@@ -653,6 +688,57 @@ defmodule Imp.MCPOAuthTest do
     assert_raise ArgumentError, ~r/credential reference/, fn ->
       OAuth.begin(store, "https://example.test/mcp", credential: "../escape")
     end
+  end
+
+  # Discovery walks every location an issuer's metadata can live at and takes
+  # the one whose document names that issuer. Taking the first document that
+  # fetches reads the host's document for a tenant issuer and fails.
+  @tag :tmp_dir
+  test "a tenant issuer is discovered at the location that names it", %{tmp_dir: tmp_dir} do
+    %{resource_url: resource_url} = fake_auth_server(tenant: "o", expires_in: 3600)
+    store = OAuth.store(directory: tmp_dir, secret: :crypto.strong_rand_bytes(32))
+
+    assert {:ok, "workspace"} = authorize_without_browser(store, resource_url)
+
+    assert {:ok, {"Authorization", "Bearer access-token-1"}} =
+             OAuth.authorization_header(store, "workspace", resource_url)
+  end
+
+  # RFC 9728 section 3.3: the protected-resource document must describe the
+  # server being authorized, or a server could send the person to authorize a
+  # client for some other resource.
+  @tag :tmp_dir
+  test "a protected-resource document that names another resource is refused",
+       %{tmp_dir: tmp_dir} do
+    %{resource_url: resource_url} =
+      fake_auth_server(resource: "https://elsewhere.example/mcp")
+
+    store = OAuth.store(directory: tmp_dir, secret: :crypto.strong_rand_bytes(32))
+
+    assert {:error, {:mcp_oauth_begin_failed, {:resource_mismatch, _declared, ^resource_url}}} =
+             OAuth.begin(store, resource_url,
+               credential: "workspace",
+               redirect_uri: "http://127.0.0.1:65535/host/callback"
+             )
+  end
+
+  # A confidential client presents its secret the way the token endpoint says
+  # it accepts: in the Authorization header for client_secret_basic, never in
+  # the form body as well.
+  @tag :tmp_dir
+  test "a client_secret_basic token endpoint gets the secret in the Authorization header",
+       %{tmp_dir: tmp_dir} do
+    %{resource_url: resource_url} =
+      fake_auth_server(token_auth: "client_secret_basic", expires_in: 3600)
+
+    store = OAuth.store(directory: tmp_dir, secret: :crypto.strong_rand_bytes(32))
+
+    assert {:ok, "workspace"} = authorize_without_browser(store, resource_url)
+
+    basic = "Basic " <> Base.encode64("imp-test-client:imp-test-client-secret")
+
+    assert [%{grant_type: "authorization_code", authorization: [^basic], client_secret: nil}] =
+             fake_state().token_requests
   end
 
   # -- fixtures --------------------------------------------------------------
