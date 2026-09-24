@@ -167,7 +167,9 @@ defmodule Imp.Test.FileMultiStudentGRPOTrainer do
 
     save_session(trainer, updated)
 
-    if trainer.runtime_mode == {:hang_after_step, model}, do: Process.sleep(5_000)
+    # The step has been applied and never answers, so the only way the
+    # optimizer learns anything is its callback timeout.
+    if trainer.runtime_mode == {:hang_after_step, model}, do: Process.sleep(:infinity)
     {:ok, updated}
   end
 
