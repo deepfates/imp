@@ -65,7 +65,7 @@ defmodule Imp.MCP.Connections do
 
   `"sse"` is MCP's deprecated HTTP+SSE transport (protocol 2024-11-05), and its
   `"url"` is the event stream's, usually ending in `/sse` (a URL without a path
-  means `/sse`; one with a query string is refused). The client GETs that
+  means `/sse`). The client GETs that
   stream, and the server's first event names the URL requests are posted to,
   headers and all. It works with servers whose posting URL carries the session
   as `sessionId`, as the TypeScript SDK's and ExMCP's do. It does not work with
@@ -80,7 +80,9 @@ defmodule Imp.MCP.Connections do
   refused before anything is dialed (`:mcp_sse_credentials_refused`): it
   refuses the whole import under the default `on_failure: :refuse`, and under
   `on_failure: :drop` it is left out, named in `unavailable` and logged, as a
-  server that cannot be dialed is.
+  server that cannot be dialed is. An `"sse"` URL with a query string is
+  refused the same way (`:mcp_sse_url_refused`): ExMCP would dial the stream
+  without it.
 
   Only descriptors the caller authorized are dialed. `trusted_servers:` lists
   them exactly; `authorize:` is a function of the descriptor (and optionally
@@ -163,6 +165,13 @@ defmodule Imp.MCP.Connections do
   leaves the server a connection fewer, and a server left with none answers
   its calls `:not_sent` with `reason: :not_connected`.
 
+  A call is answered at its `:timeout`, as `:unknown` with `reason: :timeout`,
+  while its request runs on to the connection's own request limit (the
+  `:timeout`, at least 30 s). That holds for a request that asks for progress
+  too: ExMCP ends such a request's stream a second after the timeout a call is
+  made with, and the server ends the tool with it, so Imp makes the call with
+  the whole request limit and keeps the caller's timeout itself.
+
   A `stdio` server has one connection whatever `pool_size` says. ExMCP writes
   each request to its pipe and matches answers by id, so calls to it already
   run at once over that connection, and they go straight to it. A second
@@ -230,6 +239,7 @@ defmodule Imp.MCP.Connections do
   @http_dns_timeout 1_000
   @http_connect_timeout 5_000
   @http_request_timeout 30_000
+  @http_stream_idle_timeout 60_000
 
   @doc """
   Connects authorized servers and imports all discovered tools.
@@ -423,6 +433,7 @@ defmodule Imp.MCP.Connections do
     with :ok <- validate_tool_prefix(server),
          :ok <- authorize(server, opts),
          :ok <- sse_without_credentials(server),
+         :ok <- sse_url_without_query(server),
          {:ok, headers} <- connection_headers(server, opts),
          options = client_options(server, opts, headers),
          :ok <- trust(options, self()),
@@ -441,10 +452,11 @@ defmodule Imp.MCP.Connections do
           {:error, reason, clients}
         end
 
-      # A credentialed `sse` descriptor is left out under `:drop` as an
-      # unreachable one is, with a warning: an ACP client that offers one must
-      # not lose every other server of its session.
-      {:error, {:mcp_sse_credentials_refused, _name, why} = reason} ->
+      # An `sse` descriptor refused for its credentials or its URL is left out
+      # under `:drop` as an unreachable one is, with a warning: an ACP client
+      # that offers one must not lose every other server of its session.
+      {:error, {refusal, _name, why} = reason}
+      when refusal in [:mcp_sse_credentials_refused, :mcp_sse_url_refused] ->
         if drop?(opts) do
           Logger.warning("MCP server #{inspect(server_name(server))} left out: #{why}")
 
@@ -841,12 +853,13 @@ defmodule Imp.MCP.Connections do
     case Imp.MCP.Clients.checkout(bridge, index, timeout(opts)) do
       {:ok, client} ->
         result =
-          try do
-            call_tool(client, name, arguments, server, opts)
-          catch
-            kind, reason ->
+          case await_call(client, name, arguments, server, opts) do
+            {:raised, kind, reason, stacktrace} ->
               Imp.MCP.Clients.retire(bridge, client)
-              :erlang.raise(kind, reason, __STACKTRACE__)
+              :erlang.raise(kind, reason, stacktrace)
+
+            result ->
+              result
           end
 
         # A call its caller stopped waiting for is still out inside ExMCP's
@@ -862,6 +875,49 @@ defmodule Imp.MCP.Connections do
         {:error, CallFailure.returned(server_name(server), name, reason)}
     end
   end
+
+  # ExMCP ends a request that has a stream of its own (one that asked for
+  # progress) a second after the timeout the call was made with, and its
+  # server ends the tool with the stream (`ExMCP.Client`'s `:request_timeout`).
+  # The caller's `:timeout` is Imp's to keep, the way a plain request its
+  # caller stopped waiting for runs on: the call is made from a process of its
+  # own with the whole request limit, and the caller is answered at its own
+  # timeout, `:unknown` (`reason: :timeout`), while the request runs on. The
+  # answer the caller no longer waits for goes to an alias that is gone by
+  # then. This retires if ExMCP leaves a timed-out request's stream open.
+  defp await_call(client, name, arguments, server, opts) do
+    reply_to = :erlang.alias([:reply])
+    whole = Keyword.put(opts, :timeout, request_limit(opts))
+
+    spawn(fn ->
+      answer =
+        try do
+          call_tool(client, name, arguments, server, whole)
+        catch
+          kind, reason -> {:raised, kind, reason, __STACKTRACE__}
+        end
+
+      send(reply_to, {reply_to, answer})
+    end)
+
+    receive do
+      {^reply_to, answer} -> answer
+    after
+      timeout(opts) ->
+        :erlang.unalias(reply_to)
+
+        receive do
+          {^reply_to, answer} -> answer
+        after
+          0 -> {:error, CallFailure.returned(server_name(server), name, :timeout)}
+        end
+    end
+  end
+
+  # How long an HTTP request can take as its connection bounds it (see
+  # `http_bounds/1`).
+  defp request_limit(opts),
+    do: @http_dns_timeout + @http_connect_timeout + max(timeout(opts), @http_request_timeout)
 
   defp still_out?({:error, %CallFailure{reason: :timeout}}), do: true
   defp still_out?({:error, %CallFailure{reason: {:exit, {:timeout, _call}}}}), do: true
@@ -1114,6 +1170,23 @@ defmodule Imp.MCP.Connections do
 
   defp sse_without_credentials(_server), do: :ok
 
+  # ExMCP rebuilds an event stream's URL from its origin and path and drops a
+  # query string (`ExMCP.Transport.HTTP.LegacySSE`), so a URL that carries one
+  # would be dialed as another URL.
+  defp sse_url_without_query(%{"type" => "sse", "url" => url} = server) when is_binary(url) do
+    case URI.new(url) do
+      {:ok, %URI{query: query}} when is_binary(query) ->
+        {:error,
+         {:mcp_sse_url_refused, server_name(server),
+          "an sse server's url cannot carry a query string: ExMCP would dial it without one"}}
+
+      _other ->
+        :ok
+    end
+  end
+
+  defp sse_url_without_query(_server), do: :ok
+
   defp static_headers(server),
     do: name_value_list!(Map.get(server, "headers", []), "headers")
 
@@ -1245,7 +1318,11 @@ defmodule Imp.MCP.Connections do
           url: origin,
           sse_path: path,
           headers: headers,
-          stream_handshake_timeout: timeout(opts)
+          stream_handshake_timeout: timeout(opts),
+          # ExMCP ends a stream after this long with nothing on it, and a
+          # request still out then has no stream to answer on: the stream waits
+          # longer than a request can take, and never less than ExMCP's 60 s.
+          stream_idle_timeout: max(@http_stream_idle_timeout, request_limit(opts) + 1_000)
         ] ++ http_bounds(opts)
 
       type ->
@@ -1274,9 +1351,8 @@ defmodule Imp.MCP.Connections do
   end
 
   # The event stream's URL, as the origin ExMCP posts under and the path it
-  # GETs. A URL without a path is the conventional `/sse`. ExMCP rebuilds the
-  # stream's URL from the two and drops a query string, so one is refused
-  # rather than lost.
+  # GETs. A URL without a path is the conventional `/sse`. A URL with a query
+  # string was refused before this (`sse_url_without_query/1`).
   defp sse_url!(url) do
     case URI.new(url) do
       {:ok, %URI{scheme: scheme, host: host, query: nil} = uri}
@@ -1291,9 +1367,6 @@ defmodule Imp.MCP.Connections do
           end
 
         {"#{scheme}://#{host}#{port}", path}
-
-      {:ok, %URI{query: query}} when is_binary(query) ->
-        raise ArgumentError, "an sse MCP server url cannot carry a query string"
 
       _other ->
         raise ArgumentError, "MCP server url must be an absolute HTTP(S) URL"

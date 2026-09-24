@@ -140,6 +140,19 @@ defmodule Imp.MCPLegacySSETest do
   # unknown, though the server ran it) or is refused `:not_connected`. The
   # connection is replaced when its stream ends, so the next call reaches the
   # server. The heartbeat check is sent here rather than waited for.
+  # ExMCP ends a stream after `stream_idle_timeout` (60 s by default) with
+  # nothing on it, and the answer to a request still out then has no stream
+  # to arrive on. A host that allows a call longer than that must have the
+  # stream wait at least as long as the request can.
+  test "a stream waits as long as its connection's requests can take", %{descriptor: descriptor} do
+    {imported, _tools} = tools(descriptor, timeout: 90_000)
+    {:env, env} = Function.info(imported.cleanup, :env)
+    [client] = Imp.MCP.Clients.client_pids(Enum.find(env, &is_pid/1))
+    timeouts = :sys.get_state(client).transport_state.timeouts
+    assert timeouts.request == 90_000
+    assert timeouts.stream_idle > timeouts.request
+  end
+
   test "a connection whose stream ended is replaced", %{descriptor: descriptor} do
     {imported, tools} = tools(descriptor, pool_size: 1, timeout: 2_000)
     {:env, env} = Function.info(imported.cleanup, :env)
@@ -305,6 +318,29 @@ defmodule Imp.MCPLegacySSETest do
 
       assert {:error, {:mcp_sse_credentials_refused, "redirecting", _why}} =
                Imp.MCP.connect(servers, trusted_servers: servers, timeout: 2_000)
+    end
+
+    # ExMCP rebuilds a stream's URL without its query string, so an `sse` URL
+    # with one is refused rather than dialed as another URL. It is the
+    # caller's descriptor, like a credentialed one, and follows `on_failure`
+    # the same way: under `:drop` only that server is left out.
+    test "an sse URL with a query string follows on_failure", %{descriptor: descriptor} do
+      queried = %{descriptor | "name" => "queried", "url" => descriptor["url"] <> "?key=k"}
+      servers = [queried, descriptor]
+
+      assert {:ok, imported} =
+               Imp.MCP.connect(servers, trusted_servers: servers, on_failure: :drop)
+
+      on_exit(fn -> imported.cleanup.() end)
+
+      assert [%{server: "queried", index: 0, reason: {:mcp_sse_url_refused, "queried", why}}] =
+               imported.unavailable
+
+      assert why =~ "query"
+      assert "fast" in Enum.map(imported.tools, &to_string(&1.name))
+
+      assert {:error, {:mcp_sse_url_refused, "queried", _why}} =
+               Imp.MCP.connect(servers, trusted_servers: servers)
     end
 
     test "an sse descriptor with no headers still connects", %{descriptor: descriptor} do

@@ -33,9 +33,9 @@ defmodule Imp.MCPConnectionPoolTest do
     end
 
     # A write that takes a while and says when it is done.
-    def handle_call_tool("write", %{"tag" => tag}, state) do
+    def handle_call_tool("write", %{"tag" => tag} = arguments, state) do
       :ets.insert(:pool_test_writes, {tag, :started})
-      Process.sleep(800)
+      Process.sleep(Map.get(arguments, "ms", 800))
       :ets.insert(:pool_test_writes, {tag, :finished})
       {:ok, %{"content" => [%{"type" => "text", "text" => "written"}]}, state}
     end
@@ -341,6 +341,10 @@ defmodule Imp.MCPConnectionPoolTest do
   # A request that asks for progress is posted on a stream of its own, and the
   # client is free while it is out. Closing the client cancels that stream, and
   # the server ends the tool's handler with it.
+  #
+  # ExMCP also closes that stream itself a second after the timeout the call
+  # was made with. The caller's `:timeout` is Imp's to keep, so the call is
+  # made with the whole request limit and the caller is answered at its own.
   describe "a retired connection's streamed request" do
     setup do
       :ets.new(:pool_test_writes, [:named_table, :public])
@@ -358,6 +362,21 @@ defmodule Imp.MCPConnectionPoolTest do
 
       assert eventually(fn ->
                :ets.lookup(:pool_test_writes, "streamed") == [{"streamed", :finished}]
+             end)
+    end
+
+    test "runs on past the caller's timeout and finishes on the server" do
+      call_meta = fn _server -> %{"progressToken" => "progress"} end
+      {_imported, tools} = tools(server(), pool_size: 1, timeout: 300, call_meta: call_meta)
+
+      {elapsed, result} =
+        ms(fn -> Imp.Tool.call(tools["write"], %{"tag" => "long", "ms" => 3_000}) end)
+
+      assert {:error, %CallFailure{outcome: :unknown}} = result
+      assert elapsed < 1_000, "the caller waited #{elapsed} ms"
+
+      assert eventually(fn ->
+               :ets.lookup(:pool_test_writes, "long") == [{"long", :finished}]
              end)
     end
   end
