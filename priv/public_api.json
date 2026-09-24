@@ -928,7 +928,8 @@
       "callbacks": [],
       "category": "stable",
       "functions": [
-        "format_tool_result/1"
+        "format_tool_result/1",
+        "tool_error_text/1"
       ],
       "kind": "module",
       "macros": [],
@@ -937,6 +938,9 @@
         "functions": {
           "format_tool_result/1": [
             "format_tool_result(value)"
+          ],
+          "tool_error_text/1": [
+            "tool_error_text(reason)"
           ]
         }
       },
@@ -3964,6 +3968,7 @@
       "category": "experimental",
       "functions": [
         "connect/2",
+        "failure_text/1",
         "import_tools/1"
       ],
       "kind": "module",
@@ -3973,6 +3978,9 @@
         "functions": {
           "connect/2": [
             "connect(servers, opts \\\\ [])"
+          ],
+          "failure_text/1": [
+            "failure_text(reason)"
           ],
           "import_tools/1": [
             "import_tools(catalog)"

@@ -292,7 +292,11 @@ defmodule Imp.MCPConnectionTest do
     client = Imp.MCP.HTTPClient.new("http://127.0.0.1:#{port}", result_mode: :structured)
     on_exit(fn -> Imp.MCP.Client.close(client) end)
     [tool] = Imp.MCP.import_tools(client)
-    assert {:error, {:mcp_tool_error, failure}} = Imp.Tool.call(tool, %{})
+    assert {:error, {:mcp_tool_error, failure}} = error = Imp.Tool.call(tool, %{})
+
+    # The record keeps the envelope; the model reads the tool's own words.
+    assert Imp.Adapter.Chat.format_tool_result(error) ==
+             "Error: Outcome unknown; reconcile before retry"
 
     assert failure["structuredContent"] == %{
              "code" => "indeterminate",
@@ -336,7 +340,11 @@ defmodule Imp.MCPConnectionTest do
 
     assert {:error,
             {:mcp_tool_call_failed, _, %ExMCP.Error.TransportError{reason: :outcome_unknown}}} =
-             Imp.Tool.call(tool, %{})
+             error = Imp.Tool.call(tool, %{})
+
+    assert Imp.Adapter.Chat.format_tool_result(error) ==
+             "Error: no answer came back; the connection broke after the request was sent, " <>
+               "so it may have been carried out."
 
     assert_receive :broken_attempt
     refute_receive :broken_attempt, 300

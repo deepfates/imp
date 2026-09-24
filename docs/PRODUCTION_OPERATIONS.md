@@ -229,7 +229,9 @@ Tool errors now return `{:error, {:mcp_tool_error, original_envelope}}`, retaini
 `content`, `structuredContent`, error codes and operation identifiers. This
 replaces the old text-only error tuple so refusal, authorization refusal and
 indeterminate effect outcomes remain distinguishable. Successful `:text` and
-`:structured` result conversion remains unchanged.
+`:structured` result conversion remains unchanged. The model reads only the
+text of an error result's content (`Imp.MCP.failure_text/1`); the recorded
+term keeps the whole envelope.
 
 Each imported tool carries `metadata.mcp` with `server_name`, `tool_name`,
 `schema`, and `annotations`. These describe its original source, regardless of

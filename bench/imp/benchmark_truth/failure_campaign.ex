@@ -1096,7 +1096,7 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
            prediction |> Imp.Prediction.get(:answer, "") |> to_string() |> String.downcase(),
          history <- Imp.Prediction.get(prediction, :history),
          [
-           %{tool: :lookup, result: "Execution error in lookup: :transient_local_failure"},
+           %{tool: :lookup, result: "Execution error in lookup: transient local failure"},
            %{tool: :lookup, result: "pong"},
            %{tool: :finish, result: "Completed."}
          ] <- history,
