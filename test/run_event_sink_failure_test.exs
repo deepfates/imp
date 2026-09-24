@@ -172,6 +172,39 @@ defmodule Imp.RunEventSinkFailureTest do
     refute_received {:imp_run_event_sink_failed, _run_id, _failure}
   end
 
+  # The sink's process can die outright, not just raise: here the sink is
+  # linked to a process that exits. The event it held and the ones queued
+  # behind it are reported all the same.
+  test "a sink whose process is killed reports what it had not finished" do
+    owner = self()
+
+    run =
+      start(fn
+        %{kind: :model_response} ->
+          send(owner, :holding)
+          receive(do: (:go -> spawn_link(fn -> exit(:store_crashed) end)))
+          receive(do: (:never -> :ok))
+
+        _event ->
+          :ok
+      end)
+
+    emit(run, :model_response, output: "a")
+    emit(run, :tool_call, tool_name: :lookup)
+    assert_receive :holding
+
+    monitor = Process.monitor(run.control)
+    send(:sys.get_state(run.control).delivery, :go)
+    assert_receive {:DOWN, ^monitor, :process, _pid, _reason}
+    end_task(run)
+
+    assert_received {:imp_run_event_sink_failed, _run_id,
+                     %{sequence: 1, kind: :model_response, reason: :in_sink_when_stopped}}
+
+    assert_received {:imp_run_event_sink_failed, _run_id,
+                     %{sequence: 2, kind: :tool_call, reason: :never_handed_to_sink}}
+  end
+
   # `stop/1` releases the run's control and leaves its task to finish; the
   # waiting program here never does, and would hold its place in Imp's task
   # pool after the test.

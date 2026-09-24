@@ -30,8 +30,9 @@ defmodule Imp.Run do
   after it. `kind` is `nil` for an event the snapshot no longer holds. These
   reports are in the owner's mailbox when `stop/1` or `cancel_with_events/3`
   returns, after any report the sink's own failures produced, in sequence
-  order. A stop that lands between a failed sink call and the end of its
-  delivery can report that event twice.
+  order, and each event is reported at most once. The same reports are sent
+  when the sink's process dies outright, for example because it was linked
+  to a process that crashed; the run's control then ends too.
 
   `events/1` reads the retained native sequence independently of sink progress.
   `cancel_with_events/3` snapshots that sequence before cleanup, including one
@@ -386,21 +387,18 @@ defmodule Imp.Run.Control do
     unless Enum.all?(limits, fn {_, n} -> bound?(n) end),
       do: raise(ArgumentError, "run capture limits must be positive integers or :infinity")
 
+    # Delivery is linked, and its death must reach `terminate/2` so that what
+    # it had not delivered is reported.
+    Process.flag(:trap_exit, true)
     progress = EventDelivery.new_progress()
-
-    {:ok, delivery} =
-      EventDelivery.start_link(
-        Keyword.fetch!(opts, :event_sink),
-        owner,
-        Keyword.fetch!(opts, :id),
-        progress
-      )
+    {:ok, delivery} = EventDelivery.start_link(Keyword.fetch!(opts, :event_sink), progress)
 
     {:ok,
      %{
        id: Keyword.fetch!(opts, :id),
        delivery: delivery,
        progress: progress,
+       reported: 0,
        sequence: 0,
        events: [],
        dropped_events: 0,
@@ -513,28 +511,62 @@ defmodule Imp.Run.Control do
     {:stop, :normal, state}
   end
 
+  def handle_info({EventDelivery, :failed, failure}, state),
+    do: {:noreply, report(state, failure)}
+
+  def handle_info({:EXIT, delivery, reason}, %{delivery: delivery} = state),
+    do: {:stop, {:event_delivery_exited, reason}, state}
+
+  # Trapping exits is only for delivery's sake; any other exit signal ends
+  # the run's control as it would have without trapping.
+  def handle_info({:EXIT, _pid, :normal}, state), do: {:noreply, state}
+  def handle_info({:EXIT, _pid, reason}, state), do: {:stop, reason, state}
+
   @impl true
   def terminate(_reason, state) do
     Process.unlink(state.delivery)
     monitor = Process.monitor(state.delivery)
     Process.exit(state.delivery, :kill)
     receive(do: ({:DOWN, ^monitor, :process, _pid, _reason} -> :ok))
-    report_undelivered(state)
+    state |> report_pending_failures() |> report_undelivered()
     :ok
   end
 
+  # Every report reaches the owner from this process, so the owner's reports
+  # are in sequence order and each event is reported once.
+  defp report(state, failure) do
+    send(state.owner, {:imp_run_event_sink_failed, state.id, failure})
+    %{state | reported: failure.sequence + 1}
+  end
+
+  # Delivery sends a failure here before it records the event as finished,
+  # and it is dead, so every failure it sent is already in this mailbox.
+  defp report_pending_failures(state) do
+    receive do
+      {EventDelivery, :failed, failure} -> state |> report(failure) |> report_pending_failures()
+    after
+      0 -> state
+    end
+  end
+
   # Delivery is dead, so its progress no longer moves. Every event it had not
-  # finished is reported to the owner: the one the sink was holding may have
-  # been stored, and the ones after it were never handed over.
+  # finished and that was not reported as failed is reported now: the one the
+  # sink was holding may have been stored, and the ones after it were never
+  # handed over.
   defp report_undelivered(state) do
     {handed, finished} = EventDelivery.progress(state.progress)
-    kinds = Map.new(state.events, &{&1.sequence, &1.kind})
+    first = max(finished, state.reported)
 
-    for sequence <- finished..(state.sequence - 1)//1 do
+    kinds =
+      for event <- state.events,
+          event.sequence >= first,
+          into: %{},
+          do: {event.sequence, event.kind}
+
+    Enum.reduce(first..(state.sequence - 1)//1, state, fn sequence, state ->
       reason = if sequence < handed, do: :in_sink_when_stopped, else: :never_handed_to_sink
-      failure = %{sequence: sequence, kind: Map.get(kinds, sequence), reason: reason}
-      send(state.owner, {:imp_run_event_sink_failed, state.id, failure})
-    end
+      report(state, %{sequence: sequence, kind: Map.get(kinds, sequence), reason: reason})
+    end)
   end
 
   defp record(%{terminal: terminal} = state, _kind, _attrs) when not is_nil(terminal), do: state
@@ -680,7 +712,10 @@ defmodule Imp.Run.EventDelivery do
   # Two counters shared with the run's control: how many events have been
   # handed to the sink, and how many the sink has finished with (returned,
   # raised, thrown or exited). The control reads them after this process is
-  # dead to report what was not delivered.
+  # dead to report what was not delivered. A sink failure is sent to the
+  # control, which reports it to the owner, before the event counts as
+  # finished; so once this process is dead the control holds every failure it
+  # sent and can tell which events are already reported.
   @handed 1
   @finished 2
 
@@ -689,16 +724,16 @@ defmodule Imp.Run.EventDelivery do
   def progress(progress),
     do: {:counters.get(progress, @handed), :counters.get(progress, @finished)}
 
-  def start_link(sink, owner, run_id, progress),
-    do: GenServer.start_link(__MODULE__, {sink, owner, run_id, progress})
+  def start_link(sink, progress),
+    do: GenServer.start_link(__MODULE__, {sink, self(), progress})
 
   def deliver(pid, event), do: GenServer.cast(pid, {:deliver, event})
   def barrier(pid, receiver, tag), do: GenServer.cast(pid, {:barrier, receiver, tag})
   def drain(pid, timeout), do: GenServer.call(pid, :drain, timeout)
 
   @impl true
-  def init({sink, owner, run_id, progress}),
-    do: {:ok, %{sink: sink, owner: owner, run_id: run_id, progress: progress}}
+  def init({sink, control, progress}),
+    do: {:ok, %{sink: sink, control: control, progress: progress}}
 
   @impl true
   def handle_cast({:deliver, event}, state) do
@@ -706,7 +741,7 @@ defmodule Imp.Run.EventDelivery do
 
     with {:error, reason} <- sink(state, event) do
       failure = %{sequence: event.sequence, kind: event.kind, reason: reason}
-      send(state.owner, {:imp_run_event_sink_failed, state.run_id, failure})
+      send(state.control, {__MODULE__, :failed, failure})
     end
 
     :counters.put(state.progress, @finished, event.sequence + 1)
