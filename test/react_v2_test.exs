@@ -1,6 +1,11 @@
 defmodule ReActV2Test do
   use ExUnit.Case, async: true
 
+  # A signature with more than one output keeps DSPy's `submit`; the tests of
+  # the submit path use it. `question -> answer` has one text output, so its
+  # loop has no `submit` and the answer is the prose the model writes.
+  @submit_signature "question -> answer, confidence: float"
+
   defmodule NativeToolStub do
     def generate_text(model, messages, opts) do
       state = Keyword.fetch!(opts, :state)
@@ -30,7 +35,11 @@ defmodule ReActV2Test do
                message:
                  ReqLLM.Context.assistant("",
                    tool_calls: [
-                     ReqLLM.ToolCall.new("toolu_submit", "submit", ~s({"answer":"Paris"}))
+                     ReqLLM.ToolCall.new(
+                       "toolu_submit",
+                       "submit",
+                       ~s({"answer":"Paris","confidence":0.9})
+                     )
                    ]
                  ),
                object: nil,
@@ -84,7 +93,7 @@ defmodule ReActV2Test do
                 "resp_submit",
                 "toolu_submit",
                 "submit",
-                ~s({"answer":"Paris"})
+                ~s({"answer":"Paris","confidence":0.9})
               )
 
             {{:ok, response}, :done}
@@ -138,7 +147,11 @@ defmodule ReActV2Test do
         context: ReqLLM.Context.new(messages),
         message:
           ReqLLM.Context.assistant(
-            Jason.encode!(%{reasoning: "The gathered evidence supports this.", answer: answer})
+            Jason.encode!(%{
+              reasoning: "The gathered evidence supports this.",
+              answer: answer,
+              confidence: 0.9
+            })
           ),
         object: nil,
         finish_reason: :stop
@@ -172,7 +185,11 @@ defmodule ReActV2Test do
             tool_calls: [
               %{id: "lookup-1", name: "lookup", arguments: %{query: "beam"}},
               %{id: "missing-1", name: "missing", arguments: %{}},
-              %{id: "submit-1", name: "submit", arguments: %{answer: "BEAM"}}
+              %{
+                id: "submit-1",
+                name: "submit",
+                arguments: %{answer: "BEAM", confidence: 1.0}
+              }
             ]
           }
         ],
@@ -180,7 +197,7 @@ defmodule ReActV2Test do
       )
 
     assert {:ok, prediction} =
-             Imp.react_v2("question -> answer", [lookup], lm: lm)
+             Imp.react_v2(@submit_signature, [lookup], lm: lm)
              |> Imp.call(%{question: "What runtime?"})
 
     assert Imp.get(prediction, :answer) == "BEAM"
@@ -203,10 +220,7 @@ defmodule ReActV2Test do
   test "warns loudly on extra input keys but ignores them and still runs" do
     lm =
       action_lm([
-        %{
-          next_thought: "answer directly",
-          tool_calls: [%{id: "submit-1", name: "submit", arguments: %{answer: "BEAM"}}]
-        }
+        "BEAM"
       ])
 
     program = Imp.react_v2("question -> answer", [], lm: lm)
@@ -249,7 +263,7 @@ defmodule ReActV2Test do
     lm =
       action_lm([
         %{tool_calls: [%{name: "broken", arguments: %{}}, %{name: "unknown", arguments: %{}}]},
-        %{tool_calls: [%{name: "submit", arguments: %{answer: "recovered"}}]}
+        "recovered"
       ])
 
     assert {:ok, prediction} =
@@ -271,13 +285,13 @@ defmodule ReActV2Test do
         %{
           tool_calls: [
             %{name: "write", arguments: %{path: "notes.txt"}},
-            %{name: "submit", arguments: %{answer: "recovered"}}
+            %{name: "submit", arguments: %{answer: "recovered", confidence: 1.0}}
           ]
         }
       ])
 
     assert {:ok, prediction} =
-             Imp.react_v2("question -> answer", [write], lm: lm, max_iters: 2)
+             Imp.react_v2(@submit_signature, [write], lm: lm, max_iters: 2)
              |> Imp.call(%{question: "write and verify"})
 
     assert Imp.get(prediction, :answer) == "recovered"
@@ -299,13 +313,13 @@ defmodule ReActV2Test do
       action_lm(
         [
           %{next_thought: "ready", tool_calls: []},
-          %{tool_calls: [%{name: "submit", arguments: %{answer: "forced"}}]}
+          %{tool_calls: [%{name: "submit", arguments: %{answer: "forced", confidence: 1.0}}]}
         ],
         parent
       )
 
     assert {:ok, prediction} =
-             Imp.react_v2("question -> answer", [], lm: lm, prose: :forced_submit)
+             Imp.react_v2(@submit_signature, [], lm: lm)
              |> Imp.call(%{question: "answer"})
 
     assert Imp.get(prediction, :answer) == "forced"
@@ -334,7 +348,7 @@ defmodule ReActV2Test do
       )
 
     assert {:ok, prediction} =
-             Imp.react_v2("question -> answer", [], lm: lm, max_iters: 1)
+             Imp.react_v2(@submit_signature, [], lm: lm, max_iters: 1)
              |> Imp.call(%{question: "Capital of France?"})
 
     assert Imp.get(prediction, :answer) == "Paris"
@@ -364,7 +378,7 @@ defmodule ReActV2Test do
       )
 
     assert {:ok, prediction} =
-             Imp.react_v2("question -> answer", [], lm: lm, max_iters: 1)
+             Imp.react_v2(@submit_signature, [], lm: lm, max_iters: 1)
              |> Imp.call(%{question: "Capital of France?"})
 
     assert Imp.get(prediction, :answer) == "Paris"
@@ -396,7 +410,7 @@ defmodule ReActV2Test do
     lookup = Imp.tool(:lookup, "Look up a fact", fn _args -> "unused" end)
 
     assert {:ok, prediction} =
-             Imp.react_v2("question -> answer", [lookup],
+             Imp.react_v2(@submit_signature, [lookup],
                lm: lm,
                max_iters: 1,
                config: [json_retries: 0]
@@ -432,7 +446,7 @@ defmodule ReActV2Test do
       )
 
     assert {:ok, prediction} =
-             Imp.react_v2("question -> answer", [],
+             Imp.react_v2(@submit_signature, [],
                lm: lm,
                max_iters: 1,
                config: [json_retries: 0]
@@ -460,7 +474,7 @@ defmodule ReActV2Test do
     lookup = Imp.tool(:lookup, "Look up a fact", fn _args -> "unused" end)
 
     assert {:ok, prediction} =
-             Imp.react_v2("question -> answer", [lookup],
+             Imp.react_v2(@submit_signature, [lookup],
                lm: lm,
                max_iters: 1,
                config: [json_retries: 0]
@@ -524,7 +538,7 @@ defmodule ReActV2Test do
       )
 
     assert {:ok, prediction} =
-             Imp.react_v2("question -> answer", [],
+             Imp.react_v2(@submit_signature, [],
                lm: lm,
                max_iters: 1,
                config: [json_retries: 0]
@@ -545,13 +559,20 @@ defmodule ReActV2Test do
 
   test "normalizes atom- and string-keyed tool-call collection wrappers" do
     for wrapped <- [
-          %{tool_calls: [%{name: "submit", arguments: %{answer: "atom"}}]},
-          %{"tool_calls" => [%{"name" => "submit", "arguments" => %{"answer" => "string"}}]},
+          %{tool_calls: [%{name: "submit", arguments: %{answer: "atom", confidence: 1.0}}]},
+          %{
+            "tool_calls" => [
+              %{
+                "name" => "submit",
+                "arguments" => %{"answer" => "string", "confidence" => 1.0}
+              }
+            ]
+          },
           %{
             "tool_calls" => [
               %{
                 "recipient_name" => "functions.submit",
-                "parameters" => %{"answer" => "recipient"}
+                "parameters" => %{"answer" => "recipient", "confidence" => 1.0}
               }
             ]
           }
@@ -559,7 +580,7 @@ defmodule ReActV2Test do
       lm = action_lm([Imp.Prediction.new(%{tool_calls: wrapped})])
 
       assert {:ok, prediction} =
-               Imp.react_v2("question -> answer", [], lm: lm)
+               Imp.react_v2(@submit_signature, [], lm: lm)
                |> Imp.call(%{question: "q"})
 
       assert Imp.get(prediction, :answer) in ["atom", "string", "recipient"]
@@ -577,7 +598,7 @@ defmodule ReActV2Test do
         action_lm(
           [
             %{tool_calls: [%{name: "lookup", arguments: %{}}]},
-            %{tool_calls: [%{name: "submit", arguments: %{answer: "forced"}}]}
+            "last words"
           ],
           parent
         )
@@ -588,8 +609,9 @@ defmodule ReActV2Test do
       assert {:ok, prediction} =
                Imp.call(program, Map.put(%{question: "q"}, max_iters_key, 1))
 
-      assert Imp.get(prediction, :answer) == "forced"
-      assert Imp.get(prediction, :termination_reason) == :forced_submit
+      assert Imp.get(prediction, :answer) == "last words"
+      assert Imp.get(prediction, :termination_reason) == :last_prose
+      assert Imp.get(prediction, :termination_cause) == :max_iters
       assert_received {:lm_call, _normal_opts}
       assert_received {:lm_call, _forced_opts}
       refute_received {:lm_call, _extra_opts}
@@ -617,14 +639,19 @@ defmodule ReActV2Test do
       ])
 
     assert {:ok, prediction} =
-             Imp.react_v2("question -> answer", [], lm: lm, max_iters: 1)
+             Imp.react_v2(@submit_signature, [], lm: lm, max_iters: 1)
              |> Imp.call(%{question: "q"})
 
     assert Imp.get(prediction, :answer) == nil
     assert Imp.get(prediction, :termination_reason) == :max_iters
     assert %Imp.History{messages: [event]} = Imp.get(prediction, :history)
 
-    assert [%{error: true, result: {:error, {:missing_output_fields, [:answer]}}}] =
+    assert [
+             %{
+               error: true,
+               result: {:error, {:missing_output_fields, [:answer, :confidence]}}
+             }
+           ] =
              event.tool_call_results
   end
 
@@ -686,13 +713,14 @@ defmodule ReActV2Test do
     end
 
     history = %{"messages" => [%{"question" => "prior", "answer" => "prior answer"}]}
-    lm = action_lm([%{tool_calls: [%{name: "submit", arguments: %{answer: "continued"}}]}])
+    lm = action_lm(["continued"])
 
     assert {:ok, prediction} =
              Imp.react_v2("question -> answer", [], lm: lm, max_iters: 0)
              |> Imp.call(%{question: "next", history: history})
 
     assert Imp.get(prediction, :answer) == "continued"
+    assert Imp.get(prediction, :termination_reason) == :last_prose
     assert %Imp.History{messages: [prior, current]} = Imp.get(prediction, :history)
     assert prior.question == "prior"
     assert current.answer == "continued"
@@ -738,6 +766,187 @@ defmodule ReActV2Test do
     assert call.function.name == "lookup"
   end
 
+  # A turn recorded while the loop still offered `submit` is replayed to a loop
+  # that has none as what it was: the answer, in plain text. Shown as a call to
+  # a tool the request does not offer, a model can imitate it and write the
+  # raw tool-call markup as its answer.
+  test "a recorded submit is replayed as the answer's text to a loop without submit" do
+    submitted = fn thought, calls, results ->
+      Imp.History.new([
+        %{
+          question: "prior",
+          next_thought: thought,
+          tool_calls: Imp.Adapter.Types.ToolCalls.new(calls) |> Imp.Redaction.redact(),
+          tool_call_results: results
+        }
+      ])
+    end
+
+    no_submit = [guidance: %{finish_tool: nil, input_names: [], output_names: [], tool_names: []}]
+    signature = Imp.react_v2("question -> answer", []).react.signature
+
+    alone =
+      submitted.(
+        "",
+        [%{id: "s-1", name: "submit", arguments: %{answer: "Seven, exactly."}}],
+        [%{id: "s-1", name: "submit", result: "Completed.", error: false}]
+      )
+
+    assert [%{role: :system}, %{role: :user}, answer, %{role: :user}] =
+             Imp.Adapter.Chat.format(signature, %{history: alone, tools: []}, no_submit)
+
+    assert answer == %{role: :assistant, content: "Seven, exactly."}
+
+    beside =
+      submitted.(
+        "checking",
+        [
+          %{id: "l-1", name: "lookup", arguments: %{query: "beam"}},
+          %{id: "s-1", name: "submit", arguments: %{answer: "BEAM."}}
+        ],
+        [
+          %{id: "l-1", name: "lookup", result: "BEAM", error: false},
+          %{id: "s-1", name: "submit", result: "Completed.", error: false}
+        ]
+      )
+
+    assert [
+             %{role: :system},
+             %{role: :user},
+             %{role: :assistant, content: "checking", tool_calls: [call]},
+             %{role: :tool, content: "BEAM"},
+             %{role: :assistant, content: "BEAM."},
+             %{role: :user}
+           ] = Imp.Adapter.Chat.format(signature, %{history: beside, tools: []}, no_submit)
+
+    assert call.function.name == "lookup"
+
+    # A loop that still has submit replays the call as recorded.
+    assert [
+             %{role: :system},
+             %{role: :user},
+             %{tool_calls: [kept]},
+             %{role: :tool},
+             %{role: :user}
+           ] =
+             Imp.Adapter.Chat.format(signature, %{history: alone, tools: []}, [])
+
+    assert kept.function.name == "submit"
+  end
+
+  # A submit the loop rejected was not the answer: the loop told the model so
+  # and kept going. Replayed as text it would read as an answer the model gave
+  # and then gave again. A call recorded without an id is matched to its result
+  # by name, so the results of the step's other calls are kept.
+  test "a rejected or id-less recorded submit is replayed only as what the loop accepted" do
+    no_submit = [guidance: %{finish_tool: nil, input_names: [], output_names: [], tool_names: []}]
+    signature = Imp.react_v2("question -> answer", []).react.signature
+
+    step = fn fields, calls, results ->
+      Map.merge(fields, %{
+        tool_calls: Imp.Adapter.Types.ToolCalls.new(calls) |> Imp.Redaction.redact(),
+        tool_call_results: results
+      })
+    end
+
+    history =
+      Imp.History.new([
+        step.(
+          %{question: "prior", next_thought: "trying"},
+          [%{id: "s-1", name: "submit", arguments: %{reply: "wrong key"}}],
+          [
+            %{
+              id: "s-1",
+              name: "submit",
+              result: {:error, {:missing_output_fields, [:answer]}},
+              error: true
+            }
+          ]
+        ),
+        step.(
+          %{next_thought: "again", answer: "Right key."},
+          [%{id: "s-2", name: "submit", arguments: %{answer: "Right key."}}],
+          [%{id: "s-2", name: "submit", result: %{answer: "Right key."}, error: false}]
+        )
+      ])
+      |> Imp.History.dump()
+      |> Imp.History.load()
+
+    messages = Imp.Adapter.Chat.format(signature, %{history: history, tools: []}, no_submit)
+
+    assert [
+             %{role: :system},
+             %{role: :user},
+             %{role: :assistant, content: "trying"},
+             %{role: :assistant, content: "again\n\nRight key."},
+             %{role: :user}
+           ] = messages
+
+    refute Enum.any?(messages, &String.contains?(inspect(&1), "wrong key"))
+
+    idless =
+      Imp.History.new([
+        step.(
+          %{question: "prior", next_thought: ""},
+          [
+            %{name: "lookup", arguments: %{query: "beam"}},
+            %{name: "submit", arguments: %{answer: "BEAM."}}
+          ],
+          [
+            %{name: "lookup", result: "BEAM", error: false},
+            %{name: "submit", result: %{answer: "BEAM."}, error: false}
+          ]
+        )
+      ])
+
+    assert [
+             %{role: :system},
+             %{role: :user},
+             %{role: :assistant, tool_calls: [%{function: %{name: "lookup"}}]},
+             %{role: :tool, content: "BEAM"},
+             %{role: :assistant, content: "BEAM."},
+             %{role: :user}
+           ] = Imp.Adapter.Chat.format(signature, %{history: idless, tools: []}, no_submit)
+  end
+
+  # A host that renders input sections its own way gets the same rendering for
+  # past turns as for the current one, whether or not the past turn called a
+  # tool; otherwise the model reads its history in one format and its present
+  # in another.
+  test "a history turn with tool calls uses the host's input section renderer" do
+    signature = Imp.react_v2("question -> answer", []).react.signature
+    plain = fn _field, value -> value end
+
+    history =
+      Imp.History.new([
+        %{
+          question: "prior",
+          next_thought: "",
+          tool_calls:
+            Imp.Adapter.Types.ToolCalls.new([
+              %{id: "l-1", name: "lookup", arguments: %{query: "beam"}}
+            ])
+            |> Imp.Redaction.redact(),
+          tool_call_results: [%{id: "l-1", name: "lookup", result: "BEAM", error: false}]
+        }
+      ])
+
+    assert [
+             %{role: :system},
+             %{role: :user, content: past},
+             %{role: :assistant},
+             %{role: :tool},
+             _
+           ] =
+             Imp.Adapter.Chat.format(
+               signature,
+               %{history: history, tools: []},
+               input_section_renderer: plain
+             )
+
+    assert past == "prior"
+  end
+
   test "participates in LM demo and registry-backed persistence lifecycle" do
     runner = fn %{query: query} -> query end
     registry = Imp.Saving.Registry.new(lookup_runner: runner)
@@ -749,7 +958,7 @@ defmodule ReActV2Test do
       |> Imp.with_demos([demo])
       |> Imp.dump(registry: registry)
       |> Imp.load(registry: registry)
-      |> Imp.with_lm(action_lm([%{tool_calls: [%{name: "submit", arguments: %{answer: "ok"}}]}]))
+      |> Imp.with_lm(action_lm(["ok"]))
 
     assert program.react.demos == [demo]
     assert {:ok, prediction} = Imp.call(program, %{question: "q"})
@@ -811,39 +1020,44 @@ defmodule ReActV2Test do
     assert_received {:lm_call, _forced}
   end
 
-  # The opt-out for a single-output signature: `prose: :forced_submit` is the
-  # behaviour before a prose step ended the turn, and it costs two requests.
-  test "prose: :forced_submit keeps the second request for a single-output signature" do
+  # A signature with one text output has no `submit`: the roster the provider
+  # is sent names only the user's tools, and the guidance says to answer in
+  # plain text. A model that calls `submit` anyway is calling a tool that does
+  # not exist, which is an observation like any other unknown tool.
+  test "a signature with one text output is offered no submit tool" do
     parent = self()
 
     lm =
       action_lm(
         [
-          "I already know this one, no lookup needed.",
-          %{tool_calls: [%{name: "submit", arguments: %{answer: "Paris"}}]}
+          %{tool_calls: [%{id: "s1", name: "submit", arguments: %{answer: "Paris"}}]},
+          "Paris"
         ],
         parent
       )
 
     lookup = Imp.tool(:lookup, "lookup", fn _arguments -> "unused" end)
+    program = Imp.react_v2("question -> answer", [lookup], lm: lm)
 
-    assert {:ok, prediction} =
-             Imp.react_v2("question -> answer", [lookup], lm: lm, prose: :forced_submit)
-             |> Imp.call(%{question: "Capital of France?"})
+    refute Map.has_key?(program.tools, :submit)
+    assert program.react.adapter_opts[:guidance].finish_tool == nil
 
+    assert {:ok, prediction} = Imp.call(program, %{question: "Capital of France?"})
     assert Imp.get(prediction, :answer) == "Paris"
-    assert Imp.get(prediction, :termination_reason) == :forced_submit
+    assert Imp.get(prediction, :termination_reason) == :answered
 
-    messages = prediction |> Imp.get(:history) |> Imp.History.messages()
+    assert %Imp.History{messages: [first, second]} = Imp.get(prediction, :history)
+    assert [%{error: true, result: {:error, {:unknown_tool, "submit"}}}] = first.tool_call_results
+    # The answered step's event carries the output, as a submit's event does.
+    assert second.answer == "Paris"
 
-    assert Enum.any?(
-             messages,
-             &(Map.get(&1, :next_thought) == "I already know this one, no lookup needed.")
-           )
+    assert_received {:lm_call, opts}
+    assert Enum.map(opts[:tools], & &1.function.name) == ["lookup"]
 
-    assert_received {:lm_call, _normal}
-    assert_received {:lm_call, _forced}
-    refute_received {:lm_call, _third}
+    # With several outputs the same roster carries `submit`.
+    submit_program = Imp.react_v2(@submit_signature, [lookup])
+    assert Map.has_key?(submit_program.tools, :submit)
+    assert submit_program.react.adapter_opts[:guidance].finish_tool == :submit
   end
 
   # A terminal tool ends the turn with the outputs it carries, the shape
@@ -896,7 +1110,7 @@ defmodule ReActV2Test do
       action_lm(
         [
           %{tool_calls: [%{id: "r1", name: "reply", arguments: %{"text" => "wait"}}]},
-          %{tool_calls: [%{name: "submit", arguments: %{answer: "Paris"}}]}
+          "Paris"
         ],
         parent
       )
@@ -909,7 +1123,7 @@ defmodule ReActV2Test do
              |> Imp.call(%{question: "Capital of France?"})
 
     assert Imp.get(prediction, :answer) == "Paris"
-    assert Imp.get(prediction, :termination_reason) == :submit
+    assert Imp.get(prediction, :termination_reason) == :answered
     assert %Imp.History{messages: [first, _second]} = Imp.get(prediction, :history)
     assert [%{name: "reply", error: false}] = first.tool_call_results
   end
@@ -922,7 +1136,7 @@ defmodule ReActV2Test do
     lm =
       action_lm([
         %{tool_calls: [%{id: "r1", name: "reply", arguments: %{}}]},
-        %{tool_calls: [%{name: "submit", arguments: %{answer: "Paris"}}]}
+        "Paris"
       ])
 
     assert {:ok, prediction} =
@@ -933,7 +1147,7 @@ defmodule ReActV2Test do
              |> Imp.call(%{question: "Capital of France?"})
 
     assert Imp.get(prediction, :answer) == "Paris"
-    assert Imp.get(prediction, :termination_reason) == :submit
+    assert Imp.get(prediction, :termination_reason) == :answered
 
     assert %Imp.History{messages: [first, _second]} = Imp.get(prediction, :history)
 
@@ -969,7 +1183,7 @@ defmodule ReActV2Test do
     end
 
     assert_raise ArgumentError, ~r/submit already ends the turn/, fn ->
-      Imp.react_v2("question -> answer", [reply],
+      Imp.react_v2(@submit_signature, [reply],
         finish_on: %{submit: fn _a, _r, _i -> :continue end}
       )
     end
@@ -990,7 +1204,7 @@ defmodule ReActV2Test do
       lm =
         action_lm([
           %{tool_calls: [call]},
-          %{tool_calls: [%{name: "submit", arguments: %{answer: "done"}}]}
+          "done"
         ])
 
       assert {:ok, prediction} =
@@ -1039,8 +1253,12 @@ defmodule ReActV2Test do
           send(owner, {:request, messages})
 
           Agent.get_and_update(state, fn
-            :first -> {prose, :second}
-            :second -> {%{tool_calls: [%{name: "submit", arguments: %{answer: "Paris"}}]}, :done}
+            :first ->
+              {prose, :second}
+
+            :second ->
+              {%{tool_calls: [%{name: "submit", arguments: %{answer: "Paris", confidence: 1.0}}]},
+               :done}
           end)
         end
       )
@@ -1048,9 +1266,8 @@ defmodule ReActV2Test do
     lookup = Imp.tool(:lookup, "lookup", fn _arguments -> "unused" end)
 
     assert {:ok, prediction} =
-             Imp.react_v2("question -> answer", [lookup],
+             Imp.react_v2(@submit_signature, [lookup],
                lm: lm,
-               prose: :forced_submit,
                forced_submit_notice: "Submit now."
              )
              |> Imp.call(%{question: "Capital of France?"})
@@ -1095,7 +1312,7 @@ defmodule ReActV2Test do
       Imp.LM.Static.new(
         handler: fn messages, _opts ->
           send(owner, {:request, messages})
-          %{tool_calls: [%{name: "submit", arguments: %{answer: "ok"}}]}
+          "ok"
         end
       )
 

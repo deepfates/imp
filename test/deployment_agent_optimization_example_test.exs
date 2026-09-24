@@ -21,18 +21,21 @@ defmodule Imp.DeploymentAgentOptimizationExampleTest do
   test "packaged agent story applies descriptions without replacing trusted tools" do
     lm =
       Imp.LM.Static.new(
-        handler: fn _messages, _opts ->
-          %{
-            next_thought: "refund the duplicate charge",
-            tool_calls: [
-              %{
-                id: "billing-1",
-                name: "billing_remediation",
-                arguments: %{account_id: "A-104"}
-              },
-              %{id: "submit-1", name: "submit", arguments: %{answer: "Refund queued for A-104"}}
-            ]
-          }
+        handler: fn messages, _opts ->
+          if List.last(messages)[:role] == :tool do
+            "Refund queued for A-104"
+          else
+            %{
+              next_thought: "refund the duplicate charge",
+              tool_calls: [
+                %{
+                  id: "billing-1",
+                  name: "billing_remediation",
+                  arguments: %{account_id: "A-104"}
+                }
+              ]
+            }
+          end
         end
       )
 
@@ -60,7 +63,8 @@ defmodule Imp.DeploymentAgentOptimizationExampleTest do
     assert {:ok, prediction} = Imp.call(updated, %{request: "Refund duplicate charge on A-104"})
     assert Imp.get(prediction, :answer) == "Refund queued for A-104"
 
-    [event] = Imp.get(prediction, :history).messages
+    assert Imp.get(prediction, :termination_reason) == :answered
+    [event, _answer] = Imp.get(prediction, :history).messages
 
     assert Enum.any?(event.tool_call_results, fn result ->
              result.name == "billing_remediation" and result.result == "REFUND_QUEUED:A-104"

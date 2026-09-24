@@ -167,7 +167,7 @@ defmodule Imp.HistoryTest do
       if n == 0 do
         %{tool_calls: [%{id: "old-call", name: "retired_fetch", arguments: %{}}]}
       else
-        %{tool_calls: [%{id: "done", name: "submit", arguments: %{answer: "earlier answer"}}]}
+        "earlier answer"
       end
     end)
     tool = Imp.tool(:retired_fetch, "retired capability", fn _ ->
@@ -204,7 +204,7 @@ defmodule Imp.HistoryTest do
       end), do: raise("old tool observation missing from next turn")
       unless Enum.any?(messages, &(Map.get(&1, :content, "") =~ "earlier question")),
         do: raise("old intent missing")
-      %{tool_calls: [%{id: "new-done", name: "submit", arguments: %{answer: "continued"}}]}
+      "continued"
     end)
     program = Imp.react_v2("intent -> answer", [], lm: lm)
     {:ok, result} = Imp.call(program, %{intent: "continue", history: history})

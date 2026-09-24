@@ -149,12 +149,12 @@
     "req_llm": {
       "role": "beam_runtime_dependency",
       "repository": "https://github.com/agentjido/req_llm",
-      "version": "1.17.1",
-      "git_ref": "refs/tags/v1.17.1",
-      "commit": "33840077c2f1332eb6dff2d268dff02393014da4",
+      "version": "1.24.0",
+      "git_ref": "refs/tags/v1.24.0",
+      "commit": "fd9e079fddf253e9b719b2d2c6920f4306592809",
       "source_hashes": {
-        "hex_package": "266c0e06c47b4562f243dcdf41332342cbed2ec37064750edd725fb66bb6e914",
-        "hex_registry": "169d77a77bac5cee7655a7a9158ebea1c2a7857670f4104b29516a25a2d24f1e"
+        "hex_package": "cdc5c5cd7f38c0e17cf7a949ced99b6760dcba0d860cd4d066fea1aeba422929",
+        "hex_registry": "8ab6bda68e28afc3adf070cc6616d51831b42b8ff144116a9f104999af4c763f"
       }
     }
   },

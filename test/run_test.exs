@@ -35,13 +35,17 @@ defmodule Imp.RunTest do
             next_thought: "look it up",
             tool_calls: [
               %{id: "provider-call-1", name: "lookup", arguments: %{query: "beam"}},
-              %{id: "provider-submit-1", name: "submit", arguments: %{answer: "BEAM"}}
+              %{
+                id: "provider-submit-1",
+                name: "submit",
+                arguments: %{answer: "BEAM", confidence: 1.0}
+              }
             ]
           }
         end
       )
 
-    program = Imp.react_v2("question -> answer", [lookup], lm: lm)
+    program = Imp.react_v2("question -> answer, confidence: float", [lookup], lm: lm)
 
     assert {:ok, run} =
              Imp.start_run(program, %{question: "runtime?"},
@@ -233,7 +237,11 @@ defmodule Imp.RunTest do
               {%{
                  tool_calls: [
                    %{id: "lookup-2", name: "lookup", arguments: %{query: "beam"}},
-                   %{id: "submit-2", name: "submit", arguments: %{answer: "denied safely"}}
+                   %{
+                     id: "submit-2",
+                     name: "submit",
+                     arguments: %{answer: "denied safely", confidence: 1.0}
+                   }
                  ]
                }, :done}
           end)
@@ -255,7 +263,8 @@ defmodule Imp.RunTest do
         }
       )
 
-    program = Imp.react_v2("question -> answer", [lookup], lm: lm, max_iters: 2)
+    program =
+      Imp.react_v2("question -> answer, confidence: float", [lookup], lm: lm, max_iters: 2)
 
     assert {:ok, run} =
              Imp.start_run(program, %{question: "lookup"},

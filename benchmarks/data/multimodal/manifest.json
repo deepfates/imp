@@ -81,14 +81,6 @@
         "source": "https://ai.google.dev/gemini-api/docs/pricing"
       },
       "profile": "google-gemini-2.5-flash-generate-content",
-      "req_llm_dependency": {
-        "package": "req_llm",
-        "package_sha256": "266c0e06c47b4562f243dcdf41332342cbed2ec37064750edd725fb66bb6e914",
-        "repository": "https://github.com/agentjido/req_llm",
-        "source": "hexpm",
-        "source_revision": "33840077c2f1332eb6dff2d268dff02393014da4",
-        "version": "1.17.1"
-      },
       "req_llm_model": "google:gemini-2.5-flash"
     },
     "samples": [
@@ -159,7 +151,7 @@
         "prompt": "Use both pages of the attached synthetic PDF. Among projects with review code R7 on page 2, which owner on page 1 has the highest Units value? Return exactly one JSON object with one field and no markdown: {\"answer\": \"owner\"}"
       }
     ],
-    "schema_version": 2,
+    "schema_version": 3,
     "scoring": {
       "family_thresholds": {
         "image": 0.75,
@@ -180,5 +172,5 @@
       "prompt_contract": "One pinned attachment followed by one pinned question; return only a single-field JSON object named answer."
     }
   },
-  "payload_sha256": "4b4c80497789d74dec60b2b26236f6eee2f1f9b29046f07ef95b3fa3faf8e50f"
+  "payload_sha256": "54bf6a6ca6bc66c42f927387409c5bc0ab6010a8b7b1c1fc7ef67cbbae0b930e"
 }

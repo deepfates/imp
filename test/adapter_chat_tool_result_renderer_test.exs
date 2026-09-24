@@ -24,7 +24,7 @@ defmodule Imp.Adapter.ChatToolResultRendererTest do
             next_thought: "look",
             tool_calls: [%{id: "c1", name: "look", arguments: %{}}]
           },
-          else: %{tool_calls: [%{id: "s", name: "submit", arguments: %{answer: "ok"}}]}
+          else: "ok"
       end
     )
   end

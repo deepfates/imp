@@ -383,7 +383,7 @@ defmodule Imp.BenchmarkTruth.CampaignBudgetTest do
                     1.0e-12
   end
 
-  test "ReqLLM transport guard defeats the dependency retry reset and counts one attempt" do
+  test "ReqLLM transport guard keeps the caller's single attempt and counts it" do
     parent = self()
 
     base_url =
@@ -407,8 +407,7 @@ defmodule Imp.BenchmarkTruth.CampaignBudgetTest do
         max_retries: 0
       )
 
-    # Pinned ReqLLM currently overwrites the caller's zero with its default.
-    assert prepared.options.max_retries == 3
+    assert prepared.options.max_retries == 0
 
     {:ok, budget} =
       CampaignBudget.start_link(

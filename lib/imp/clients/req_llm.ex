@@ -18,6 +18,9 @@ defmodule Imp.Clients.ReqLLM do
   `error.code = "context_length_exceeded"` become
   `Imp.ContextWindowExceededError`. Other provider errors retain their original
   shape; prose and generic HTTP 400 responses do not trigger context recovery.
+  A successful HTTP response whose body carries a provider error, which is how
+  OpenRouter relays an upstream refusal, is returned as that error
+  (`ReqLLM.Error.API.Request`), never as an empty completion.
 
   `:reasoning_effort` is the one reasoning option, on the client or on a call.
   It takes `none`, `minimal`, `low`, `medium`, `high`, `xhigh` or `default`, as
@@ -312,11 +315,15 @@ defmodule Imp.Clients.ReqLLM do
       opts
       |> encode_openrouter_reasoning(lm.model)
       |> cap_transport_timeouts()
+      |> bind_to_caller()
       |> enforce_explicit_no_retry()
 
     case lm.req_module.generate_text(lm.model, to_req_messages(messages), opts) do
       {:ok, response} ->
-        {:ok, from_response(response, lm.model)}
+        case relayed_error(response) do
+          nil -> {:ok, from_response(response, lm.model)}
+          error -> {:error, normalize_context_refusal(error)}
+        end
 
       {:error, reason} ->
         {:error, normalize_context_refusal(reason)}
@@ -329,6 +336,34 @@ defmodule Imp.Clients.ReqLLM do
   catch
     kind, reason -> {:error, {:req_llm_generate_failed, error_message({kind, reason})}}
   end
+
+  # OpenRouter relays an upstream provider's refusal as a successful HTTP
+  # response whose body is an error object with no choices, and ReqLLM decodes
+  # that into a response with an empty message and the error in
+  # `provider_meta`. Read as a completion it says nothing, and a model that
+  # says nothing has declined to answer (`Imp.Predict.ReActV2`), so a refused
+  # request would be recorded as a choice. It is the failed request it reports,
+  # in the shape ReqLLM gives an HTTP error.
+  defp relayed_error(%ReqLLM.Response{provider_meta: %{} = meta}) do
+    case Map.get(meta, "error") || Map.get(meta, :error) do
+      %{} = error ->
+        code = Map.get(error, "code") || Map.get(error, :code)
+
+        %ReqLLM.Error.API.Request{
+          reason: Map.get(error, "message") || Map.get(error, :message) || inspect(error),
+          status: if(is_integer(code), do: code),
+          response_body: %{"error" => error}
+        }
+
+      message when is_binary(message) and message != "" ->
+        %ReqLLM.Error.API.Request{reason: message, response_body: %{"error" => message}}
+
+      _none ->
+        nil
+    end
+  end
+
+  defp relayed_error(_response), do: nil
 
   # OpenAI-compatible providers name this refusal in the structured error code.
   # General HTTP 400s and prose mentioning context are not safe retry signals.
@@ -1129,15 +1164,24 @@ defmodule Imp.Clients.ReqLLM do
         opts
 
       deadline ->
-        remaining = Imp.Deadline.remaining(deadline)
+        # ReqLLM takes neither timeout as zero, and an expired deadline is a
+        # call that should end at once as a timeout rather than fail option
+        # validation.
+        remaining = max(Imp.Deadline.remaining(deadline), 1)
 
+        # :receive_timeout bounds one attempt's wait for the next bytes, and
+        # ReqLLM retries a timed-out attempt, and a 429 or 529 after its
+        # retry-after, so that cap alone let one call run to several
+        # multiples of the time left. :total_timeout is ReqLLM's bound on the
+        # whole call, retries and their waits included.
+        #
         # Cap :connect_options only when the caller supplied it — ReqLLM's
         # option schema rejects the key, so fabricating it here made every
         # deadline-bearing call fail validation (GEPA reflection was the
-        # only such caller and was undrivable live). The :receive_timeout
-        # cap alone bounds the call end to end.
+        # only such caller and was undrivable live).
         opts
         |> cap_timeout(:receive_timeout, remaining)
+        |> cap_timeout(:total_timeout, remaining)
         |> then(fn capped ->
           if Keyword.has_key?(capped, :connect_options) do
             Keyword.update!(capped, :connect_options, &cap_timeout(&1, :timeout, remaining))
@@ -1148,11 +1192,58 @@ defmodule Imp.Clients.ReqLLM do
     end
   end
 
-  # ReqLLM attaches its retry step after constructing the Req request and
-  # resets `max_retries` to 3, so an explicit caller no-retry policy is
-  # re-applied in a final request step at the adapter boundary, where nothing
-  # overwrites it. The attempt event fires immediately before the Req adapter
-  # call, so it counts transports rather than Imp calls.
+  # ReqLLM runs a call that has a :total_timeout -- every call under a deadline,
+  # above -- in a task under its own supervisor, not linked to the caller
+  # (ReqLLM.TimeoutBudget). Three things the call had in the caller's process
+  # are lost in that task: a caller that dies mid-call, such as a cancelled
+  # Imp.Run, leaves the task retrying against the provider until its timeouts
+  # run out; events emitted from it (the transport attempt, ReqLLM's usage)
+  # lose the caller's trace and span; and handlers that count only the
+  # caller's own events, such as a campaign budget's usage, drop them. The
+  # request step below runs first in that task and restores all three: it ends
+  # the task when the caller goes down, and makes the task emit as the caller
+  # (`Imp.Telemetry.act_for/2`). It is unnecessary once ReqLLM runs the call
+  # in the caller's process or ties the task to it.
+  defp bind_to_caller(opts) do
+    http_opts = Keyword.get(opts, :req_http_options, [])
+
+    if Keyword.has_key?(opts, :total_timeout) and Keyword.keyword?(http_opts) and
+         is_list(Keyword.get(http_opts, :plugins, [])) do
+      step = {__MODULE__, :act_for_caller, [self(), Imp.Telemetry.context()]}
+      plugin = &Req.Request.prepend_request_steps(&1, imp_act_for_caller: step)
+      plugins = Keyword.get(http_opts, :plugins, []) ++ [plugin]
+      Keyword.put(opts, :req_http_options, Keyword.put(http_opts, :plugins, plugins))
+    else
+      opts
+    end
+  end
+
+  @doc false
+  def act_for_caller(%Req.Request{} = request, caller, context) do
+    worker = self()
+
+    if worker != caller do
+      Imp.Telemetry.act_for(caller, context)
+
+      spawn(fn ->
+        caller_down = Process.monitor(caller)
+        worker_down = Process.monitor(worker)
+
+        receive do
+          {:DOWN, ^caller_down, :process, _pid, _reason} -> Process.exit(worker, :kill)
+          {:DOWN, ^worker_down, :process, _pid, _reason} -> :ok
+        end
+      end)
+    end
+
+    request
+  end
+
+  # An explicit caller no-retry policy is applied again in a final request step
+  # at the adapter boundary, after every ReqLLM and Req step has run, so no
+  # later option merge can restore retries. The same step emits the attempt
+  # event immediately before the Req adapter call, so it counts transports
+  # rather than Imp calls; campaign budgets read that count.
   defp enforce_explicit_no_retry(opts) do
     http_opts = Keyword.get(opts, :req_http_options, [])
 

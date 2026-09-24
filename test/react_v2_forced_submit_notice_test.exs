@@ -1,6 +1,10 @@
 defmodule ReActV2ForcedSubmitNoticeTest do
   use ExUnit.Case, async: true
 
+  # The forced submit belongs to a signature with `submit`: more than one
+  # output, or one that is not text.
+  @signature "intent -> answer, confidence: float"
+
   # The forced submit re-asks the model with `tool_choice: submit` and says
   # nothing about why. A host that wants the model told why it is being made to
   # finish sets `:forced_submit_notice`; the notice is a user message in the
@@ -19,7 +23,7 @@ defmodule ReActV2ForcedSubmitNoticeTest do
         send(owner, {:request, n, messages, opts})
 
         if forced?(opts) do
-          %{tool_calls: [%{id: "s", name: "submit", arguments: %{answer: "ok"}}]}
+          %{tool_calls: [%{id: "s", name: "submit", arguments: %{answer: "ok", confidence: 1.0}}]}
         else
           %{
             next_thought: "look first",
@@ -42,7 +46,7 @@ defmodule ReActV2ForcedSubmitNoticeTest do
     notice = "You have used every turn. Submit the answer you have now."
 
     program =
-      Imp.react_v2("intent -> answer", [look()],
+      Imp.react_v2(@signature, [look()],
         lm: recording_lm(owner),
         max_iters: 1,
         forced_submit_notice: fn reason ->
@@ -68,7 +72,7 @@ defmodule ReActV2ForcedSubmitNoticeTest do
     owner = self()
 
     program =
-      Imp.react_v2("intent -> answer", [look()],
+      Imp.react_v2(@signature, [look()],
         lm: recording_lm(owner),
         max_iters: 1,
         forced_submit_notice: "Submit now."
@@ -87,7 +91,7 @@ defmodule ReActV2ForcedSubmitNoticeTest do
     owner = self()
 
     program =
-      Imp.react_v2("intent -> answer", [look()], lm: recording_lm(owner), max_iters: 1)
+      Imp.react_v2(@signature, [look()], lm: recording_lm(owner), max_iters: 1)
 
     assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
     [{first, _}, {forced, _}] = requests(2)
@@ -102,7 +106,7 @@ defmodule ReActV2ForcedSubmitNoticeTest do
     owner = self()
 
     program =
-      Imp.react_v2("intent -> answer", [look()],
+      Imp.react_v2(@signature, [look()],
         lm: recording_lm(owner),
         max_iters: 1,
         forced_submit_notice: fn _reason -> nil end
@@ -115,11 +119,11 @@ defmodule ReActV2ForcedSubmitNoticeTest do
 
   test "the option rejects anything that is not a string or a 1-arity function" do
     assert_raise ArgumentError, ~r/forced_submit_notice/, fn ->
-      Imp.react_v2("intent -> answer", [look()], forced_submit_notice: fn -> "no" end)
+      Imp.react_v2(@signature, [look()], forced_submit_notice: fn -> "no" end)
     end
 
     assert_raise ArgumentError, ~r/forced_submit_notice/, fn ->
-      Imp.react_v2("intent -> answer", [look()], forced_submit_notice: 7)
+      Imp.react_v2(@signature, [look()], forced_submit_notice: 7)
     end
   end
 end

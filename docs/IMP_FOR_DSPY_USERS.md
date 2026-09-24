@@ -17,7 +17,7 @@ updates, telemetry, and fresh-runtime artifact application.
 | `dspy.Signature` / `"q -> a"` | `Imp.signature("q -> a")` — the same compact input/output idea with Imp type spellings such as `array[...]`, `enum[...]`, and `number` |
 | `dspy.Predict(sig)` | `Imp.predict(sig, lm: lm)` |
 | `dspy.ChainOfThought` | `Imp.chain_of_thought/2` |
-| `dspy.ReAct(sig, tools=[...])` | `Imp.react_v2(sig, tools, tool_policy: [...])` — typed tools, structured observations, and validated `submit` |
+| `dspy.ReAct(sig, tools=[...])` | `Imp.react_v2(sig, tools, tool_policy: [...])` — typed tools, structured observations, and validated `submit` for several or typed outputs; one text output is answered in prose |
 | `dspy.Example` / `.with_inputs` | `Imp.example/1` / `Imp.with_inputs/2` |
 | `dspy.Prediction` | `%Imp.Prediction{}` — read fields with `Imp.get/2` |
 | `dspy.Evaluate` | `Imp.evaluate/4` — returns score plus per-example rows |

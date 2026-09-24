@@ -102,7 +102,8 @@ defmodule Imp.Adapter.Chat do
       output: output_renderer,
       input_section: input_renderer,
       tool_result: tool_result_renderer,
-      history_note: Keyword.get(opts, :history_note_renderer) || (&no_history_note/2)
+      history_note: Keyword.get(opts, :history_note_renderer) || (&no_history_note/2),
+      submit_is_text?: submit_is_text?(Keyword.get(opts, :guidance))
     }
 
     {history_messages, history_fields} = extract_history(signature, inputs, renderers)
@@ -618,18 +619,30 @@ defmodule Imp.Adapter.Chat do
   end
 
   # Renders loop guidance passed as data, appended after the program's own
-  # instructions so the two have separate owners.
+  # instructions so the two have separate owners. With a finish tool the text
+  # is DSPy ReActV2's, byte for byte. A `finish_tool` of nil means the loop has
+  # no finish tool and the answer is the text the model writes when it stops
+  # calling tools, so that one line says so instead; this is Imp's divergence
+  # for a signature with one text output (`Imp.Predict.ReActV2`).
   defp with_guidance(instructions, nil), do: instructions
 
   defp with_guidance(instructions, %{} = guidance) do
     names = fn key -> guidance |> Map.get(key, []) |> Enum.map_join(", ", &"`#{&1}`") end
-    finish = Map.get(guidance, :finish_tool, :submit)
+
+    finish =
+      case Map.get(guidance, :finish_tool, :submit) do
+        nil ->
+          "When the final answer is ready, write it as plain text without calling a tool."
+
+        tool ->
+          "When the final answer is ready, call `#{tool}` with #{names.(:output_names)}."
+      end
 
     """
     #{instructions}
     You are an Agent. Use the supplied tools to produce #{names.(:output_names)} from #{names.(:input_names)}.
     Call tools when more information is needed.
-    When the final answer is ready, call `#{finish}` with #{names.(:output_names)}.
+    #{finish}
     The available tools are: #{names.(:tool_names)}.
     """
     |> String.trim()
@@ -1053,7 +1066,7 @@ defmodule Imp.Adapter.Chat do
 
       messages =
         if native_tool_history_turn?(turn) do
-          render_native_tool_history_turn(signature, turn, renderers.tool_result)
+          render_native_tool_history_turn(signature, turn, renderers)
         else
           [
             %{
@@ -1093,13 +1106,31 @@ defmodule Imp.Adapter.Chat do
 
   defp native_tool_history_turn?(turn), do: not is_nil(fetch_field(turn, :tool_calls))
 
-  defp render_native_tool_history_turn(signature, turn, tool_result_renderer) do
+  # A loop whose guidance names no finish tool answers in plain text, and has
+  # no `submit` for a recorded call to name.
+  defp submit_is_text?(%{} = guidance),
+    do: Map.has_key?(guidance, :finish_tool) and is_nil(guidance.finish_tool)
+
+  defp submit_is_text?(_guidance), do: false
+
+  defp render_native_tool_history_turn(signature, turn, renderers) do
     calls = normalize_history_tool_calls(fetch_field(turn, :tool_calls))
     results = List.wrap(fetch_field(turn, :tool_call_results))
 
+    {calls, results, answer} =
+      if renderers.submit_is_text?,
+        do: submit_as_text(calls, results),
+        else: {calls, results, nil}
+
+    tool_result_renderer = renderers.tool_result
+
     user = %{
       role: :user,
-      content: render_inputs(signature, turn, skip: history_input_fields(signature))
+      content:
+        render_inputs(signature, turn,
+          skip: history_input_fields(signature),
+          section_renderer: renderers.input_section
+        )
     }
 
     thought = turn |> fetch_field(:next_thought) |> blank_to_empty()
@@ -1133,12 +1164,105 @@ defmodule Imp.Adapter.Chat do
         }
       end)
 
-    [user, assistant | tool_messages]
+    answered =
+      cond do
+        is_nil(answer) -> []
+        calls == [] -> []
+        true -> [%{role: :assistant, content: answer}]
+      end
+
+    assistant =
+      if is_binary(answer) and calls == [],
+        do: %{assistant | content: join_text(thought, answer)},
+        else: assistant
+
+    ([user, assistant | tool_messages] ++ answered)
     |> Enum.reject(fn
       %{role: :assistant, tool_calls: calls} -> calls == []
       message -> blank_message?(message)
     end)
   end
+
+  # A recorded `submit` call, replayed to a loop that has none. The call was
+  # the turn's answer, so it is shown as the answer: assistant text, with its
+  # result dropped. Shown as a call to a tool the request does not offer, some
+  # providers' models imitate it and write the raw tool-call markup as text.
+  # A submit the loop rejected was not the answer, so it is dropped with its
+  # error; the loop took the last accepted one, and so does this. A call
+  # recorded without an id is matched to its result by name.
+  defp submit_as_text(calls, results) do
+    {submits, calls} = Enum.split_with(calls, &submit_call?/1)
+
+    case submits do
+      [] ->
+        {calls, results, nil}
+
+      submits ->
+        {submit_results, results} = Enum.split_with(results, &submit_result?(&1, submits))
+
+        answer =
+          submits
+          |> Enum.zip(submit_results_in_order(submits, submit_results))
+          |> Enum.reject(fn {_submit, result} -> rejected?(result) end)
+          |> List.last()
+          |> case do
+            nil -> nil
+            {submit, _result} -> submit |> get_in([:function, :arguments]) |> submitted_text()
+          end
+
+        {calls, results, answer}
+    end
+  end
+
+  defp submit_call?(call), do: get_in(call, [:function, :name]) == "submit"
+
+  defp submit_result?(result, submits) do
+    case fetch_field(result, :id) do
+      nil -> to_string(fetch_field(result, :name)) == "submit"
+      id -> Enum.any?(submits, &(Map.get(&1, :id) == id))
+    end
+  end
+
+  # Each submit's result, or nil when none was recorded: by id when the call
+  # has one, otherwise the next id-less result, since the loop records results
+  # in call order.
+  defp submit_results_in_order(submits, submit_results) do
+    idless = Enum.filter(submit_results, &is_nil(fetch_field(&1, :id)))
+
+    {paired, _idless} =
+      Enum.map_reduce(submits, idless, fn submit, idless ->
+        case Map.get(submit, :id) do
+          nil ->
+            case idless do
+              [result | rest] -> {result, rest}
+              [] -> {nil, []}
+            end
+
+          id ->
+            {Enum.find(submit_results, &(fetch_field(&1, :id) == id)), idless}
+        end
+      end)
+
+    paired
+  end
+
+  defp rejected?(nil), do: false
+
+  defp rejected?(result),
+    do: fetch_field(result, :error) == true or match?({:error, _}, fetch_field(result, :result))
+
+  defp submitted_text(%{} = arguments) do
+    case Map.values(arguments) do
+      [text] when is_binary(text) -> text
+      _other -> Jason.encode!(arguments)
+    end
+  end
+
+  defp submitted_text(text) when is_binary(text), do: text
+  defp submitted_text(_arguments), do: ""
+
+  defp join_text("", answer), do: answer
+  defp join_text(thought, answer), do: thought <> "\n\n" <> answer
 
   defp normalize_history_tool_calls(%Imp.Adapter.Types.ToolCalls{tool_calls: calls}),
     do: Enum.map(calls, &Imp.Adapter.Types.ToolCall.format/1)

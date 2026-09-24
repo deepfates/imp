@@ -166,12 +166,11 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.Campaign do
     do: raise(ArgumentError, "campaign options must be a keyword list, got: #{inspect(opts)}")
 
   @doc false
-  def handle_usage(_event, _measurements, _metadata, {_agent, owner})
-      when owner != self(),
-      do: :ok
-
-  def handle_usage(event, measurements, metadata, {agent, _owner}),
-    do: handle_usage(event, measurements, metadata, agent)
+  def handle_usage(event, measurements, metadata, {agent, owner}) when is_pid(owner) do
+    if Imp.Telemetry.emitted_for?(owner),
+      do: handle_usage(event, measurements, metadata, agent),
+      else: :ok
+  end
 
   def handle_usage(_event, measurements, _metadata, agent) do
     Agent.update(agent, fn audit ->

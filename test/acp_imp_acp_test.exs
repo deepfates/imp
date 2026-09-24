@@ -1552,13 +1552,7 @@ defmodule Imp.ACPTest do
       Imp.LM.Static.new(
         handler: fn messages, _opts ->
           send(test_pid, {:react_messages, messages})
-
-          %{
-            next_thought: "answer",
-            tool_calls: [
-              %{id: "submit", name: "submit", arguments: %{answer: "ok"}}
-            ]
-          }
+          "ok"
         end
       )
 
@@ -1570,12 +1564,12 @@ defmodule Imp.ACPTest do
     {:ok, %{"sessionId" => session_id}} = Client.new_session(client, "/tmp/project")
     assert {:ok, %{"stopReason" => "end_turn"}} = Client.prompt(client, session_id, "first")
     assert_receive {:react_messages, first_messages}
-    refute inspect(first_messages) =~ "answer: \"ok\""
+    refute inspect(first_messages) =~ "content: \"ok\""
 
     assert {:ok, %{"stopReason" => "end_turn"}} = Client.prompt(client, session_id, "second")
     assert_receive {:react_messages, second_messages}
     assert inspect(second_messages) =~ "first"
-    assert inspect(second_messages) =~ "answer: \"ok\""
+    assert inspect(second_messages) =~ "content: \"ok\""
   end
 
   test "durable ReAct sessions list, load, replay, continue, and delete across agent restart" do
@@ -1593,11 +1587,7 @@ defmodule Imp.ACPTest do
       Imp.LM.Static.new(
         handler: fn messages, _opts ->
           send(test_pid, {:durable_react_messages, messages})
-
-          %{
-            next_thought: "answer",
-            tool_calls: [%{id: "submit", name: "submit", arguments: %{answer: "ok"}}]
-          }
+          "ok"
         end
       )
 
@@ -1615,7 +1605,7 @@ defmodule Imp.ACPTest do
              Client.prompt(first_client, session_id, "first")
 
     assert_receive {:durable_react_messages, first_messages}
-    refute inspect(first_messages) =~ "answer: \"ok\""
+    refute inspect(first_messages) =~ "content: \"ok\""
 
     stop_if_alive(first_client)
     stop_if_alive(first_agent)
@@ -1653,7 +1643,7 @@ defmodule Imp.ACPTest do
 
     assert_receive {:durable_react_messages, second_messages}
     assert inspect(second_messages) =~ "first"
-    assert inspect(second_messages) =~ "answer: \"ok\""
+    assert inspect(second_messages) =~ "content: \"ok\""
 
     assert {:ok, %{}} = Client.delete_session(second_client, session_id)
     assert {:ok, %{"sessions" => []}} = Client.list_sessions(second_client, cwd: workspace)
@@ -1664,14 +1654,13 @@ defmodule Imp.ACPTest do
 
     lm =
       Imp.LM.Static.new(
-        handler: fn _messages, _opts ->
-          %{
-            next_thought: "checking the workspace",
-            tool_calls: [
-              %{id: "lookup-live-1", name: "lookup", arguments: %{query: "beam"}},
-              %{id: "submit-live-1", name: "submit", arguments: %{answer: "BEAM"}}
-            ]
-          }
+        handler: fn messages, _opts ->
+          tool_then_answer(
+            messages,
+            "checking the workspace",
+            %{id: "lookup-live-1", name: "lookup", arguments: %{query: "beam"}},
+            "BEAM"
+          )
         end
       )
 
@@ -1714,7 +1703,6 @@ defmodule Imp.ACPTest do
     assert tool_call_id == authorized_tool_call_id
     assert tool_call_id == result_tool_call_id
     assert String.ends_with?(tool_call_id, ":lookup-live-1")
-    refute Enum.any?(updates, &String.ends_with?(&1["toolCallId"] || "", ":submit-live-1"))
   end
 
   test "ACP tool-call IDs remain unique when source IDs repeat across session turns" do
@@ -1722,14 +1710,13 @@ defmodule Imp.ACPTest do
 
     lm =
       Imp.LM.Static.new(
-        handler: fn _messages, _opts ->
-          %{
-            next_thought: "checking",
-            tool_calls: [
-              %{id: "reused-source-id", name: "lookup", arguments: %{query: "beam"}},
-              %{id: "reused-submit-id", name: "submit", arguments: %{answer: "BEAM"}}
-            ]
-          }
+        handler: fn messages, _opts ->
+          tool_then_answer(
+            messages,
+            "checking",
+            %{id: "reused-source-id", name: "lookup", arguments: %{query: "beam"}},
+            "BEAM"
+          )
         end
       )
 
@@ -2082,21 +2069,28 @@ submit(%{answer: observed <> ":" <> scratch})|
     %DelayedProgram{signature: Imp.signature("question -> answer"), test_pid: test_pid}
   end
 
+  # A scripted step that makes `call` until a tool result is the newest
+  # message, and then answers in prose.
+  defp tool_then_answer(messages, thought, call, answer) do
+    if List.last(messages)[:role] == :tool,
+      do: answer,
+      else: %{next_thought: thought, tool_calls: [call]}
+  end
+
   defp one_tool_program(tool, answer) do
     lm =
       Imp.LM.Static.new(
-        handler: fn _messages, _opts ->
-          %{
-            next_thought: "request the effect",
-            tool_calls: [
-              %{id: "external-call", name: "external", arguments: %{value: "x"}},
-              %{id: "submit-call", name: "submit", arguments: %{answer: answer}}
-            ]
-          }
+        handler: fn messages, _opts ->
+          tool_then_answer(
+            messages,
+            "request the effect",
+            %{id: "external-call", name: "external", arguments: %{value: "x"}},
+            answer
+          )
         end
       )
 
-    Imp.react_v2("question -> answer", [tool], lm: lm, max_iters: 1)
+    Imp.react_v2("question -> answer", [tool], lm: lm, max_iters: 2)
   end
 
   defp mcp_program(tools) do
@@ -2113,12 +2107,7 @@ submit(%{answer: observed <> ":" <> scratch})|
               }
 
             %{content: content} ->
-              %{
-                next_thought: "submit MCP observation",
-                tool_calls: [
-                  %{id: "mcp-submit", name: "submit", arguments: %{answer: "mcp:#{content}"}}
-                ]
-              }
+              "mcp:#{content}"
           end
         end
       )
@@ -2153,9 +2142,7 @@ submit(%{answer: observed <> ":" <> scratch})|
               })
 
             _ ->
-              tool_turn("finish", "submit", "host-submit", %{
-                answer: "host capabilities complete"
-              })
+              "host capabilities complete"
           end
         end
       )

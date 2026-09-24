@@ -38,14 +38,13 @@ defmodule ReasoningContinuityTest do
     ]
 
     assert_continuity(:openrouter, "reasoning_details", details)
+    assert_submit_continuity(:openrouter, "reasoning_details", details)
   end
 
   test "DeepSeek native reasoning text survives tool continuation and a JSON history reload" do
-    assert_continuity(
-      :deepseek,
-      "reasoning_content",
-      "  Native plan: #{@continuation_token}\nuse lookup.\n"
-    )
+    text = "  Native plan: #{@continuation_token}\nuse lookup.\n"
+    assert_continuity(:deepseek, "reasoning_content", text)
+    assert_submit_continuity(:deepseek, "reasoning_content", text)
   end
 
   test "atom and string keyed assistant messages retain native reasoning without duplicating it" do
@@ -204,9 +203,101 @@ defmodule ReasoningContinuityTest do
     assert_raise ArgumentError, fn -> String.to_existing_atom(unknown_provider) end
   end
 
+  # A one-text-output loop has no `submit`: the lookup step carries reasoning
+  # with its tool call, and the prose answer carries reasoning with its text.
+  # The saved history is then resumed by a fresh program after a JSON round
+  # trip, and every recorded assistant turn keeps its reasoning on the wire.
   defp assert_continuity(provider, field, value) do
+    {lm, counter} = scripted_lm(provider, field, value, [:lookup, :prose, :prose])
+
+    lookup = lookup_tool()
+    program = Imp.react_v2("question -> answer", [lookup], lm: lm, max_iters: 4)
+
+    assert {:ok, run} =
+             Imp.Run.start(program, %{question: "Look up the fixture. #{@input_token}"})
+
+    assert {:ok, first} = Task.await(run.task)
+    events = Imp.Run.events(run)
+    assert :ok = Imp.Run.stop(run)
+    assert Imp.get(first, :termination_reason) == :answered
+    assert Imp.get(first, :answer) == "done"
+    assert_received {:wire_request, 1, _initial}
+    assert_received {:wire_request, 2, continuation}
+
+    history = Imp.get(first, :history)
+    refute inspect(history, limit: :infinity) =~ @input_token
+
+    restarted = Imp.react_v2("question -> answer", [lookup], lm: lm, max_iters: 4)
+
+    assert {:ok, resumed} =
+             Imp.call(restarted, %{question: "Continue.", history: reload(history)})
+
+    assert Imp.get(resumed, :answer) == "done"
+    assert Agent.get(counter, & &1) == 3
+    assert_received {:wire_request, 3, after_reload}
+
+    assert_replayed(continuation, "original-call-1", field, value)
+    assert_replayed(after_reload, "original-call-1", field, value)
+    assert_answer_replayed(after_reload, "done", field, value)
+
+    # Operational continuation data is lossless; diagnostic copies still use
+    # the ordinary credential redactor, including inside provider extensions.
+    refute inspect(Imp.History.redact(history), limit: :infinity) =~ @continuation_token
+    assert Enum.any?(events, &(&1.kind == :model_response))
+    assert Enum.any?(events, &(&1.kind == :run_finished))
+    refute inspect(events, limit: :infinity) =~ @continuation_token
+    refute_received {:wire_request, _, _}
+  end
+
+  # A loop that still needs `submit` (two outputs) records the answer as a
+  # submit call. Resumed by a one-text-output loop, that call is replayed as
+  # the answer's text; the assistant turn that made it keeps its reasoning.
+  defp assert_submit_continuity(provider, field, value) do
+    submit = {:submit, %{"answer" => "done", "source" => "fixture"}}
+    {lm, _counter} = scripted_lm(provider, field, value, [:lookup, submit, :prose])
+
+    lookup = lookup_tool()
+    program = Imp.react_v2("question -> answer, source", [lookup], lm: lm, max_iters: 4)
+
+    assert {:ok, first} = Imp.call(program, %{question: "Look up the fixture."})
+    assert Imp.get(first, :termination_reason) == :submit
+    assert Imp.get(first, :answer) == "done"
+    assert_received {:wire_request, 1, _initial}
+    assert_received {:wire_request, 2, continuation}
+    assert_replayed(continuation, "original-call-1", field, value)
+
+    restarted = Imp.react_v2("question -> answer", [lookup], lm: lm, max_iters: 4)
+
+    assert {:ok, _resumed} =
+             Imp.call(restarted, %{
+               question: "Continue.",
+               history: reload(Imp.get(first, :history))
+             })
+
+    assert_received {:wire_request, 3, after_reload}
+    assert_replayed(after_reload, "original-call-1", field, value)
+
+    refute Enum.any?(after_reload["messages"], fn message ->
+             Enum.any?(message["tool_calls"] || [], &(&1["id"] == "original-call-2"))
+           end)
+
+    assert_answer_replayed(
+      after_reload,
+      Jason.encode!(%{"answer" => "done", "source" => "fixture"}),
+      field,
+      value
+    )
+  end
+
+  defp lookup_tool,
+    do: Imp.tool(:lookup, "Read an immutable fixture", fn %{query: "fixture"} -> "found" end)
+
+  defp reload(history),
+    do: history |> Imp.History.dump() |> Jason.encode!() |> Jason.decode!() |> Imp.History.load()
+
+  defp scripted_lm(provider, field, value, script) do
     owner = self()
-    counter = start_supervised!({Agent, fn -> 0 end})
+    counter = start_supervised!({Agent, fn -> 0 end}, id: make_ref())
 
     base_url =
       Imp.Test.LocalHTTP.start(fn request ->
@@ -214,10 +305,12 @@ defmodule ReasoningContinuityTest do
         body = Jason.decode!(request.body)
         send(owner, {:wire_request, count, body})
 
-        {name, arguments} =
-          if count == 1,
-            do: {"lookup", %{"query" => "fixture"}},
-            else: {"submit", %{"answer" => "done"}}
+        {finish, message} =
+          case Enum.at(script, count - 1) do
+            :lookup -> {"tool_calls", tool_message(count, "lookup", %{"query" => "fixture"})}
+            {:submit, arguments} -> {"tool_calls", tool_message(count, "submit", arguments)}
+            :prose -> {"stop", %{"role" => "assistant", "content" => "done"}}
+          end
 
         {200,
          %{
@@ -227,19 +320,8 @@ defmodule ReasoningContinuityTest do
            "choices" => [
              %{
                "index" => 0,
-               "finish_reason" => "tool_calls",
-               "message" => %{
-                 "role" => "assistant",
-                 "content" => "",
-                 field => value,
-                 "tool_calls" => [
-                   %{
-                     "id" => "original-call-#{count}",
-                     "type" => "function",
-                     "function" => %{"name" => name, "arguments" => Jason.encode!(arguments)}
-                   }
-                 ]
-               }
+               "finish_reason" => finish,
+               "message" => Map.put(message, field, value)
              }
            ],
            "usage" => %{"prompt_tokens" => 2, "completion_tokens" => 3, "total_tokens" => 5}
@@ -254,44 +336,40 @@ defmodule ReasoningContinuityTest do
         req_http_options: [retry: false, max_retries: 0]
       )
 
-    lookup = Imp.tool(:lookup, "Read an immutable fixture", fn %{query: "fixture"} -> "found" end)
-    program = Imp.react_v2("question -> answer", [lookup], lm: lm, max_iters: 4)
-
-    assert {:ok, run} =
-             Imp.Run.start(program, %{question: "Look up the fixture. #{@input_token}"})
-
-    assert {:ok, first} = Task.await(run.task)
-    events = Imp.Run.events(run)
-    assert :ok = Imp.Run.stop(run)
-    assert Imp.get(first, :termination_reason) == :submit
-    assert Imp.get(first, :answer) == "done"
-    assert_received {:wire_request, 1, _initial}
-    assert_received {:wire_request, 2, continuation}
-
-    history = Imp.get(first, :history)
-    refute inspect(history, limit: :infinity) =~ @input_token
-
-    restored =
-      history |> Imp.History.dump() |> Jason.encode!() |> Jason.decode!() |> Imp.History.load()
-
-    restarted = Imp.react_v2("question -> answer", [lookup], lm: lm, max_iters: 4)
-
-    assert {:ok, resumed} = Imp.call(restarted, %{question: "Continue.", history: restored})
-    assert Imp.get(resumed, :answer) == "done"
-    assert Agent.get(counter, & &1) == 3
-    assert_received {:wire_request, 3, after_reload}
-
-    assert_replayed(continuation, "original-call-1", field, value)
-    assert_replayed(after_reload, "original-call-1", field, value)
-    assert_replayed(after_reload, "original-call-2", field, value)
-
-    # Operational continuation data is lossless; diagnostic copies still use
-    # the ordinary credential redactor, including inside provider extensions.
-    refute inspect(Imp.History.redact(history), limit: :infinity) =~ @continuation_token
-    assert Enum.any?(events, &(&1.kind == :model_response))
-    assert Enum.any?(events, &(&1.kind == :run_finished))
-    refute inspect(events, limit: :infinity) =~ @continuation_token
+    {lm, counter}
   end
+
+  defp tool_message(count, name, arguments) do
+    %{
+      "role" => "assistant",
+      "content" => "",
+      "tool_calls" => [
+        %{
+          "id" => "original-call-#{count}",
+          "type" => "function",
+          "function" => %{"name" => name, "arguments" => Jason.encode!(arguments)}
+        }
+      ]
+    }
+  end
+
+  defp assert_answer_replayed(request, text, field, value) do
+    assistant =
+      Enum.find(request["messages"], fn message ->
+        message["role"] == "assistant" and message["tool_calls"] in [nil, []] and
+          message_text(message) == text
+      end)
+
+    assert assistant, "missing recorded answer #{inspect(text)}"
+    assert assistant[field] == value
+  end
+
+  defp message_text(%{"content" => content}) when is_binary(content), do: content
+
+  defp message_text(%{"content" => parts}) when is_list(parts),
+    do: parts |> Enum.filter(&(&1["type"] == "text")) |> Enum.map_join(& &1["text"])
+
+  defp message_text(_message), do: nil
 
   defp assert_replayed(request, id, field, value) do
     assistant =

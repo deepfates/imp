@@ -411,11 +411,25 @@ defmodule Imp.Observability do
     %{event_count: length(trace), actions: actions}
   end
 
+  # The termination reasons of a run that ended with its outputs. ReAct and
+  # ReActV2 end with `:submit`, `:forced_submit` or `:direct`; ReActV2 also
+  # ends with prose (`:answered`), the text of the last request of an
+  # interrupted turn (`:last_prose`) and a terminal tool (`:finished_by_tool`).
+  # Every other reason names why a run stopped without them.
+  @complete_terminations [
+    :submit,
+    :forced_submit,
+    :direct,
+    :answered,
+    :last_prose,
+    :finished_by_tool,
+    nil
+  ]
+
   defp prediction_status(%Imp.Prediction{} = prediction) do
-    case Imp.Prediction.get(prediction, :termination_reason) do
-      reason when reason in [:submit, :forced_submit, :direct, nil] -> :ok
-      _reason -> :incomplete
-    end
+    if Imp.Prediction.get(prediction, :termination_reason) in @complete_terminations,
+      do: :ok,
+      else: :incomplete
   end
 
   defp result_status({:error, _reason}), do: :error
