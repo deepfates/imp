@@ -47,7 +47,7 @@ seams are why swapping `Imp.LM.Static` into tests requires no patching.
 **Supervision is the execution model, not an add-on.** Evaluation fan-out,
 tool execution, and sandboxed code all run in bounded, supervised workers.
 A slow provider call returns a timeout instead of hanging your program; a
-crashed interpreter restarts. The [deployment example](../examples/deployment/README.md)
+crashed interpreter restarts. The [deployment example](https://github.com/deepfates/imp/blob/main/examples/deployment/README.md)
 is a complete OTP application, not a snippet.
 
 **The restricted interpreters are Elixir-shaped, not OS sandboxes.**

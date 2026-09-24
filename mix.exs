@@ -231,8 +231,7 @@ defmodule Imp.MixProject do
       "docs/TUTORIAL_TICKET_ROUTING.md",
       "docs/IMP_FOR_DSPY_USERS.md",
       "docs/PRODUCTION_OPERATIONS.md",
-      "docs/TRAJECTORIES.md",
-      "examples/workspace_agent/README.md"
+      "docs/TRAJECTORIES.md"
     ]
   end
 

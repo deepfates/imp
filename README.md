@@ -87,7 +87,7 @@ Single-call programs use `Imp.predict/2` or `Imp.chain_of_thought/2`. Larger
 programs are normal structs implementing `Imp.Module`; named predictor
 callbacks let the same optimizers improve one stage at a time.
 
-The [deployment example](examples/deployment/README.md) is a complete
+The [deployment example](https://github.com/deepfates/imp/blob/main/examples/deployment/README.md) is a complete
 two-stage support pipeline. It selects a program from disjoint data, writes a
 linked result and parameter artifact, loads the artifact in a fresh OS
 process, serves concurrent calls from a supervised process, hot-reloads new
@@ -131,8 +131,11 @@ Add Imp to your dependencies in `mix.exs`:
 {:imp, "~> 0.5"}
 ```
 
-Imp requires Elixir `~> 1.19`. Every dependency comes from Hex. Version `0.5.0`
-changes how Imp is installed and one `Imp.MCP.OAuth` option; see the
+Imp requires Elixir `~> 1.19` on macOS or Linux. Every dependency comes from
+Hex. One of them, erlexec, builds a small C++ program, so the machine that
+compiles Imp needs a C++ compiler (the Xcode command line tools, or `g++`).
+Version `0.5.0` changes how Imp is installed and one `Imp.MCP.OAuth` option;
+see the
 [release notes](RELEASE_NOTES.md) when upgrading from `0.4.0`.
 
 ExMCP and erlexec are declared `runtime: false`, so an OTP release that uses
@@ -145,7 +148,7 @@ modules are ported from.
 
 Imp uses [ReqLLM](https://hex.pm/packages/req_llm) for model providers. The
 examples use OpenAI, but programs are not tied to that provider. The
-[provider-free ticket router](examples/provider_free_ticket_router/README.md)
+[provider-free ticket router](https://github.com/deepfates/imp/blob/main/examples/provider_free_ticket_router/README.md)
 runs a complete evaluation-and-optimization path without an API key; the
 provider-free parts of the learning path and deployment example do too.
 
@@ -192,7 +195,7 @@ protocol endpoint. See [protocol integration and migration](docs/PRODUCTION_OPER
 Run `mix docs` for the exhaustive module and function reference.
 
 For an ordinary ACP workspace agent with bounded tools, see
-[examples/workspace_agent](examples/workspace_agent/README.md). It depends
+[examples/workspace_agent](https://github.com/deepfates/imp/blob/main/examples/workspace_agent/README.md). It depends
 directly on this Imp checkout by path and includes a provider-free mode for
 checking its launcher and workspace boundary.
 
