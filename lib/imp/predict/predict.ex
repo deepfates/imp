@@ -972,8 +972,25 @@ defmodule Imp.Predict.Predict do
     with {:ok, retry_raw} <- Imp.LM.generate(lm, retry_messages, provider_lm_opts(retry_opts)),
          {:ok, retry_raw, retry_lm_metadata} <- Imp.LM.Result.split(retry_raw) do
       case adapter.parse(signature, retry_raw, []) do
-        {:ok, prediction} -> {:ok, prediction, retry_messages, retry_raw, retry_lm_metadata}
-        retry_error -> parse_error(retry_error, retry_messages, retry_raw, signature)
+        {:ok, prediction} ->
+          {:ok, prediction, retry_messages, retry_raw, retry_lm_metadata}
+
+        # `json_retries` counts the retries, as DSPy's typed predictors'
+        # `max_retries` did. Each retry is the original request plus the
+        # latest failure's message.
+        retry_error ->
+          if adapter_parse_error?(retry_error) and retry_opts[:json_retries] > 0,
+            do:
+              retry_with_feedback(
+                retry_error,
+                adapter,
+                signature,
+                messages,
+                lm,
+                retry_opts,
+                retry_raw
+              ),
+            else: parse_error(retry_error, retry_messages, retry_raw, signature)
       end
     end
   end

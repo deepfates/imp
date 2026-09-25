@@ -343,6 +343,9 @@ User-visible changes to Imp are recorded here.
   `ArgumentError` naming the key to use; before, the documented
   `minimum`/`maximum` were ignored. Pydantic's `ge` and `le` still mean the
   same bounds.
+- `json_retries: n` makes up to n retries of a parse failure, each the
+  original request plus the latest failure's message, and stops at the first
+  reply that parses. Before, any n above 0 made one.
 
 ### Errors and shapes
 
