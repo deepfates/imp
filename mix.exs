@@ -19,6 +19,7 @@ defmodule Imp.MixProject do
           ["README.md"] ++
             product_docs() ++ livebooks() ++ ["RELEASE_NOTES.md", "CHANGELOG.md"],
         groups_for_extras: [
+          "Diving deeper": ~r"docs/diving-deeper/",
           Guides: product_docs(),
           Livebooks: livebooks(),
           Releases: ["RELEASE_NOTES.md", "CHANGELOG.md"]
@@ -110,7 +111,7 @@ defmodule Imp.MixProject do
       # MCP and ACP wire protocols. Both are started only by the protocol entry
       # points (`Imp.ACP.*`, a non-empty `Imp.MCP.connect/2`), never by ordinary
       # Imp boot, so neither is a runtime application here; releases that use
-      # the adapters include them in :load mode (docs/PRODUCTION_OPERATIONS.md).
+      # the adapters include them in :load mode (docs/production.md).
       # erlexec owns the process group of each local MCP server
       # (`Imp.MCP.OwnedStdio`); its application starts a port program, which is
       # why it is started on the first stdio connection and not at boot.
@@ -235,8 +236,12 @@ defmodule Imp.MixProject do
       "docs/LEARNING_PATH.md",
       "docs/TUTORIAL_TICKET_ROUTING.md",
       "docs/IMP_FOR_DSPY_USERS.md",
-      "docs/PRODUCTION_OPERATIONS.md",
-      "docs/TRAJECTORIES.md"
+      "docs/production.md",
+      "docs/diving-deeper/choosing-an-optimizer.md",
+      "docs/diving-deeper/metrics-and-evaluation.md",
+      "docs/diving-deeper/saving-and-artifacts.md",
+      "docs/diving-deeper/runs-and-supervision.md",
+      "docs/diving-deeper/settings-and-context.md"
     ]
   end
 
