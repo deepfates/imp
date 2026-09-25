@@ -66,9 +66,9 @@ Imp wrote this system message from the signature:
 
 ```text
 Your input fields are:
-1. `ticket` (str):
+1. `ticket` (string):
 Your output fields are:
-1. `team` (Literal['atlas', 'harbor', 'beacon', 'quill']):
+1. `team` (one of: atlas, harbor, beacon, quill):
 All interactions will be structured in the following way, with the appropriate values filled in.
 
 Inputs will have the following structure:
@@ -91,11 +91,12 @@ and this user message from our input:
 [[ ## ticket ## ]]
 We were charged twice this month.
 
-Respond with a JSON object in the following order of fields: `team` (must be formatted as a valid Python Literal['atlas', 'harbor', 'beacon', 'quill']).
+Respond with a JSON object in the following order of fields: `team` (must be formatted as one of: atlas, harbor, beacon, quill).
 ```
 
-Imp renders signatures as DSPy's adapters do, down to the Python type names,
-so what you know about DSPy's prompts holds here.
+Imp lays out prompts as DSPy's adapters do, with the types named in plain
+words instead of Python annotations, so what you know about DSPy's prompts
+holds here.
 
 The model replied:
 
