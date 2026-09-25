@@ -48,61 +48,126 @@ defmodule Imp.ACP do
 
   # :on_cancel is distinct from :cleanup: an attachment closing must not imply
   # cancellation of independently owned application work.
-  @adapter_keys [
-    :program,
-    :program_factory,
-    :input_key,
-    :input_mapper,
-    :output_key,
-    :output_renderer,
-    :cleanup,
-    :on_cancel,
-    :session_store,
-    :permission_policy,
-    :authorization_timeout,
-    :cancel_timeout,
-    :tool_kinds
+  @adapter_keys Keyword.keys(Imp.ACP.Options.schema())
+
+  # What Imp passes to `ExMCP.ACP.Agent`. `:handler` and `:handler_opts` are
+  # Imp's own; a transport's options go in `:transport_options`, so every other
+  # key is one this module knows.
+  @agent_schema [
+    name: [
+      type: :any,
+      doc: "A `GenServer` name for the agent process (`start_link/1` only)."
+    ],
+    agent_info: [
+      type: {:map, :string, :any},
+      doc: "The `agentInfo` the agent announces at `initialize`."
+    ],
+    agent_capabilities: [
+      type: {:map, :string, :any},
+      doc: "The `agentCapabilities` announced at `initialize`; `capabilities/1` by default."
+    ],
+    auth_methods: [
+      type: {:list, :map},
+      doc: "The `authMethods` announced at `initialize`; none by default."
+    ],
+    protocol_version: [
+      type: :pos_integer,
+      doc: "The ACP protocol version announced; ExMCP's by default."
+    ],
+    max_frame_bytes: [
+      type: :pos_integer,
+      doc: "Largest JSON-RPC frame read or written, in bytes; ExMCP's 1 MiB by default."
+    ],
+    max_pending_requests: [
+      type: :pos_integer,
+      doc: "Requests to the client awaiting an answer at once; ExMCP's by default."
+    ],
+    pending_request_timeout: [
+      type: :pos_integer,
+      default: 3_600_000,
+      doc: "Milliseconds a request to the client (a permission request) may wait."
+    ],
+    handler_request_timeout: [
+      type: :pos_integer,
+      doc: "Milliseconds a client request may take in the adapter; ExMCP's by default."
+    ],
+    transport: [
+      type: {:or, [{:in, [:stdio, :memory]}, {:tuple, [{:in, [:memory]}, :any]}, :atom]},
+      doc:
+        "`:stdio` (the default), `{:memory, peer}` for an in-VM client, or a " <>
+          "transport module."
+    ],
+    transport_mod: [
+      type: :atom,
+      doc: "A transport module, in place of `:transport`."
+    ],
+    transport_options: [
+      type: :keyword_list,
+      default: [],
+      doc:
+        "Options for the transport, such as `ExMCP.ACP.Agent.Transport.Stdio`'s " <>
+          "`:input` and `:output`."
+    ]
   ]
+
+  @schema Imp.ACP.Options.schema() ++ @agent_schema
 
   @doc false
   def adapter_keys, do: @adapter_keys
 
-  @default_pending_request_timeout 3_600_000
+  @doc false
+  # Validates a full option list without starting anything; `Imp.ACP.Local`
+  # checks the options for the agents it will start this way before it listens.
+  def validate_options!(opts, context, schema \\ @schema),
+    do: Imp.Options.validate!(opts, schema, context)
 
-  @doc "Starts a linked ACP agent process."
+  @doc false
+  def schema, do: @schema
+
+  @doc """
+  Starts a linked ACP agent process.
+
+  An option this function does not know raises `ArgumentError`.
+
+  ## Options
+
+  #{NimbleOptions.docs(@schema)}
+  """
   @spec start_link(keyword()) :: GenServer.on_start()
-  def start_link(opts) when is_list(opts) do
-    with :ok <- ensure_runtime() do
-      {adapter_opts, agent_opts} = Keyword.split(opts, @adapter_keys)
+  def start_link(opts) do
+    opts = validate_options!(opts, "Imp.ACP.start_link/1")
 
-      ExMCP.ACP.start_agent(
-        agent_opts
-        |> Keyword.put(:handler, Imp.ACP.Handler)
-        |> Keyword.put(:handler_opts, adapter_opts)
-        |> Keyword.put_new(:agent_info, %{"name" => "imp-acp", "version" => "0.1.0"})
-        |> Keyword.put_new(:agent_capabilities, capabilities(adapter_opts))
-        |> Keyword.put_new(:pending_request_timeout, @default_pending_request_timeout)
-      )
+    with :ok <- ensure_runtime() do
+      opts |> agent_options() |> ExMCP.ACP.start_agent()
     end
   end
 
-  @doc "Runs an ACP stdio agent until its connection exits."
+  @doc """
+  Runs an ACP stdio agent until its connection exits.
+
+  Takes the options `start_link/1` takes, and raises `ArgumentError` for one
+  it does not know before anything is started.
+  """
   @spec run(keyword()) :: :ok | {:error, term()}
-  def run(opts) when is_list(opts) do
+  def run(opts) do
+    opts = validate_options!(opts, "Imp.ACP.run/1")
     prepare_stdio_runtime()
 
     with :ok <- ensure_runtime() do
-      {adapter_opts, agent_opts} = Keyword.split(opts, @adapter_keys)
-
-      ExMCP.ACP.run_agent(
-        agent_opts
-        |> Keyword.put(:handler, Imp.ACP.Handler)
-        |> Keyword.put(:handler_opts, adapter_opts)
-        |> Keyword.put_new(:agent_info, %{"name" => "imp-acp", "version" => "0.1.0"})
-        |> Keyword.put_new(:agent_capabilities, capabilities(adapter_opts))
-        |> Keyword.put_new(:pending_request_timeout, @default_pending_request_timeout)
-      )
+      opts |> agent_options() |> ExMCP.ACP.run_agent()
     end
+  end
+
+  defp agent_options(opts) do
+    {adapter_opts, agent_opts} = Keyword.split(opts, @adapter_keys)
+    {transport_opts, agent_opts} = Keyword.pop!(agent_opts, :transport_options)
+
+    agent_opts
+    |> Keyword.merge(transport_opts)
+    |> Keyword.put(:handler, Imp.ACP.Handler)
+    |> Keyword.put(:handler_opts, adapter_opts)
+    |> Keyword.put_new(:agent_info, %{"name" => "imp-acp", "version" => "0.1.0"})
+    |> Keyword.put_new(:agent_capabilities, capabilities(adapter_opts))
   end
 
   # Stdio is the ACP wire. Silence logging before starting any dependency so
@@ -125,8 +190,16 @@ defmodule Imp.ACP do
     end
   end
 
-  @doc "Default adapter capabilities, for agents adding explicitly supported protocol features."
+  @doc """
+  Default adapter capabilities, for agents adding explicitly supported protocol features.
+
+  Takes the adapter options `start_link/1` takes; `:session_store` decides
+  whether sessions can be loaded, listed, resumed and deleted.
+  """
   def capabilities(adapter_opts \\ []) do
+    adapter_opts =
+      Imp.Options.validate!(adapter_opts, Imp.ACP.Options.schema(), "Imp.ACP.capabilities/1")
+
     capabilities = %{
       "_meta" => %{
         "deepfates.com/imp-acp" => %{"permissionToolName" => true}

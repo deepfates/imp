@@ -18,49 +18,123 @@ defmodule Imp.ACP.Options do
 
   @type t :: %__MODULE__{}
 
+  @acp_tool_kinds ~w(read edit delete move search execute think fetch switch_mode other)
+
+  @schema [
+    program: [
+      type: {:custom, __MODULE__, :validate_program, []},
+      doc:
+        "An `Imp.Module` struct installed into every session. Convenient for an " <>
+          "immutable program; use `:program_factory` for anything with state."
+    ],
+    program_factory: [
+      type: {:fun, 1},
+      doc:
+        "Builds each session's program from the session map (see above). Returns " <>
+          "the program, `{:ok, program}`, `{:ok, program, cleanup}` with a 0-arity " <>
+          "cleanup function, `{:ok, program, lifecycle}` with a map of 0-arity " <>
+          "`:before_turn`, `:after_turn` and `:cleanup` functions and `:tool_kinds`, " <>
+          "or `{:error, reason}`. Pass exactly one of `:program` " <>
+          "and `:program_factory`."
+    ],
+    input_key: [
+      type: {:or, [:atom, :string]},
+      doc:
+        "The program input the prompt text goes to. When absent, the signature's " <>
+          "only input."
+    ],
+    input_mapper: [
+      type: {:or, [{:fun, 2}, nil]},
+      doc: "`fn prompt, context -> inputs end`, in place of `:input_key`."
+    ],
+    output_key: [
+      type: {:or, [:atom, :string]},
+      doc:
+        "The prediction field that becomes the response. When absent, the " <>
+          "signature's only output."
+    ],
+    output_renderer: [
+      type: {:or, [{:fun, 2}, nil]},
+      doc: "`fn prediction, context -> text end`, in place of `:output_key`."
+    ],
+    cleanup: [
+      type: {:or, [{:fun, 1}, nil]},
+      doc:
+        "`fn program -> _ end`, called with the session's program when the " <>
+          "session closes; its return value is ignored."
+    ],
+    on_cancel: [
+      type: {:or, [{:fun, 2}, nil]},
+      doc:
+        "`fn program, session_metadata -> :ok end`, for an explicit " <>
+          "`session/cancel` only (see above)."
+    ],
+    session_store: [
+      type: {:custom, __MODULE__, :validate_session_store, []},
+      doc:
+        "A directory that keeps each session's history and transcript, which " <>
+          "enables `session/load`, `list`, `resume` and `delete`."
+    ],
+    permission_policy: [
+      type: {:or, [{:in, [:client, :unrestricted]}, {:fun, 1}, {:fun, 2}]},
+      default: :client,
+      doc:
+        "Who decides a ReActV2 or RLM tool call: `:client` asks the ACP client, " <>
+          "`:unrestricted` asks no one, and a function of the request (and the " <>
+          "session context) returns `:allow`, `:client` or `{:deny, reason}`."
+    ],
+    authorization_timeout: [
+      type: :pos_integer,
+      default: 3_600_000,
+      doc: "Milliseconds a permission decision may take before it is a denial."
+    ],
+    cancel_timeout: [
+      type: :pos_integer,
+      default: 5_000,
+      doc: "Milliseconds a cancelled turn's effects have to end."
+    ],
+    tool_kinds: [
+      type: {:custom, __MODULE__, :validate_tool_kinds_option, []},
+      default: %{},
+      doc:
+        "Map of tool name to ACP tool kind (#{Enum.map_join(@acp_tool_kinds, ", ", &"`#{&1}`")}), " <>
+          "for tools whose kind their MCP annotations do not give; it outranks a " <>
+          "kind derived from them."
+    ]
+  ]
+
+  @doc false
+  def schema, do: @schema
+
   def new(opts) when is_list(opts) do
-    program_factory = program_factory!(opts)
-    input_mapper = optional_fun!(opts, :input_mapper, 2)
-    output_renderer = optional_fun!(opts, :output_renderer, 2)
-    cleanup = optional_fun!(opts, :cleanup, 1)
-    on_cancel = optional_fun!(opts, :on_cancel, 2)
-    session_store = session_store!(opts)
-    permission_policy = Keyword.get(opts, :permission_policy, :client)
-    authorization_timeout = Keyword.get(opts, :authorization_timeout, 3_600_000)
-    cancel_timeout = Keyword.get(opts, :cancel_timeout, 5_000)
-    tool_kinds = tool_kinds!(opts)
-
-    unless permission_policy in [:client, :unrestricted] or
-             is_function(permission_policy, 1) or is_function(permission_policy, 2) do
-      raise ArgumentError,
-            ":permission_policy must be :client, :unrestricted, or a function of arity 1 or 2"
-    end
-
-    unless is_integer(authorization_timeout) and authorization_timeout > 0 do
-      raise ArgumentError, ":authorization_timeout must be a positive integer"
-    end
-
-    unless is_integer(cancel_timeout) and cancel_timeout > 0 do
-      raise ArgumentError, ":cancel_timeout must be a positive integer"
-    end
+    opts = Imp.Options.validate!(opts, @schema, "Imp.ACP")
 
     %__MODULE__{
-      program_factory: program_factory,
-      input_key: Keyword.get(opts, :input_key),
-      input_mapper: input_mapper,
-      output_key: Keyword.get(opts, :output_key),
-      output_renderer: output_renderer,
-      cleanup: cleanup,
-      on_cancel: on_cancel,
-      session_store: session_store,
-      tool_kinds: tool_kinds,
-      permission_policy: permission_policy,
-      authorization_timeout: authorization_timeout,
-      cancel_timeout: cancel_timeout
+      program_factory: program_factory!(opts),
+      input_key: opts[:input_key],
+      input_mapper: opts[:input_mapper],
+      output_key: opts[:output_key],
+      output_renderer: opts[:output_renderer],
+      cleanup: opts[:cleanup],
+      on_cancel: opts[:on_cancel],
+      session_store: opts[:session_store],
+      tool_kinds: opts[:tool_kinds],
+      permission_policy: opts[:permission_policy],
+      authorization_timeout: opts[:authorization_timeout],
+      cancel_timeout: opts[:cancel_timeout]
     }
   end
 
-  @acp_tool_kinds ~w(read edit delete move search execute think fetch switch_mode other)
+  @doc false
+  def validate_program(%_{} = program), do: {:ok, program}
+  def validate_program(other), do: {:error, "expected a program struct, got: #{inspect(other)}"}
+
+  @doc false
+  def validate_session_store(path) when is_binary(path) and path != "",
+    do: {:ok, Path.expand(path)}
+
+  def validate_session_store(nil), do: {:ok, nil}
+  def validate_session_store(_other), do: {:error, "must be a non-empty path"}
 
   @doc "ACP tool kinds accepted in `:tool_kinds`."
   def acp_tool_kinds, do: @acp_tool_kinds
@@ -71,19 +145,19 @@ defmodule Imp.ACP.Options do
   # so an agent declares the kind of each of its tools here. MCP tools are
   # derived from their annotations by `Imp.ACP.ToolKind` instead; this option
   # names a kind annotations cannot express and outranks anything derived.
-  defp tool_kinds!(opts) do
-    case validate_tool_kinds(Keyword.get(opts, :tool_kinds, %{})) do
+  @doc false
+  def validate_tool_kinds_option(kinds) do
+    case validate_tool_kinds(kinds) do
       {:ok, kinds} ->
-        kinds
+        {:ok, kinds}
 
       {:error, {:invalid_tool_kind, name, kind}} ->
-        raise ArgumentError,
-              ":tool_kinds values must be ACP tool kinds #{inspect(@acp_tool_kinds)}, " <>
-                "got #{inspect(kind)} for #{inspect(name)}"
+        {:error,
+         "values must be ACP tool kinds #{inspect(@acp_tool_kinds)}, " <>
+           "got #{inspect(kind)} for #{inspect(name)}"}
 
       {:error, {:invalid_tool_kinds, other}} ->
-        raise ArgumentError,
-              ":tool_kinds must be a map of tool name to ACP kind, got: #{inspect(other)}"
+        {:error, "must be a map of tool name to ACP kind, got: #{inspect(other)}"}
     end
   end
 
@@ -276,39 +350,16 @@ defmodule Imp.ACP.Options do
     kind, reason -> {:deny, {:permission_policy_failed, {kind, reason}}}
   end
 
-  def extract_history(%Imp.Prediction{} = prediction, previous) do
-    Imp.Prediction.get(prediction, :history, previous)
+  def extract_history(%Imp.Prediction{metadata: metadata}, previous) do
+    Map.get(metadata, :history, previous)
   end
 
   defp program_factory!(opts) do
-    case {Keyword.get(opts, :program), Keyword.get(opts, :program_factory)} do
-      {nil, factory} when is_function(factory, 1) ->
-        factory
-
-      {%_{} = program, nil} ->
-        fn _session -> program end
-
-      {nil, nil} ->
-        raise ArgumentError, "expected :program or :program_factory"
-
-      {_program, _factory} ->
-        raise ArgumentError, "pass either :program or :program_factory, not both"
-    end
-  end
-
-  defp optional_fun!(opts, key, arity) do
-    case Keyword.get(opts, key) do
-      nil -> nil
-      fun when is_function(fun, arity) -> fun
-      _ -> raise ArgumentError, ":#{key} must be a function of arity #{arity}"
-    end
-  end
-
-  defp session_store!(opts) do
-    case Keyword.get(opts, :session_store) do
-      nil -> nil
-      path when is_binary(path) and path != "" -> Path.expand(path)
-      _other -> raise ArgumentError, ":session_store must be a non-empty path"
+    case {opts[:program], opts[:program_factory]} do
+      {nil, factory} when is_function(factory, 1) -> factory
+      {%_{} = program, nil} -> fn _session -> program end
+      {nil, nil} -> raise ArgumentError, "Imp.ACP: expected :program or :program_factory"
+      _both -> raise ArgumentError, "Imp.ACP: pass either :program or :program_factory, not both"
     end
   end
 

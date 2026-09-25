@@ -38,7 +38,8 @@ defmodule Imp.TrajectoryTest do
     encoded = Jason.encode!(document)
     refute encoded =~ secret
     assert encoded =~ "[REDACTED]"
-    assert document["extra"]["outcome"] == "run_finished"
+    assert document["extra"]["terminal_event"] == "run_finished"
+    refute Map.has_key?(document["extra"], "outcome")
 
     assert Enum.map(document["steps"], & &1["step_id"]) ==
              Enum.to_list(1..length(document["steps"]))
@@ -72,7 +73,7 @@ defmodule Imp.TrajectoryTest do
     [step | _] = doc["steps"]
     assert step["extra"]["outcome"] == "unknown"
     refute Map.has_key?(step, "observation")
-    assert doc["extra"]["outcome"] == "run_cancelled"
+    assert doc["extra"]["terminal_event"] == "run_cancelled"
     assert_raise ArgumentError, fn -> Imp.Trajectory.to_atif(Enum.reverse(events)) end
 
     assert_raise ArgumentError, fn ->
@@ -134,5 +135,52 @@ defmodule Imp.TrajectoryTest do
     [first, second] = Imp.Trajectory.to_atif(events)["steps"]
     refute hd(first["tool_calls"])["tool_call_id"] == hd(second["tool_calls"])["tool_call_id"]
     assert second["extra"]["outcome"] == "unknown"
+  end
+
+  test "a tool result's outcome is the one its loop recorded, and a stored kind Imp does not know is kept" do
+    events = [
+      %{
+        "run_id" => "r",
+        "sequence" => 0,
+        "kind" => "tool_call",
+        "tool_call_id" => "a",
+        "tool_name" => "post",
+        "input" => %{}
+      },
+      %{
+        "run_id" => "r",
+        "sequence" => 1,
+        "kind" => "tool_result",
+        "tool_call_id" => "a",
+        "error" => %{"reason" => "denied"},
+        "metadata" => %{"outcome" => "refused"}
+      },
+      %{
+        "run_id" => "r",
+        "sequence" => 2,
+        "kind" => "tool_call",
+        "tool_call_id" => "b",
+        "tool_name" => "post",
+        "input" => %{}
+      },
+      %{
+        "run_id" => "r",
+        "sequence" => 3,
+        "kind" => "tool_result",
+        "tool_call_id" => "b",
+        "error" => %{"reason" => "timeout"},
+        "metadata" => %{"outcome" => "unknown"}
+      },
+      %{"run_id" => "r", "sequence" => 4, "kind" => "would_post", "metadata" => %{}},
+      %{"run_id" => "r", "sequence" => 5, "kind" => "run_finished"}
+    ]
+
+    doc = Imp.Trajectory.to_atif(events)
+    [refused, unknown] = Enum.filter(doc["steps"], &Map.has_key?(&1, "tool_calls"))
+
+    assert refused["extra"]["outcome"] == "refused"
+    assert [%{"extra" => %{"outcome" => "refused"}}] = refused["observation"]["results"]
+    assert unknown["extra"]["outcome"] == "unknown"
+    assert Enum.any?(doc["extra"]["diagnostics"], &(&1["event_kind"] == "would_post"))
   end
 end

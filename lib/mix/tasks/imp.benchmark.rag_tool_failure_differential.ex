@@ -201,9 +201,16 @@ defmodule Mix.Tasks.Imp.Benchmark.RagToolFailureDifferential do
 
     try do
       {:ok, prediction} = Imp.call(program, %{question: scenario["id"]})
-      history = Imp.Prediction.get(prediction, :history, [])
+      history = Map.get(prediction.metadata, :history, [])
       trace = Enum.map(history, &normalize_imp_event/1)
-      reason = normalize_terminal_reason(Imp.Prediction.get(prediction, :termination_reason))
+
+      # DSPy's terminal is `finish` or the step budget: the turn's reason when
+      # the model finished, and what interrupted it when it did not.
+      reason =
+        normalize_terminal_reason(
+          prediction.metadata[:termination_cause] || prediction.metadata[:termination_reason]
+        )
+
       answer = prediction |> Imp.Prediction.get(:answer) |> to_string()
       remaining = Agent.get(queue, &length/1)
 

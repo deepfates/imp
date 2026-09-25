@@ -12,7 +12,8 @@ document = Imp.Trajectory.to_atif(events, agent: %{name: "my-agent", version: "1
 File.write!("trajectory.json", Jason.encode!(document, pretty: true))
 ```
 
-An event sink receives `%Imp.Run.Event{}`. `Imp.Run.Event.to_map(event)` produces
+An event sink receives `%Imp.Run.Event{}`; `Imp.Run.Event.kinds/0` lists
+every kind Imp emits. `Imp.Run.Event.to_map(event)` produces
 redacted, JSON-compatible native data. `Imp.Trajectory.to_atif/2` also accepts
 these stored maps. Keep native records when order, lifecycle, or application
 recovery matters; the ATIF projection attaches tool results to their earlier
@@ -44,9 +45,10 @@ digest is not a recoverable artifact. Truncated observations are never exported 
 The projection uses ATIF-v1.8. It preserves actual initial context roles, marks
 that context as copied, and keeps later model request messages in metadata.
 Structured model outputs remain structured output rendered as JSON text. Tool
-calls and explicit reasoning come from native semantic events. Run lifecycle
-and final prediction bookkeeping remain diagnostics, avoiding duplicate final
-answers. Model request counts are not inference counts: a cache may satisfy a
+calls and explicit reasoning come from native semantic events; a tool result's
+`extra.outcome` is the one its loop recorded. Run lifecycle events remain
+diagnostics, avoiding duplicate final answers, and `extra.terminal_event` names
+the one that ended the run. Model request counts are not inference counts: a cache may satisfy a
 request, so `llm_call_count` remains null. Deterministic tool dispatch steps use
 zero. Metrics are retained only as observed metadata; none are inferred.
 Overlapping reused native tool IDs are rejected rather than mispaired.

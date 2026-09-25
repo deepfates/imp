@@ -1377,7 +1377,7 @@ defmodule UpstreamExam.PredictTest do
 
   describe "test_react.py" do
     # Upstream: test_tool_calling_without_typehint — one tool call, then
-    # finish, then extraction. The trajectory (Imp: prediction :history)
+    # finish, then extraction. The trajectory (Imp: prediction metadata :history)
     # records thought/tool/args/observation, with "Completed." for finish.
     test "tool calling without typehint" do
       foo = Imp.tool(:foo, "Add two numbers.", fn %{a: a, b: b} -> a + b end)
@@ -1402,7 +1402,7 @@ defmodule UpstreamExam.PredictTest do
       assert {:ok, outputs} = Imp.call(react, %{a: 1, b: 2})
       assert Imp.get(outputs, :c) == 3
 
-      assert [first, second] = Imp.get(outputs, :history)
+      assert [first, second] = outputs.metadata.history
       assert first.thought == "I need to add two numbers."
       assert to_string(first.tool) == "foo"
       assert first.arguments == %{a: 1, b: 2}
@@ -1440,7 +1440,7 @@ defmodule UpstreamExam.PredictTest do
       assert {:ok, outputs} = Imp.call(react, %{a: 1, b: 2, max_iters: 2})
       assert Imp.get(outputs, :c) == 3
 
-      assert [first, second] = Imp.get(outputs, :history)
+      assert [first, second] = outputs.metadata.history
 
       for entry <- [first, second] do
         assert entry.thought == "I need to add two numbers."

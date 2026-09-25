@@ -57,7 +57,7 @@ defmodule Imp.RunTest do
     :ok = Imp.Run.stop(run)
 
     events = receive_events([])
-    assert Enum.map(events, & &1.sequence) == Enum.to_list(0..10)
+    assert Enum.map(events, & &1.sequence) == Enum.to_list(0..9)
 
     assert [
              %{kind: :run_started},
@@ -69,9 +69,29 @@ defmodule Imp.RunTest do
              %{kind: :tool_result, tool_call_id: "provider-call-1", output: "found beam"},
              %{kind: :tool_call, tool_call_id: "provider-submit-1", tool_name: "submit"},
              %{kind: :tool_result, tool_call_id: "provider-submit-1"},
-             %{kind: :final},
              %{kind: :run_finished}
            ] = events
+
+    assert Enum.all?(events, &(&1.kind in Imp.Run.Event.kinds()))
+  end
+
+  test "start refuses an option it does not know before starting anything" do
+    program =
+      Imp.predict("question -> answer",
+        lm: Imp.LM.Static.new(handler: fn _, _ -> %{answer: "x"} end)
+      )
+
+    # A misspelled :authorize would otherwise start a run whose tool calls
+    # nobody is asked about, and a misspelled :admission would count it in the
+    # machine-wide pool.
+    for typo <- [[authorise: fn _ -> :allow end], [admision: {:agent, 1}]] do
+      error = assert_raise ArgumentError, fn -> Imp.Run.start(program, %{question: "q"}, typo) end
+      assert Exception.message(error) =~ "unknown options"
+    end
+
+    assert_raise ArgumentError, ~r/positive integer limit/, fn ->
+      Imp.Run.start(program, %{question: "q"}, admission: {:agent, 0})
+    end
   end
 
   test "cancelling an RLM run cancels its registered in-flight LM effect before returning" do
@@ -316,7 +336,7 @@ defmodule Imp.RunTest do
     refute_received {:tool_executed, _args}
     assert Imp.get(prediction, :answer) == "denied safely"
 
-    [first | _] = Imp.get(prediction, :history).messages
+    [first | _] = prediction.metadata.history.messages
 
     assert Enum.any?(first.tool_call_results, fn result ->
              result.id == "invalid-1" and result.error

@@ -14,17 +14,68 @@ defmodule Imp.ACP.Local do
   use GenServer
   import Bitwise
 
-  def start_link(opts), do: GenServer.start_link(__MODULE__, opts)
+  # This module chooses each connection's transport and frame limit itself.
+  @owned_agent_keys [:name, :transport, :transport_mod, :transport_options, :max_frame_bytes]
+
+  @max_frame_bytes [
+    type: :pos_integer,
+    default: 1_048_576,
+    doc: "Largest ACP frame read or written, in bytes."
+  ]
+
+  @schema [
+    socket_path: [
+      type: :string,
+      required: true,
+      doc: "Where to listen. The path must not exist; its directory must be private."
+    ],
+    max_frame_bytes: @max_frame_bytes,
+    agent_options: [
+      type: {:custom, __MODULE__, :validate_agent_options, []},
+      default: [],
+      doc:
+        "Options for the `Imp.ACP` agent each connection gets, as `Imp.ACP.start_link/1` " <>
+          "takes them, less the transport and frame limit this module sets: " <>
+          "#{Enum.map_join(@owned_agent_keys, ", ", &"`#{inspect(&1)}`")}."
+    ]
+  ]
+
+  @relay_schema [max_frame_bytes: @max_frame_bytes]
+
+  @doc """
+  Listens on a private UNIX socket and gives each connection its own agent.
+
+  The agent options are validated here, before anything listens, and an
+  option this function does not know raises `ArgumentError`.
+
+  ## Options
+
+  #{NimbleOptions.docs(@schema)}
+  """
+  def start_link(opts) do
+    opts = Imp.Options.validate!(opts, @schema, "Imp.ACP.Local.start_link/1")
+    GenServer.start_link(__MODULE__, opts)
+  end
+
+  @doc false
+  def validate_agent_options(opts) when is_list(opts) do
+    schema = Keyword.drop(Imp.ACP.schema(), @owned_agent_keys)
+    {:ok, Imp.ACP.validate_options!(opts, "Imp.ACP.Local :agent_options", schema)}
+  rescue
+    error in ArgumentError -> {:error, Exception.message(error)}
+  end
+
+  def validate_agent_options(other),
+    do: {:error, "expected a keyword list, got: #{inspect(other)}"}
 
   @impl true
   def init(opts) do
     Process.flag(:trap_exit, true)
     path = opts |> Keyword.fetch!(:socket_path) |> Path.expand()
-    limit = Keyword.get(opts, :max_frame_bytes, 1_048_576)
-    agent_opts = Keyword.get(opts, :agent_options, [])
+    limit = Keyword.fetch!(opts, :max_frame_bytes)
+    agent_opts = Keyword.fetch!(opts, :agent_options)
 
     with {:ok, _} <- Application.ensure_all_started(:ex_mcp),
-         :ok <- validate_limit(limit),
          :ok <- private_directory(Path.dirname(path)),
          :ok <- unused_path(path),
          {:ok, socket} <- :gen_tcp.listen(0, socket_options(path, limit)) do
@@ -81,7 +132,7 @@ defmodule Imp.ACP.Local do
         agent_opts =
           Keyword.merge(opts,
             transport_mod: Imp.ACP.Local.Transport,
-            socket: socket,
+            transport_options: [socket: socket],
             max_frame_bytes: limit
           )
 
@@ -123,9 +174,6 @@ defmodule Imp.ACP.Local do
       send_timeout_close: true
     ]
 
-  defp validate_limit(limit) when is_integer(limit) and limit > 0, do: :ok
-  defp validate_limit(_), do: {:error, :invalid_max_frame_bytes}
-
   defp unused_path(path) do
     case File.lstat(path) do
       {:error, :enoent} -> :ok
@@ -150,13 +198,17 @@ defmodule Imp.ACP.Local do
     end
   end
 
-  @doc "Relays bounded ACP frames between standard streams and a local service socket."
-  def relay(path, opts \\ []) do
-    limit = Keyword.get(opts, :max_frame_bytes, 1_048_576)
+  @doc """
+  Relays bounded ACP frames between standard streams and a local service socket.
 
-    with :ok <- validate_limit(limit),
-         {:ok, stdio} <-
-           ExMCP.ACP.Agent.Transport.Stdio.connect(Keyword.put(opts, :max_frame_bytes, limit)),
+  ## Options
+
+  #{NimbleOptions.docs(@relay_schema)}
+  """
+  def relay(path, opts \\ []) do
+    limit = Imp.Options.validate!(opts, @relay_schema, "Imp.ACP.Local.relay/2")[:max_frame_bytes]
+
+    with {:ok, stdio} <- ExMCP.ACP.Agent.Transport.Stdio.connect(max_frame_bytes: limit),
          {:ok, remote} <-
            Imp.ACP.Local.Transport.connect(socket_path: path, max_frame_bytes: limit) do
       parent = self()

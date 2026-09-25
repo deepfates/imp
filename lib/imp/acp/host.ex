@@ -46,23 +46,28 @@ defmodule Imp.ACP.Host do
     }
   end
 
+  @tools_schema [
+    only: [
+      type: {:list, {:in, @host_tool_names}},
+      default: @host_tool_names,
+      doc: "The host tools to request."
+    ]
+  ]
+
   @doc """
   Builds tools for the capabilities advertised by the connected ACP host.
 
-  Use `:only` to select a subset of `[:read_file, :write_file, :run_command]`.
-  The default requests all three, but unsupported tools are omitted. ACP treats
-  omitted capabilities as unsupported, so an agent never advertises an effect
-  that its host cannot perform.
+  All three host tools are requested by default, but unsupported tools are
+  omitted. ACP treats omitted capabilities as unsupported, so an agent never
+  advertises an effect that its host cannot perform.
+
+  ## Options
+
+  #{NimbleOptions.docs(@tools_schema)}
   """
   @spec tools(t(), keyword()) :: [Imp.Tool.t()]
   def tools(%__MODULE__{} = host, opts \\ []) do
-    only = Keyword.get(opts, :only, @host_tool_names)
-
-    unknown = only -- @host_tool_names
-
-    if unknown != [] do
-      raise ArgumentError, "unknown ACP host tools: #{inspect(unknown)}"
-    end
+    only = Imp.Options.validate!(opts, @tools_schema, "Imp.ACP.Host.tools/2")[:only]
 
     catalog = %{
       read_file: read_file_tool(host),

@@ -265,7 +265,7 @@ defmodule Imp.Observability do
   defp normalize_inspection(%Imp.Prediction{} = prediction) do
     metadata = prediction.metadata
     provider = map_entries(Map.get(metadata, :trace), :provider)
-    tools = prediction |> Imp.Prediction.get(:history) |> history_entries(:tool)
+    tools = metadata |> Map.get(:history) |> history_entries(:tool)
     rlm = metadata |> Map.get(:rlm_trace) |> list_entries(:rlm)
 
     optimizer =
@@ -411,25 +411,8 @@ defmodule Imp.Observability do
     %{event_count: length(trace), actions: actions}
   end
 
-  # The termination reasons of a run that ended with its outputs. ReAct and
-  # ReActV2 end with `:submit`, `:forced_submit` or `:direct`; ReActV2 also
-  # ends with text and no tool call (`:answered`), the text of the last request of an
-  # interrupted turn (`:last_text`) and a terminal tool (`:finished_by_tool`).
-  # Every other reason names why a run stopped without them.
-  @complete_terminations [
-    :submit,
-    :forced_submit,
-    :direct,
-    :answered,
-    :last_text,
-    :finished_by_tool,
-    nil
-  ]
-
   defp prediction_status(%Imp.Prediction{} = prediction) do
-    if Imp.Prediction.get(prediction, :termination_reason) in @complete_terminations,
-      do: :ok,
-      else: :incomplete
+    if Imp.Prediction.complete?(prediction), do: :ok, else: :incomplete
   end
 
   defp result_status({:error, _reason}), do: :error

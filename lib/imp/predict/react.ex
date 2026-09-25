@@ -60,7 +60,23 @@ defmodule Imp.Predict.ReAct do
   with an invocation-local `:max_iters` or `"max_iters"` input. The control
   value is validated and removed before task inputs are sent to the LM.
 
-  Tool call history is redacted before it is attached to the final prediction.
+  ## The prediction
+
+  The prediction's fields are the signature's outputs (and, from an extraction
+  pass, its `reasoning`). Its metadata carries the redacted tool call
+  `:history`, `:termination_reason`, how the turn ended, and, when something
+  interrupted it, `:termination_cause`:
+
+    * `:submit`, `:finish` — the model called the reserved tool.
+    * `:forced_submit` — a `:provider_native` step called no tool
+      (`termination_cause: :empty_tool_calls`) and the forced `submit` that
+      followed answered.
+    * `:answered` — as above, but the forced `submit` did not answer, so the
+      step's own text is projected onto the outputs.
+    * `:extracted` — a `:dspy_3_2_1` turn that ended at `max_iters`, on a step
+      that could not be parsed, or on a step with no tool call, answered by
+      DSPy's extraction pass; `termination_cause` is `:max_iters`,
+      `:parse_error` or `:empty_tool_calls`.
   """
 
   require Logger
@@ -370,7 +386,7 @@ defmodule Imp.Predict.ReAct do
 
       {:error, reason, effective_history} when agent.mode == :dspy_3_2_1 ->
         if action_parse_failure?(reason) do
-          extract_final(agent, inputs, effective_history, :parse_failure)
+          extract_final(agent, inputs, effective_history, :parse_error)
         else
           {:error, reason}
         end
@@ -464,12 +480,12 @@ defmodule Imp.Predict.ReAct do
 
           _other ->
             direct = project_outputs(agent.signature, direct_prediction)
-            validate_final(agent.signature, direct, history, :direct)
+            validate_final(agent.signature, direct, history, :answered)
         end
 
       {:error, _reason, _effective_history} ->
         direct = project_outputs(agent.signature, direct_prediction)
-        validate_final(agent.signature, direct, history, :direct)
+        validate_final(agent.signature, direct, history, :answered)
     end
   end
 
@@ -667,7 +683,7 @@ defmodule Imp.Predict.ReAct do
         # missing action) and proceeds to extraction. Mirror that for parse
         # failures; surface anything else (LM/input errors) as-is.
         if action_parse_failure?(reason) do
-          faithful_extract(agent, inputs, trajectory, :parse_failure)
+          faithful_extract(agent, inputs, trajectory, :parse_error)
         else
           {:error, reason}
         end
@@ -1026,17 +1042,30 @@ defmodule Imp.Predict.ReAct do
     Imp.Prediction.new(fields, metadata: prediction.metadata)
   end
 
-  defp validate_final(signature, prediction, history, reason) do
+  # How the turn ended, and what interrupted it when something did. The model
+  # calling `submit` or `finish` ends a turn on its own terms. In
+  # `:provider_native` mode a step that calls no tool is answered by a forced
+  # `submit`, or failing that by its own text (`:answered`); in `:dspy_3_2_1`
+  # mode every other ending is DSPy's extraction pass (`:extracted`).
+  defp termination(reason) when reason in [:submit, :finish],
+    do: %{termination_reason: reason}
+
+  defp termination(reason) when reason in [:forced_submit, :answered],
+    do: %{termination_reason: reason, termination_cause: :empty_tool_calls}
+
+  defp termination(cause), do: %{termination_reason: :extracted, termination_cause: cause}
+
+  defp validate_final(signature, prediction, history, ending) do
     fields = Imp.Prediction.to_map(prediction)
 
     case Imp.Schema.validate_fields(signature.outputs, fields) do
       :ok ->
-        prediction =
-          prediction
-          |> Imp.Prediction.put(:history, history)
-          |> Imp.Prediction.put(:termination_reason, reason)
+        metadata =
+          prediction.metadata
+          |> Map.put(:history, history)
+          |> Map.merge(termination(ending))
 
-        {:ok, prediction}
+        {:ok, %{prediction | metadata: metadata}}
 
       {:error, errors} ->
         missing =

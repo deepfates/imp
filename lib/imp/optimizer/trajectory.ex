@@ -274,9 +274,9 @@ defmodule Imp.Optimizer.Trajectory do
   defp projection_trace(%Imp.Prediction{} = prediction), do: prediction_trace(prediction)
   defp projection_trace(value) when is_map(value), do: fetch(value, :trace, [])
 
-  defp prediction_trace(%Imp.Prediction{metadata: metadata} = prediction) do
+  defp prediction_trace(%Imp.Prediction{metadata: metadata}) do
     fetch(metadata, :rlm_trace, fetch(metadata, :optimizer_trace, fetch(metadata, :trajectory))) ||
-      Imp.Prediction.get(prediction, :history, [])
+      fetch(metadata, :history, [])
   end
 
   defp events_from_trace(trace) when is_list(trace) do

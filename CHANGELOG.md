@@ -36,12 +36,21 @@ User-visible changes to Imp are recorded here.
   `{:error, %Imp.MCP.CallFailure{}}` instead of
   `{:mcp_tool_call_failed, server, reason}` or
   `{:mcp_connection_unavailable, server, reason}`. Its `outcome` says whether
-  the call was refused before anything ran, never sent, or sent with no
-  trustworthy answer (`:refused`, `:not_sent`, `:unknown`); `reason` keeps
-  ExMCP's error unchanged, and an exit is kept as `{:exit, reason}`.
-  `Imp.Tool.outcome/1` gives the outcome of any tool call (`:result` when the
-  tool answered, MCP error results included), and ReActV2 and RLM record it on
-  each `:tool_result` event as `metadata.outcome`.
+  the call was refused before anything ran, its credential was refused (an
+  HTTP 401 or a failed OAuth flow), it was never sent, or it was sent with no
+  trustworthy answer (`:refused`, `:auth_refused`, `:not_sent`, `:unknown`);
+  `reason` keeps ExMCP's error unchanged, and an exit is kept as
+  `{:exit, reason}`.
+- `Imp.Tool.outcome/1` gives the outcome of a tool call's value: `:result`
+  when the tool answered, MCP error results included, unless the error result
+  declares `structuredContent.outcome` as `"refused"`, `"auth_refused"` or
+  `"unknown"`, which it then is (a server marks a write that may have been
+  applied `"unknown"`). A value alone never reads as `:refused`, because a tool can
+  return any term: ReActV2 and RLM decide a refusal where they refuse the call
+  (an unknown tool, a malformed call, arguments that fail the schema, a tool
+  policy, a host's authorization, submit outputs that do not fit) and record
+  every call's outcome on its `:tool_result` event as `metadata.outcome`.
+  `Imp.Tool.outcomes/0` lists the five.
 - A failed tool call reaches the model as plain text instead of an Elixir
   term. An MCP error result is the text of its content, the tool's own words,
   after `Error: ` unless the text already begins with "error"; a JSON-RPC
@@ -119,6 +128,15 @@ User-visible changes to Imp are recorded here.
   server are always named by the server's string. Lookups (`resolve_name/2`,
   tool policies) already compare names by text; code that matched an imported
   tool's name against an atom matches the string now.
+- `Imp.ACP.start_link/1`, `Imp.ACP.run/1` and `Imp.ACP.Local.start_link/1`
+  raise `ArgumentError` for an option they do not know, before anything
+  starts; `Imp.ACP.Local` checks its `:agent_options` before it listens. In
+  0.4.0 a key Imp did not know went to ExMCP, which handed it to the
+  transport, so a misspelled `:permission_policy` or `:session_store` was
+  silently ignored. The options are declared once and `Imp.ACP.start_link/1`
+  documents them. A transport's own options go in `:transport_options`
+  (`Imp.ACP.Local` passes its socket there), and `:capabilities` is no longer
+  accepted beside `:agent_capabilities`.
 
 ### Runs
 
@@ -147,20 +165,60 @@ User-visible changes to Imp are recorded here.
   The run's owner is sent
   `{:imp_run_event_sink_failed, run_id, %{sequence: _, kind: _, reason: _}}`,
   and delivery goes on with the next event. Stopping or cancelling a run
-  reports the same way every event the sink had not finished with
-  (`:in_sink_when_stopped`, `:never_handed_to_sink`). Run owners receive this
-  message where they received nothing before; an owner with a strict
-  `handle_info/2` needs a clause for it.
+  reports the event the sink was holding the same way (`reason:
+  :in_sink_when_stopped`, since it may have been stored), and each event after
+  it, which the sink never received, as
+  `{:imp_run_event_undelivered, run_id, %{sequence: _, kind: _}}`. Run owners
+  receive these messages where they received nothing before; an owner with a
+  strict `handle_info/2` needs clauses for them.
+- `Imp.Run.start/3` raises `ArgumentError` for an option it does not know. In
+  0.4.0 it ignored one, so a misspelled `:authorize` started a run whose tool
+  calls nobody was asked about. Its options are declared once, and its
+  documentation lists them; an invalid capture bound now raises from
+  `start/3` instead of returning `{:error, {%ArgumentError{}, stacktrace}}`.
+- `Imp.Run.Event.kinds/0` lists every event kind Imp emits. ReActV2 no longer
+  emits a `:final` event: it carried the same prediction as the
+  `:run_finished` event after it. A host may still emit kinds of its own with
+  `Imp.Run.emit/2`.
+- `Imp.Trajectory.to_atif/2` names the event that ended the run
+  `extra.terminal_event` (it was `extra.outcome`), and a tool result's
+  `extra.outcome` is the `Imp.Tool.outcome/1` its loop recorded (`"result"`,
+  `"refused"`, `"auth_refused"`, `"not_sent"`, `"unknown"`) rather than
+  `"returned"` or `"error"` read from whether the event carried an error. A
+  stored event whose kind Imp does not know keeps its kind string instead of
+  becoming `:other`.
 
 ### ReActV2, adapters and models
 
 - The names follow the glossary: a step answered in text ends as `:answered`,
   the last request of an interrupted turn as `:last_text` with
-  `last_text_note`, the step signature declares `metadata[:text_step]`, and
+  `last_request_note`, the step signature declares `metadata[:text_step]`, and
   the tool list sent to a provider is the `:tools_sent` event. Builds of
   `main` between 0.4.0 and 0.5.0 called them `:last_prose`,
-  `last_prose_note`, `:prose_step` and `:tools_offered`; a store that kept
-  events under the old kind reads them back as `:other`.
+  `last_prose_note` (later `last_text_note`, beside `forced_submit_notice`),
+  `:prose_step` and `:tools_offered`.
+- A ReActV2 or ReAct prediction's fields are the signature's outputs and
+  nothing else. `history`, `termination_reason`, `termination_cause`,
+  `termination_error`, `finished_by_tool`, `unexecuted_tool_calls` and
+  `context_projection` are in `prediction.metadata`; in 0.4.0 they were
+  fields, so an output named `history` collided with the loop's own. Read
+  `prediction.metadata.history` where `Imp.get(prediction, :history)` was
+  read.
+- `termination_reason` says only how the turn ended: `:answered`, `:submit`,
+  `:finished_by_tool`, `:last_text`, `:forced_submit`, `:extracted` (the
+  tools-disabled extractor wrote the outputs; it was `:forced_submit` with
+  `completion_mode: :typed_extraction`, and `completion_mode` is gone), or
+  `:incomplete` (no answer; it was the failure itself, such as `:max_iters`
+  or `:context_window_exceeded`). `termination_cause` is set whenever the turn
+  was interrupted, including a forced submit that answered, where 0.4.0 left
+  it out: the interruption that led to the last request, or for
+  `:incomplete` what left the turn without an answer. `Imp.Predict.ReAct`
+  follows the same rule: `:dspy_3_2_1` mode's extraction after `max_iters`, a
+  parse failure or an empty step is `:extracted` with that cause, spelled
+  `:parse_error` (it was `:parse_failure`), and `:provider_native` mode's
+  `:direct` is `:answered` with `termination_cause: :empty_tool_calls`.
+  `Imp.Prediction.complete?/1` is false exactly for `:incomplete`, and
+  `Imp.Observability` reads it.
 - `ReActV2` offers `submit` only to a signature that needs it. A task
   signature with exactly one output of type `:string` gets no `submit` tool:
   a step that comes back as text with no tool call is the answer, in that
@@ -181,19 +239,19 @@ User-visible changes to Imp are recorded here.
   `:prediction_error`, `:parse_error`, `:invalid_answer`). A completion that says nothing is an empty answer rather
   than an error. A tool call the model makes on that request anyway is not
   run; the text is the answer and the calls are listed in
-  `unexecuted_tool_calls`. `last_text_note`, a string, puts one line of host text in
-  front of that request as a user message and keeps it in the returned
-  history; Imp writes no sentence of its own. If the process's `Imp.Deadline`
-  has already passed, no request is made and the run ends with
-  `termination_reason: :deadline_exceeded`. `forced_submit_notice` is for
-  signatures with `submit` and `last_text_note` for those without; each is
-  refused at construction for the other.
+  `unexecuted_tool_calls`. If the process's `Imp.Deadline` has already
+  passed, no request is made and the turn ends `:incomplete` with
+  `termination_cause: :deadline_exceeded`.
+- `last_request_note`, a string, puts one line of host text in front of the
+  last request of an interrupted turn, the text-only request or the forced
+  `submit`, as a user message, keeps it in the returned history, and is saved
+  with the program. Imp writes no sentence of its own.
 - `ReActV2` gains `finish_on`, a map from tool name to
   `fn arguments, result, inputs -> {:finish, outputs} | :continue end`. A tool
   named there ends the turn with the outputs the function returns, which are
   validated against the signature exactly as a `submit`'s are, with
-  `termination_reason: :finished_by_tool` and `finished_by_tool` naming the
-  tool. This is the shape Pydantic AI calls an output tool: one call both does
+  `termination_reason: :finished_by_tool` and `finished_by_tool` (in the
+  prediction's metadata) naming the tool. This is the shape Pydantic AI calls an output tool: one call both does
   the work and carries the answer. `:continue` leaves the loop running. When a
   step calls several terminal tools, the first in call order finishes the run
   and the rest still execute and are recorded; a `submit` in the same step
@@ -209,9 +267,6 @@ User-visible changes to Imp are recorded here.
   marker-free completion this way only for a signature that declares
   `metadata[:text_step]`; every other signature parses exactly as before, JSON
   fallback included.
-- `Imp.Observability` reports a prediction that ended `:answered`,
-  `:last_text` or `:finished_by_tool` as complete; it reported them as
-  incomplete.
 - ReActV2 preserves provider-native reasoning text and opaque reasoning details
   across tool calls and saved-history reloads. ReqLLM receives the original
   continuation data, including provider extension fields and signatures, instead

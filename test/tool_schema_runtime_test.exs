@@ -68,7 +68,7 @@ defmodule ToolSchemaRuntimeTest do
 
     assert {:ok, prediction} = Imp.call(react, %{question: "q"})
     assert Imp.get(prediction, :answer) == "recovered"
-    assert %Imp.History{messages: [first, _second]} = Imp.get(prediction, :history)
+    assert %Imp.History{messages: [first, _second]} = prediction.metadata[:history]
 
     assert [%{error: true, result: {:error, {:missing_required, ["query"]}}}] =
              first.tool_call_results

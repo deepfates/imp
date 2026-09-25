@@ -757,7 +757,7 @@ defmodule ProductionHardeningTest do
     leak = Imp.Tool.new(:leak, "leak", fn _args -> secret end)
     react = Imp.Predict.ReAct.new("question -> answer", [leak], lm: react_lm)
     assert {:ok, react_prediction} = Imp.Predict.ReAct.call(react, %{question: "q"})
-    refute inspect(Imp.Prediction.get(react_prediction, :history)) =~ secret
+    refute inspect(react_prediction.metadata[:history]) =~ secret
 
     code_lm = %{
       module: Imp.LM.Static,
