@@ -329,6 +329,20 @@ User-visible changes to Imp are recorded here.
   id, go through `Imp.context/2`, which still carries any key; both check
   Imp's own settings the same way, so `:track_usage` and
   `:warn_on_type_mismatch` must now be booleans.
+- `ReActV2`'s `submit` finds an output by the text of its name. A string
+  signature keeps a field name as a string when its atom did not exist yet,
+  and argument keys become atoms when the atom exists by the time the call
+  arrives, so such a field was always missing and every `submit` failed with
+  `missing_output_fields`.
+
+### Signatures
+
+- Numeric bounds are `minimum` and `maximum`, JSON Schema's names, in
+  validation, in the JSON schema and in the rendered prompt, and a validation
+  error's rule is `:minimum` or `:maximum`. `min` and `max` raise an
+  `ArgumentError` naming the key to use; before, the documented
+  `minimum`/`maximum` were ignored. Pydantic's `ge` and `le` still mean the
+  same bounds.
 
 ### Errors and shapes
 

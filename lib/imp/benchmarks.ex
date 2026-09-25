@@ -58,7 +58,7 @@ defmodule Imp.Benchmarks do
         inputs: [:text],
         outputs: [
           %{name: :sentiment, type: :string, constraints: %{enum: ["positive", "negative"]}},
-          %{name: :confidence, type: :number, constraints: %{min: 0.5, max: 1.0}}
+          %{name: :confidence, type: :number, constraints: %{minimum: 0.5, maximum: 1.0}}
         ]
       })
 
@@ -150,7 +150,7 @@ defmodule Imp.Benchmarks do
         inputs: [:text],
         outputs: [
           %{name: :sentiment, type: :string, constraints: %{enum: ["positive", "negative"]}},
-          %{name: :confidence, type: :number, constraints: %{min: 0.5, max: 1.0}}
+          %{name: :confidence, type: :number, constraints: %{minimum: 0.5, maximum: 1.0}}
         ]
       })
 
