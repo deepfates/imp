@@ -134,7 +134,7 @@ defmodule ImpOptimizerLifecycles.Ensemble do
   defp score(program, rows, metric, opts \\ []) do
     report =
       Imp.evaluate(program, rows, metric,
-        max_concurrency: Keyword.get(opts, :max_concurrency, 8),
+        num_threads: Keyword.get(opts, :max_concurrency, 8),
         timeout: 60_000
       )
 

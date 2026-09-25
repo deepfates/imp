@@ -74,9 +74,9 @@ defmodule TutorialTicketRoutingExperiment do
         started_at = DateTime.utc_now() |> DateTime.truncate(:second)
         t0 = System.monotonic_time(:millisecond)
 
-        baseline = Imp.evaluate(router, testset, metric, max_concurrency: 8, timeout: 60_000)
+        baseline = Imp.evaluate(router, testset, metric, num_threads: 8, timeout: 60_000)
         compiled = Imp.optimize!(router, optimizer, trainset)
-        optimized = Imp.evaluate(compiled, testset, metric, max_concurrency: 8, timeout: 60_000)
+        optimized = Imp.evaluate(compiled, testset, metric, num_threads: 8, timeout: 60_000)
 
         duration_ms = System.monotonic_time(:millisecond) - t0
         cache_stats = Imp.Cache.stats()
@@ -169,7 +169,7 @@ defmodule TutorialTicketRoutingExperiment do
           "LabeledFewShot(k: 8) held-out lift on the shipped sixty-ticket routing task with #{model} across #{repeats} live repeats",
         "not_claimed" => [
           "generalization beyond the shipped support-ticket dataset",
-          "search-optimizer (RandomSearch/MIPROv2) effectiveness",
+          "search-optimizer (BootstrapFewShotWithRandomSearch/MIPROv2) effectiveness",
           "DSPy-matched comparison"
         ]
       }

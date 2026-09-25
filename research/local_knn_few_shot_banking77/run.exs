@@ -159,12 +159,12 @@ defmodule LocalKNNFewShotBanking77.Runner do
   defp fresh do
     paths = paths!()
     {job, rows} = preflight!(paths, false)
-    selected = Imp.load!(paths.saved_program, registry: registry())
+    selected = Imp.read!(paths.saved_program, registry: registry())
     {:ok, rebound} = TrainingJob.rebind(job, selected)
     observer = observer!()
 
     observed =
-      Imp.with_lm(rebound, %ObservedLM{inner: Imp.ProgramAccess.lm(rebound), observer: observer})
+      Imp.with_lm(rebound, %ObservedLM{inner: program_lm(rebound), observer: observer})
 
     selection = read_json!(Path.join(paths.output, "03-selection.json"))
     expected = if selection["selected_arm"] == "knn", do: 80, else: 40
@@ -192,7 +192,7 @@ defmodule LocalKNNFewShotBanking77.Runner do
 
   defp preflight!(paths, persist?) do
     unless sha256_file(paths.data) == @data_sha256, do: raise("Banking77 data digest drift")
-    job = TrainingJob.load!(paths.job)
+    job = TrainingJob.read!(paths.job)
     {:ok, _manifest} = MLXLMTrainer.verify_job(job)
     rows = split_rows!(paths.data)
 
@@ -232,7 +232,7 @@ defmodule LocalKNNFewShotBanking77.Runner do
       )
 
     {:ok, rebound} = TrainingJob.rebind(job, source)
-    runtime_lm = Imp.ProgramAccess.lm(rebound)
+    runtime_lm = program_lm(rebound)
     observed = Imp.with_lm(rebound, %ObservedLM{inner: runtime_lm, observer: observer})
     {observed, runtime_lm}
   end
@@ -397,6 +397,10 @@ defmodule LocalKNNFewShotBanking77.Runner do
   defp sha256_file(path), do: path |> File.read!() |> sha256()
   defp sha256_term(term), do: term |> Jason.encode!() |> sha256()
   defp sha256(bytes), do: :crypto.hash(:sha256, bytes) |> Base.encode16(case: :lower)
+
+  # The LM of the program's first predictor, through the public parameter view.
+  defp program_lm(program),
+    do: program |> Imp.ProgramParameters.predictors() |> hd() |> then(& &1.predictor.lm)
 end
 
 unless System.get_env("IMP_KNN_DEFINE_ONLY") == "1",

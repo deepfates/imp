@@ -244,7 +244,7 @@ metric = Imp.exact_match(:answer)
 compiled =
   program
   |> Imp.optimize!(
-    Imp.Optimizer.RandomSearch.new(metric, candidates: 2, demos_per_candidate: 1),
+    Imp.Optimizer.BootstrapFewShotWithRandomSearch.new(metric, num_candidate_programs: 2, max_bootstrapped_demos: 1),
     trainset,
     devset
   )
@@ -267,7 +267,7 @@ case live_lm.([]) do
 
     %{
       credential_in_artifact?: inspect(state) =~ (api_key || openrouter_key),
-      loadable?: match?(%{__struct__: Imp.Predict.Predict}, Imp.load(state))
+      loadable?: match?({:ok, %Imp.Predict{}}, Imp.load(state))
     }
 
   :missing_key ->

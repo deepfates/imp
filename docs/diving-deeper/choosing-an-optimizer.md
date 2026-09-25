@@ -120,11 +120,11 @@ table at the end of this page is the closest thing to a recommendation.
 **What is holding the program back?** If the wording is wrong, instruction
 optimizers help (COPRO, GEPA, MIPROv2). If the model needs examples to get
 the format or the categories right, demo optimizers help (LabeledFewShot,
-BootstrapFewShot, RandomSearch). If the model itself is the limit and you can
+BootstrapFewShot, BootstrapFewShotWithRandomSearch). If the model itself is the limit and you can
 train it, tune weights (BootstrapFinetune).
 
 **What can you spend?** LabeledFewShot costs nothing and BootstrapFewShot
-little. Search (RandomSearch, MIPROv2, GEPA, SIMBA) costs real money, roughly
+little. Search (BootstrapFewShotWithRandomSearch, MIPROv2, GEPA, SIMBA) costs real money, roughly
 in proportion to candidates times validation examples. Combinations
 (BetterTogether) pay for each step. To put a hard ceiling on any of them, wrap
 the task and proposal models with `Imp.budgeted_lm/3` under
@@ -162,7 +162,7 @@ try when you trust the metric.
 ### Search across demo sets
 
 ```elixir
-random_search = Imp.Optimizer.RandomSearch.new(metric, num_candidate_programs: 8)
+random_search = Imp.Optimizer.BootstrapFewShotWithRandomSearch.new(metric, num_candidate_programs: 8)
 
 knn =
   Imp.Optimizer.KNNFewShot.new(3, trainset,
@@ -171,7 +171,7 @@ knn =
   )
 ```
 
-**`RandomSearch`** (also `BootstrapRS`, DSPy's name) bootstraps
+**`BootstrapFewShotWithRandomSearch`** (DSPy's `BootstrapRS`) bootstraps
 `num_candidate_programs` demo sets with different seeds, evaluates each, and
 keeps the best. Pass a validation set to select on it; without one it selects
 on the training set. Cost: candidates times (bootstrap plus evaluation).
@@ -245,7 +245,7 @@ ensemble = Imp.Optimizer.Ensemble.new(reduce_fn: &Imp.majority/1)
 
 **`BetterTogether`** runs a sequence such as `strategy: "p -> w -> p"`
 (prompt, then weights, then prompt again), evaluates the original and every
-prefix, and returns the best. Its default prompt step is `RandomSearch`; its
+prefix, and returns the best. Its default prompt step is `BootstrapFewShotWithRandomSearch`; its
 weight step needs a configured trainer.
 
 **`Ensemble`** is not a search. `Imp.Optimizer.Ensemble.compile(ensemble,
@@ -281,7 +281,7 @@ Each of these is Imp's own and still settling.
 |---|---|
 | Starting out; no idea what helps | `LabeledFewShot`, then `BootstrapFewShot` |
 | Multi-step program; labels cover only the final answer | `BootstrapFewShot` |
-| Demo quality varies from run to run | `RandomSearch` |
+| Demo quality varies from run to run | `BootstrapFewShotWithRandomSearch` |
 | Inputs vary so much that one demo set cannot fit them all | `KNNFewShot` |
 | The wording is wrong; the demos are fine | `COPRO` or `GEPA` |
 | Both look weak and you have budget | `MIPROv2` or `GEPA` |

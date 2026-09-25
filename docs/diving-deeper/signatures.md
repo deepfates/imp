@@ -227,7 +227,7 @@ Every change returns a new signature.
 - `Imp.Signature.prepend_output(signature, field)` puts a field first among
   the outputs. `Imp.chain_of_thought/2` uses it to add `reasoning` ahead of
   your outputs.
-- `Imp.Signature.dump/1` and `Imp.Signature.load/1` round-trip a signature
+- `Imp.Signature.dump/1` and `Imp.Signature.load!/1` round-trip a signature
   through JSON-friendly data.
 - `Imp.Signature.input_names/1`, `output_names/1` and `to_spec/1` read it.
 

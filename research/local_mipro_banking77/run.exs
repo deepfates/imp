@@ -78,15 +78,15 @@ defmodule LocalMIPROBanking77.Runner do
           max_bootstrapped_demos: 0,
           max_labeled_demos: 0,
           prompt_lm: prompt_lm,
-          task_lm: Imp.ProgramAccess.lm(baseline),
+          task_lm: baseline.lm,
           startup_trials: 1,
           minibatch: false,
-          max_concurrency: 1,
+          num_threads: 1,
           timeout: 120_000,
           max_errors: :infinity,
           seed: 9
         )
-        |> MIPROv2.compile(baseline, examples(rows.train), examples(rows.selection))
+        |> then(&Imp.optimize!(baseline, &1, examples(rows.train), examples(rows.selection)))
 
       report = Report.fetch(selected)
       artifact = Artifact.from_optimized_program(selected, artifact_id: "local-mipro-banking77")
@@ -177,7 +177,7 @@ defmodule LocalMIPROBanking77.Runner do
   defp preflight!(paths) do
     unless sha256_file(paths.data) == @data_sha256, do: raise("Banking77 data digest drift")
     verify_ollama!()
-    job = TrainingJob.load!(paths.job)
+    job = TrainingJob.read!(paths.job)
     {:ok, _manifest} = Imp.Clients.MLXLMTrainer.verify_job(job)
     rows = split_rows!(paths.data)
 
@@ -216,7 +216,7 @@ defmodule LocalMIPROBanking77.Runner do
       )
 
     {:ok, rebound} = TrainingJob.rebind(job, source)
-    Imp.Predict.Predict.with_lm(rebound, observed(Imp.ProgramAccess.lm(rebound), observer, :task))
+    Imp.Predict.with_lm(rebound, observed(rebound.lm, observer, :task))
   end
 
   defp ollama_lm do

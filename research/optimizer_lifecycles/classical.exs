@@ -1,5 +1,5 @@
 defmodule ImpOptimizerLifecycles.Classical do
-  alias Imp.Optimizer.{Artifact, BootstrapFewShot, KNNFewShot, RandomSearch, Report}
+  alias Imp.Optimizer.{Artifact, BootstrapFewShot, KNNFewShot, BootstrapFewShotWithRandomSearch, Report}
 
   @dataset "priv/tutorial/support_tickets.json"
   @model "openrouter:openai/gpt-5.4-mini"
@@ -46,7 +46,7 @@ defmodule ImpOptimizerLifecycles.Classical do
     random =
       base
       |> Imp.optimize!(
-        RandomSearch.new(metric,
+        BootstrapFewShotWithRandomSearch.new(metric,
           num_candidate_programs: 2,
           max_bootstrapped_demos: 8,
           max_labeled_demos: 8,
@@ -119,7 +119,7 @@ defmodule ImpOptimizerLifecycles.Classical do
       artifacts: Map.new(paths, fn {family, path} -> {family, artifact_summary(path)} end),
       scope: %{
         claimed:
-          "one natural live retained lifecycle for BootstrapFewShot, RandomSearch, and KNNFewShot on the shipped support-routing task",
+          "one natural live retained lifecycle for BootstrapFewShot, BootstrapFewShotWithRandomSearch, and KNNFewShot on the shipped support-routing task",
         not_claimed: ["general optimizer effectiveness", "DSPy parity", "multi-seed evidence"]
       }
     }
@@ -141,7 +141,7 @@ defmodule ImpOptimizerLifecycles.Classical do
           artifact |> Artifact.read!() |> Artifact.apply(router(runtime_lm))
 
         "knn_few_shot" ->
-          artifact |> Imp.load!(registry: saving_registry()) |> Imp.with_lm(runtime_lm)
+          artifact |> Imp.read!(registry: saving_registry()) |> Imp.with_lm(runtime_lm)
 
         other ->
           raise "unknown family #{inspect(other)}"
@@ -208,7 +208,7 @@ defmodule ImpOptimizerLifecycles.Classical do
   defp score(program, rows, metric, opts \\ []) do
     report =
       Imp.evaluate(program, rows, metric,
-        max_concurrency: Keyword.get(opts, :max_concurrency, 8),
+        num_threads: Keyword.get(opts, :max_concurrency, 8),
         timeout: 60_000
       )
 

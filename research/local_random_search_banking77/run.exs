@@ -53,7 +53,7 @@ end
 
 defmodule LocalRandomSearchBanking77.Runner do
   alias Imp.Clients.{MLXLMDeployment, MLXLMTrainer, TrainingJob}
-  alias Imp.Optimizer.{RandomSearch, Report}
+  alias Imp.Optimizer.{BootstrapFewShotWithRandomSearch, Report}
   alias LocalRandomSearchBanking77.{Atomic, Metric, ObservedLM, Observer}
 
   @routes ["R17", "R42", "R68", "R93"]
@@ -83,7 +83,7 @@ defmodule LocalRandomSearchBanking77.Runner do
       Observer.phase(transport_observer, "optimization")
 
       compiled =
-        RandomSearch.new(&Metric.exact_route/2,
+        BootstrapFewShotWithRandomSearch.new(&Metric.exact_route/2,
           num_candidate_programs: 1,
           max_bootstrapped_demos: 2,
           max_labeled_demos: 2,
@@ -91,11 +91,10 @@ defmodule LocalRandomSearchBanking77.Runner do
           num_threads: 1,
           max_errors: :infinity
         )
-        |> RandomSearch.compile(
-          source,
-          examples(rows.train),
-          examples(rows.selection),
-          teacher: teacher
+        |> then(
+          &Imp.optimize!(source, &1, examples(rows.train), examples(rows.selection),
+            teacher: teacher
+          )
         )
 
       report = Report.fetch(compiled)
@@ -148,7 +147,7 @@ defmodule LocalRandomSearchBanking77.Runner do
         selected_test: metrics(selected_test),
         fresh_byte_identical: true,
         claim_boundary:
-          "One retained-model/task RandomSearch lifecycle with real local teacher bootstrap; not general effectiveness, exact RNG parity, reliability, or BEAM superiority."
+          "One retained-model/task BootstrapFewShotWithRandomSearch lifecycle with real local teacher bootstrap; not general effectiveness, exact RNG parity, reliability, or BEAM superiority."
       }
 
       Atomic.write!(Path.join(paths.output, "result.json"), result)
@@ -170,12 +169,12 @@ defmodule LocalRandomSearchBanking77.Runner do
   defp fresh do
     paths = paths!()
     {job, rows} = preflight!(paths, false)
-    selected = Imp.load!(paths.saved_program, registry: registry())
+    selected = Imp.read!(paths.saved_program, registry: registry())
     {:ok, rebound} = TrainingJob.rebind(job, selected)
     observer = observer!()
 
     observed =
-      Imp.with_lm(rebound, %ObservedLM{inner: Imp.ProgramAccess.lm(rebound), observer: observer})
+      Imp.with_lm(rebound, %ObservedLM{inner: program_lm(rebound), observer: observer})
 
     try do
       stage = evaluate(observed, rows.test, observer, "fresh_test")
@@ -201,7 +200,7 @@ defmodule LocalRandomSearchBanking77.Runner do
   defp preflight!(paths, persist?) do
     unless sha256_file(paths.data) == @data_sha256, do: raise("Banking77 data digest drift")
     verify_teacher!()
-    job = TrainingJob.load!(paths.job)
+    job = TrainingJob.read!(paths.job)
     {:ok, _manifest} = MLXLMTrainer.verify_job(job)
     rows = split_rows!(paths.data)
 
@@ -239,7 +238,7 @@ defmodule LocalRandomSearchBanking77.Runner do
       )
 
     {:ok, rebound} = TrainingJob.rebind(job, source)
-    runtime_lm = Imp.ProgramAccess.lm(rebound)
+    runtime_lm = program_lm(rebound)
     {Imp.with_lm(rebound, %ObservedLM{inner: runtime_lm, observer: observer}), runtime_lm}
   end
 
@@ -318,7 +317,7 @@ defmodule LocalRandomSearchBanking77.Runner do
              stage.accepted_augmented_demos > 0 and stage.augmented_demo_rendered_calls > 0 and
              stage.teacher_calls > 0 and stage.task_calls == 32 and
              stage.transport_attempts == stage.task_calls + stage.teacher_calls,
-           do: raise("RandomSearch did not exercise real rendered bootstrap: #{inspect(stage)}")
+           do: raise("BootstrapFewShotWithRandomSearch did not exercise real rendered bootstrap: #{inspect(stage)}")
   end
 
   defp evaluate(program, rows, observer, phase) do
@@ -468,6 +467,10 @@ defmodule LocalRandomSearchBanking77.Runner do
   defp sha256_file(path), do: path |> File.read!() |> sha256()
   defp sha256_term(term), do: term |> Jason.encode!() |> sha256()
   defp sha256(bytes), do: :crypto.hash(:sha256, bytes) |> Base.encode16(case: :lower)
+
+  # The LM of the program's first predictor, through the public parameter view.
+  defp program_lm(program),
+    do: program |> Imp.ProgramParameters.predictors() |> hd() |> then(& &1.predictor.lm)
 end
 
 unless System.get_env("IMP_RANDOM_SEARCH_DEFINE_ONLY") == "1",

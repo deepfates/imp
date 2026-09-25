@@ -139,11 +139,11 @@ defmodule LocalSIMBATREC.Runner do
           max_steps: 3,
           max_demos: 4,
           prompt_lm: observed(reflection_lm(), observer, :reflection),
-          max_concurrency: 1,
+          num_threads: 1,
           timeout: 120_000,
           seed: 20_260_726
         )
-        |> SIMBA.compile(baseline, examples(rows.train), examples(rows.validation))
+        |> then(&Imp.optimize!(baseline, &1, examples(rows.train), examples(rows.validation)))
 
       report = Report.fetch(selected)
       artifact = Artifact.from_optimized_program(selected, artifact_id: "local-simba-trec-v1")
@@ -228,7 +228,7 @@ defmodule LocalSIMBATREC.Runner do
     observer = observer!()
 
     try do
-      source = Imp.load!(paths.program)
+      source = Imp.read!(paths.program)
       assert_runtime!(source)
       baseline = observe_program(source, observer)
       artifact = Artifact.read!(paths.artifact)
@@ -304,9 +304,9 @@ defmodule LocalSIMBATREC.Runner do
   end
 
   defp observe_program(program, observer) do
-    Imp.Predict.Predict.with_lm(
+    Imp.Predict.with_lm(
       program,
-      observed(Imp.ProgramAccess.lm(program), observer, :task)
+      observed(program_lm(program), observer, :task)
     )
   end
 
@@ -450,7 +450,7 @@ defmodule LocalSIMBATREC.Runner do
   end
 
   defp assert_runtime!(program) do
-    lm = Imp.ProgramAccess.lm(program)
+    lm = program_lm(program)
 
     unless program.adapter == adapter_module!() and lm.model == @model_spec and
              Keyword.get(lm.opts, :cache) == false and
@@ -461,7 +461,7 @@ defmodule LocalSIMBATREC.Runner do
   end
 
   defp model_identity(program) do
-    case Imp.ProgramAccess.lm(program) do
+    case program_lm(program) do
       %ObservedLM{inner: inner} -> inner.model
       lm -> lm.model
     end
@@ -533,6 +533,10 @@ defmodule LocalSIMBATREC.Runner do
   defp sha256_file(path), do: path |> File.read!() |> sha256()
   defp sha256_term(term), do: term |> Jason.encode!() |> sha256()
   defp sha256(bytes), do: :crypto.hash(:sha256, bytes) |> Base.encode16(case: :lower)
+
+  # The LM of the program's first predictor, through the public parameter view.
+  defp program_lm(program),
+    do: program |> Imp.ProgramParameters.predictors() |> hd() |> then(& &1.predictor.lm)
 end
 
 unless System.get_env("IMP_SIMBA_TREC_DEFINE_ONLY") == "1" do
