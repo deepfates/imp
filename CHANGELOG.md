@@ -341,6 +341,15 @@ User-visible changes to Imp are recorded here.
   and argument keys become atoms when the atom exists by the time the call
   arrives, so such a field was always missing and every `submit` failed with
   `missing_output_fields`.
+- `Imp.req_llm/2` clients send their requests through Imp's own HTTP pool,
+  one pool of `config :imp, http_pool_size: n` connections (default 16), and
+  `Imp.configure(async_max_workers: n)` raises when n is larger. ReqLLM's
+  default pool is eight one-connection pools picked at random, so concurrent
+  calls collided well below eight, and on OpenRouter the second of two failed
+  after five seconds with "unable to provide a connection" (6 of 8 concurrent
+  slow calls succeeded; through Imp's pool, 8 of 8). A caller's own `:finch`
+  or `:connect_options` in `req_http_options` is left alone. Streaming still
+  uses ReqLLM's pool.
 
 ### Signatures
 

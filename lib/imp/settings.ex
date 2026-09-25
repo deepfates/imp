@@ -67,6 +67,9 @@ defmodule Imp.Settings do
   @known_string_keys Map.new([{:callbacks, []} | @schema], fn {key, _spec} ->
                        {Atom.to_string(key), key}
                      end)
+  # Twice the default `async_max_workers`, so the calls that run outside
+  # admission (a batch client, a host's own tasks) still find a connection.
+  @default_http_pool_size 16
   @context_key :imp_context_stack
   @snapshot_key :imp_settings_snapshot
   @unset :imp_settings_unset
@@ -204,6 +207,13 @@ defmodule Imp.Settings do
           "Imp.context/2 expects settings as a map or settings pair list; got: #{inspect(opts)}"
   end
 
+  @doc """
+  The number of connections in Imp's HTTP pool, which `Imp.req_llm/2` clients
+  send their requests through: `config :imp, http_pool_size: n`, default 16.
+  It is read when Imp starts, and `:async_max_workers` may not exceed it.
+  """
+  def http_pool_size, do: Application.get_env(:imp, :http_pool_size, @default_http_pool_size)
+
   @doc false
   def context_stack, do: Process.get(@context_key, [])
 
@@ -304,6 +314,19 @@ defmodule Imp.Settings do
     raise ArgumentError,
           "#{context} does not support :callbacks (got #{inspect(value)}); " <>
             "attach handlers with :telemetry.attach/4 to Imp's [:imp, ...] events instead"
+  end
+
+  defp put_validated_setting(normalized, :async_max_workers, value, context) do
+    Imp.Options.validate!([async_max_workers: value], @validation_schema, context)
+
+    if value > http_pool_size() do
+      raise ArgumentError,
+            "#{context}: :async_max_workers is #{value}, more than the #{http_pool_size()} " <>
+              "connections of Imp's HTTP pool; set `config :imp, http_pool_size: #{value}` " <>
+              "or more, so concurrent model calls do not wait for a connection"
+    end
+
+    Map.put(normalized, :async_max_workers, value)
   end
 
   defp put_validated_setting(normalized, key, value, context) when is_atom(key) do

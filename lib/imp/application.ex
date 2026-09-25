@@ -8,6 +8,8 @@ defmodule Imp.Application do
   @impl true
   def start(_type, _args) do
     children = [
+      {Finch,
+       name: Imp.Finch, pools: %{default: [size: Imp.Settings.http_pool_size(), count: 1]}},
       {DynamicSupervisor, name: Imp.ACP.SessionSupervisor, strategy: :one_for_one},
       Imp.Settings,
       Imp.Cache,

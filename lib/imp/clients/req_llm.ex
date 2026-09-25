@@ -321,6 +321,7 @@ defmodule Imp.Clients.ReqLLM do
       opts
       |> encode_openrouter_reasoning(lm.model)
       |> cap_transport_timeouts()
+      |> use_imp_pool()
       |> bind_to_caller()
       |> enforce_explicit_no_retry()
 
@@ -1249,6 +1250,26 @@ defmodule Imp.Clients.ReqLLM do
             capped
           end
         end)
+    end
+  end
+
+  # Requests go through Imp's own Finch pool, one pool of
+  # `Imp.Settings.http_pool_size/0` connections. ReqLLM's default pool is eight
+  # pools of one connection, each request placed on one at random, so two
+  # concurrent calls can land on the same connection, and on a provider that
+  # sets no `pool_timeout` (OpenRouter) the second fails after five seconds
+  # with "unable to provide a connection" while Imp runs far fewer than eight
+  # calls. A caller's own `:finch`, or `:connect_options` (which Req refuses
+  # beside `:finch`), is left alone.
+  defp use_imp_pool(opts) do
+    http_opts = Keyword.get(opts, :req_http_options, [])
+
+    if Keyword.keyword?(http_opts) and not Keyword.has_key?(http_opts, :finch) and
+         not Keyword.has_key?(http_opts, :connect_options) and
+         not Keyword.has_key?(opts, :connect_options) do
+      Keyword.put(opts, :req_http_options, Keyword.put(http_opts, :finch, name: Imp.Finch))
+    else
+      opts
     end
   end
 
