@@ -275,14 +275,19 @@ envelope.
 A call that got no answer from its tool returns
 `{:error, %Imp.MCP.CallFailure{outcome: outcome, reason: reason}}`. `outcome`
 is `:refused` (a JSON-RPC parse error, invalid request or method not found,
-or a 4xx status),
+or a 4xx status other than 401), `:auth_refused` (a 401 or a failed OAuth
+flow: the credential was refused and nothing ran),
 `:not_sent` (the request never left) or `:unknown` (it was, or may yet be,
 delivered, with no trustworthy answer: a timeout, a closed connection after
 sending, a 5xx status, a handler that crashed or timed out on the server,
 invalid params, which a server can send after its tool ran).
-`reason` is ExMCP's own error, unchanged. `Imp.Tool.outcome/1` reads the
-outcome of any tool call, and ReActV2 and RLM record it on each `:tool_result`
-event as `metadata.outcome`. A timeout is always `:unknown`: ExMCP's client
+`reason` is ExMCP's own error, unchanged. An error result that declares
+`structuredContent.outcome` as `"refused"`, `"auth_refused"` or `"unknown"`
+(a server marks a write that may have been applied `"unknown"`) has that
+outcome. `Imp.Tool.outcome/1` reads the outcome of any tool call's value, and
+ReActV2 and RLM record each call's outcome on its `:tool_result` event as
+`metadata.outcome`, deciding a refusal where they refused the call rather than
+from the term. A timeout is always `:unknown`: ExMCP's client
 sends one HTTP request at a time from its own process, so a call that timed
 out waiting behind another is still sent afterwards.
 

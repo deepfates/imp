@@ -219,12 +219,12 @@ defmodule ReasoningContinuityTest do
     assert {:ok, first} = Task.await(run.task)
     events = Imp.Run.events(run)
     assert :ok = Imp.Run.stop(run)
-    assert Imp.get(first, :termination_reason) == :answered
+    assert first.metadata[:termination_reason] == :answered
     assert Imp.get(first, :answer) == "done"
     assert_received {:wire_request, 1, _initial}
     assert_received {:wire_request, 2, continuation}
 
-    history = Imp.get(first, :history)
+    history = first.metadata[:history]
     refute inspect(history, limit: :infinity) =~ @input_token
 
     restarted = Imp.react_v2("question -> answer", [lookup], lm: lm, max_iters: 4)
@@ -260,7 +260,7 @@ defmodule ReasoningContinuityTest do
     program = Imp.react_v2("question -> answer, source", [lookup], lm: lm, max_iters: 4)
 
     assert {:ok, first} = Imp.call(program, %{question: "Look up the fixture."})
-    assert Imp.get(first, :termination_reason) == :submit
+    assert first.metadata[:termination_reason] == :submit
     assert Imp.get(first, :answer) == "done"
     assert_received {:wire_request, 1, _initial}
     assert_received {:wire_request, 2, continuation}
@@ -271,7 +271,7 @@ defmodule ReasoningContinuityTest do
     assert {:ok, _resumed} =
              Imp.call(restarted, %{
                question: "Continue.",
-               history: reload(Imp.get(first, :history))
+               history: reload(first.metadata[:history])
              })
 
     assert_received {:wire_request, 3, after_reload}

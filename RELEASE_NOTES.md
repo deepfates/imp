@@ -39,9 +39,14 @@ Ordinary Imp startup starts no protocol endpoint.
 - `ReActV2` gains `finish_on` for tools whose call is the answer.
 - `:model_request` events record the whole request, and tool definitions are
   emitted once per run as `:tools_sent`.
-- An MCP tool call that got no answer says whether it was refused, never sent,
-  or may have run (`Imp.MCP.CallFailure`, `Imp.Tool.outcome/1`), and a failed
-  tool call reaches the model as plain text.
+- An MCP tool call that got no answer says whether it was refused, had its
+  credential refused, was never sent, or may have run (`Imp.MCP.CallFailure`,
+  `Imp.Tool.outcome/1`), an error result that declares its outcome is read as
+  declared, and a failed tool call reaches the model as plain text.
+- A ReAct prediction's fields are its outputs; how the turn ended is metadata,
+  in one vocabulary, with `Imp.Prediction.complete?/1`.
+- `Imp.Run` and `Imp.ACP` refuse options they do not know, and
+  `Imp.Run.Event.kinds/0` lists every event kind.
 - A host names its own run pool and limit (`Imp.Run.start/3`'s `:admission`),
   and a failing run event sink is reported to the run's owner.
 - `Imp.MCP.connect/2` takes `pool_size:`, so several calls to one HTTP server
@@ -88,26 +93,45 @@ Ordinary Imp startup starts no protocol endpoint.
 - When a run's control process ends while the run is still going, the task is
   killed after its registered cancellations are called; its monitor reports
   `:killed`.
-- A run's owner can receive
-  `{:imp_run_event_sink_failed, run_id, details}`; an owner with a strict
-  `handle_info/2` needs a clause for it.
+- A run's owner can receive `{:imp_run_event_sink_failed, run_id, details}`
+  and `{:imp_run_event_undelivered, run_id, event}`; an owner with a strict
+  `handle_info/2` needs clauses for them.
+- `Imp.Run.start/3`, `Imp.ACP.start_link/1`, `Imp.ACP.run/1` and
+  `Imp.ACP.Local.start_link/1` raise `ArgumentError` for an option they do
+  not know. A transport's own options for `Imp.ACP` go in
+  `:transport_options`, and `:capabilities` is spelled `:agent_capabilities`.
+- ReActV2 emits no `:final` event; `:run_finished` carries the prediction.
+  `Imp.Trajectory.to_atif/2`'s `extra.outcome` is `extra.terminal_event`, and
+  a tool result's `extra.outcome` is the recorded `Imp.Tool.outcome/1`
+  instead of `"returned"` or `"error"`.
+- A ReActV2 or ReAct prediction's fields are its outputs only: `history`,
+  `termination_reason`, `termination_cause`, `termination_error`,
+  `finished_by_tool`, `unexecuted_tool_calls` and `context_projection` are in
+  `prediction.metadata`. `termination_reason` says how the turn ended, and a
+  turn without an answer is `:incomplete` with `termination_cause` saying why;
+  typed extraction is `:extracted` (no `completion_mode`), and
+  `Imp.Predict.ReAct` spells `:parse_failure` as `:parse_error` and `:direct`
+  as `:answered`. Use `Imp.Prediction.complete?/1` to ask whether a turn
+  answered.
 - For a signature with one `:string` output, `ReActV2` offers no `submit`
-  tool, and a step answered in text with no tool call ends the turn. Code that
-  matches on `termination_reason` meets three new values: `:answered`,
-  `:last_text` and `:finished_by_tool`.
+  tool, and a step answered in text with no tool call ends the turn.
 
 ## Upgrade path
 
 1. Change the dependency line, run `mix deps.get`, and commit `mix.lock`.
 2. Add `erlexec: :load` to any release that lists `ex_mcp: :load`.
 3. Replace `OAuth.begin/3`'s `:flow` with `:client_registration` if you used it.
-4. Match MCP call failures on `%Imp.MCP.CallFailure{outcome: ...}`, compare
-   imported tool names as strings, and give run owners a clause for
-   `:imp_run_event_sink_failed`.
-5. Change `"type" => "sse"` descriptors for Streamable HTTP servers to
+4. Match MCP call failures on `%Imp.MCP.CallFailure{outcome: ...}` (a 401 is
+   `:auth_refused`), compare imported tool names as strings, and give run
+   owners clauses for `:imp_run_event_sink_failed` and
+   `:imp_run_event_undelivered`.
+5. Read a ReAct or ReActV2 prediction's `history` and `termination_*` from
+   `prediction.metadata`, and match `termination_reason` against the new
+   values.
+6. Change `"type" => "sse"` descriptors for Streamable HTTP servers to
    `"http"`. A server that needs credentials is reached over Streamable HTTP;
    an `sse` descriptor takes none.
-6. Run your held-out evaluation and application smoke test against the new
+7. Run your held-out evaluation and application smoke test against the new
    release; a one-text-output ReActV2 program now ends turns differently.
 
 The [CHANGELOG](CHANGELOG.md) records every user-visible change in this

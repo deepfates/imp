@@ -127,14 +127,10 @@ defmodule Imp.RunObservationTest do
   end
 
   test "capture limits still reject anything that is neither a positive integer nor infinity" do
-    ExUnit.CaptureLog.capture_log(fn ->
-      for bad <- [[max_events: 0], [max_event_bytes: :unbounded], [max_snapshot_bytes: -1]] do
-        assert {:error, {%ArgumentError{} = error, _stacktrace}} =
-                 Imp.Run.start(%Wait{}, %{owner: self()}, bad)
-
-        assert Exception.message(error) =~ "positive integers"
-      end
-    end)
+    for bad <- [[max_events: 0], [max_event_bytes: :unbounded], [max_snapshot_bytes: -1]] do
+      error = assert_raise ArgumentError, fn -> Imp.Run.start(%Wait{}, %{owner: self()}, bad) end
+      assert Exception.message(error) =~ "positive integer"
+    end
   end
 
   test "oversized provider errors retain status without request or response content" do

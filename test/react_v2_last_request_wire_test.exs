@@ -44,7 +44,7 @@ defmodule Imp.ReActV2LastRequestWireTest do
 
       assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
       assert Imp.get(prediction, :answer) == "It is there."
-      assert Imp.get(prediction, :termination_reason) == :last_text
+      assert prediction.metadata[:termination_reason] == :last_text
 
       [first, last] = Agent.get(bodies, & &1)
       assert last["tool_choice"] == unquote(Macro.escape(expected_choice))

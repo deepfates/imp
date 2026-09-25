@@ -1186,27 +1186,22 @@ defmodule Imp.Predict.RLM do
         input: args
       )
 
+    # `execute_tool_call/6` says whether it refused the call or ran the tool,
+    # and the outcome is decided from that: a tool can return any term, so its
+    # value alone cannot say it was refused.
     case run_budgeted(runtime.budget, fn ->
            execute_tool_call(rlm, name, name, args, tool_call_id, runtime.execution)
          end) do
       {:cancel, reason} ->
         {:error, {:execution_cancelled, reason}, runtime}
 
-      {:error, reason} ->
-        error = {:rlm_tool_error, reason}
+      {:refused, reason} ->
+        tool_failed(name, tool_call_id, reason, :refused, runtime)
 
-        :ok =
-          Imp.Run.emit(:tool_result,
-            component: __MODULE__,
-            tool_call_id: tool_call_id,
-            tool_name: name,
-            error: error,
-            metadata: %{outcome: Imp.Tool.outcome({:error, error})}
-          )
+      {:ran, {:error, reason} = error} ->
+        tool_failed(name, tool_call_id, reason, Imp.Tool.outcome(error), runtime)
 
-        {:error, error, runtime}
-
-      value ->
+      {:ran, value} ->
         :ok =
           Imp.Run.emit(:tool_result,
             component: __MODULE__,
@@ -1217,11 +1212,30 @@ defmodule Imp.Predict.RLM do
           )
 
         {:ok, value, runtime}
+
+      # The budget stopped the call, before the tool started or while it ran.
+      {:error, reason} ->
+        tool_failed(name, tool_call_id, reason, :unknown, runtime)
     end
   end
 
   defp interpreter_tool(name, args, runtime),
     do: {:error, {:invalid_tool_arguments, name, args}, runtime}
+
+  defp tool_failed(name, tool_call_id, reason, outcome, runtime) do
+    error = {:rlm_tool_error, reason}
+
+    :ok =
+      Imp.Run.emit(:tool_result,
+        component: __MODULE__,
+        tool_call_id: tool_call_id,
+        tool_name: name,
+        error: error,
+        metadata: %{outcome: outcome}
+      )
+
+    {:error, error, runtime}
+  end
 
   defp query_sub_lm(%__MODULE__{} = rlm, prompt, model) do
     case resolve_sub_lm(rlm) do
@@ -1794,7 +1808,7 @@ defmodule Imp.Predict.RLM do
   end
 
   defp execute_tool_call(_rlm, nil, requested_name, _args, _tool_call_id, _execution),
-    do: {:error, {:unknown_tool, requested_name}}
+    do: {:refused, {:unknown_tool, requested_name}}
 
   defp execute_tool_call(rlm, name, _requested_name, args, tool_call_id, execution) do
     tool = Map.fetch!(rlm.tools, name)
@@ -1812,16 +1826,16 @@ defmodule Imp.Predict.RLM do
 
       case Imp.Execution.authorize(execution, request) do
         :allow ->
-          call_known_tool(tool, args)
+          {:ran, call_known_tool(tool, args)}
 
         {:deny, reason} ->
-          {:error, {:tool_authorization_denied, name, Imp.Redaction.redact(reason)}}
+          {:refused, {:tool_authorization_denied, name, Imp.Redaction.redact(reason)}}
 
         {:cancel, reason} ->
           {:cancel, reason}
       end
     else
-      {:error, reason} -> {:error, reason}
+      {:error, reason} -> {:refused, reason}
     end
   end
 

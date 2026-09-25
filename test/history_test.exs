@@ -175,7 +175,7 @@ defmodule Imp.HistoryTest do
     end)
     program = Imp.react_v2("intent -> answer", [tool], lm: lm)
     {:ok, result} = Imp.call(program, %{intent: "earlier question"})
-    File.write!(#{inspect(path)}, result |> Imp.get(:history) |> Imp.History.dump() |> Jason.encode!())
+    File.write!(#{inspect(path)}, result.metadata[:history] |> Imp.History.dump() |> Jason.encode!())
     """
 
     assert {_, 0} =

@@ -704,6 +704,6 @@ defmodule ImpTest do
 
     assert {:ok, prediction} = Imp.Predict.ReAct.call(program, %{question: "Find x"})
     assert Imp.Prediction.get(prediction, :answer) == "found x"
-    assert [%{tool: :lookup}, %{tool: :submit}] = Imp.Prediction.get(prediction, :history)
+    assert [%{tool: :lookup}, %{tool: :submit}] = prediction.metadata[:history]
   end
 end

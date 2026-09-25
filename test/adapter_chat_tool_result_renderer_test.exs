@@ -51,7 +51,7 @@ defmodule Imp.Adapter.ChatToolResultRendererTest do
     assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
     assert tool_contents(request(2)) == ["look:c1:10000"]
 
-    [turn | _] = Imp.History.messages(Imp.get(prediction, :history))
+    [turn | _] = Imp.History.messages(prediction.metadata[:history])
     assert [%{result: recorded}] = turn.tool_call_results
     assert recorded == big()
   end

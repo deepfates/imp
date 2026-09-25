@@ -51,11 +51,11 @@ defmodule Imp.ReActV2ContextTest do
         {:ok, run} = Imp.Run.start(program, %{intent: "question #{n}", history: history})
         {:ok, prediction} = Task.await(run.task, 30_000)
         assert Imp.get(prediction, :answer) == "done"
-        next = Imp.get(prediction, :history)
+        next = prediction.metadata[:history]
         assert length(next.messages) == n
         assert Enum.take(next.messages, n - 1) == history.messages
 
-        if projection = Imp.get(prediction, :context_projection) do
+        if projection = prediction.metadata[:context_projection] do
           assert projection.omitted_prior_entries > 0
           events = Imp.Run.events(run)
           assert Enum.any?(events, &(&1.kind == :context_projected))
@@ -134,11 +134,12 @@ defmodule Imp.ReActV2ContextTest do
       Imp.call(Imp.react_v2("intent -> answer", [tool], lm: lm), %{intent: "now", history: prior})
 
     assert Imp.get(prediction, :answer) == nil
-    assert Imp.get(prediction, :termination_reason) == :context_window_exceeded
+    assert prediction.metadata[:termination_reason] == :incomplete
+    assert prediction.metadata[:termination_cause] == :context_window_exceeded
     assert Agent.get(counter, & &1.effects) == 1
-    assert length(Imp.get(prediction, :history).messages) == 2
-    assert inspect(Imp.get(prediction, :history)) =~ "observed-write"
-    assert Imp.get(prediction, :context_projection).omitted_prior_entries == 1
+    assert length(prediction.metadata[:history].messages) == 2
+    assert inspect(prediction.metadata[:history]) =~ "observed-write"
+    assert prediction.metadata[:context_projection].omitted_prior_entries == 1
     assert Agent.get(counter, & &1.calls) == 3
   end
 
@@ -172,14 +173,14 @@ defmodule Imp.ReActV2ContextTest do
       Imp.call(Imp.react_v2("intent -> answer", [], lm: lm), %{intent: "now", history: prior})
 
     assert Imp.get(prediction, :answer) == "continued"
-    assert Enum.take(Imp.get(prediction, :history).messages, 3) == prior.messages
+    assert Enum.take(prediction.metadata[:history].messages, 3) == prior.messages
     [first, second, third] = Agent.get(requests, & &1)
     assert inspect(first) =~ "first observation"
     refute inspect(second) =~ "first observation"
     refute inspect(second) =~ "first episode"
     assert inspect(second) =~ "unfinished observation"
     refute inspect(third) =~ "unfinished"
-    assert Imp.get(prediction, :context_projection).omitted_prior_entries == 3
+    assert prediction.metadata[:context_projection].omitted_prior_entries == 3
   end
 
   test "a successful smaller retry preserves the current effect and never executes it again" do
@@ -222,7 +223,7 @@ defmodule Imp.ReActV2ContextTest do
       })
 
     assert Imp.get(prediction, :answer) == "done"
-    assert length(Imp.get(prediction, :history).messages) == 3
+    assert length(prediction.metadata[:history].messages) == 3
     assert Agent.get(state, & &1.effects) == 1
   end
 
@@ -236,7 +237,8 @@ defmodule Imp.ReActV2ContextTest do
 
     {:ok, prediction} = Imp.call(Imp.react_v2("intent -> answer", [], lm: lm), %{intent: "now"})
     assert Imp.get(prediction, :answer) == nil
-    assert Imp.get(prediction, :termination_reason) == :context_window_exceeded
+    assert prediction.metadata[:termination_reason] == :incomplete
+    assert prediction.metadata[:termination_cause] == :context_window_exceeded
     assert Agent.get(calls, & &1) == 1
   end
 
@@ -253,9 +255,9 @@ defmodule Imp.ReActV2ContextTest do
     {:ok, prediction} =
       Imp.call(Imp.react_v2("intent -> answer", [], lm: lm), %{intent: "now", history: prior})
 
-    assert Imp.get(prediction, :history) == prior
-    assert Imp.get(prediction, :context_projection).recovery_requests == 8
-    assert Imp.get(prediction, :context_projection).omitted_prior_entries == 1024
+    assert prediction.metadata[:history] == prior
+    assert prediction.metadata[:context_projection].recovery_requests == 8
+    assert prediction.metadata[:context_projection].omitted_prior_entries == 1024
     assert Agent.get(calls, & &1) == 9
   end
 
@@ -272,8 +274,8 @@ defmodule Imp.ReActV2ContextTest do
     {:ok, prediction} =
       Imp.call(Imp.react_v2("intent -> answer", [], lm: lm), %{intent: "now", history: prior})
 
-    assert Imp.get(prediction, :history) == prior
-    assert Imp.get(prediction, :context_projection) == nil
+    assert prediction.metadata[:history] == prior
+    assert prediction.metadata[:context_projection] == nil
     # Existing forced-submit strategy remains; there are no history retries.
     assert Agent.get(calls, & &1) == 2
   end
