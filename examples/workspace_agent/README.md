@@ -8,7 +8,7 @@ bounded reads. Every write and command still requires an explicit ACP approval.
 
 The local Toad journey is:
 
-1. obtain authorized GitHub access to the private Imp repository;
+1. clone [the Imp repository](https://github.com/deepfates/imp);
 2. install [Toad](https://github.com/batrachianai/toad) and run LM Studio's
    OpenAI-compatible server with `qwen/qwen3.6-35b-a3b` loaded;
 3. launch the workspace you want the agent to inspect; the launcher runs

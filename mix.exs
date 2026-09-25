@@ -11,13 +11,20 @@ defmodule Imp.MixProject do
       description: "Declarative self-improving language-model programs for Elixir.",
       package: package(),
       docs: [
-        main: "Imp",
+        main: "readme",
         assets: %{"assets" => "assets"},
         api_reference: true,
         warnings_as_errors: true,
         extras:
-          ["README.md", "CHANGELOG.md", "RELEASE_NOTES.md"] ++
-            product_docs() ++ repository_docs() ++ livebooks(),
+          ["README.md"] ++
+            product_docs() ++
+            repository_docs() ++ livebooks() ++ ["RELEASE_NOTES.md", "CHANGELOG.md"],
+        groups_for_extras: [
+          Guides: product_docs(),
+          Evidence: repository_docs(),
+          Livebooks: livebooks(),
+          Releases: ["RELEASE_NOTES.md", "CHANGELOG.md"]
+        ],
         groups_for_modules: public_api_doc_groups(),
         filter_modules: &public_doc_module?/2,
         skip_undefined_reference_warnings_on: &skip_filtered_doc_reference?/1,
