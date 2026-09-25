@@ -59,6 +59,12 @@ difference:
 - the standalone local environment permits Python imports, while Imp executes
   an allowlisted Elixir AST and never embeds Python in its production runtime;
 
+Imp's `max_recursion_depth` counts levels of child RLMs below the root, one
+rule for `rlm_query*` and `recurse/2`, so its default of 1 allows one level of
+children. The standalone `max_depth` counts the root as well: its
+`max_depth=1` is Imp's `max_recursion_depth: 0`, and the depth-boundary row
+runs Imp with 0.
+
 Failed generated cells are transactional for ordinary assignments in both
 runtimes. Imp retains completed effect-journal entries and explicitly loaded or
 protected values so a repair neither replays an external effect nor loses an

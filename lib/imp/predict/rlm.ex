@@ -84,7 +84,7 @@ defmodule Imp.Predict.RLM do
     recursive children; it excludes controller, extraction, and compaction calls.
   - `:max_time_ms` - optional deadline for the complete RLM call. When omitted,
     RLM effects have no configured deadline.
-  - `:max_recursion_depth` - maximum symbolic child depth; defaults to `1`.
+  - `:max_recursion_depth` - how many levels of child RLMs `rlm_query*` and `recurse/2` may start below the root; defaults to `1`, one level. At the limit `rlm_query*` falls back to a one-shot sub-LM query and `recurse/2` fails.
   - `:max_interpreter_steps` - AST execution steps per controller turn.
   - `:max_interpreter_value_bytes` - maximum serialized size of an interpreter value.
   - `:max_interpreter_effects` - external effects allowed per controller turn.
@@ -979,8 +979,11 @@ defmodule Imp.Predict.RLM do
   defp interpreter_rlm_query_batched(args, runtime),
     do: {:error, {:invalid_rlm_query_batched_arguments, args}, runtime}
 
+  # The same rule `Budget.enter_recursion/2` applies to `recurse/2`: the root
+  # is depth 0 and a child may run at any depth up to `max_recursion_depth`,
+  # so the default of 1 allows one level of child RLMs.
   defp recursive_child_available?(%{depth: depth, rlm: rlm}) do
-    depth + 1 < rlm.max_recursion_depth
+    depth + 1 <= rlm.max_recursion_depth
   end
 
   defp run_recursive_child(

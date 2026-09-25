@@ -426,6 +426,12 @@ User-visible changes to Imp are recorded here.
   `str(value)`; a map's preview shows its values, not only its keys. A
   variable holding a tuple, which could not be encoded into the turn message
   and ended the call, is previewed the same way.
+- RLM `max_recursion_depth` is one rule: the number of levels of child RLMs
+  below the root. `recurse/2` already allowed a child at depth
+  `max_recursion_depth`, but `rlm_query*` started one only below it, so the
+  default of 1 gave `recurse/2` a child and `rlm_query` none. Both now allow
+  one level by default; `max_recursion_depth: 0` makes `rlm_query*` a one-shot
+  sub-LM query, as the standalone runtime's `max_depth=1` does.
 
 ### Errors and shapes
 
