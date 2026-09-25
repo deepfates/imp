@@ -182,7 +182,8 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
       "id" => case["id"],
       "status" => "ok",
       "prediction" => prediction_map,
-      "tool_trace" => tool_trace(prediction_map),
+      # A ReAct prediction carries its tool calls in metadata, not as a field.
+      "tool_trace" => tool_trace(normalize(%{"history" => prediction.metadata[:history]})),
       "error" => nil,
       "history" => fixture_history(calls),
       "remaining_responses" => Agent.get(queue, &length/1)
