@@ -34,6 +34,12 @@ defmodule CredentialInspectTest do
       Imp.req_llm("openai:gpt-4o-mini", provider_options: [api_key: @secret]),
       Imp.predict("question -> answer", lm: lm()),
       Imp.Retrievers.HTTP.new("https://retriever.test", headers: bearer),
+      Imp.Retrievers.Databricks.new("https://db.test/index", token: @secret),
+      Imp.Retrievers.Weaviate.new("https://weaviate.test", "Doc", headers: bearer),
+      Imp.rag(
+        Imp.predict("context, question -> answer"),
+        Imp.Retrievers.Databricks.new("https://db.test/index", token: @secret)
+      ),
       struct(Imp.Tracking.MLflow, headers: bearer),
       struct(Imp.Tracking.WandB, authorization: "Basic " <> @secret),
       Imp.Optimize.Anything.Config.Tracking.new(wandb_api_key: @secret),
@@ -43,6 +49,19 @@ defmodule CredentialInspectTest do
 
     leaking = for struct <- structs, printed(struct) =~ @secret, do: struct.__struct__
     assert leaking == []
+  end
+
+  test "refusing to save a retriever does not print it" do
+    program =
+      Imp.rag(
+        Imp.predict("context, question -> answer"),
+        Imp.Retrievers.Databricks.new("https://db.test/index", token: @secret)
+      )
+
+    path = Path.join(System.tmp_dir!(), "credential-#{System.unique_integer([:positive])}.json")
+    error = assert_raise ArgumentError, fn -> Imp.save!(program, path) end
+    refute error.message =~ @secret
+    assert error.message =~ "Imp.Retrievers.HTTP"
   end
 
   test "neither a saved program nor a trace of its call carries the LM's credential" do
