@@ -7,7 +7,7 @@ defmodule Imp.LM do
   its input and the rest of the request in its metadata: `:options`, the
   request options with the tool definitions removed, and `:tools_hash`, the
   SHA-256 of the canonical JSON of those definitions, or `nil` when the request
-  offered no tools. The definitions themselves are emitted once per run per
+  sent no tools. The definitions themselves are emitted once per run per
   distinct hash, as a `:tools_sent` event whose input is the tool list as
   sent. Between the two, a recorded request can be reproduced without repeating
   a roster on every call. Both are redacted like every other event. A request

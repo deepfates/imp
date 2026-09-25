@@ -170,7 +170,8 @@ defmodule PublicAPIManifestTest do
     supported = Mix.Tasks.Imp.PublicApi.manifest()["modules"] |> MapSet.new(& &1["module"])
 
     assert generated == supported
-    assert Mix.Project.config()[:docs][:main] == "Imp"
+    # hexdocs opens on the README, the front door the documentation contract tests guard.
+    assert Mix.Project.config()[:docs][:main] == "readme"
     assert MapSet.member?(generated, "Imp")
   end
 

@@ -17,7 +17,7 @@ updates, telemetry, and fresh-runtime artifact application.
 | `dspy.Signature` / `"q -> a"` | `Imp.signature("q -> a")` — the same compact input/output idea with Imp type spellings such as `array[...]`, `enum[...]`, and `number` |
 | `dspy.Predict(sig)` | `Imp.predict(sig, lm: lm)` |
 | `dspy.ChainOfThought` | `Imp.chain_of_thought/2` |
-| `dspy.ReAct(sig, tools=[...])` | `Imp.react_v2(sig, tools, tool_policy: [...])` — typed tools, structured observations, and validated `submit` for several or typed outputs; one text output is answered in prose |
+| `dspy.ReAct(sig, tools=[...])` | `Imp.react_v2(sig, tools, tool_policy: [...])` — typed tools, structured observations, and validated `submit` for several or typed outputs; a signature with one text output ends on a step answered in text. `Imp.react/3` builds a different loop, `Imp.Predict.ReAct` |
 | `dspy.Example` / `.with_inputs` | `Imp.example/1` / `Imp.with_inputs/2` |
 | `dspy.Prediction` | `%Imp.Prediction{}` — read fields with `Imp.get/2` |
 | `dspy.Evaluate` | `Imp.evaluate/4` — returns score plus per-example rows |
@@ -76,7 +76,7 @@ own held-out data.
 DSPy also has a larger Python integration ecosystem. Imp provides extension
 boundaries through `Imp.LM`, `Imp.Retrieve`, adapters, tools, and trainer
 clients; integrations written for Python do not automatically work on the
-BEAM. DSPy's Flex code optimizer is not included in `0.4.0`.
+BEAM. DSPy's Flex code optimizer is not included.
 
 ## Nearby Elixir work
 

@@ -132,6 +132,10 @@ defmodule Imp.MCP.CallFailure do
   defp transport_outcome(%Mint.HTTPError{}), do: :not_sent
   defp transport_outcome(reason) when reason in @unsent_reasons, do: :not_sent
   defp transport_outcome({:security_violation, _error}), do: :not_sent
+  # An ExMCP auth provider reports a refused credential as `:forbidden` or
+  # `:scope_step_up_exhausted`; those would read as `:unknown` below. Imp
+  # configures no auth provider, so neither reaches here today; one that is
+  # configured should map them to `:auth_refused`.
   defp transport_outcome({:unauthorized, 401, _body, _challenge}), do: :auth_refused
   defp transport_outcome({:oauth_failed, _reason}), do: :auth_refused
   defp transport_outcome({:http_error, status, _body}), do: status_outcome(status)

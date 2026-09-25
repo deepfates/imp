@@ -285,6 +285,29 @@ defmodule DocumentationContractTest do
     assert wrong == [], "relative links that open another page: #{inspect(wrong)}"
   end
 
+  # ExDoc's Markdown parser reads a fence whose info string has a second word
+  # (```elixir no_run) as inline code, which unbalances every fence after it:
+  # the rest of the page renders its headings as literal `##` text. A block
+  # the docs evaluator must skip is fenced with ~~~ instead.
+  test "rendered pages fence code with a one-word info string" do
+    extras =
+      Mix.Project.config()
+      |> Keyword.fetch!(:docs)
+      |> Keyword.fetch!(:extras)
+      |> Enum.map(fn
+        {path, _opts} -> to_string(path)
+        path -> path
+      end)
+
+    wrong =
+      for page <- extras,
+          {line, number} <- page |> File.read!() |> String.split("\n") |> Enum.with_index(1),
+          Regex.match?(~r/^\s*(```|~~~)\S+\s+\S/, line),
+          do: "#{page}:#{number}"
+
+    assert wrong == [], "fences with a multi-word info string: #{inspect(wrong)}"
+  end
+
   test "README common workflow snippets compose as one coherent path" do
     typed_lm = %{
       module: Imp.LM.Static,

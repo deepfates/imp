@@ -33,7 +33,7 @@ Ordinary Imp startup starts no protocol endpoint.
   release; trust for authorized remote servers; the connection options public
   servers need; and the browser OAuth flow.
 - `ReActV2` offers `submit` only to a signature that needs one. A task with
-  exactly one text output ends its turn on a step that answers in prose, and an
+  exactly one text output ends its turn on a step that answers in text, and an
   interrupted turn makes one last request whose text is the answer instead of
   failing.
 - `ReActV2` gains `finish_on` for tools whose call is the answer.
@@ -114,7 +114,7 @@ Ordinary Imp startup starts no protocol endpoint.
   as `:answered`. Use `Imp.Prediction.complete?/1` to ask whether a turn
   answered.
 - For a signature with one `:string` output, `ReActV2` offers no `submit`
-  tool, and a step answered in prose with no tool call ends the turn.
+  tool, and a step answered in text with no tool call ends the turn.
 
 ## Upgrade path
 
