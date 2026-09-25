@@ -1096,7 +1096,8 @@ defmodule Imp.Predict.ReActV2 do
 
     {outputs, missing} =
       Enum.reduce(names, {%{}, []}, fn name, {outputs, missing} ->
-        case fetch_by_text(arguments, name) do
+        # The name and the key may be the same text as an atom and a string.
+        case Imp.FieldMap.fetch(arguments, name) do
           {:ok, value} -> {Map.put(outputs, name, value), missing}
           :error -> {outputs, missing ++ [name]}
         end
@@ -1116,18 +1117,6 @@ defmodule Imp.Predict.ReActV2 do
 
   defp validate_submit(_signature, arguments),
     do: {{:error, {:invalid_submit_arguments, arguments}}, true}
-
-  # A field name and an argument key may be the same text as an atom and a
-  # string: a string signature keeps a name as a string when its atom did not
-  # exist yet, and `Imp.Tool.normalize_arguments/1` makes a key an atom when
-  # the atom exists by the time the call arrives.
-  defp fetch_by_text(arguments, name) do
-    text = to_string(name)
-
-    Enum.find_value(arguments, :error, fn {key, value} ->
-      if to_string(key) == text, do: {:ok, value}
-    end)
-  end
 
   defp history_event(pending, prediction, calls, results, final) do
     pending

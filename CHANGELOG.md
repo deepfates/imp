@@ -346,7 +346,6 @@ User-visible changes to Imp are recorded here.
 - `json_retries: n` makes up to n retries of a parse failure, each the
   original request plus the latest failure's message, and stops at the first
   reply that parses. Before, any n above 0 made one.
-
 - An arity-3 metric receives `nil` as its trace from `Imp.evaluate/4` and the
   optimizers' validation scoring, and the program's trace while an optimizer
   bootstraps demos, as DSPy's `trace=None` has it. Before, evaluation passed
