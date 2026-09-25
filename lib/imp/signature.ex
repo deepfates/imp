@@ -81,6 +81,7 @@ defmodule Imp.Signature do
 
     inputs = build_fields!(inputs, :input, "Imp.Signature.new/2 :inputs")
     outputs = build_fields!(outputs, :output, "Imp.Signature.new/2 :outputs")
+    refuse_repeated_names!(inputs ++ outputs, "Imp.Signature.new/2")
 
     %__MODULE__{
       inputs: inputs,
@@ -104,6 +105,32 @@ defmodule Imp.Signature do
   @doc "Returns output field names in declaration order."
   def output_names(%__MODULE__{outputs: fields}), do: Enum.map(fields, & &1.name)
 
+  @doc false
+  # The names that appear more than once among `fields`, compared by text, so
+  # `:answer` and `"answer"` are the same name.
+  def repeated_names(fields) do
+    fields
+    |> Enum.map(&to_string(&1.name))
+    |> Enum.frequencies()
+    |> Enum.filter(fn {_name, count} -> count > 1 end)
+    |> Enum.map(&elem(&1, 0))
+    |> Enum.sort()
+  end
+
+  # A repeated name would make one field shadow the other in prompts and
+  # parses.
+  defp refuse_repeated_names!(fields, context) do
+    case repeated_names(fields) do
+      [] ->
+        :ok
+
+      repeated ->
+        raise ArgumentError,
+              "#{context}: field names must be distinct, but these are repeated: " <>
+                "'#{Enum.join(repeated, ", ")}'"
+    end
+  end
+
   @doc "Returns all field names, inputs first and outputs second."
   def field_names(%__MODULE__{} = signature),
     do: input_names(signature) ++ output_names(signature)
@@ -115,6 +142,11 @@ defmodule Imp.Signature do
   """
   def extend(%__MODULE__{} = signature, fields, kind) when kind in [:input, :output] do
     parsed = build_fields!(List.wrap(fields), kind, "Imp.Signature.extend/3 fields")
+
+    refuse_repeated_names!(
+      signature.inputs ++ signature.outputs ++ parsed,
+      "Imp.Signature.extend/3"
+    )
 
     case kind do
       :input -> %{signature | inputs: signature.inputs ++ parsed}

@@ -99,6 +99,19 @@ defmodule Imp.Signature.Parser do
           "input and output fields must have distinct names, but found duplicates: " <>
             "'#{Enum.join(duplicates, ", ")}'"
     end
+
+    case Imp.Signature.repeated_names(inputs ++ outputs) do
+      [] ->
+        :ok
+
+      repeated ->
+        raise Imp.Signature.ParseError,
+          input: spec,
+          position: 0,
+          detail:
+            "field names must be distinct, but these are repeated: " <>
+              "'#{Enum.join(repeated, ", ")}'"
+    end
   end
 
   defp split_arrow(spec) do

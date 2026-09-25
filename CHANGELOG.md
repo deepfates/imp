@@ -343,6 +343,11 @@ User-visible changes to Imp are recorded here.
   `ArgumentError` naming the key to use; before, the documented
   `minimum`/`maximum` were ignored. Pydantic's `ge` and `le` still mean the
   same bounds.
+- A signature refuses a repeated field name, on one side or across the arrow,
+  and names it: the string form raises `Imp.Signature.ParseError`, the map
+  form and `Imp.Signature.extend/3` raise `ArgumentError`, and `:a` and `"a"`
+  are the same name. Before, only a name on both sides of the arrow raised,
+  and `"q -> a, a"` built two fields called `a`.
 - `json_retries: n` makes up to n retries of a parse failure, each the
   original request plus the latest failure's message, and stops at the first
   reply that parses. Before, any n above 0 made one.
