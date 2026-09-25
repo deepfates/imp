@@ -182,7 +182,7 @@ case live_lm.(max_tokens: 400) do
   {:ok, lm} ->
     lookup =
       Imp.tool(:lookup, "Look up a fact by query.", fn args ->
-        case args[:query] || args["query"] do
+        case args["query"] do
           "capital-france" -> "Paris"
           other -> {:error, {:unknown_query, other}}
         end

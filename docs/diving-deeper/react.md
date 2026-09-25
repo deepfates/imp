@@ -34,12 +34,13 @@ The history comes back as `prediction.metadata.history`. Pass it as the
 
 ### 2. How a turn ends depends on the outputs
 
-A signature with **one text output** (`ticket -> reply`) ends the way most
+A signature with **one unconstrained text output** (`ticket -> reply`) ends the way most
 tool loops end: when the model stops calling tools and writes text, that text
 is the answer. No `submit` tool is offered. This costs one request fewer and
 matches what models are trained to do.
 
-**Every other signature** (several outputs, or one that is not text) gets a
+**Every other signature** (several outputs, one that is not text, or one text
+output with a constraint such as an enum, a pattern or an answer shape) gets a
 `submit` tool whose parameters are the outputs, as in DSPy. Calling it with
 valid values ends the turn; values that do not fit the signature are recorded
 as that call's error, and the loop goes on. The name `submit` is reserved.
@@ -47,9 +48,8 @@ as that call's error, and the loop goes on. The name `submit` is reserved.
 The one-text-output rule has a consequence to design for: any step that
 writes text and calls no tool has answered. A model that says what it is
 about to do, instead of doing it, has given that sentence as its answer.
-And an output typed `string` with a constraint, such as an enum, still takes
-the text path; text that does not fit the constraint is not an answer (see
-below).
+A constrained output never takes that path: its allowed values are in
+`submit`'s schema, and text is not an answer to it.
 
 ### 3. An interrupted turn gets one last request
 
@@ -63,8 +63,12 @@ than return nothing, Imp makes one more request:
   (`:extracted`).
 - With one text output, the request is an ordinary step, same tools, and its
   text is the answer (`:last_text`). Tool calls in it are not run; they are
-  listed in `unexecuted_tool_calls`. Text that does not fit the output makes
-  the answer `nil`.
+  listed in `unexecuted_tool_calls`.
+
+If the last request does not produce an answer either, the turn ends
+`:incomplete`. That is still `{:ok, prediction}`, carrying the history and a
+`termination_cause`, and `Imp.Prediction.complete?/1` is false for it; a turn
+without an answer is never reported complete.
 
 Imp adds nothing to that request unless you pass `last_request_note:`, one
 line of your own text, sent as a user message and kept in the history.
@@ -93,8 +97,8 @@ on_call =
   Imp.tool(
     :on_call,
     "Look up the on-call engineer for a squad.",
-    fn args ->
-      %{"atlas" => "Maya", "harbor" => "Tom", "beacon" => "Ines", "quill" => "Raj"}[args[:team] || args["team"]]
+    fn %{"team" => team} ->
+      %{"atlas" => "Maya", "harbor" => "Tom", "beacon" => "Ines", "quill" => "Raj"}[team]
     end,
     schema: %{
       "type" => "object",
@@ -230,8 +234,8 @@ page_and_stop =
   Imp.react(escalation, [on_call],
     lm: lm,
     finish_on: %{
-      on_call: fn args, contact, _inputs ->
-        {:finish, %{team: args[:team] || args["team"], contact: contact}}
+      on_call: fn %{"team" => team}, contact, _inputs ->
+        {:finish, %{team: team, contact: contact}}
       end
     }
   )
@@ -287,6 +291,24 @@ lm =
 
 {prediction.metadata.termination_reason, prediction.metadata.termination_cause, Imp.get(prediction, :contact)}
 #=> {:forced_submit, :max_iters, "Maya"}
+```
+
+An enum output keeps `submit`, so text alone does not end the turn. A model
+that only ever writes text is interrupted, the forced `submit` gets text too,
+and the turn has no answer:
+
+```elixir
+lm =
+  script.([
+    %{next_thought: "team: atlas", tool_calls: []},
+    %{next_thought: "team: atlas", tool_calls: []}
+  ])
+
+router = Imp.react(Imp.signature("ticket -> team: enum[atlas,harbor,beacon,quill]"), [on_call], lm: lm)
+{:ok, prediction} = Imp.call(router, %{ticket: "We were charged twice this month."})
+
+{prediction.metadata.termination_reason, prediction.metadata.termination_cause, Imp.Prediction.complete?(prediction)}
+#=> {:incomplete, :empty_tool_calls, false}
 ```
 
 `max_iters` is 20 by default; a call can override it with a `max_iters`

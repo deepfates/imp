@@ -49,8 +49,8 @@ ticket -> tags: list[str]
 did you mean "array[str]"? (Imp uses array[...] where DSPy uses list[...])
 ```
 
-Unknown types and a name used on both sides of the arrow fail when the
-signature is built, not when the first request goes out.
+Unknown types and a name used twice, on one side of the arrow or on both,
+fail when the signature is built, not when the first request goes out.
 
 ### 3. Outputs are checked strictly, inputs leniently
 
@@ -163,7 +163,7 @@ triage =
       inputs: [:ticket, %{name: :plan, type: :string, default: "free"}],
       outputs: [
         %{name: :team, type: :string, constraints: %{enum: ~w[atlas harbor beacon quill]}},
-        %{name: :priority, type: :integer, constraints: %{min: 1, max: 4}},
+        %{name: :priority, type: :integer, constraints: %{minimum: 1, maximum: 4}},
         %{name: :reply, type: :string, desc: "One sentence to the customer."},
         %{name: :duplicate_of, type: :string, optional: true}
       ]
@@ -191,12 +191,16 @@ Constraint keys:
 | Key | Applies to |
 | --- | --- |
 | `enum` | any value: one of the list |
-| `min`, `max` (inclusive), `gt`, `lt`, `multiple_of` | numbers |
+| `minimum`, `maximum` (inclusive), `gt`, `lt`, `multiple_of` | numbers |
 | `min_length`, `max_length`, `pattern` | strings |
 | `items` | the element type of an array, as a field map |
 | `properties` | the fields of an object |
 | `any_of` | a union: a list of field maps, one of which must match |
 | `answer_shape` | `:yes_no`, `:short_span` or `:numeric_span` |
+
+A constraint Imp does not know refuses the field when it is built, with the
+key to use: `min` and `max` name `minimum` and `maximum`. Enum members are
+strings, because answers arrive as text; atom members are refused the same way.
 
 ### How a value is checked
 
@@ -211,7 +215,7 @@ adapter shows the model when it asks again:
 field = Enum.find(triage.outputs, &(to_string(&1.name) == "priority"))
 
 Imp.Schema.validate_field(field, 9)
-#=> [%{field: :priority, rule: :max, message: "must be <= 4"}]
+#=> [%{field: :priority, rule: :maximum, message: "must be <= 4"}]
 ```
 
 ### Changing a signature

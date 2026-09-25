@@ -40,7 +40,7 @@ same rules the signature declares (see [Signatures](signatures.md)). An
 answer that is missing a field, or has a value that does not fit, is an
 error, never a partial prediction.
 
-### 4. A failed parse gets one more chance, and says why
+### 4. A failed parse gets another chance, and says why
 
 A model that ignores the format usually does so once. So a parse failure is
 followed by one more request, not an error straight away:
@@ -48,13 +48,14 @@ followed by one more request, not an error straight away:
 - The Chat and XML adapters retry through the JSON adapter, which asks for a
   JSON object instead. This is on by default, as in DSPy; turn it off with
   `config: [json_fallback: false]`.
-- The JSON and single-field adapters retry only when asked, with
-  `config: [json_retries: 1]`. The retry repeats the request with the
-  validation message added as a user turn, so the model sees exactly what was
-  wrong.
+- The JSON and single-field adapters retry only when asked:
+  `config: [json_retries: n]` makes up to `n` more requests. Each repeats the
+  original request with the latest failure's message added as a user turn, so
+  the model sees exactly what was wrong, and the retries stop at the first
+  reply that parses.
 
-A second failure is returned to you. Imp does not loop on a model that will
-not comply.
+A failure after that is returned to you. Imp does not loop on a model that
+will not comply.
 
 ### 5. The Chat adapter speaks DSPy's format
 
