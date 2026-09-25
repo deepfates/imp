@@ -65,14 +65,8 @@ defmodule DocumentationContractTest do
   # Replaced for the run, so no real key is ever sent anywhere.
   @provider_keys ["OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY"]
 
-  # Names the module check reads as modules that are not documented modules:
-  # process names and namespaces.
-  @module_reference_allowlist MapSet.new([
-                                "Imp.Optimize",
-                                "Imp.Optimizer",
-                                "Imp.TaskSupervisor",
-                                "Imp.UnlinkedTaskSupervisor"
-                              ])
+  # Process names the module check would otherwise read as modules.
+  @module_reference_allowlist MapSet.new(["Imp.TaskSupervisor", "Imp.UnlinkedTaskSupervisor"])
 
   @history ["CHANGELOG.md", "RELEASE_NOTES.md"]
 
@@ -133,7 +127,7 @@ defmodule DocumentationContractTest do
             page not in @history,
             name <- page |> File.read!() |> without_output() |> module_references(),
             not MapSet.member?(@module_reference_allowlist, name),
-            not MapSet.member?(documented, name),
+            not documented?(documented, name),
             uniq: true,
             do: "#{page}: #{name}"
 
@@ -423,6 +417,12 @@ defmodule DocumentationContractTest do
   # name an internal module; only the page's own words and code are checked.
   defp without_output(text) do
     Regex.replace(~r/^\s*(```|~~~)(?!elixir\s*$)[^\n]*\n.*?^\s*\1\s*$/ms, text, "")
+  end
+
+  # A documented module, or a namespace of documented modules (`Imp.Retrievers`).
+  defp documented?(documented, name) do
+    MapSet.member?(documented, name) or
+      Enum.any?(documented, &String.starts_with?(&1, name <> "."))
   end
 
   defp module_references(text) do
