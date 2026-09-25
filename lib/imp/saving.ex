@@ -1601,10 +1601,18 @@ defmodule Imp.Saving do
     }
   end
 
+  # The retriever is named, not printed: a retriever's struct can carry a
+  # bearer token.
   defp dump_retriever(retriever) do
     raise ArgumentError,
-          "unsupported saved Imp retriever: #{inspect(retriever)}; only Imp.Retrieve.Memory is portable"
+          "unsupported saved Imp retriever: #{retriever_name(retriever)}; " <>
+            "only Imp.Retrieve.Memory is portable"
   end
+
+  defp retriever_name(%module{}), do: inspect(module)
+  defp retriever_name(fun) when is_function(fun), do: "a function"
+  defp retriever_name(module) when is_atom(module), do: inspect(module)
+  defp retriever_name(_other), do: "a retriever that is not a struct"
 
   defp load_retriever!(%{"type" => "memory"} = state) do
     Imp.Retrieve.Memory.new(

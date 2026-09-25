@@ -4,6 +4,15 @@ User-visible changes to Imp are recorded here.
 
 ## 0.5.0 — not yet released
 
+### Security
+
+- An LM client, the HTTP, Databricks and Weaviate retrievers and the MLflow
+  and W&B trackers print with their credentials redacted, and so does a
+  program holding one. `Imp.req_llm(model, api_key: key)` printed the key in
+  IEx, in log lines and in crash reports, and a RAG program printed its
+  retriever's bearer token. Refusing to save a retriever that is not portable
+  names its module instead of printing it.
+
 ### Installing
 
 - Imp is a Hex package: `{:imp, "~> 0.5"}`. Every dependency comes from Hex,
