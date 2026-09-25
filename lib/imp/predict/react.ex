@@ -22,8 +22,9 @@ defmodule Imp.Predict.ReAct do
   This mode preserves the original Imp contract:
 
   - unknown model-selected tools return `{:error, {:unknown_tool, name}}`;
-  - denied tools return `{:error, {:tool_denied, name}}`;
-  - tool crashes return `{:error, {:tool_error, name, reason}}`;
+  - denied tools return `{:error, {:tool_authorization_denied, name, :tool_policy}}`;
+  - tool crashes return `{:error, {:tool_error, name, reason}}`, where `reason`
+    is the exception raised or `{kind, value}` for a throw or an exit;
   - tool-policy crashes return `{:error, {:tool_policy_error, name, reason}}`;
   - missing final fields return `{:error, {:missing_output_fields, fields}}`.
 
@@ -599,7 +600,7 @@ defmodule Imp.Predict.ReAct do
     {:ok, Imp.Tool.call(tool, args)}
   rescue
     exception ->
-      {:error, {:tool_error, tool.name, Exception.message(exception)}}
+      {:error, {:tool_error, tool.name, exception}}
   catch
     kind, reason ->
       {:error, {:tool_error, tool.name, {kind, reason}}}
@@ -645,8 +646,6 @@ defmodule Imp.Predict.ReAct do
   # reads the words `Imp.Adapter.Chat` renders for them rather than the term.
   defp format_tool_error(reason), do: Imp.Adapter.Chat.tool_error_text(reason)
 
-  defp action_parse_failure?(%{reason: {:error, %Imp.AdapterParseError{}}}), do: true
-  defp action_parse_failure?(%{reason: {:error, {:missing_output_fields, _fields}}}), do: true
   defp action_parse_failure?(%Imp.AdapterParseError{}), do: true
   defp action_parse_failure?({:missing_output_fields, _fields}), do: true
   defp action_parse_failure?({:react_context_window_exceeded_after_truncation, _reason}), do: true
@@ -814,7 +813,7 @@ defmodule Imp.Predict.ReAct do
 
       {:error, reason} ->
         cond do
-          not context_window_exceeded?(reason) ->
+          not Imp.Errors.context_window_exceeded?(reason) ->
             {:error, reason, trajectory}
 
           attempts_left > 1 ->
@@ -967,7 +966,7 @@ defmodule Imp.Predict.ReAct do
         {:ok, prediction, history}
 
       {:error, reason} when attempts_left > 1 ->
-        if context_window_exceeded?(reason) do
+        if Imp.Errors.context_window_exceeded?(reason) do
           case history do
             [_oldest | rest] ->
               retry_trajectory_call(call, rest, attempts_left - 1)
@@ -980,7 +979,7 @@ defmodule Imp.Predict.ReAct do
         end
 
       {:error, reason} ->
-        if context_window_exceeded?(reason) do
+        if Imp.Errors.context_window_exceeded?(reason) do
           case history do
             [_oldest | rest] ->
               {:error, {:react_context_window_exceeded_after_truncation, reason}, rest}
@@ -993,12 +992,6 @@ defmodule Imp.Predict.ReAct do
         end
     end
   end
-
-  defp context_window_exceeded?(%Imp.ContextWindowExceededError{}), do: true
-  defp context_window_exceeded?({:error, reason}), do: context_window_exceeded?(reason)
-  defp context_window_exceeded?({:lm_failed, _lm, reason}), do: context_window_exceeded?(reason)
-  defp context_window_exceeded?(%{reason: reason}), do: context_window_exceeded?(reason)
-  defp context_window_exceeded?(_reason), do: false
 
   defp project_extraction(signature, prediction) do
     fields =

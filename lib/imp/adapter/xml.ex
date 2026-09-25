@@ -10,8 +10,8 @@ defmodule Imp.Adapter.XML do
   ("Respond with the corresponding output fields wrapped in XML tags ...").
 
   Parse fills declared output defaults and omitted nullable fields, then returns
-  `{:error, {:missing_output_fields, missing}}` if any required output remains
-  absent. Typed objects, arrays, mappings, and unions use recursive XML. Saxy
+  an `Imp.AdapterParseError` of kind `:missing_fields` if any required output
+  remains absent. Typed objects, arrays, mappings, and unions use recursive XML. Saxy
   parses completed responses; declarations, doctypes, and custom entities are
   rejected before parsing. Tag-free prose is a loud error, never silently
   stuffed into a field.
@@ -55,9 +55,6 @@ defmodule Imp.Adapter.XML do
          {:ok, fields} <- parse_output_fields(signature.outputs, grouped, raw),
          {:ok, prediction} <- Imp.Adapter.Chat.parse(signature, fields, opts) do
       {:ok, prediction}
-    else
-      {:error, %Imp.AdapterParseError{} = error} -> {:error, error}
-      {:error, reason} -> {:error, reason}
     end
   end
 
@@ -266,7 +263,7 @@ defmodule Imp.Adapter.XML do
   end
 
   defp xml_error(raw, message) do
-    {:error, %Imp.AdapterParseError{message: message, reason: raw}}
+    {:error, %Imp.AdapterParseError{kind: :malformed, message: message, reason: raw}}
   end
 
   defp validate_tree(root, raw) do
@@ -318,6 +315,7 @@ defmodule Imp.Adapter.XML do
   defp xml_field_error(raw, field, reason) do
     {:error,
      %Imp.AdapterParseError{
+       kind: :invalid_fields,
        message: "Failed to parse XML field #{field.name}: #{reason}",
        reason: raw
      }}

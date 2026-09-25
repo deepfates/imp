@@ -233,12 +233,14 @@ defmodule ExternalRetrieverTest do
         method: :get
       )
 
-    assert {:error, {:unsupported_http_method, :get}} =
+    assert {:error, {:http_method_not_supported, Imp.Retrievers.HTTP, :get}} =
              Imp.Retrieve.retrieve(retriever, "capital France")
   end
 
   test "retriever facade reports callback crashes and invalid results" do
-    assert {:error, {:retriever_failed, :anonymous_retriever, "retriever exploded"}} =
+    assert {:error,
+            {:retriever_failed, :anonymous_retriever,
+             %RuntimeError{message: "retriever exploded"}}} =
              Imp.Retrieve.retrieve(fn _query, _opts -> raise "retriever exploded" end, "q")
 
     assert {:ok, [%{text: "Paris", id: "p1"}]} =
@@ -303,7 +305,7 @@ defmodule ExternalRetrieverTest do
                    )
                  end
 
-    assert {:error, {:retriever_failed, Imp.Retrieve.Memory, message}} =
+    assert {:error, {:retriever_failed, Imp.Retrieve.Memory, %ArgumentError{message: message}}} =
              Imp.Retrieve.retrieve(Imp.Retrieve.Memory.new([%{text: "Paris"}]), "Paris", k: -1)
 
     assert message =~ "expected non negative integer"

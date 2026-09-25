@@ -724,7 +724,7 @@ defmodule Imp.Optimizer.BetterTogether do
   rescue
     error ->
       Imp.OperationalSafetyError.raise_if_present!(error)
-      {:error, {:optimizer_failed, module, Exception.message(error)}}
+      {:error, {:optimizer_failed, module, error}}
   catch
     kind, reason ->
       Imp.OperationalSafetyError.raise_if_present!({kind, reason})

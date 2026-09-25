@@ -208,7 +208,7 @@ defmodule Imp.Adapter.TwoStep do
       {:error, _retry_reason} ->
         # Mirrors DSPy's ValueError("Failed to parse response from the
         # original completion: ...") — loud, and the completion is retained.
-        {:error, {:two_step_extraction_failed, original_reason, completion}}
+        {:error, extraction_failed(original_reason, completion)}
     end
   end
 
@@ -248,7 +248,26 @@ defmodule Imp.Adapter.TwoStep do
   end
 
   defp require_text(raw) when is_binary(raw), do: {:ok, raw}
-  defp require_text(raw), do: {:error, {:unsupported_lm_output, raw}}
+  defp require_text(raw), do: {:error, Imp.AdapterParseError.unsupported_output(raw)}
+
+  # The extraction's own failure keeps its kind when it was a parse failure;
+  # an extraction LM that failed is `:other`, with its error as the reason.
+  defp extraction_failed(reason, completion) do
+    kind =
+      case reason do
+        %Imp.AdapterParseError{kind: kind} when not is_nil(kind) -> kind
+        _other -> :other
+      end
+
+    %Imp.AdapterParseError{
+      kind: kind,
+      message:
+        "Failed to parse response from the original completion: " <>
+          if(is_exception(reason), do: Exception.message(reason), else: inspect(reason)),
+      reason: reason,
+      trace: %{raw: completion}
+    }
+  end
 
   defp present?(fields, name), do: match?({:ok, _value}, fetch_present(fields, name))
 

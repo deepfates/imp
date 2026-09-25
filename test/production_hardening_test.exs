@@ -113,7 +113,7 @@ defmodule ProductionHardeningTest do
     lm = Imp.req_llm("openai:gpt-test", req_module: FlakyReqLLM)
     program = Imp.predict("question -> answer", lm: lm)
 
-    assert {:error, :temporary_unavailable} =
+    assert {:error, %Imp.LMError{reason: :temporary_unavailable}} =
              Imp.Predict.Predict.call(program, %{question: "recover?"})
 
     assert {:ok, prediction} = Imp.Predict.Predict.call(program, %{question: "recover?"})
@@ -169,7 +169,9 @@ defmodule ProductionHardeningTest do
 
     messages = [%{role: :user, content: "cache transient"}]
 
-    assert {:error, :temporary_unavailable} = Imp.LM.generate(lm, messages, cache: true)
+    assert {:error, %Imp.LMError{reason: :temporary_unavailable}} =
+             Imp.LM.generate(lm, messages, cache: true)
+
     assert_req_llm_output(Imp.LM.generate(lm, messages, cache: true), "Answer: recovered")
     assert_req_llm_output(Imp.LM.generate(lm, messages, cache: true), "Answer: recovered")
     assert Process.get(:transient_error_count) == 2
@@ -206,7 +208,7 @@ defmodule ProductionHardeningTest do
       ^ref,
       [:imp, :span, :throw, :exception],
       %{duration: duration},
-      %{api_key: "[REDACTED]", operation: :throw_probe, error: "{:throw, :span_thrown}"}
+      %{api_key: "[REDACTED]", operation: :throw_probe, kind: :throw, reason: :span_thrown}
     }
 
     assert is_integer(duration)
@@ -415,7 +417,7 @@ defmodule ProductionHardeningTest do
                []
              )
 
-    assert {:error, {:lm_failed, :anonymous_lm, "lm exploded"}} =
+    assert {:error, {:lm_failed, :anonymous_lm, %RuntimeError{message: "lm exploded"}}} =
              Imp.LM.generate(fn _messages, _opts -> raise "lm exploded" end, [], [])
 
     assert {:ok, "prefix:value"} =
@@ -453,7 +455,7 @@ defmodule ProductionHardeningTest do
       Imp.LM.Static.generate([], %{handler: fn _messages, _opts -> "ok" end})
     end
 
-    assert {:error, {:lm_failed, Imp.LM.Static, message}} =
+    assert {:error, {:lm_failed, Imp.LM.Static, %ArgumentError{message: message}}} =
              Imp.LM.generate(Imp.LM.Static, [], handler: :not_a_function)
 
     assert message =~ "Imp.LM.Static.generate/2 expects :handler"

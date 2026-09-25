@@ -224,7 +224,7 @@ defmodule Imp.ACP.Options do
         {:error, {:invalid_program_factory_result, shape(other)}}
     end
   rescue
-    exception -> {:error, {:program_factory_failed, Exception.message(exception)}}
+    exception -> {:error, {:program_factory_failed, exception}}
   catch
     kind, reason -> {:error, {:program_factory_failed, {kind, reason}}}
   end
@@ -233,7 +233,7 @@ defmodule Imp.ACP.Options do
       when is_function(mapper, 2) do
     normalize_inputs(mapper.(prompt, Map.put(context, :program, program)))
   rescue
-    exception -> {:error, {:input_mapper_failed, Exception.message(exception)}}
+    exception -> {:error, {:input_mapper_failed, exception}}
   catch
     kind, reason -> {:error, {:input_mapper_failed, {kind, reason}}}
   end
@@ -255,7 +255,7 @@ defmodule Imp.ACP.Options do
       when is_function(renderer, 2) do
     normalize_rendered(renderer.(prediction, context))
   rescue
-    exception -> {:error, {:output_renderer_failed, Exception.message(exception)}}
+    exception -> {:error, {:output_renderer_failed, exception}}
   catch
     kind, reason -> {:error, {:output_renderer_failed, {kind, reason}}}
   end
@@ -309,9 +309,9 @@ defmodule Imp.ACP.Options do
         {:error, :invalid_before_turn_result}
     end
   rescue
-    _ -> {:error, :before_turn_failed}
+    exception -> {:error, {:before_turn_failed, exception}}
   catch
-    _, _ -> {:error, :before_turn_failed}
+    kind, reason -> {:error, {:before_turn_failed, {kind, reason}}}
   end
 
   def before_turn(_), do: :ok
@@ -336,7 +336,7 @@ defmodule Imp.ACP.Options do
       when is_function(policy, 2) do
     normalize_permission(policy.(request, context))
   rescue
-    exception -> {:deny, {:permission_policy_failed, Exception.message(exception)}}
+    exception -> {:deny, {:permission_policy_failed, exception}}
   catch
     kind, reason -> {:deny, {:permission_policy_failed, {kind, reason}}}
   end
@@ -345,7 +345,7 @@ defmodule Imp.ACP.Options do
       when is_function(policy, 1) do
     normalize_permission(policy.(request))
   rescue
-    exception -> {:deny, {:permission_policy_failed, Exception.message(exception)}}
+    exception -> {:deny, {:permission_policy_failed, exception}}
   catch
     kind, reason -> {:deny, {:permission_policy_failed, {kind, reason}}}
   end

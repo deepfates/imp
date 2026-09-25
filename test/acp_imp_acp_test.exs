@@ -932,7 +932,7 @@ defmodule Imp.ACPTest do
       "env" => []
     }
 
-    assert {:error, {:mcp_server_not_authorized, "untrusted"}} =
+    assert {:error, {:mcp_server_not_authorized, "untrusted", :not_trusted}} =
              Imp.ACP.MCP.import_tools([server], cwd: File.cwd!())
   end
 
@@ -1024,7 +1024,7 @@ defmodule Imp.ACPTest do
 
     # A name the program has already taken refuses rather than being renamed,
     # so the declaration is what says to call this server's tools something else.
-    assert {:error, {:mcp_tool_name_collision, "annotated_destructive", ["annotated"]}} =
+    assert {:error, {:mcp_tool_name_reserved, "annotated_destructive", ["annotated"]}} =
              Imp.ACP.MCP.import_tools([server],
                cwd: File.cwd!(),
                trusted_servers: [server],
@@ -1182,7 +1182,7 @@ defmodule Imp.ACPTest do
 
     # A name the program has already taken is refused, not renamed: the tool a
     # caller addresses must be the one its declaration named.
-    assert {:error, {:mcp_tool_name_collision, "external_workspace_name", ["imp-acp-demo-http"]}} =
+    assert {:error, {:mcp_tool_name_reserved, "external_workspace_name", ["imp-acp-demo-http"]}} =
              Imp.ACP.MCP.import_tools([server],
                cwd: File.cwd!(),
                trusted_servers: [server],

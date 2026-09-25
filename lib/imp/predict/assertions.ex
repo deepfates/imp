@@ -10,7 +10,9 @@ defmodule Imp.Predict.Assertions do
   If attempts are exhausted, the best prediction by assertion pass rate is
   returned with `:assertion_score`, `:assertion_failures`, and
   `:assertion_history` fields. Pass `strict: true` to return an error instead
-  when no attempt satisfies every assertion.
+  when no attempt satisfies every assertion. When no attempt returned a
+  prediction at all, the error is the last attempt's reason, or `:no_attempts`
+  with `max_attempts: 0`.
   """
 
   defstruct [:program, :assertions, max_attempts: 3, strict: false]
@@ -184,11 +186,11 @@ defmodule Imp.Predict.Assertions do
     {:error, {:assertions_failed, evaluation.failures, history}}
   end
 
-  defp finish(%{last_error: reason, history: history}, _wrapper) when not is_nil(reason) do
-    {:error, reason, history}
-  end
+  # No attempt returned a prediction, so there is no history of scored attempts
+  # to report: the last attempt's reason is the answer.
+  defp finish(%{last_error: reason}, _wrapper) when not is_nil(reason), do: {:error, reason}
 
-  defp finish(%{history: history}, _wrapper), do: {:error, :no_attempts, history}
+  defp finish(_state, _wrapper), do: {:error, :no_attempts}
 
   defp attach_assertion_metadata(prediction, evaluation, history) do
     prediction

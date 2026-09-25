@@ -193,9 +193,10 @@ defmodule Imp.MCP.Connections do
   prefixes offer the same tool name, the import refuses with
   `{:mcp_tool_name_collision, tool, servers}` naming the tool and both servers,
   and logs the fix — give one of them a `"tool_prefix"`. A tool whose name is
-  one the program has already taken (`:reserved_tool_names`) is refused the
-  same way. Both refusals stand under `on_failure: :drop`, which drops what the
-  network did and never what the caller declared.
+  one the program has already taken (`:reserved_tool_names`) is refused as
+  `{:mcp_tool_name_reserved, tool, servers}`. Both refusals stand under
+  `on_failure: :drop`, which drops what the network did and never what the
+  caller declared.
 
   A consequence to plan for: a collision between two unprefixed servers goes
   unnoticed for as long as one of them is absent, and then refuses the import
@@ -205,11 +206,23 @@ defmodule Imp.MCP.Connections do
   the server published, whatever the tool ended up called.
 
   Dropping covers failures of the connection and of `tools/list`, not of the
-  declaration. A descriptor that `:authorize` refused, one whose `auth` cannot
-  produce a header (a `bearer_env` variable declared `required` and unset, for
-  example), one whose `"tool_prefix"` is not a string, one that is malformed, a
-  tool name two servers both claim, and anything raised by the caller's own
-  `:tool_filter` all refuse the import under either setting.
+  declaration. A descriptor that `:authorize` refused
+  (`{:mcp_server_not_authorized, server, answer}`, where `answer` is what the
+  callback returned, or `:not_trusted` for a descriptor not among
+  `:trusted_servers`), one whose `auth` cannot produce a header (a
+  `bearer_env` variable declared `required` and unset, for example), one whose
+  `"tool_prefix"` is not a string, one that is malformed
+  (`{:invalid_mcp_server, index, %ArgumentError{}}`, named by its place in the
+  list), a tool name two servers both claim, and anything raised by the
+  caller's own `:tool_filter` all refuse the import under either setting.
+
+  A server left out under `:drop` is `%{server: name, index: index, reason:
+  reason}` in the import's `unavailable` list, where `reason` is the term the
+  import would have refused with under `:refuse`. A connection that failed is
+  `{:mcp_connection_failed, detail}` and a catalog that could not be listed is
+  `{:mcp_tools_list_failed, server, detail}`, where `detail` is ExMCP's error,
+  `:timeout` for a dial that did not answer in time, `{:exit, reason}`, or the
+  exception raised while connecting.
   """
 
   require Logger
@@ -434,8 +447,7 @@ defmodule Imp.MCP.Connections do
          :ok <- authorize(server, opts),
          :ok <- sse_without_credentials(server),
          :ok <- sse_url_without_query(server),
-         {:ok, headers} <- connection_headers(server, opts),
-         options = client_options(server, opts, headers),
+         {:ok, options} <- descriptor_options(server, index, opts),
          :ok <- trust(options, self()),
          {:ok, client, options} <- dial_http_fallback(options, timeout(opts)),
          :ok <- trust(options, client) do
@@ -471,13 +483,33 @@ defmodule Imp.MCP.Connections do
         {:error, reason, clients}
     end
   rescue
-    exception -> {:error, {:mcp_connection_failed, Exception.message(exception)}, clients}
+    exception -> {:error, {:mcp_connection_failed, exception}, clients}
   catch
     kind, reason -> {:error, {:mcp_connection_failed, {kind, reason}}, clients}
   end
 
-  defp connect_all([server | _rest], _opts, _index, clients, _unavailable),
-    do: {:error, {:invalid_mcp_server, shape(server)}, clients}
+  defp connect_all([server | _rest], _opts, index, clients, _unavailable) do
+    reason =
+      ArgumentError.exception("an MCP server descriptor must be a map, got: #{shape(server)}")
+
+    {:error, {:invalid_mcp_server, index, reason}, clients}
+  end
+
+  # What the descriptor says, read into client options. A descriptor nobody can
+  # address (a bad type, a URL that is not absolute HTTP(S), headers that are
+  # not name/value pairs) is the caller's declaration, so it refuses the import
+  # under `on_failure: :drop` too, named by its place in the list: a malformed
+  # descriptor may not have a usable name.
+  defp descriptor_options(server, index, opts) do
+    with {:ok, headers} <- connection_headers(server, opts) do
+      options = client_options(server, opts, headers)
+      # The origin trust is held for; a URL without one is not addressable.
+      if url = Keyword.get(options, :url), do: http_origin!(url)
+      {:ok, options}
+    end
+  rescue
+    error in ArgumentError -> {:error, {:invalid_mcp_server, index, error}}
+  end
 
   # One dial, bounded on its own. `ExMCP.Client.start_link/1` returns only when
   # the handshake has finished, and a host that accepts the connection and then
@@ -741,7 +773,7 @@ defmodule Imp.MCP.Connections do
         {:error, reason}
     end
   rescue
-    exception -> {:error, {:mcp_tool_import_failed, Exception.message(exception)}}
+    exception -> {:error, {:mcp_tool_import_failed, exception}}
   catch
     kind, reason -> {:error, {:mcp_tool_import_failed, {kind, reason}}}
   end
@@ -774,12 +806,10 @@ defmodule Imp.MCP.Connections do
 
   defp drop?(opts), do: Keyword.get(opts, :on_failure, :refuse) == :drop
 
-  # What the import says about a server it left out. The reason is the term the
-  # refusal would have carried, with its detail summarized: a transport error
-  # arrives as a nested struct whose inspection runs to several lines, and this
-  # is read in a log line and an operator's report.
+  # What the import says about a server it left out: the reason is the term the
+  # refusal would have carried under `on_failure: :refuse`, unchanged.
   defp absence(server, index, reason),
-    do: %{server: server_name(server), index: index, reason: shorten(reason)}
+    do: %{server: server_name(server), index: index, reason: reason}
 
   defp shorten({tag, detail}) when is_atom(tag), do: {tag, summary(detail)}
 
@@ -1043,7 +1073,7 @@ defmodule Imp.MCP.Connections do
             "program reserves; give that server a \"tool_prefix\" in its descriptor"
         )
 
-        {:error, {:mcp_tool_name_collision, name, servers}}
+        {:error, {:mcp_tool_name_reserved, name, servers}}
     end
   end
 
@@ -1100,19 +1130,29 @@ defmodule Imp.MCP.Connections do
   defp tool_schemas(other),
     do: {:error, {:invalid_mcp_tools_response, shape(other)}}
 
+  # A refusal names the server and what refused it: the `:authorize`
+  # callback's own answer, or `:not_trusted` for a descriptor that is not one
+  # of `:trusted_servers`.
   defp authorize(server, opts) do
     context = %{cwd: Keyword.get(opts, :cwd), server: server}
 
-    result =
+    answer =
       case Keyword.get(opts, :authorize) do
-        callback when is_function(callback, 2) -> safe_authorize(callback, server, context)
-        callback when is_function(callback, 1) -> safe_authorize(callback, server)
-        nil -> Enum.any?(Keyword.get(opts, :trusted_servers, []), &exact_server?(&1, server))
+        callback when is_function(callback, 2) ->
+          safe_authorize(callback, server, context)
+
+        callback when is_function(callback, 1) ->
+          safe_authorize(callback, server)
+
+        nil ->
+          if Enum.any?(Keyword.get(opts, :trusted_servers, []), &exact_server?(&1, server)),
+            do: :ok,
+            else: :not_trusted
       end
 
-    if result in [true, :ok],
+    if answer in [true, :ok],
       do: :ok,
-      else: {:error, {:mcp_server_not_authorized, server_name(server)}}
+      else: {:error, {:mcp_server_not_authorized, server_name(server), answer}}
   end
 
   defp safe_authorize(callback, server, context), do: callback.(server, context)

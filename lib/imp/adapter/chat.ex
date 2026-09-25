@@ -147,7 +147,7 @@ defmodule Imp.Adapter.Chat do
     build_prediction(signature, parse_fields(signature, text))
   end
 
-  defp do_parse(_signature, raw), do: {:error, {:unsupported_lm_output, raw}}
+  defp do_parse(_signature, raw), do: {:error, Imp.AdapterParseError.unsupported_output(raw)}
 
   @doc false
   def validate_demos(demos) do
@@ -170,15 +170,16 @@ defmodule Imp.Adapter.Chat do
          :ok <- Imp.Schema.validate_fields(signature.outputs, completed) do
       {:ok, Imp.Prediction.new(completed)}
     else
+      {:error, {:missing_output_fields, missing}} ->
+        {:error, Imp.AdapterParseError.missing_fields(missing)}
+
       {:error, errors} when is_list(errors) ->
         {:error,
          %Imp.AdapterParseError{
+           kind: :invalid_fields,
            message: Imp.Schema.retry_feedback(errors),
            reason: fields
          }}
-
-      {:error, reason} ->
-        {:error, reason}
     end
   end
 
@@ -893,8 +894,6 @@ defmodule Imp.Adapter.Chat do
 
   defp error_text({:malformed_tool_call, _received}), do: "the tool call could not be read."
 
-  defp error_text({:tool_denied, name}), do: "#{name} is not allowed."
-
   defp error_text({:missing_required, keys}) when is_list(keys),
     do: "missing required arguments: " <> Enum.map_join(keys, ", ", &to_string/1)
 
@@ -904,6 +903,9 @@ defmodule Imp.Adapter.Chat do
         "#{fetch_field(error, :field)} #{fetch_field(error, :message)}"
       end)
   end
+
+  defp error_text({:tool_authorization_denied, name, :tool_policy}),
+    do: "#{name} is not allowed."
 
   defp error_text({:tool_authorization_denied, name, :client_denied}),
     do: "#{name} was not allowed; the person declined it."

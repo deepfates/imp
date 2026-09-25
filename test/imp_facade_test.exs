@@ -409,10 +409,11 @@ defmodule ImpFacadeTest do
 
   test "call reports program exceptions and throws as structured errors" do
     assert Imp.call(%RaisingProgram{}, %{question: "q"}) ==
-             {:error, {:module_call_failed, RaisingProgram, "program exploded"}}
+             {:error,
+              {:module_call_failed, RaisingProgram, %RuntimeError{message: "program exploded"}}}
 
     assert Imp.call(%ThrowingProgram{}, %{question: "q"}) ==
-             {:error, {:module_call_failed, ThrowingProgram, "{:throw, :program_thrown}"}}
+             {:error, {:module_call_failed, ThrowingProgram, {:throw, :program_thrown}}}
   end
 
   test "call reports invalid module return shapes at the public boundary" do

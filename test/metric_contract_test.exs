@@ -234,9 +234,15 @@ defmodule MetricContractTest do
 
     assert raised.score == -1.0
 
-    assert [%{reason: {:module_call_failed, Program, "program exploded"}}] = raised.errors
+    assert [%{reason: {:module_call_failed, Program, %RuntimeError{message: "program exploded"}}}] =
+             raised.errors
 
-    assert [%{error: {:module_call_failed, Program, "program exploded"}, prediction: nil}] =
+    assert [
+             %{
+               error: {:module_call_failed, Program, %RuntimeError{message: "program exploded"}},
+               prediction: nil
+             }
+           ] =
              raised.rows
 
     invalid = %Program{handler: fn _inputs -> :not_a_module_result end}

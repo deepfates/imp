@@ -6,9 +6,10 @@ defmodule Imp.Example do
   `with_inputs/2` to mark which fields a program may see. The remaining fields
   are labels for evaluation, bootstrapping, demonstrations, and optimizers.
 
-  Keys are normalized carefully. Existing atoms stay atoms, existing atom names
-  in strings resolve to those atoms, and unknown strings remain strings rather
-  than creating atoms from untrusted external data.
+  A key keeps the type it was given: `%{"question" => ...}` is stored under the
+  string and `%{question: ...}` under the atom, and no string is turned into an
+  atom. Every function that takes a key compares keys by their text, so
+  `get(example, :question)` reads a field stored under `"question"`.
 
   Internal fields whose names start with `imp_` are omitted from `keys/1`,
   `items/1`, and `values/1`, but `to_map/1` remains lossless for persistence and
@@ -36,7 +37,7 @@ defmodule Imp.Example do
   def new(%__MODULE__{} = example), do: example
 
   def new(fields) when is_list(fields) or is_map(fields),
-    do: %__MODULE__{fields: normalize_keys(fields)}
+    do: %__MODULE__{fields: Imp.FieldMap.new!(fields, "Imp.Example.new/1", "Imp.Example")}
 
   def new(fields) do
     raise ArgumentError,
@@ -44,12 +45,16 @@ defmodule Imp.Example do
   end
 
   @doc "Reads a field, returning `default` when it is missing."
-  def get(%__MODULE__{fields: fields}, key, default \\ nil),
-    do: get_key(fields, normalize_key(key), default)
+  def get(%__MODULE__{fields: fields}, key, default \\ nil) do
+    case Imp.FieldMap.fetch(fields, key!(key)) do
+      {:ok, value} -> value
+      :error -> default
+    end
+  end
 
   @doc "Reads a field or raises `KeyError` when it is missing."
   def fetch!(%__MODULE__{fields: fields}, key) do
-    case fetch_key(fields, normalize_key(key)) do
+    case Imp.FieldMap.fetch(fields, key!(key)) do
       {:ok, value} -> value
       :error -> raise KeyError, key: key, term: fields
     end
@@ -57,11 +62,11 @@ defmodule Imp.Example do
 
   @doc "Returns a copy of the example with one field set."
   def put(%__MODULE__{fields: fields} = example, key, value),
-    do: %{example | fields: Map.put(fields, normalize_key(key), value)}
+    do: %{example | fields: Imp.FieldMap.put(fields, key!(key), value)}
 
   @doc "Returns a copy of the example with one field removed."
   def delete(%__MODULE__{fields: fields} = example, key),
-    do: %{example | fields: delete_key(fields, normalize_key(key))}
+    do: %{example | fields: Imp.FieldMap.delete(fields, key!(key))}
 
   @doc "Returns non-internal field keys."
   def keys(%__MODULE__{fields: fields}), do: Map.keys(fields) |> Enum.reject(&internal?/1)
@@ -78,19 +83,19 @@ defmodule Imp.Example do
 
   @doc "Marks which fields are inputs for programs and optimizers."
   def with_inputs(%__MODULE__{} = example, keys),
-    do: %{example | input_keys: keys |> List.wrap() |> Enum.map(&normalize_key/1)}
+    do: %{example | input_keys: keys |> List.wrap() |> Enum.map(&key!/1)}
 
   @doc "Returns an example containing only the marked input fields."
   def inputs(%__MODULE__{input_keys: nil} = example), do: example
 
   def inputs(%__MODULE__{} = example),
-    do: %{example | fields: Map.take(example.fields, example.input_keys)}
+    do: %{example | fields: Imp.FieldMap.take(example.fields, example.input_keys)}
 
   @doc "Returns an example containing label fields, excluding marked inputs."
   def labels(%__MODULE__{input_keys: nil}), do: new(%{})
 
   def labels(%__MODULE__{} = example),
-    do: %{example | fields: Map.drop(example.fields, example.input_keys)}
+    do: %{example | fields: Imp.FieldMap.drop(example.fields, example.input_keys)}
 
   @doc "Attaches demonstrations to an example."
   def with_demos(%__MODULE__{} = example, demos),
@@ -119,62 +124,7 @@ defmodule Imp.Example do
           "#{context} expects demos as Imp.Example structs, maps, or field pair lists; got: #{inspect(demo)}"
   end
 
-  defp normalize_keys(fields) do
-    Enum.reduce(fields, %{}, fn
-      {key, value}, normalized ->
-        Map.put(normalized, normalize_key(key), value)
-
-      invalid_entry, _normalized ->
-        raise ArgumentError,
-              "Imp.Example.new/1 expects fields as {key, value} pairs; got entry: #{inspect(invalid_entry)}"
-    end)
-  end
-
-  defp normalize_key(key) when is_atom(key), do: key
-  defp normalize_key(key) when is_binary(key), do: existing_atom_or_string(key)
-
-  defp normalize_key(key) do
-    raise ArgumentError,
-          "Imp.Example keys must be atoms or strings; got: #{inspect(key)}"
-  end
-
-  defp existing_atom_or_string(key) do
-    String.to_existing_atom(key)
-  rescue
-    ArgumentError -> key
-  end
-
-  defp get_key(fields, key, default) do
-    case fetch_key(fields, key) do
-      {:ok, value} -> value
-      :error -> default
-    end
-  end
-
-  defp fetch_key(fields, key) do
-    cond do
-      Map.has_key?(fields, key) ->
-        Map.fetch(fields, key)
-
-      is_atom(key) and Map.has_key?(fields, Atom.to_string(key)) ->
-        Map.fetch(fields, Atom.to_string(key))
-
-      is_binary(key) ->
-        case existing_atom_or_string(key) do
-          atom when is_atom(atom) -> Map.fetch(fields, atom)
-          _string -> :error
-        end
-
-      true ->
-        :error
-    end
-  end
-
-  defp delete_key(fields, key) when is_atom(key),
-    do: fields |> Map.delete(key) |> Map.delete(Atom.to_string(key))
-
-  defp delete_key(fields, key) when is_binary(key),
-    do: fields |> Map.delete(key) |> Map.delete(existing_atom_or_string(key))
+  defp key!(key), do: Imp.FieldMap.key!(key, "Imp.Example")
 
   defp internal?(key) when is_atom(key),
     do: key |> Atom.to_string() |> String.starts_with?("imp_")

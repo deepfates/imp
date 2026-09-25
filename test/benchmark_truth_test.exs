@@ -736,7 +736,8 @@ defmodule BenchmarkTruthTest do
     [row] = task["rows"]
 
     refute row["passed"]
-    assert row["error"]["reason"] == ["error", ["missing_output_fields", ["answer"]]]
+    assert row["error"]["kind"] == "missing_fields"
+    assert row["error"]["reason"] == ["answer"]
     assert row["diagnostic"]["trace"]["raw"] =~ "I forgot the answer field."
     assert row["diagnostic"]["trace"]["messages"] != []
   end

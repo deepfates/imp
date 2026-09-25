@@ -7,9 +7,8 @@ defmodule Imp.Prediction do
   metrics use `score` or score-like fields when normalizing results, and traces
   live under metadata so debugging information stays separate from task output.
 
-  Like `Imp.Example`, prediction keys are normalized without creating atoms
-  from unknown external strings. This matters for provider JSON, user-provided
-  schemas, and other dynamic boundaries.
+  Like `Imp.Example`, a key keeps the type it was given and no string is turned
+  into an atom; every function that takes a key compares keys by their text.
 
   ## Example
 
@@ -43,8 +42,8 @@ defmodule Imp.Prediction do
   @doc """
   Builds a prediction from fields and optional completions, score, and metadata.
 
-  `fields` may be a map or field pair list. Existing atom names in string keys
-  are resolved to those atoms, while unknown string keys remain strings.
+  `fields` may be a map or field pair list. Keys stay the atoms or strings they
+  were given.
   """
   def new(fields \\ %{}, opts \\ [])
 
@@ -52,7 +51,7 @@ defmodule Imp.Prediction do
     opts = Imp.Options.validate!(opts, @option_schema, "Imp.Prediction.new/2")
 
     %__MODULE__{
-      fields: normalize_fields(fields),
+      fields: Imp.FieldMap.new!(fields, "Imp.Prediction.new/2", "Imp.Prediction"),
       completions: opts[:completions],
       score: opts[:score],
       metadata: opts[:metadata]
@@ -65,12 +64,16 @@ defmodule Imp.Prediction do
   end
 
   @doc "Reads a prediction field, returning `default` when it is missing."
-  def get(%__MODULE__{fields: fields}, key, default \\ nil),
-    do: get_key(fields, normalize_key(key), default)
+  def get(%__MODULE__{fields: fields}, key, default \\ nil) do
+    case Imp.FieldMap.fetch(fields, key!(key)) do
+      {:ok, value} -> value
+      :error -> default
+    end
+  end
 
   @doc "Reads a prediction field or raises `KeyError` when it is missing."
   def fetch!(%__MODULE__{fields: fields}, key) do
-    case fetch_key(fields, normalize_key(key)) do
+    case Imp.FieldMap.fetch(fields, key!(key)) do
       {:ok, value} -> value
       :error -> raise KeyError, key: key, term: fields
     end
@@ -78,7 +81,7 @@ defmodule Imp.Prediction do
 
   @doc "Returns a copy of the prediction with one field set."
   def put(%__MODULE__{fields: fields} = prediction, key, value),
-    do: %{prediction | fields: Map.put(fields, normalize_key(key), value)}
+    do: %{prediction | fields: Imp.FieldMap.put(fields, key!(key), value)}
 
   @doc "Returns the prediction field map."
   def to_map(%__MODULE__{fields: fields}), do: fields
@@ -119,54 +122,5 @@ defmodule Imp.Prediction do
   def from_example(%Imp.Example{} = example, opts \\ []),
     do: new(Imp.Example.to_map(example), opts)
 
-  defp normalize_fields(fields) do
-    Enum.reduce(fields, %{}, fn
-      {key, value}, normalized ->
-        Map.put(normalized, normalize_key(key), value)
-
-      invalid_entry, _normalized ->
-        raise ArgumentError,
-              "Imp.Prediction.new/2 expects fields as {key, value} pairs; got entry: #{inspect(invalid_entry)}"
-    end)
-  end
-
-  defp normalize_key(key) when is_atom(key), do: key
-  defp normalize_key(key) when is_binary(key), do: existing_atom_or_string(key)
-
-  defp normalize_key(key) do
-    raise ArgumentError,
-          "Imp.Prediction keys must be atoms or strings; got: #{inspect(key)}"
-  end
-
-  defp existing_atom_or_string(key) do
-    String.to_existing_atom(key)
-  rescue
-    ArgumentError -> key
-  end
-
-  defp get_key(fields, key, default) do
-    case fetch_key(fields, key) do
-      {:ok, value} -> value
-      :error -> default
-    end
-  end
-
-  defp fetch_key(fields, key) do
-    cond do
-      Map.has_key?(fields, key) ->
-        Map.fetch(fields, key)
-
-      is_atom(key) and Map.has_key?(fields, Atom.to_string(key)) ->
-        Map.fetch(fields, Atom.to_string(key))
-
-      is_binary(key) ->
-        case existing_atom_or_string(key) do
-          atom when is_atom(atom) -> Map.fetch(fields, atom)
-          _string -> :error
-        end
-
-      true ->
-        :error
-    end
-  end
+  defp key!(key), do: Imp.FieldMap.key!(key, "Imp.Prediction")
 end

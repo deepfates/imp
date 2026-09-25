@@ -658,8 +658,11 @@ defmodule Imp.Optimizer.Playbook.Campaign do
   end
 
   @doc false
-  def classify_model_failure(%{reason: {:error, %Jason.DecodeError{}}, trace: %{raw: raw}}),
-    do: {:ok, "adapter_decode_failure", %{"raw_sha256" => sha256(raw)}}
+  def classify_model_failure(%Imp.AdapterParseError{
+        reason: %Jason.DecodeError{},
+        trace: %{raw: raw}
+      }),
+      do: {:ok, "adapter_decode_failure", %{"raw_sha256" => sha256(raw)}}
 
   def classify_model_failure({kind, _details})
       when kind in [:code_act_sandbox_error, :code_act_max_iters, :invalid_program_outputs],

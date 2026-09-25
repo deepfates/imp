@@ -7,7 +7,7 @@ defmodule Imp.LMRetrieveOperationalSafetyTest do
     assert {:error, ^safety} =
              Imp.LM.generate(fn _messages, _opts -> raise safety end, [], [])
 
-    assert {:error, {:lm_failed, :anonymous_lm, "ordinary LM crash"}} =
+    assert {:error, {:lm_failed, :anonymous_lm, %RuntimeError{message: "ordinary LM crash"}}} =
              Imp.LM.generate(fn _messages, _opts -> raise "ordinary LM crash" end, [], [])
   end
 
@@ -17,7 +17,9 @@ defmodule Imp.LMRetrieveOperationalSafetyTest do
     assert {:error, ^safety} =
              Imp.Retrieve.retrieve(fn _query, _opts -> raise safety end, "query")
 
-    assert {:error, {:retriever_failed, :anonymous_retriever, "ordinary retrieval crash"}} =
+    assert {:error,
+            {:retriever_failed, :anonymous_retriever,
+             %RuntimeError{message: "ordinary retrieval crash"}}} =
              Imp.Retrieve.retrieve(
                fn _query, _opts -> raise "ordinary retrieval crash" end,
                "query"
@@ -60,7 +62,8 @@ defmodule Imp.LMRetrieveOperationalSafetyTest do
     assert {:error, ^safety} =
              Imp.ToolPolicy.authorize(fn _name, _input -> raise safety end, :lookup, %{})
 
-    assert {:error, {:tool_policy_error, :lookup, "ordinary policy crash"}} =
+    assert {:error,
+            {:tool_policy_error, :lookup, %RuntimeError{message: "ordinary policy crash"}}} =
              Imp.ToolPolicy.authorize(
                fn _name, _input -> raise "ordinary policy crash" end,
                :lookup,

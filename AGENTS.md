@@ -31,15 +31,20 @@ rather than re-describe it.
 ## Where the boundaries are half-declared
 
 Imp has many `@callback` boundaries, and nearly all of them return
-`{:error, term()}`. Some paths return bare strings
-(`{:error, "expected an LM module exporting generate/2"}`), which a caller cannot
-act on except by matching text.
+`{:error, term()}`. A reason that is only text is one a caller cannot act on
+except by matching it. The `validate_*` functions that return
+`{:error, "expected ..."}` are the exception: they are NimbleOptions custom
+validators, whose contract is a message string, and their failure reaches a
+caller as the `ArgumentError` NimbleOptions raises.
 
-The classification instinct is already present: `Imp.Exceptions` carries
-`retryable`, and `Imp.OperationalSafetyError` carries `:kind`. Extend that to the
-behaviours rather than inventing a new scheme — a boundary should name the
-failure classes its callers must distinguish, especially anywhere a retry or a
-spend decision hangs on the answer.
+The classes that exist are the ones to extend rather than inventing a new
+scheme: `Imp.LMError` carries `status`, `retryable` and
+`context_window_exceeded`, read through `Imp.Errors`; `Imp.AdapterParseError`
+carries `:kind`; `Imp.OperationalSafetyError` carries `:kind`; and
+`Imp.MCP.CallFailure` carries `outcome`. A boundary should name the failure
+classes its callers must distinguish, especially anywhere a retry or a spend
+decision hangs on the answer, and a reason is a term — the exception struct
+itself where there is one — never its message text.
 
 ## Process ownership
 

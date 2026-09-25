@@ -53,7 +53,6 @@ defmodule PublicSurfaceTest do
     Imp.Embeddings.BagOfWords,
     Imp.AdapterParseError,
     Imp.Assertion,
-    Imp.ContextWindowExceededError,
     Imp.Error,
     Imp.Errors,
     Imp.Execution,
@@ -782,14 +781,19 @@ defmodule PublicSurfaceTest do
     assert {:ok, prediction} =
              Imp.Optimizer.Ensemble.Program.call(ensemble, %{question: "2+2?"})
 
-    assert [{:ok, %Imp.Prediction{}}, {:error, {:ensemble_program_failed, "program exploded"}}] =
+    assert [
+             {:ok, %Imp.Prediction{}},
+             {:error, {:ensemble_program_failed, %RuntimeError{message: "program exploded"}}}
+           ] =
              Imp.Prediction.get(prediction, :outputs)
 
     reducer =
       Imp.Optimizer.Ensemble.new(reduce_fn: fn _predictions -> raise "reducer exploded" end)
       |> Imp.Optimizer.Ensemble.compile([program])
 
-    assert {:error, {:ensemble_reduce_failed, "reducer exploded", [{:ok, %Imp.Prediction{}}]}} =
+    assert {:error,
+            {:ensemble_reduce_failed, %RuntimeError{message: "reducer exploded"},
+             [{:ok, %Imp.Prediction{}}]}} =
              Imp.Optimizer.Ensemble.Program.call(reducer, %{question: "2+2?"})
   end
 

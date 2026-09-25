@@ -217,7 +217,7 @@ renders as a text block.
 | test_json_adapter_sync_call | pass | Predict + JSON adapter + strict-JSON completion → answer "Paris". |
 | test_json_adapter_async_call | n/a | asyncio variant. |
 | test_json_adapter_on_pydantic_model | n/a | Pydantic User/Answer models; exact pydantic-schema prompt strings. |
-| test_json_adapter_parse_raise_error_on_mismatch_fields | pass | Loud error confirmed. Since dee-16qm, Imp repairs the single-quoted JSON exactly as DSPy does and then reports the missing `answer` field (`{:missing_output_fields, [:answer]}` — Imp's error tuple in place of upstream's adapter_name/parsed_result exception attributes). |
+| test_json_adapter_parse_raise_error_on_mismatch_fields | pass | Loud error confirmed. Since dee-16qm, Imp repairs the single-quoted JSON exactly as DSPy does and then reports the missing `answer` field (`%Imp.AdapterParseError{kind: :missing_fields, reason: [:answer]}` in place of upstream's adapter_name/parsed_result exception attributes). |
 | test_json_adapter_formats_image | pass | Same 3-chunk structure as chat. |
 | test_json_adapter_formats_image_with_few_shot_examples | pass | 6 messages, images in the right user turns. |
 | test_json_adapter_formats_image_with_nested_images | n/a | Pydantic wrapper traversal. |
@@ -293,7 +293,7 @@ n/a wholesale.
 | test_two_step_adapter_call | pass | Main persona prompt + `name: value` user turn, then extraction call over `text -> outputs`; answer coerces to 12.0 (== 12). Extraction LM configured via `two_step_extraction_lm` setting (DSPy: constructor arg). |
 | test_two_step_adapter_async_call | n/a | asyncio variant. |
 | test_two_step_adapter_parse | pass | Extraction JSON yields tags list + 0.87 confidence (chat extraction fails on the bare JSON, TwoStep's JSONAdapter retry parses it — DSPy's own fallback path). |
-| test_two_step_adapter_parse_errors | pass (was FAIL) | Fixed by dee-coia: strict chat parse rejects the unusable text, the JSON retry also fails, and the loud `two_step_extraction_failed` error matches DSPy's ValueError. |
+| test_two_step_adapter_parse_errors | pass (was FAIL) | Fixed by dee-coia: strict chat parse rejects the unusable text, the JSON retry also fails, and the loud extraction failure (`Imp.AdapterParseError`) matches DSPy's ValueError. |
 
 ## tests/adapters/test_xml_adapter.py (12)
 
@@ -301,7 +301,7 @@ n/a wholesale.
 |---|---|---|
 | test_xml_adapter_format_and_parse_basic | pass | `format_field_with_value` is internal in Imp; the identical rendering is asserted via the demo assistant turn (`<answer>\nParis\n</answer>`), plus the parse half verbatim. |
 | test_xml_adapter_parse_multiple_fields | pass | |
-| test_xml_adapter_parse_raises_on_missing_field | pass | `{:error, {:missing_output_fields, [:explanation]}}` (tuple, not exception — Imp's error contract). |
+| test_xml_adapter_parse_raises_on_missing_field | pass | `{:error, %Imp.AdapterParseError{kind: :missing_fields, reason: [:explanation]}}`. |
 | test_xml_adapter_parse_casts_types | pass | int/bool cast from tag text. |
 | test_xml_adapter_parse_raises_on_type_error | pass | `{:error, %Imp.AdapterParseError{}}` for `<number>not_a_number</number>`. |
 | test_xml_adapter_format_and_parse_nested_model | n/a | Pydantic model output. |

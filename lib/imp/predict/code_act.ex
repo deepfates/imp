@@ -275,7 +275,7 @@ defmodule Imp.Predict.CodeAct do
     Imp.Tool.call(tool, arguments)
   rescue
     exception ->
-      {:error, {:tool_error, tool.name, Exception.message(exception)}}
+      {:error, {:tool_error, tool.name, exception}}
   catch
     kind, reason ->
       {:error, {:tool_error, tool.name, {kind, reason}}}

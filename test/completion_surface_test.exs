@@ -220,8 +220,13 @@ defmodule CompletionSurfaceTest do
       )
 
     assert {:error,
-            {:code_act_tool_error, {:tool_denied, :lookup},
-             [%{action: :tool, output: {:error, {:tool_denied, :lookup}}}]}} =
+            {:code_act_tool_error, {:tool_authorization_denied, :lookup, :tool_policy},
+             [
+               %{
+                 action: :tool,
+                 output: {:error, {:tool_authorization_denied, :lookup, :tool_policy}}
+               }
+             ]}} =
              Imp.Predict.CodeAct.call(denied, %{question: "q"})
 
     boom = Imp.Tool.new(:boom, "boom", fn _args -> raise "tool exploded" end)
@@ -229,8 +234,13 @@ defmodule CompletionSurfaceTest do
     crashing = Imp.Predict.CodeAct.new("question -> answer", [boom], lm: lm, max_iters: 2)
 
     assert {:error,
-            {:code_act_tool_error, {:tool_error, :boom, "tool exploded"},
-             [%{action: :tool, output: {:error, {:tool_error, :boom, "tool exploded"}}}]}} =
+            {:code_act_tool_error, {:tool_error, :boom, %RuntimeError{message: "tool exploded"}},
+             [
+               %{
+                 action: :tool,
+                 output: {:error, {:tool_error, :boom, %RuntimeError{message: "tool exploded"}}}
+               }
+             ]}} =
              Imp.Predict.CodeAct.call(crashing, %{question: "q"})
   after
     Process.delete(:code_act_failure_actions)
@@ -437,7 +447,7 @@ defmodule CompletionSurfaceTest do
 
     assert [
              %Imp.Streaming.Messages.StreamResponse{
-               chunk: {:error, {:lm_failed, Imp.LM.Static, message}},
+               chunk: {:error, {:lm_failed, Imp.LM.Static, %ArgumentError{message: message}}},
                done: true
              }
            ] =
