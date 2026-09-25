@@ -6,7 +6,7 @@ defmodule ProgramOfThoughtFidelityTest do
   use ExUnit.Case, async: false
 
   setup do
-    Imp.configure(lm: nil, adapter: Imp.Adapter.Chat, retriever: nil)
+    Imp.configure(lm: nil, adapter: Imp.Adapter.Chat)
     on_exit(&Imp.Settings.reset/0)
     :ok
   end

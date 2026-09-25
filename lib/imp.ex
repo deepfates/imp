@@ -79,7 +79,9 @@ defmodule Imp do
   Runs `fun` with temporary process-local settings.
 
   This is the preferred way to override the LM or adapter for one request,
-  test, task, or Livebook cell without mutating global defaults.
+  test, task, or Livebook cell without mutating global defaults. Keys of the
+  caller's own, such as a request id, are carried too; Imp's own settings are
+  type-checked as in `configure/1`. See `Imp.Settings.context/2`.
   """
   defdelegate context(opts, fun), to: Settings
 

@@ -55,7 +55,9 @@ defmodule Imp.Predict.CodeAct do
   @doc "Builds a bounded CodeAct predictor with an allowlisted tool catalog."
   @spec new(term(), [struct()], keyword()) :: t()
   def new(signature, tools \\ [], opts \\ []) do
-    opts = Imp.Options.validate!(opts, @option_schema, "Imp.Predict.CodeAct.new/3")
+    opts =
+      Imp.Predict.Predict.validate_options!(opts, @option_schema, "Imp.Predict.CodeAct.new/3")
+
     tools = Imp.Tool.index_tools!(tools, "Imp.Predict.CodeAct.new/3")
     pot_opts = Keyword.take(opts, [:lm, :adapter, :demos, :config, :metadata, :output_field])
 

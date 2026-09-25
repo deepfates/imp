@@ -51,7 +51,13 @@ defmodule Imp.Predict.MultiChainComparison do
   time and must be a positive integer.
   """
   def new(signature, opts \\ []) do
-    opts = Imp.Options.validate!(opts, @option_schema, "Imp.Predict.MultiChainComparison.new/2")
+    opts =
+      Imp.Predict.Predict.validate_options!(
+        opts,
+        @option_schema,
+        "Imp.Predict.MultiChainComparison.new/2"
+      )
+
     signature = Imp.Signature.ensure(signature)
     last_key = signature |> Imp.Signature.output_names() |> List.last()
     m = Keyword.get(opts, :m, Keyword.get(opts, :M, 3))

@@ -62,7 +62,7 @@ defmodule Imp.Optimizer.InferRules do
       type: {:custom, Imp.Optimizer.BootstrapFewShot, :validate_optional_number, []},
       default: nil
     ],
-    teacher_settings: [type: :keyword_list, default: []],
+    teacher_settings: [type: {:custom, Imp.Settings, :validate_overrides, []}, default: []],
     max_bootstrapped_demos: [type: :non_neg_integer, default: 4],
     max_labeled_demos: [type: :non_neg_integer, default: 16],
     max_rounds: [type: :non_neg_integer, default: 1],

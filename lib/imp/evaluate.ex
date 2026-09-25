@@ -269,6 +269,11 @@ defmodule Imp.Evaluate do
   end
 
   @doc false
+  # The error budget of BootstrapFewShot, RandomSearch and COPRO when they are
+  # given no `:max_errors`: DSPy's `settings.max_errors` default.
+  def default_optimizer_max_errors, do: 10
+
+  @doc false
   def validate_max_errors(:infinity), do: {:ok, :infinity}
   def validate_max_errors(value) when is_integer(value) and value >= 0, do: {:ok, value}
 

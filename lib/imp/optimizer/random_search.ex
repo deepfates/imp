@@ -42,7 +42,7 @@ defmodule Imp.Optimizer.RandomSearch do
   ]
 
   @option_schema [
-    teacher_settings: [type: :keyword_list, default: []],
+    teacher_settings: [type: {:custom, Imp.Settings, :validate_overrides, []}, default: []],
     max_bootstrapped_demos: [type: :non_neg_integer, default: 4],
     max_labeled_demos: [type: :non_neg_integer, default: 16],
     max_rounds: [type: :non_neg_integer, default: 1],
@@ -671,12 +671,11 @@ defmodule Imp.Optimizer.RandomSearch do
     Enum.map(errors, &Map.merge(%{seed: seed, stage: :evaluation}, Map.new(&1)))
   end
 
-  defp resolve_max_errors!(nil), do: resolve_settings_max_errors!()
+  defp resolve_max_errors!(nil), do: default_max_errors()
   defp resolve_max_errors!(value), do: {validate_max_errors!(value), :explicit}
 
-  defp resolve_settings_max_errors! do
-    {Imp.Settings.fetch!(:max_errors) |> validate_max_errors!(), :settings}
-  end
+  defp default_max_errors,
+    do: {Imp.Evaluate.default_optimizer_max_errors(), :default}
 
   defp validate_max_errors!(value) do
     case Imp.Evaluate.validate_max_errors(value) do
@@ -684,7 +683,7 @@ defmodule Imp.Optimizer.RandomSearch do
         max_errors
 
       {:error, message} ->
-        raise ArgumentError, "invalid effective :max_errors setting: #{message}"
+        raise ArgumentError, "invalid :max_errors: #{message}"
     end
   end
 

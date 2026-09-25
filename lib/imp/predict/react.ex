@@ -117,7 +117,7 @@ defmodule Imp.Predict.ReAct do
 
   def new(signature, tools, opts \\ []) do
     signature = Imp.Signature.ensure(signature)
-    opts = Imp.Options.validate!(opts, @option_schema, "Imp.Predict.ReAct.new/3")
+    opts = Imp.Predict.Predict.validate_options!(opts, @option_schema, "Imp.Predict.ReAct.new/3")
     # index_tools!/2 validates the list and raises on invalid entries; keep the
     # original `tools` list because DSPy tool order is load-bearing for the
     # `next_tool_name` Literal and the instruction listing (:dspy_3_2_1).
