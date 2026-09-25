@@ -59,10 +59,12 @@ will not comply.
 
 ### 5. The Chat adapter speaks DSPy's format
 
-`Imp.Adapter.Chat` renders the same messages DSPy's `ChatAdapter` does,
+`Imp.Adapter.Chat` lays out its messages the way DSPy's `ChatAdapter` does,
 `[[ ## field ## ]]` markers included. Those markers rarely appear in real
-text, so the reply splits cleanly into fields. It also means a prompt tuned
-in DSPy reads the same in Imp.
+text, so the reply splits cleanly into fields, and a prompt tuned in DSPy
+reads nearly the same in Imp. One thing differs: Imp names each type in plain
+words (`string`, `one of: atlas, harbor, ...`) where DSPy writes Python
+annotations (`str`, `Literal[...]`).
 
 ## API walkthrough
 
@@ -145,9 +147,9 @@ asks for the outputs in order, each with its expected type, ending with the
 ```text
 --- system
 Your input fields are:
-1. `ticket` (str):
+1. `ticket` (string):
 Your output fields are:
-1. `team` (Literal['atlas', 'harbor', 'beacon', 'quill']): atlas: money. harbor: the platform. beacon: identity. quill: the product.
+1. `team` (one of: atlas, harbor, beacon, quill): atlas: money. harbor: the platform. beacon: identity. quill: the product.
 All interactions will be structured in the following way, with the appropriate values filled in.
 
 [[ ## ticket ## ]]
@@ -163,7 +165,7 @@ In adhering to this structure, your objective is:
 [[ ## ticket ## ]]
 We were charged twice this month.
 
-Respond with the corresponding output fields, starting with the field `[[ ## team ## ]]` (must be formatted as a valid Python Literal['atlas', 'harbor', 'beacon', 'quill']), and then ending with the marker for `[[ ## completed ## ]]`.
+Respond with the corresponding output fields, starting with the field `[[ ## team ## ]]` (must be formatted as one of: atlas, harbor, beacon, quill), and then ending with the marker for `[[ ## completed ## ]]`.
 ```
 
 Demos become worked exchanges between the system message and the request:
