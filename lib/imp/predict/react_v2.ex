@@ -1127,6 +1127,7 @@ defmodule Imp.Predict.ReActV2 do
 
     {outputs, missing} =
       Enum.reduce(names, {%{}, []}, fn name, {outputs, missing} ->
+        # The name and the key may be the same text as an atom and a string.
         case Imp.FieldMap.fetch(arguments, name) do
           {:ok, value} -> {Map.put(outputs, name, value), missing}
           :error -> {outputs, missing ++ [name]}
