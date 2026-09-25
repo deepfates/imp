@@ -7,9 +7,11 @@ defmodule Imp.Predict.ReActV2 do
 
   ## Which signatures get `submit`
 
-  A task signature with exactly one output of type `:string` has an answer
-  that the model can write as plain text, so its loop offers no `submit` tool.
-  Every other signature (several outputs, or one output that is not text) gets
+  A task signature with exactly one output of type `:string` and no
+  constraints has an answer that the model can write as plain text, so its
+  loop offers no `submit` tool. Every other signature (several outputs, one
+  output that is not text, or one text output with constraints such as an
+  `enum`, whose allowed values reach the model in `submit`'s schema) gets
   the reserved `submit` tool, whose parameters are the signature's outputs,
   exactly as DSPy's ReActV2 has it. The name `submit` is reserved for every
   signature, so a user tool cannot take it.
@@ -295,7 +297,7 @@ defmodule Imp.Predict.ReActV2 do
   # program goes through here too, so the rule lives in one place.
   #
   # Divergence from DSPy's ReActV2, which offers `submit` for every signature:
-  # a signature with one text output gets none. Its answer is the text the
+  # a signature with one unconstrained text output gets none. Its answer is the text the
   # model writes when it stops calling tools, which is how every other
   # mainstream tool loop ends a turn, and a `submit` beside that would be a
   # second way to say the same thing. DSPy needs `submit` because a signature
@@ -589,16 +591,25 @@ defmodule Imp.Predict.ReActV2 do
       case predict(react.react, react, history, pending) do
         {:ok, prediction, history} ->
           calls = prediction |> Imp.get(:tool_calls, []) |> normalize_calls(turn)
-          outputs = last_text_outputs(react.signature, prediction)
           no_calls = %ToolCalls{tool_calls: []}
-          history = append_last_step(history, pending, prediction, no_calls, outputs)
 
-          final_prediction(
-            outputs,
-            history,
-            :last_text,
-            put_unexecuted(%{termination_cause: cause}, calls)
-          )
+          case last_text_outputs(react.signature, prediction) do
+            {:ok, outputs} ->
+              history = append_last_step(history, pending, prediction, no_calls, outputs)
+
+              final_prediction(
+                outputs,
+                history,
+                :last_text,
+                put_unexecuted(%{termination_cause: cause}, calls)
+              )
+
+            # Text the output does not accept is no answer, and a nil where
+            # the signature requires a value is not a complete prediction.
+            :invalid ->
+              history = append_last_step(history, pending, prediction, no_calls, nil)
+              incomplete_prediction(history, :invalid_answer, initial_error)
+          end
 
         {:error, reason, history} ->
           incomplete_prediction(history, failed_last_request_cause(cause, reason), %{
@@ -648,12 +659,8 @@ defmodule Imp.Predict.ReActV2 do
 
   defp last_text_outputs(signature, prediction) do
     case parse_text(signature, prediction) do
-      {:ok, outputs} ->
-        outputs
-
-      {:none, _cause} ->
-        [%Imp.Signature.Field{name: name}] = signature.outputs
-        %{name => nil}
+      {:ok, outputs} -> {:ok, outputs}
+      {:none, _cause} -> :invalid
     end
   end
 
@@ -1011,12 +1018,11 @@ defmodule Imp.Predict.ReActV2 do
   end
 
   # A step that stops calling tools and says something has answered, when the
-  # task declares exactly one text output for that text to be. Several outputs,
-  # or one that is not text, cannot be filled from text alone and take the
-  # forced submit. The text is validated through the same parse a `submit`'s
-  # arguments go through, so a constrained output is not quietly filled with
-  # something it excludes. What is not an answer carries the interruption it
-  # is.
+  # task declares exactly one unconstrained text output for that text to be.
+  # Several outputs, one that is not text, or one with constraints cannot be
+  # filled from text alone and take the forced submit. The text still goes
+  # through the parse a `submit`'s arguments go through. What is not an answer
+  # carries the interruption it is.
   defp parse_text(signature, prediction) do
     with {:text, [%Imp.Signature.Field{name: name}]} <- text_output(signature),
          {:written, text} when is_binary(text) and text != "" <-
@@ -1033,10 +1039,20 @@ defmodule Imp.Predict.ReActV2 do
   defp text_output(signature),
     do: if(single_text_output?(signature), do: {:text, signature.outputs}, else: :submit)
 
-  defp single_text_output?(%Imp.Signature{outputs: [%Imp.Signature.Field{type: type}]}),
-    do: type in [:string, "string"]
+  # Text is the answer only when any text is a valid answer: a constrained
+  # string (an enum, a pattern, an answer shape) keeps `submit`, whose schema
+  # tells the model what the output accepts.
+  defp single_text_output?(%Imp.Signature{outputs: [%Imp.Signature.Field{} = field]}),
+    do: field.type in [:string, "string"] and unconstrained?(field)
 
   defp single_text_output?(_signature), do: false
+
+  defp unconstrained?(field) do
+    constraints =
+      Map.get(field.metadata, :constraints, Map.get(field.metadata, "constraints"))
+
+    constraints in [nil, %{}]
+  end
 
   defp execute_call(
          _react,
@@ -1111,11 +1127,10 @@ defmodule Imp.Predict.ReActV2 do
 
     {outputs, missing} =
       Enum.reduce(names, {%{}, []}, fn name, {outputs, missing} ->
-        value = Imp.FieldMap.get(arguments, name, :__missing__)
-
-        if value == :__missing__,
-          do: {outputs, missing ++ [name]},
-          else: {Map.put(outputs, name, value), missing}
+        case Imp.FieldMap.fetch(arguments, name) do
+          {:ok, value} -> {Map.put(outputs, name, value), missing}
+          :error -> {outputs, missing ++ [name]}
+        end
       end)
 
     cond do

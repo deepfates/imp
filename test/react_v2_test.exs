@@ -1369,6 +1369,47 @@ defmodule ReActV2Test do
     assert prediction.metadata[:termination_cause] == :deadline_exceeded
   end
 
+  # A string signature keeps a field name as a string when its atom does not
+  # exist yet. Arguments that arrive after the atom exists are atom-keyed, and
+  # submit still has to find the field by its text.
+  test "submit finds an output named by a string whose atom appeared after parsing" do
+    name = "contact_" <> Integer.to_string(System.unique_integer([:positive]))
+    signature = Imp.signature("ticket -> team, " <> name)
+    assert Enum.any?(signature.outputs, &(&1.name == name))
+    _atom = String.to_atom(name)
+
+    lm = action_lm([%{tool_calls: [%{name: "submit", arguments: %{"team" => "atlas", name => "Maya"}}]}])
+
+    assert {:ok, prediction} =
+             Imp.react_v2(signature, [], lm: lm, max_iters: 1) |> Imp.call(%{ticket: "t"})
+
+    assert prediction.metadata[:termination_reason] == :submit
+    assert Imp.get(prediction, :team) == "atlas"
+    assert Imp.get(prediction, name) == "Maya"
+  end
+
+  # The text answer is for one unconstrained text output. An enum is a string
+  # the model can get wrong, so it is filled through submit, whose schema
+  # carries the allowed values.
+  test "an enum output keeps submit, and text it rejects is not a complete answer" do
+    parent = self()
+    lm = action_lm([%{next_thought: "team: harbor", tool_calls: []}], parent)
+
+    assert {:ok, prediction} =
+             Imp.react_v2("ticket -> team: enum[atlas, harbor]", [], lm: lm, max_iters: 2)
+             |> Imp.call(%{ticket: "t"})
+
+    assert_received {:lm_call, opts}
+    submit = Enum.find(opts[:tools] || [], &(&1.function.name == "submit"))
+    assert submit.function.parameters["properties"]["team"]["enum"] == ["atlas", "harbor"]
+
+    # The step wrote text instead of calling submit, and the forced submit and
+    # the extraction after it got the same text, which the enum rejects.
+    assert prediction.metadata[:termination_reason] == :incomplete
+    assert prediction.metadata[:termination_cause] == :empty_tool_calls
+    refute Imp.Prediction.complete?(prediction)
+  end
+
   defp action_lm(actions, notify \\ nil) do
     {:ok, state} = Agent.start_link(fn -> actions end)
 

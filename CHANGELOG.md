@@ -285,13 +285,18 @@ User-visible changes to Imp are recorded here.
   `Imp.Prediction.complete?/1` is false exactly for `:incomplete`, and
   `Imp.Observability` reads it.
 - `ReActV2` offers `submit` only to a signature that needs it. A task
-  signature with exactly one output of type `:string` gets no `submit` tool:
+  signature with exactly one output of type `:string` and no constraints gets
+  no `submit` tool:
   a step that comes back as text with no tool call is the answer, in that
   one request, with `termination_reason: :answered`, which is how Anthropic's
   tool runner, the OpenAI Agents SDK, LangGraph's ReAct and Pydantic AI end a
   turn. Its history event carries the output, as a `submit`'s does, and the
   answer is not also emitted as a `:reasoning` event. A signature with several
-  outputs, or one non-text output, keeps DSPy's `submit` unchanged.
+  outputs, one non-text output, or one constrained text output (an `enum`, a
+  pattern, an answer shape) keeps DSPy's `submit` unchanged, so the allowed
+  values reach the model in its schema. Text that the one text output does
+  not accept ends the turn `:incomplete` with `termination_cause:
+  :invalid_answer`, never a complete prediction with a `nil` output.
 - A step of a one-text-output signature that calls nothing and says nothing
   is an empty answer: the turn ends there with `termination_reason:
   :answered` and no further request, because saying nothing is how a model
