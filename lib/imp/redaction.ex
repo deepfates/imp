@@ -188,6 +188,12 @@ defmodule Imp.Redaction do
     }
   end
 
+  # An exception keeps its type, so a redacted failure still matches as the
+  # failure it is; only its fields are redacted.
+  def redact(value, keys) when is_exception(value) do
+    struct(value.__struct__, value |> Map.from_struct() |> redact(keys))
+  end
+
   def redact(value, keys) when is_struct(value) do
     value
     |> Map.from_struct()

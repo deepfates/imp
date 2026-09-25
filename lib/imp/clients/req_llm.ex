@@ -14,13 +14,16 @@ defmodule Imp.Clients.ReqLLM do
   or capacity reservation; without a model tokenizer it is not treated as an
   exact token counter.
 
-  Non-streaming HTTP 400 errors with the structured code
-  `error.code = "context_length_exceeded"` become
-  `Imp.ContextWindowExceededError`. Other provider errors retain their original
-  shape; prose and generic HTTP 400 responses do not trigger context recovery.
-  A successful HTTP response whose body carries a provider error, which is how
-  OpenRouter relays an upstream refusal, is returned as that error
-  (`ReqLLM.Error.API.Request`), never as an empty completion.
+  A failed request returns `{:error, %Imp.LMError{}}`, whether the provider
+  answered with an error status, the connection failed, or ReqLLM raised; the
+  struct carries the status, whether a retry may succeed, and whether the input
+  was longer than the model's context window, with ReqLLM's own error under
+  `:reason`. Only an HTTP 400 with the structured code
+  `error.code = "context_length_exceeded"` counts as the context window; prose
+  and generic HTTP 400 responses do not trigger context recovery. A successful
+  HTTP response whose body carries a provider error, which is how OpenRouter
+  relays an upstream refusal, is returned as that error, never as an empty
+  completion.
 
   `:reasoning_effort` is the one reasoning option, on the client or on a call.
   It takes `none`, `minimal`, `low`, `medium`, `high`, `xhigh` or `default`, as
@@ -310,6 +313,9 @@ defmodule Imp.Clients.ReqLLM do
     end)
   end
 
+  # Options are prepared before the request, outside its rescue: an option
+  # this client refuses raises `ArgumentError` like every other option error,
+  # and only what happens once the request is made is an `Imp.LMError`.
   defp do_generate_uncached(lm, messages, opts) do
     opts =
       opts
@@ -318,23 +324,27 @@ defmodule Imp.Clients.ReqLLM do
       |> bind_to_caller()
       |> enforce_explicit_no_retry()
 
+    send_generate(lm, messages, opts)
+  end
+
+  defp send_generate(lm, messages, opts) do
     case lm.req_module.generate_text(lm.model, to_req_messages(messages), opts) do
       {:ok, response} ->
         case relayed_error(response) do
           nil -> {:ok, from_response(response, lm.model)}
-          error -> {:error, normalize_context_refusal(error)}
+          error -> {:error, lm_error(error)}
         end
 
       {:error, reason} ->
-        {:error, normalize_context_refusal(reason)}
+        {:error, lm_error(reason)}
 
       other ->
-        {:error, {:invalid_req_llm_response, inspect(other)}}
+        {:error, lm_error({:invalid_req_llm_response, other}, false)}
     end
   rescue
-    error -> {:error, {:req_llm_generate_failed, error_message(error)}}
+    error -> {:error, lm_error(error)}
   catch
-    kind, reason -> {:error, {:req_llm_generate_failed, error_message({kind, reason})}}
+    kind, reason -> {:error, lm_error({kind, reason})}
   end
 
   # OpenRouter relays an upstream provider's refusal as a successful HTTP
@@ -365,11 +375,63 @@ defmodule Imp.Clients.ReqLLM do
 
   defp relayed_error(_response), do: nil
 
+  # Every failed request becomes one `Imp.LMError`, classified here, where the
+  # provider library's error shapes are known, so no caller has to know them.
+  defp lm_error(%Imp.LMError{} = error), do: error
+
+  defp lm_error(reason), do: lm_error(reason, retryable?(reason))
+
+  defp lm_error(reason, retryable) do
+    %Imp.LMError{
+      message: lm_error_message(reason),
+      status: status(reason),
+      reason: reason,
+      retryable: retryable,
+      context_window_exceeded: context_length_exceeded?(reason)
+    }
+  end
+
+  defp status(%{status: status}) when is_integer(status), do: status
+  defp status(_reason), do: nil
+
+  # One rule for `retryable` (see `Imp.LMError`): a status that says try
+  # later, a status that says no, ReqLLM's own `retryable` where the status
+  # does not decide, and otherwise the transport failure. `:timeout` and
+  # `:closed` are retryable even though the request may have run.
+  @try_later_statuses [408, 425, 429]
+  @transport_reasons [:econnrefused, :pool_not_available, :closed, :timeout]
+  @transport_errors [Req.TransportError, Mint.TransportError, Finch.TransportError]
+
+  defp retryable?(reason) do
+    case {status(reason), reason} do
+      {status, _reason} when status in @try_later_statuses or status in 500..599 ->
+        true
+
+      {409, _reason} ->
+        false
+
+      {_status, %ReqLLM.Error.API.Request{retryable: retryable}} when is_boolean(retryable) ->
+        retryable
+
+      {nil, reason} ->
+        transport_retryable?(reason)
+
+      {_status, _reason} ->
+        false
+    end
+  end
+
+  defp transport_retryable?(%module{reason: reason}) when module in @transport_errors,
+    do: reason in @transport_reasons
+
+  defp transport_retryable?(%ReqLLM.Error.API.Request{cause: cause}) when not is_nil(cause),
+    do: transport_retryable?(cause)
+
+  defp transport_retryable?(_reason), do: false
+
   # OpenAI-compatible providers name this refusal in the structured error code.
-  # General HTTP 400s and prose mentioning context are not safe retry signals.
-  defp normalize_context_refusal(
-         %ReqLLM.Error.API.Request{status: 400, response_body: body} = error
-       ) do
+  # General HTTP 400s and prose mentioning context are not that signal.
+  defp context_length_exceeded?(%ReqLLM.Error.API.Request{status: 400, response_body: body}) do
     body =
       if is_binary(body) do
         case Jason.decode(body) do
@@ -380,19 +442,13 @@ defmodule Imp.Clients.ReqLLM do
         body
       end
 
-    case body do
-      %{"error" => %{"code" => "context_length_exceeded"}} ->
-        %Imp.ContextWindowExceededError{
-          message: "Provider refused the input context length",
-          reason: %{status: 400, code: "context_length_exceeded"}
-        }
-
-      _ ->
-        error
-    end
+    match?(%{"error" => %{"code" => "context_length_exceeded"}}, body)
   end
 
-  defp normalize_context_refusal(error), do: error
+  defp context_length_exceeded?(_reason), do: false
+
+  defp lm_error_message(reason) when is_exception(reason), do: Exception.message(reason)
+  defp lm_error_message(reason), do: inspect(reason, limit: 20, printable_limit: 500)
 
   def cache_key(%__MODULE__{} = lm, messages, opts) do
     opts = validate_call_opts!(opts, "#{inspect(__MODULE__)}.cache_key/3")
@@ -519,16 +575,20 @@ defmodule Imp.Clients.ReqLLM do
       |> cap_transport_timeouts()
       |> enforce_explicit_no_retry()
 
+    open_provider_stream(lm, messages, opts)
+  end
+
+  defp open_provider_stream(lm, messages, opts) do
     case lm.req_module.stream_text(lm.model, to_req_messages(messages), opts) do
       {:ok, %ReqLLM.StreamResponse{} = response} -> {:ok, response}
-      {:ok, other} -> {:error, {:invalid_req_llm_stream, inspect(other)}}
-      {:error, reason} -> {:error, reason}
-      other -> {:error, {:invalid_req_llm_stream, inspect(other)}}
+      {:ok, other} -> {:error, lm_error({:invalid_req_llm_stream, other}, false)}
+      {:error, reason} -> {:error, lm_error(reason)}
+      other -> {:error, lm_error({:invalid_req_llm_stream, other}, false)}
     end
   rescue
-    error -> {:error, {:req_llm_stream_failed, error_message(error)}}
+    error -> {:error, lm_error(error)}
   catch
-    kind, reason -> {:error, {:req_llm_stream_failed, error_message({kind, reason})}}
+    kind, reason -> {:error, lm_error({kind, reason})}
   end
 
   def dump(%__MODULE__{} = lm) do
@@ -1787,8 +1847,10 @@ defmodule Imp.Clients.ReqLLM do
 
   defp accumulate_stream_metadata(metadata, _chunk), do: metadata
 
+  # The stream had opened, so the request reached the provider: sending it
+  # again may be billed again, and repeats chunks the caller already has.
   defp stream_failure(state, error) do
-    reason = {:req_llm_stream_failed, error_message(error)}
+    reason = lm_error(error, true)
 
     {[%Imp.Streaming.Messages.StreamResponse{chunk: {:error, reason}, done: true}],
      %{state | completed?: true, failed?: true}}
@@ -1840,7 +1902,4 @@ defmodule Imp.Clients.ReqLLM do
 
   defp redact_lm(%__MODULE__{model: model}),
     do: %{provider: :req_llm, model: Imp.Redaction.redact(model)}
-
-  defp error_message(%_{} = exception), do: Exception.message(exception)
-  defp error_message(error), do: inspect(error)
 end

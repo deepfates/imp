@@ -912,20 +912,21 @@ submit(%{answer: child[:answer]})|
         ~S|lookup(%{})|,
         [Imp.Tool.new(:lookup, "lookup", fn _ -> :ok end)],
         [],
-        {:rlm_tool_error, {:tool_denied, :lookup}}
+        {:rlm_tool_error, {:tool_authorization_denied, :lookup, :tool_policy}}
       },
       {~S|missing_tool(%{})|, [], :allow, {:function_not_allowed, :missing_tool}},
       {
         ~S|boom(%{})|,
         [Imp.Tool.new(:boom, "boom", fn _ -> raise "tool exploded" end)],
         :allow,
-        {:rlm_tool_error, {:tool_error, :boom, "tool exploded"}}
+        {:rlm_tool_error, {:tool_error, :boom, %RuntimeError{message: "tool exploded"}}}
       },
       {
         ~S|lookup(%{})|,
         [Imp.Tool.new(:lookup, "lookup", fn _ -> :ok end)],
         fn _name, _args -> raise "policy exploded" end,
-        {:rlm_tool_error, {:tool_policy_error, :lookup, "policy exploded"}}
+        {:rlm_tool_error,
+         {:tool_policy_error, :lookup, %RuntimeError{message: "policy exploded"}}}
       }
     ]
 

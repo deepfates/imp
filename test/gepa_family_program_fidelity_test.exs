@@ -41,10 +41,8 @@ defmodule Imp.GEPAFamilyProgramFidelityTest do
 
       assert Prediction.get(plain_prediction, :answer) == "42"
 
-      assert {:error,
-              %{
-                reason: {:error, {:missing_output_fields, [:reasoning]}}
-              }} = ChainOfThought.call(cot, family.inputs),
+      assert {:error, %Imp.AdapterParseError{kind: :missing_fields, reason: [:reasoning]}} =
+               ChainOfThought.call(cot, family.inputs),
              family.family
     end
   end

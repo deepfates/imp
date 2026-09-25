@@ -95,7 +95,7 @@ defmodule Imp.Retrievers.HTTP do
   def retrieve(retriever, query, opts \\ [])
 
   def retrieve(%__MODULE__{method: method}, _query, _opts) when method != :post do
-    {:error, {:unsupported_http_method, method}}
+    {:error, {:http_method_not_supported, __MODULE__, method}}
   end
 
   def retrieve(%__MODULE__{} = retriever, query, opts) do

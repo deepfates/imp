@@ -50,7 +50,7 @@ defmodule Imp.Embeddings do
       {:error, safety}
 
     error ->
-      {:error, {:embedding_provider_failed, provider, Exception.message(error)}}
+      {:error, {:embedding_provider_failed, provider, error}}
   catch
     kind, reason ->
       case Imp.OperationalSafetyError.find({kind, reason}) do

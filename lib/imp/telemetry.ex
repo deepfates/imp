@@ -5,7 +5,9 @@ defmodule Imp.Telemetry do
   Imp telemetry metadata is redacted before it reaches `:telemetry`, so traces
   can stay useful without leaking provider credentials. `span/3` emits
   `event_prefix ++ [:start]`, then either `[:stop]` with a result status or
-  `[:exception]` before re-raising the original failure. Every span carries a
+  `[:exception]` before re-raising the original failure. The exception event's
+  metadata carries `:kind`, `:reason` and `:stacktrace`, as `:telemetry.span/3`
+  does: for a raise, `kind` is `:error` and `reason` the exception struct. Every span carries a
   stable `:call_id`; nested spans carry `:parent_call_id`, and ordinary events
   emitted inside a span inherit its `:call_id`.
   """
@@ -58,17 +60,6 @@ defmodule Imp.Telemetry do
       )
 
       result
-    rescue
-      error ->
-        duration = System.monotonic_time() - started
-
-        execute(
-          event_prefix ++ [:exception],
-          %{duration: duration},
-          Map.merge(span_metadata, %{error: Exception.message(error)})
-        )
-
-        reraise error, __STACKTRACE__
     catch
       kind, reason ->
         stacktrace = __STACKTRACE__
@@ -77,7 +68,7 @@ defmodule Imp.Telemetry do
         execute(
           event_prefix ++ [:exception],
           %{duration: duration},
-          Map.merge(span_metadata, %{error: error_message({kind, reason})})
+          Map.merge(span_metadata, %{kind: kind, reason: reason, stacktrace: stacktrace})
         )
 
         :erlang.raise(kind, reason, stacktrace)
@@ -147,8 +138,4 @@ defmodule Imp.Telemetry do
   defp result_status({:ok, _value}), do: :ok
   defp result_status({:error, _reason}), do: :error
   defp result_status(_value), do: :ok
-
-  defp error_message({:throw, reason}), do: inspect({:throw, reason})
-  defp error_message({:exit, reason}), do: inspect({:exit, reason})
-  defp error_message({kind, reason}), do: inspect({kind, reason})
 end

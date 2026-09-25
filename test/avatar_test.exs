@@ -58,7 +58,8 @@ defmodule AvatarTest do
           finalizer?(prompt) ->
             %{answer: "recovered"}
 
-          prompt =~ "unknown_tool" or prompt =~ "tool_denied" or prompt =~ "tool_error" ->
+          prompt =~ "unknown_tool" or prompt =~ "tool_authorization_denied" or
+              prompt =~ "tool_error" ->
             finish_action()
 
           prompt =~ "unknown case" ->
@@ -89,12 +90,22 @@ defmodule AvatarTest do
 
     assert {:ok, denied} = Imp.call(avatar, %{question: "denied case"})
 
-    assert [%ActionOutput{tool_output: {:error, {:tool_denied, :lookup}}, error?: true}] =
+    assert [
+             %ActionOutput{
+               tool_output: {:error, {:tool_authorization_denied, :lookup, :tool_policy}},
+               error?: true
+             }
+           ] =
              Imp.get(denied, :actions)
 
     assert {:ok, crashed} = Imp.call(avatar, %{question: "crash case"})
 
-    assert [%ActionOutput{tool_output: {:error, {:tool_error, :crash, "boom"}}, error?: true}] =
+    assert [
+             %ActionOutput{
+               tool_output: {:error, {:tool_error, :crash, %RuntimeError{message: "boom"}}},
+               error?: true
+             }
+           ] =
              Imp.get(crashed, :actions)
 
     refute_received :lookup_called
@@ -139,7 +150,9 @@ defmodule AvatarTest do
 
     assert [
              %ActionOutput{
-               tool_output: {:error, {:tool_policy_error, :lookup, "policy exploded"}},
+               tool_output:
+                 {:error,
+                  {:tool_policy_error, :lookup, %RuntimeError{message: "policy exploded"}}},
                error?: true
              }
            ] = Imp.get(prediction, :actions)
@@ -212,7 +225,7 @@ defmodule AvatarTest do
     assert {:error, {:invalid_avatar_inputs, "expected inputs as {key, value} pairs"}} =
              Imp.call(avatar, [:not_a_pair])
 
-    assert {:error, %{reason: {:error, %Imp.AdapterParseError{message: message}}}} =
+    assert {:error, %Imp.AdapterParseError{kind: :invalid_fields, message: message}} =
              Imp.call(avatar, %{question: "q"})
 
     assert message =~ "action.tool_name is required"

@@ -457,17 +457,19 @@ defmodule Imp.Adapter.JSON do
           {:error, errors} when is_list(errors) ->
             {:error,
              %Imp.AdapterParseError{
+               kind: :invalid_fields,
                message: Imp.Schema.retry_feedback(errors),
-               reason: raw
+               reason: decoded
              }}
 
-          {:error, reason} ->
-            {:error, reason}
+          {:error, %Imp.AdapterParseError{}} = error ->
+            error
         end
 
       :error ->
         {:error,
          %Imp.AdapterParseError{
+           kind: :malformed,
            message: "LM response cannot be serialized to a JSON object.",
            reason: raw
          }}

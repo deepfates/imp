@@ -7,7 +7,11 @@ defmodule Imp.Module do
   is the central boundary used by evaluators, composition modules, streaming,
   optimizers, and the public `Imp.call/2` facade. It catches callback crashes
   and normalizes malformed callback returns so composed workflows can report
-  failures without losing the rest of the run.
+  failures without losing the rest of the run. A program that raises, throws
+  or exits returns `{:error, {:module_call_failed, module, reason}}`, where
+  `reason` is the exception struct it raised or `{kind, value}` for a throw or
+  an exit; one that returns anything else returns
+  `{:error, {:invalid_module_result, module, inspected}}`.
 
   Consumer-defined multi-stage programs may expose named predictors to every
   program optimizer by implementing the paired optional callbacks
@@ -124,15 +128,12 @@ defmodule Imp.Module do
     end)
   rescue
     safety in Imp.OperationalSafetyError -> {:error, safety}
-    error -> {:error, {:module_call_failed, module, error_message(error)}}
+    error -> {:error, {:module_call_failed, module, error}}
   catch
     kind, reason ->
       case Imp.OperationalSafetyError.find({kind, reason}) do
         %Imp.OperationalSafetyError{} = safety -> {:error, safety}
-        nil -> {:error, {:module_call_failed, module, error_message({kind, reason})}}
+        nil -> {:error, {:module_call_failed, module, {kind, reason}}}
       end
   end
-
-  defp error_message(%_{} = exception), do: Exception.message(exception)
-  defp error_message(error), do: inspect(error)
 end

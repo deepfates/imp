@@ -83,6 +83,12 @@ defmodule Imp.Predict.Predict do
   Returns `{:ok, prediction}` on success or `{:error, reason}` for local input
   errors, LM errors, or adapter parse errors. Successful predictions include
   redacted trace metadata with the rendered messages and raw LM output.
+
+  A completion that could not be read as the outputs, after the chat and XML
+  adapters' JSON fallback, is `{:error, %Imp.AdapterParseError{}}` with its
+  `:trace` set; see that module for the kinds. An LM request that failed,
+  including the fallback's own request, is the LM's error (`Imp.LMError` for
+  `Imp.Clients.ReqLLM`).
   """
   @impl true
   def call(%__MODULE__{} = predict, inputs) when is_list(inputs) or is_map(inputs) do
@@ -590,7 +596,7 @@ defmodule Imp.Predict.Predict do
     end
   rescue
     error ->
-      {:error, {:adapter_format_failed, adapter, Exception.message(error)}}
+      {:error, {:adapter_format_failed, adapter, error}}
   catch
     kind, reason ->
       {:error, {:adapter_format_failed, adapter, {kind, reason}}}
@@ -628,7 +634,7 @@ defmodule Imp.Predict.Predict do
     end
   rescue
     error ->
-      {:error, {:adapter_lm_opts_failed, adapter, Exception.message(error)}}
+      {:error, {:adapter_lm_opts_failed, adapter, error}}
   catch
     kind, reason ->
       {:error, {:adapter_lm_opts_failed, adapter, {kind, reason}}}
@@ -692,20 +698,25 @@ defmodule Imp.Predict.Predict do
         {:ok, prediction, messages, raw, %{completion_metadata: completion_metadata}}
 
       {:error, _reason} = error ->
-        if chat_json_fallback?(adapter, opts) do
-          retry_completions_with_json_adapter(
-            error,
-            signature,
-            lm,
-            opts,
-            inputs,
-            demos,
-            messages,
-            raw
-          )
-        else
-          emit_parse_error(adapter, signature, error)
-          parse_error(error, messages, raw, signature)
+        cond do
+          lm_failure?(error) ->
+            error
+
+          chat_json_fallback?(adapter, opts) ->
+            retry_completions_with_json_adapter(
+              error,
+              signature,
+              lm,
+              opts,
+              inputs,
+              demos,
+              messages,
+              raw
+            )
+
+          true ->
+            emit_parse_error(adapter, signature, error)
+            parse_error(error, messages, raw, signature)
         end
     end
   end
@@ -734,6 +745,9 @@ defmodule Imp.Predict.Predict do
 
   defp recover_parse_failure(error, adapter, signature, messages, lm, opts, inputs, demos, raw) do
     cond do
+      lm_failure?(error) ->
+        error
+
       chat_json_fallback?(adapter, opts) ->
         retry_with_json_adapter(error, signature, lm, opts, inputs, demos, messages, raw)
 
@@ -754,8 +768,14 @@ defmodule Imp.Predict.Predict do
 
   defp chat_json_fallback?(_adapter, _opts), do: false
 
-  defp parse_completions(_adapter, _signature, []),
-    do: {:error, {:empty_completions, "the LM returned an empty completion list"}}
+  defp parse_completions(_adapter, _signature, []) do
+    {:error,
+     %Imp.AdapterParseError{
+       kind: :unsupported_output,
+       message: "The LM returned an empty completion list.",
+       reason: []
+     }}
+  end
 
   defp parse_completions(adapter, signature, raw_completions) do
     raw_completions
@@ -765,7 +785,10 @@ defmodule Imp.Predict.Predict do
            {:ok, prediction} <- adapter.parse(signature, output, []) do
         {:cont, {:ok, [{prediction, lm_metadata} | acc]}}
       else
-        {:error, reason} -> {:halt, {:error, {:completion_parse_failed, index, reason}}}
+        {:error, reason} = error ->
+          if lm_failure?(error),
+            do: {:halt, error},
+            else: {:halt, {:error, %{parse_failure(reason) | completion_index: index}}}
       end
     end)
     |> case do
@@ -809,13 +832,25 @@ defmodule Imp.Predict.Predict do
       )
       |> Keyword.put(:json_fallback, false)
 
-    with {:ok, retry_raw} when is_list(retry_raw) <-
-           Imp.LM.generate(lm, retry_messages, provider_lm_opts(retry_opts)),
-         {:ok, prediction, completion_metadata} <-
-           parse_completions(Imp.Adapter.JSON, signature, retry_raw) do
-      {:ok, prediction, retry_messages, retry_raw, %{completion_metadata: completion_metadata}}
-    else
-      _retry_failure -> parse_error(error, original_messages, original_raw, signature)
+    # The retry's own LM failure is returned as it is, the way DSPy's JSON
+    # fallback lets the LM's exception through: it is not a parse failure, and
+    # whether it may be retried is the caller's to read.
+    case Imp.LM.generate(lm, retry_messages, provider_lm_opts(retry_opts)) do
+      {:ok, retry_raw} when is_list(retry_raw) ->
+        case parse_completions(Imp.Adapter.JSON, signature, retry_raw) do
+          {:ok, prediction, completion_metadata} ->
+            {:ok, prediction, retry_messages, retry_raw,
+             %{completion_metadata: completion_metadata}}
+
+          {:error, _retry_reason} ->
+            parse_error(error, original_messages, original_raw, signature)
+        end
+
+      {:ok, _single} ->
+        parse_error(error, original_messages, original_raw, signature)
+
+      {:error, _reason} = lm_error ->
+        lm_error
     end
   end
 
@@ -844,15 +879,13 @@ defmodule Imp.Predict.Predict do
       )
       |> Keyword.put(:json_fallback, false)
 
+    # As above: an LM failure on the retry is returned as it is.
     with {:ok, retry_raw} <- Imp.LM.generate(lm, retry_messages, provider_lm_opts(retry_opts)),
          {:ok, retry_raw, retry_lm_metadata} <- Imp.LM.Result.split(retry_raw) do
       case Imp.Adapter.JSON.parse(signature, retry_raw, []) do
         {:ok, prediction} -> {:ok, prediction, retry_messages, retry_raw, retry_lm_metadata}
         _retry_error -> parse_error(error, original_messages, original_raw, signature)
       end
-    else
-      {:error, _reason} = retry_error ->
-        parse_error(retry_error, original_messages, original_raw, signature)
     end
   end
 
@@ -883,6 +916,11 @@ defmodule Imp.Predict.Predict do
     end
   end
 
+  # An adapter that sends its own request, such as `Imp.Adapter.TwoStep`,
+  # returns that request's failure as it is. It is not a parse failure: no
+  # fallback is tried, and the caller reads it as the LM error it is.
+  defp lm_failure?({:error, reason}), do: Imp.Errors.lm_failure?(reason)
+
   defp adapter_parse_error?({:error, %Imp.AdapterParseError{}}), do: true
   defp adapter_parse_error?(_error), do: false
 
@@ -894,22 +932,33 @@ defmodule Imp.Predict.Predict do
     })
   end
 
-  defp parse_error_message({:error, %Imp.AdapterParseError{} = error}), do: error.message
-  defp parse_error_message(error), do: error
+  defp parse_error_message({:error, reason}), do: parse_failure(reason).message
 
   defp provider_lm_opts(opts), do: Keyword.drop(opts, [:json_fallback, :json_retries])
 
-  defp parse_error(error, messages, raw, signature) do
-    {:error,
-     %{
-       reason: error,
-       trace:
-         Imp.Redaction.redact(%{
-           messages: messages,
-           raw: raw,
-           format_progress: format_progress(error, signature)
-         })
-     }}
+  defp parse_error({:error, reason}, messages, raw, signature) do
+    failure = parse_failure(reason)
+
+    trace =
+      Imp.Redaction.redact(%{
+        messages: messages,
+        raw: raw,
+        format_progress: format_progress(failure, signature)
+      })
+
+    {:error, %{failure | trace: trace}}
+  end
+
+  # A custom adapter may return any term from `parse/3`; the caller still gets
+  # one shape for a completion that could not be read.
+  defp parse_failure(%Imp.AdapterParseError{} = error), do: error
+
+  defp parse_failure(reason) do
+    %Imp.AdapterParseError{
+      kind: :other,
+      message: "The adapter could not parse the completion: #{inspect(reason, limit: 20)}",
+      reason: reason
+    }
   end
 
   # Records which output fields were decoded before a typed adapter failure,
@@ -922,14 +971,12 @@ defmodule Imp.Predict.Predict do
     %{expected: expected, present: present}
   end
 
-  defp present_output_fields({:error, reason}, expected),
-    do: present_output_fields(reason, expected)
-
-  defp present_output_fields({:completion_parse_failed, _index, reason}, expected),
-    do: present_output_fields(reason, expected)
-
-  defp present_output_fields({:missing_output_fields, missing}, expected) when is_list(missing),
-    do: expected -- missing
+  defp present_output_fields(
+         %Imp.AdapterParseError{kind: :missing_fields, reason: missing},
+         expected
+       )
+       when is_list(missing),
+       do: expected -- missing
 
   defp present_output_fields(%Imp.AdapterParseError{reason: fields}, expected)
        when is_map(fields) do

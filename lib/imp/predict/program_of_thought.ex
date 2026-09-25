@@ -123,7 +123,11 @@ defmodule Imp.Predict.ProgramOfThought do
         )
       ])
 
-    call_with_signature(pot, signature, Map.put(inputs, :trajectory, trajectory))
+    call_with_signature(
+      pot,
+      signature,
+      Map.put(inputs, :trajectory, model_trajectory(trajectory))
+    )
   end
 
   @doc false
@@ -141,7 +145,7 @@ defmodule Imp.Predict.ProgramOfThought do
       inputs
       |> Map.put(:final_generated_program, program)
       |> Map.put(:code_output, value)
-      |> Map.put(:trajectory, trajectory)
+      |> Map.put(:trajectory, model_trajectory(trajectory))
 
     call_with_signature(pot, signature, extraction_inputs)
   end
@@ -171,7 +175,7 @@ defmodule Imp.Predict.ProgramOfThought do
   def eval_program(program, inputs) do
     Imp.Sandbox.eval(program, inputs)
   rescue
-    exception -> {:error, {:program_runtime_error, Exception.message(exception)}}
+    exception -> {:error, {:program_runtime_error, exception}}
   catch
     kind, reason -> {:error, {:program_runtime_error, {kind, reason}}}
   end
@@ -244,8 +248,8 @@ defmodule Imp.Predict.ProgramOfThought do
       retry_inputs =
         inputs
         |> Map.put(:previous_program, generated)
-        |> Map.put(:error, inspect(reason))
-        |> Map.put(:trajectory, Enum.reverse(trace))
+        |> Map.put(:error, error_text(reason))
+        |> Map.put(:trajectory, model_trajectory(Enum.reverse(trace)))
 
       with {:ok, prediction} <- regenerate_step(pot, retry_inputs) do
         execute_attempt(pot, inputs, prediction, iteration + 1, trace)
@@ -324,6 +328,27 @@ defmodule Imp.Predict.ProgramOfThought do
     instructions <>
       "\nExtract the declared outputs from final_generated_program, code_output, and trajectory. Return only those declared outputs."
   end
+
+  # What the model reads about a failed program: the term as it has always
+  # read it, with a raised exception written as its message. The recorded
+  # error keeps the exception.
+  @doc false
+  def error_text(reason), do: inspect(model_reason(reason))
+
+  @doc false
+  def model_trajectory(events) when is_list(events) do
+    Enum.map(events, fn
+      %{output: {:error, reason}} = event -> %{event | output: {:error, model_reason(reason)}}
+      event -> event
+    end)
+  end
+
+  def model_trajectory(other), do: other
+
+  defp model_reason({:program_runtime_error, exception}) when is_exception(exception),
+    do: {:program_runtime_error, Exception.message(exception)}
+
+  defp model_reason(reason), do: reason
 
   defp execution_event(iteration, program, result) do
     Imp.Redaction.redact(%{

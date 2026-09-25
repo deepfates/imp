@@ -435,7 +435,7 @@ defmodule SilentFailureRegressionsTest do
   test "P05: XML parse rejects tag-free prose loudly" do
     signature = Imp.signature("question -> answer")
 
-    assert {:error, {:missing_output_fields, [:answer]}} =
+    assert {:error, %Imp.AdapterParseError{kind: :missing_fields, reason: [:answer]}} =
              Imp.Adapter.XML.parse(signature, "no xml tags here, just prose", [])
   end
 

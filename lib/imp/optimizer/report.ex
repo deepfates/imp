@@ -283,11 +283,20 @@ defmodule Imp.Optimizer.Report do
     })
   end
 
+  # A pid, port or reference names something inside the VM that made it and
+  # means nothing once read back. A failure reason can hold one (a
+  # `GenServer.call` timeout names the server), so it is written as its
+  # inspected text rather than refused. A function is still refused: it is
+  # code, and a program that holds one is not portable.
+  defguardp is_local_term(value) when is_pid(value) or is_port(value) or is_reference(value)
+
   @doc """
   Encodes an Elixir term into Imp's lossless tagged JSON representation.
 
   This is a structural codec, not a logging boundary. Callers writing telemetry,
-  reports, or user-visible artifacts should use `json_safe/1` instead.
+  reports, or user-visible artifacts should use `json_safe/1` instead. A pid,
+  port or reference is written as its inspected text, and reads back as that
+  text.
   """
   def encode_term(value), do: dump_value(value)
 
@@ -446,6 +455,7 @@ defmodule Imp.Optimizer.Report do
   defp dump_value(value) when is_atom(value),
     do: %{"__imp_type__" => "atom", "value" => Atom.to_string(value)}
 
+  defp dump_value(value) when is_local_term(value), do: inspect(value)
   defp dump_value(value), do: value
 
   defp dump_projection(%Imp.Example{} = example) do
@@ -537,6 +547,7 @@ defmodule Imp.Optimizer.Report do
   defp dump_projection(value) when is_atom(value),
     do: %{"__imp_type__" => "atom", "value" => Atom.to_string(value)}
 
+  defp dump_projection(value) when is_local_term(value), do: inspect(value)
   defp dump_projection(value), do: value
 
   defp dump_plain_map(map) do

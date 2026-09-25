@@ -356,9 +356,9 @@ defmodule Imp.LM do
     end
   rescue
     safety in Imp.OperationalSafetyError -> {:error, safety}
-    error -> {:error, {:lm_failed, lm_name(lm), error_message(error)}}
+    error -> {:error, {:lm_failed, lm_name(lm), error}}
   catch
-    kind, reason -> {:error, {:lm_failed, lm_name(lm), error_message({kind, reason})}}
+    kind, reason -> {:error, {:lm_failed, lm_name(lm), {kind, reason}}}
   end
 
   defp call_lm(fun, lm) do
@@ -374,12 +374,12 @@ defmodule Imp.LM do
     end
   rescue
     safety in Imp.OperationalSafetyError -> {:error, safety}
-    error -> {:error, {:lm_failed, lm_name(lm), error_message(error)}}
+    error -> {:error, {:lm_failed, lm_name(lm), error}}
   catch
     kind, reason ->
       case Imp.OperationalSafetyError.find({kind, reason}) do
         %Imp.OperationalSafetyError{} = safety -> {:error, safety}
-        nil -> {:error, {:lm_failed, lm_name(lm), error_message({kind, reason})}}
+        nil -> {:error, {:lm_failed, lm_name(lm), {kind, reason}}}
       end
   end
 
@@ -387,9 +387,6 @@ defmodule Imp.LM do
   defp lm_name(fun) when is_function(fun), do: :anonymous_lm
   defp lm_name(%module{}), do: module
   defp lm_name(other), do: other
-
-  defp error_message(%_{} = exception), do: Exception.message(exception)
-  defp error_message(error), do: inspect(error)
 
   defp validate_opts!(opts, context) when is_list(opts) do
     if Keyword.keyword?(opts) do
