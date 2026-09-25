@@ -25,10 +25,17 @@ defmodule Imp.LMError do
 
     * `:status` — the HTTP status the provider answered with, or `nil` when no
       response came back.
-    * `:retryable` — `true` when sending the same request again may succeed: a
-      408, 425, 429 or 5xx status, or a connection that closed, timed out or
-      was refused. A language-model request changes nothing outside the
-      provider, so repeating it is safe; it may be billed again.
+    * `:retryable` — `true` when sending the same request again may succeed.
+      That is so when the provider says to try later (a 408, 425, 429 or 5xx
+      status), and when the request provably never reached the provider (the
+      connection was refused, no pooled connection was free, or it closed or
+      timed out before the request was sent). For any other status it is
+      ReqLLM's own `retryable` when ReqLLM set one, and `false` otherwise; a
+      409 is never retryable. It is also `true` for a timeout while waiting
+      for the answer and for a stream that failed after it started: those
+      requests may have run and been billed, and a retried stream repeats the
+      chunks the caller already has. A response or stream of a shape ReqLLM
+      never returns is `false`.
     * `:context_window_exceeded` — `true` when the provider refused the
       request because its input is longer than the model accepts. Sending it
       again unchanged will fail again; a shorter input may not.
@@ -86,12 +93,13 @@ defmodule Imp.AdapterParseError do
   sending the same request again is not what fixes it.
   """
 
+  @enforce_keys [:kind]
   defexception [:kind, :message, :reason, :completion_index, :trace]
 
   @type kind :: :malformed | :missing_fields | :invalid_fields | :unsupported_output | :other
 
   @type t :: %__MODULE__{
-          kind: kind() | nil,
+          kind: kind(),
           message: String.t() | nil,
           reason: term(),
           completion_index: non_neg_integer() | nil,

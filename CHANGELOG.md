@@ -323,13 +323,20 @@ Every change here is breaking for code that matches on the old shape.
 - A failed request from `Imp.Clients.ReqLLM` is
   `{:error, %Imp.LMError{}}`, whatever failed: an HTTP error status, an error
   relayed inside a successful response, a connection that failed, or an
-  exception raised inside ReqLLM. It carries `status`, `retryable` (a 408,
-  425, 429 or 5xx status, or a connection that closed, timed out or was
-  refused) and `context_window_exceeded`, with ReqLLM's own error unchanged
-  under `reason`. In 0.4.0 these reached the caller as ReqLLM's structs, as
-  `{:req_llm_generate_failed, text}` or `{:req_llm_stream_failed, text}`, or,
-  for a context-length refusal, as `Imp.ContextWindowExceededError`, which is
-  gone. An option the client refuses raises `ArgumentError` before the
+  exception raised inside ReqLLM, or a response or stream of a shape ReqLLM
+  never returns. It carries `status`, `retryable` and
+  `context_window_exceeded`, with ReqLLM's own error unchanged under
+  `reason`. `retryable` is `true` for a 408, 425, 429 or 5xx status, for a
+  request that never reached the provider (connection refused, no free
+  pooled connection, closed or timed out before sending), for any other
+  status whose ReqLLM error says `retryable: true`, and for a timeout while
+  waiting for the answer or a stream that failed after it started; those
+  last two may have run and been billed, and a retried stream repeats chunks
+  the caller already has. A 409 is never retryable. In 0.4.0 these reached
+  the caller as ReqLLM's structs, as `{:req_llm_generate_failed, text}`,
+  `{:req_llm_stream_failed, text}`, `{:invalid_req_llm_response, text}` or
+  `{:invalid_req_llm_stream, text}`, or, for a context-length refusal, as
+  `Imp.ContextWindowExceededError`, which is gone. An option the client refuses raises `ArgumentError` before the
   request, as every other option error does.
 - `Imp.Errors.retryable?/1` reads `Imp.LMError`'s `retryable`, and the new
   `Imp.Errors.context_window_exceeded?/1` its `context_window_exceeded`, each
@@ -353,12 +360,14 @@ Every change here is breaking for code that matches on the old shape.
   `{:transport, reason}`),
   `{:embedding_provider_failed, provider, reason}` from `Imp.Embeddings`, and
   `Imp.Predict.Predict`'s `{:adapter_format_failed, adapter, reason}` and
-  `{:adapter_lm_opts_failed, adapter, reason}`. Several of these carried text
-  on one path and a term on another.
+  `{:adapter_lm_opts_failed, adapter, reason}`, and
+  `{:program_runtime_error, reason}` from `Imp.Predict.ProgramOfThought` and
+  `Imp.Predict.CodeAct`, whose model still reads the exception's message.
+  Several of these carried text on one path and a term on another.
 - A completion that cannot be read as the outputs is always
   `%Imp.AdapterParseError{}`, with a `kind`: `:malformed`, `:missing_fields`
   (`reason` is the missing names), `:invalid_fields`, `:unsupported_output`
-  or `:other`. In 0.4.0 an adapter could return the struct,
+  or `:other`; `kind` is required. In 0.4.0 an adapter could return the struct,
   `{:missing_output_fields, names}` or `{:unsupported_lm_output, raw}`, and
   `Imp.Adapter.TwoStep` `{:two_step_extraction_failed, reason, completion}`.
   `Imp.Predict.ReAct`'s final outputs follow the same rule: in 0.4.0 a missing

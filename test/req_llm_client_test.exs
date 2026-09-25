@@ -1771,7 +1771,9 @@ defmodule ReqLLMClientTest do
       assert [
                %Imp.Streaming.Messages.StreamResponse{chunk: "partial", done: false},
                %Imp.Streaming.Messages.StreamResponse{
-                 chunk: {:error, %Imp.LMError{reason: ^reason}},
+                 # A stream that died after it started may be sent again; the
+                 # retry repeats chunks the caller already has.
+                 chunk: {:error, %Imp.LMError{reason: ^reason, retryable: true}},
                  done: true
                }
              ] =
@@ -1810,7 +1812,11 @@ defmodule ReqLLMClientTest do
   test "ReqLLM client reports invalid provider module return shapes" do
     lm = Imp.req_llm("openai:gpt-test", req_module: InvalidStub)
 
-    assert {:error, {:invalid_req_llm_response, ":not_a_req_llm_response"}} =
+    assert {:error,
+            %Imp.LMError{
+              retryable: false,
+              reason: {:invalid_req_llm_response, :not_a_req_llm_response}
+            }} =
              Imp.Clients.ReqLLM.generate(lm, [%{role: :user, content: "hello"}], [])
   end
 

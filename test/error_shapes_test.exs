@@ -19,6 +19,15 @@ defmodule Imp.ErrorShapesTest do
       do: {:error, %Req.TransportError{reason: :timeout}}
   end
 
+  defmodule ErrorReqLLM do
+    def generate_text(_model, _messages, opts), do: {:error, Keyword.fetch!(opts, :error)}
+  end
+
+  defmodule ShapelessReqLLM do
+    def generate_text(_model, _messages, _opts), do: :not_a_response
+    def stream_text(_model, _messages, _opts), do: {:ok, :not_a_stream}
+  end
+
   defmodule RaisingReqLLM do
     def generate_text(_model, _messages, _opts), do: raise("transport exploded")
   end
@@ -92,6 +101,55 @@ defmodule Imp.ErrorShapesTest do
       assert error.message == "transport exploded"
     end
 
+    test "retryable: statuses that say try later, and requests that never reached the provider" do
+      retryable = fn error ->
+        lm = Imp.req_llm("openai:gpt-test", req_module: ErrorReqLLM, error: error)
+        assert {:error, %Imp.LMError{retryable: retryable}} = request(lm)
+        retryable
+      end
+
+      api = fn fields -> struct(ReqLLM.Error.API.Request, [reason: "no"] ++ fields) end
+
+      for status <- [408, 425, 429, 500, 503], do: assert(retryable.(api.(status: status)))
+      for status <- [400, 401, 404, 409], do: refute(retryable.(api.(status: status)))
+
+      # ReqLLM's own field decides where the status does not; 409 and the
+      # try-later statuses decide for themselves.
+      assert retryable.(api.(status: 418, retryable: true))
+      refute retryable.(api.(status: 409, retryable: true))
+      assert retryable.(api.(status: 503, retryable: false))
+
+      for reason <- [:econnrefused, :pool_not_available, :closed, :timeout] do
+        assert retryable.(%Req.TransportError{reason: reason})
+        assert retryable.(api.(cause: %Mint.TransportError{reason: reason}))
+      end
+
+      refute retryable.(%Req.TransportError{reason: :nxdomain})
+    end
+
+    test "a response or stream of the wrong shape is a non-retryable LM error" do
+      lm = Imp.req_llm("openai:gpt-test", req_module: ShapelessReqLLM)
+
+      assert {:error,
+              %Imp.LMError{retryable: false, reason: {:invalid_req_llm_response, :not_a_response}}} =
+               request(lm)
+
+      assert [
+               %Imp.Streaming.Messages.StreamResponse{
+                 chunk:
+                   {:error,
+                    %Imp.LMError{
+                      retryable: false,
+                      reason: {:invalid_req_llm_stream, :not_a_stream}
+                    }},
+                 done: true
+               }
+             ] =
+               lm
+               |> Imp.Clients.ReqLLM.stream([%{role: :user, content: "hi"}], [])
+               |> Enum.to_list()
+    end
+
     test "a client that raises keeps its exception under :lm_failed" do
       lm = Imp.LM.Static.new(handler: fn _messages, _opts -> raise ArgumentError, "bad" end)
 
@@ -115,6 +173,12 @@ defmodule Imp.ErrorShapesTest do
               }} = Imp.call(program, %{question: "q"})
 
       assert progress == %{expected: [:answer], present: []}
+    end
+
+    test "every parse error has a kind" do
+      assert_raise ArgumentError, ~r/kind/, fn ->
+        struct!(Imp.AdapterParseError, message: "no kind")
+      end
     end
 
     test "a completion of the wrong type is :invalid_fields" do

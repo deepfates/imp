@@ -339,7 +339,7 @@ defmodule Imp.Clients.ReqLLM do
         {:error, lm_error(reason)}
 
       other ->
-        {:error, {:invalid_req_llm_response, inspect(other)}}
+        {:error, lm_error({:invalid_req_llm_response, other}, false)}
     end
   rescue
     error -> {:error, lm_error(error)}
@@ -379,14 +379,14 @@ defmodule Imp.Clients.ReqLLM do
   # provider library's error shapes are known, so no caller has to know them.
   defp lm_error(%Imp.LMError{} = error), do: error
 
-  defp lm_error(reason) do
-    status = status(reason)
+  defp lm_error(reason), do: lm_error(reason, retryable?(reason))
 
+  defp lm_error(reason, retryable) do
     %Imp.LMError{
       message: lm_error_message(reason),
-      status: status,
+      status: status(reason),
       reason: reason,
-      retryable: retryable_status?(status) or transient_transport?(reason),
+      retryable: retryable,
       context_window_exceeded: context_length_exceeded?(reason)
     }
   end
@@ -394,22 +394,40 @@ defmodule Imp.Clients.ReqLLM do
   defp status(%{status: status}) when is_integer(status), do: status
   defp status(_reason), do: nil
 
-  # ReqLLM's own retry step retries these transport reasons
-  # (`ReqLLM.Step.Retry`), which Imp turns off so the caller decides.
-  @transient_transport_reasons [:closed, :timeout, :econnrefused]
+  # One rule for `retryable` (see `Imp.LMError`): a status that says try
+  # later, a status that says no, ReqLLM's own `retryable` where the status
+  # does not decide, and otherwise the transport failure. `:timeout` and
+  # `:closed` are retryable even though the request may have run.
+  @try_later_statuses [408, 425, 429]
+  @transport_reasons [:econnrefused, :pool_not_available, :closed, :timeout]
   @transport_errors [Req.TransportError, Mint.TransportError, Finch.TransportError]
 
-  defp retryable_status?(status) when status in [408, 425, 429], do: true
-  defp retryable_status?(status) when is_integer(status) and status >= 500, do: true
-  defp retryable_status?(_status), do: false
+  defp retryable?(reason) do
+    case {status(reason), reason} do
+      {status, _reason} when status in @try_later_statuses or status in 500..599 ->
+        true
 
-  defp transient_transport?(%module{reason: reason}) when module in @transport_errors,
-    do: reason in @transient_transport_reasons
+      {409, _reason} ->
+        false
 
-  defp transient_transport?(%ReqLLM.Error.API.Request{cause: cause}) when not is_nil(cause),
-    do: transient_transport?(cause)
+      {_status, %ReqLLM.Error.API.Request{retryable: retryable}} when is_boolean(retryable) ->
+        retryable
 
-  defp transient_transport?(_reason), do: false
+      {nil, reason} ->
+        transport_retryable?(reason)
+
+      {_status, _reason} ->
+        false
+    end
+  end
+
+  defp transport_retryable?(%module{reason: reason}) when module in @transport_errors,
+    do: reason in @transport_reasons
+
+  defp transport_retryable?(%ReqLLM.Error.API.Request{cause: cause}) when not is_nil(cause),
+    do: transport_retryable?(cause)
+
+  defp transport_retryable?(_reason), do: false
 
   # OpenAI-compatible providers name this refusal in the structured error code.
   # General HTTP 400s and prose mentioning context are not that signal.
@@ -563,9 +581,9 @@ defmodule Imp.Clients.ReqLLM do
   defp open_provider_stream(lm, messages, opts) do
     case lm.req_module.stream_text(lm.model, to_req_messages(messages), opts) do
       {:ok, %ReqLLM.StreamResponse{} = response} -> {:ok, response}
-      {:ok, other} -> {:error, {:invalid_req_llm_stream, inspect(other)}}
+      {:ok, other} -> {:error, lm_error({:invalid_req_llm_stream, other}, false)}
       {:error, reason} -> {:error, lm_error(reason)}
-      other -> {:error, {:invalid_req_llm_stream, inspect(other)}}
+      other -> {:error, lm_error({:invalid_req_llm_stream, other}, false)}
     end
   rescue
     error -> {:error, lm_error(error)}
@@ -1829,8 +1847,10 @@ defmodule Imp.Clients.ReqLLM do
 
   defp accumulate_stream_metadata(metadata, _chunk), do: metadata
 
+  # The stream had opened, so the request reached the provider: sending it
+  # again may be billed again, and repeats chunks the caller already has.
   defp stream_failure(state, error) do
-    reason = lm_error(error)
+    reason = lm_error(error, true)
 
     {[%Imp.Streaming.Messages.StreamResponse{chunk: {:error, reason}, done: true}],
      %{state | completed?: true, failed?: true}}
