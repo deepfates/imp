@@ -868,12 +868,12 @@ defmodule Imp.Predict.ReAct do
   defp format_trajectory_value(value) when is_list(value), do: format_input_list(value)
   defp format_trajectory_value(value) when is_map(value), do: python_json(value)
   defp format_trajectory_value(value) when is_binary(value), do: value
-  # DSPy renders a bare scalar observation through str(serialize_for_json(v)):
-  # `True`/`False`/`None`, and Python float repr (fixed vs exponent form) rather
-  # than Elixir's `true`/`false`, empty line, and `1.0e6` exponent form (dee-h7nw).
-  defp format_trajectory_value(true), do: "True"
-  defp format_trajectory_value(false), do: "False"
-  defp format_trajectory_value(nil), do: "None"
+  # A bare scalar observation takes its JSON spelling (`true`, `false`,
+  # `null`), and a float its shortest fixed-or-exponent form (1000000.0, not
+  # Elixir's 1.0e6).
+  defp format_trajectory_value(true), do: "true"
+  defp format_trajectory_value(false), do: "false"
+  defp format_trajectory_value(nil), do: "null"
   defp format_trajectory_value(value) when is_float(value), do: Imp.PyFloat.repr(value)
   defp format_trajectory_value(value), do: to_string(value)
 

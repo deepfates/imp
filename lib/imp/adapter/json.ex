@@ -281,9 +281,10 @@ defmodule Imp.Adapter.JSON do
   defp capability_response_format(_signature, %Imp.LM.Capability{}),
     do: [response_format: %{type: "json_object"}]
 
-  # DSPy `_get_structured_outputs_response_format` (a pydantic `DSPyProgramOutputs`
-  # model) in the wire form litellm sends: `{"type": "json_schema", "json_schema":
-  # {"name": "DSPyProgramOutputs", "schema": <model_json_schema>, "strict": true}}`.
+  # DSPy `_get_structured_outputs_response_format` in the wire form litellm
+  # sends: `{"type": "json_schema", "json_schema": {"name": ..., "schema":
+  # <model_json_schema>, "strict": true}}`. DSPy names the schema after its
+  # pydantic class; Imp names it `outputs`, which is what the provider shows.
   # Returns `:fallback` when any output is an open-ended mapping or a shape whose
   # structured schema Imp cannot express (DSPy's json_object path).
   defp structured_response_format(signature) do
@@ -293,13 +294,13 @@ defmodule Imp.Adapter.JSON do
         "additionalProperties" => false,
         "properties" => Map.new(properties),
         "required" => Enum.map(signature.outputs, &to_string(&1.name)),
-        "title" => "DSPyProgramOutputs"
+        "title" => "Outputs"
       }
 
       {:ok,
        %{
          type: "json_schema",
-         json_schema: %{name: "DSPyProgramOutputs", schema: schema, strict: true}
+         json_schema: %{name: "outputs", schema: schema, strict: true}
        }}
     end
   rescue

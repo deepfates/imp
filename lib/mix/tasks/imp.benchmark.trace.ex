@@ -360,7 +360,8 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
       # on the DSPy side (response_format, tools, tool_choice, temperature,
       # ...). This is false wherever Imp and DSPy send different options.
       "envelope_parity" =>
-        canonical(call_envelopes(imp_calls)) == canonical(call_envelopes(dspy_calls)),
+        canonical(call_envelopes(imp_calls)) ==
+          canonical(call_envelopes(dspy_calls)) |> Imp.DSPyWording.in_imp_words(),
       # Surfaced so a divergence is legible in the report rather than only in
       # raw history.
       "imp_call_envelopes" => call_envelopes(imp_calls),
@@ -497,7 +498,12 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
     calls = Agent.get(counter, & &1)
     Agent.stop(counter)
 
-    pass? = generated_content(first) == "Answer: cached" and second == first and calls == 1
+    # A hit returns the stored answer marked as a hit with no usage, since it
+    # cost nothing; the provider is called once.
+    pass? =
+      generated_content(first) == "Answer: cached" and
+        generated_content(second) == generated_content(first) and
+        cache_hit?(second) and not cache_hit?(first) and calls == 1
 
     %{
       "id" => "req_llm_cache_hit_reuses_success",
@@ -506,6 +512,11 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
       "evidence" => %{"calls" => calls, "first" => inspect(first), "second" => inspect(second)}
     }
   end
+
+  defp cache_hit?({:ok, %{__imp_lm_metadata__: %{req_llm: metadata}}}),
+    do: Map.get(metadata, :cache_hit) == true
+
+  defp cache_hit?(_result), do: false
 
   defp generated_content(result) do
     case Imp.LM.Result.unwrap(result) do
@@ -530,7 +541,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
 
     pass? =
       chunks == [
-        %{"chunk" => "tool:", "done" => false},
+        %{"chunk" => "[[ ## answer ## ]]\n", "done" => false},
         %{
           "chunk" => %{
             "tool_calls" => [
@@ -543,8 +554,9 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
           },
           "done" => false
         },
-        %{"chunk" => "Paris", "done" => false},
-        %{"chunk" => nil, "done" => true}
+        %{"chunk" => "Paris\n\n[[ ## completed ## ]]", "done" => false},
+        %{"chunk" => nil, "done" => true},
+        %{"prediction" => %{"answer" => "Paris"}}
       ]
 
     %{
@@ -558,6 +570,9 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
   defp normalize_stream_response(%Imp.Streaming.Messages.StreamResponse{} = response) do
     %{"chunk" => response.chunk, "done" => response.done}
   end
+
+  defp normalize_stream_response(%Imp.Prediction{} = prediction),
+    do: %{"prediction" => prediction |> Imp.Prediction.to_map() |> normalize()}
 
   defp normalize_stream_response(other), do: normalize(other)
 
@@ -657,9 +672,9 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace.StreamReqLLM do
     {:ok,
      %ReqLLM.StreamResponse{
        stream: [
-         ReqLLM.StreamChunk.text("tool:"),
+         ReqLLM.StreamChunk.text("[[ ## answer ## ]]\n"),
          ReqLLM.StreamChunk.tool_call("lookup", %{query: "capital-france"}, %{id: "call_1"}),
-         ReqLLM.StreamChunk.text("Paris"),
+         ReqLLM.StreamChunk.text("Paris\n\n[[ ## completed ## ]]"),
          ReqLLM.StreamChunk.meta(%{finish_reason: "stop"})
        ],
        metadata_handle: self(),

@@ -928,15 +928,15 @@ defmodule Imp.Adapter.Chat do
     end
   end
 
-  # Scalars take Python's `str(...)` spelling: `None`, `True`, `False`, where
-  # Elixir's `to_string/1` would give "", "true" and "false". Public as an
-  # internal cross-adapter seam, so the other adapters format scalars
-  # identically and differ only in dialect.
+  # Text renders as itself; other scalars take their JSON spelling (`null`,
+  # `true`, `false`), where Elixir's `to_string/1` would give "" for nil.
+  # Public as an internal cross-adapter seam, so the other adapters format
+  # values identically and differ only in dialect.
   @doc false
   def format_value(value) when is_binary(value), do: value
-  def format_value(nil), do: "None"
-  def format_value(true), do: "True"
-  def format_value(false), do: "False"
+  def format_value(nil), do: "null"
+  def format_value(true), do: "true"
+  def format_value(false), do: "false"
 
   def format_value(value) when is_atom(value) or is_number(value) or is_boolean(value),
     do: to_string(value)
@@ -946,7 +946,7 @@ defmodule Imp.Adapter.Chat do
   def format_value(%NaiveDateTime{} = value), do: NaiveDateTime.to_iso8601(value)
   def format_value(%Imp.Adapter.Types.Code{} = value), do: Imp.Adapter.Types.Code.format(value)
 
-  # A list or map renders as complete, compact JSON with Python's default
+  # A list or map renders as complete, compact JSON with `", "` and `": "`
   # separators. It must never be truncated: a cut structured tool result is one
   # the model cannot count and no bound can measure.
   def format_value(value) when is_list(value) or (is_map(value) and not is_struct(value)),

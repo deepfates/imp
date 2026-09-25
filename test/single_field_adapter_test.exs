@@ -145,7 +145,7 @@ defmodule Imp.SingleFieldAdapterTest do
 
     assert %{
              type: "json_schema",
-             json_schema: %{name: "DSPyProgramOutputs", schema: schema, strict: true}
+             json_schema: %{name: "outputs", schema: schema, strict: true}
            } = opts[:response_format]
 
     assert schema["required"] == ["sentiment"]

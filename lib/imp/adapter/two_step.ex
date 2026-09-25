@@ -287,8 +287,8 @@ defmodule Imp.Adapter.TwoStep do
     end
   end
 
-  # Python `str(...)` as DSPy's f-strings apply it: None/True/False keep their
-  # Python spelling and floats render in repr form (1000000.0, not 1.0e6).
+  # A value in its JSON spelling (null/true/false), with floats in their
+  # shortest fixed-or-exponent form (1000000.0, not 1.0e6).
   defp py_str(value) when is_float(value), do: Imp.PyFloat.repr(value)
   defp py_str(value), do: Imp.Adapter.Chat.format_value(value)
 

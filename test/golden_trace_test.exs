@@ -38,8 +38,8 @@ defmodule GoldenTraceTest do
     assert report["fixtures"]["cases"] == 42
 
     # Prompt fidelity (epic dee-8zev): the lane MEASURES whether Imp's rendered
-    # prompt carries the same text as DSPy's, per case, once DSPy's Python type
-    # annotations are put into Imp's neutral words (`decisions.md`: parity
+    # prompt carries the same text as DSPy's, per case, once DSPy's Python
+    # spellings are put into Imp's neutral words (`Imp.DSPyWording`; parity
     # means behaviour and information, not text). "Byte-identical" below means
     # identical after that translation. Every case is measured, and
     # the paths proven byte-identical to DSPy are LOCKED as regressions here.
@@ -80,7 +80,7 @@ defmodule GoldenTraceTest do
     # case's demo list exercises every confirmed axis at once: a COMPLETE demo
     # with `flag: true`, a COMPLETE demo with `flag: false` (a legitimate false
     # must render "False"/false, not be dropped for the missing sentinel), a
-    # present-but-nil demo (kept as INCOMPLETE, values render "None"/null — not
+    # present-but-nil demo (kept as INCOMPLETE, values render null — not
     # dropped), and an absent-output demo (the missing-field message). The chat
     # side now always emits the trailing `[[ ## completed ## ]]` marker; the JSON
     # side emits a pretty JSON object for assistant turns instead of chat markers.
@@ -155,8 +155,8 @@ defmodule GoldenTraceTest do
     # additionalProperties:true, consistent with standalone object.
     assert parity_by_case["p1d5_array_object_json"] == true
 
-    # dee-h7nw: bare scalar ReAct observations render Python-faithfully — float
-    # fixed/exponent form (1000000.0, not 1.0e6), True/False, and None.
+    # dee-h7nw: bare scalar ReAct observations render float fixed/exponent
+    # form (1000000.0, not 1.0e6), and true/false/null for DSPy's True/False/None.
     assert parity_by_case["h7nw_react_float_observation"] == true
     assert parity_by_case["h7nw_react_bool_observation"] == true
     assert parity_by_case["h7nw_react_nil_observation"] == true
@@ -229,12 +229,12 @@ defmodule GoldenTraceTest do
 
     # two_step_basic also proves the demo path: a complete demo and a
     # present-nil (incomplete) demo render as plain `name: value` turns with
-    # DSPy's incomplete-demo prefix and Python `None` spelling.
+    # DSPy's incomplete-demo prefix, with a nil value as `null`.
     two_step_basic = Enum.find(report["cases"], &(&1["id"] == "two_step_basic"))
     [main_call | _] = two_step_basic["imp"]["history"]
     demo_contents = Enum.map(main_call["messages"], & &1["content"])
     assert Enum.any?(demo_contents, &(&1 == "answer: Berlin"))
-    assert Enum.any?(demo_contents, &(&1 == "answer: None"))
+    assert Enum.any?(demo_contents, &(&1 == "answer: null"))
 
     # Request-envelope fidelity (dee-idig). The old instrument compared only
     # message role+content, so it reported false parity while Imp shipped
@@ -291,7 +291,7 @@ defmodule GoldenTraceTest do
     #
     #   tier 1 (none)          -> nothing              (every JSON case above)
     #   tier 2 (response_format) -> {"type":"json_object"}
-    #   tier 3 (json_schema)   -> DSPyProgramOutputs structured schema
+    #   tier 3 (json_schema)   -> the structured schema
     assert envelope_by_case["ps19_response_format_tier_json"] == true
     assert envelope_by_case["ps19_json_schema_tier_json"] == true
 
@@ -304,20 +304,20 @@ defmodule GoldenTraceTest do
 
     schema_tier = Enum.find(report["cases"], &(&1["id"] == "ps19_json_schema_tier_json"))
 
-    # The structured schema Imp builds from the signature outputs is the pydantic
-    # `DSPyProgramOutputs` model in litellm's wire form (scalar + list + Literal),
-    # byte-identical to what real DSPy sends.
+    # The structured schema Imp builds from the signature outputs is DSPy's
+    # pydantic model in litellm's wire form (scalar + list + Literal), named
+    # `outputs` where DSPy names it after its class `DSPyProgramOutputs`.
     assert schema_tier["imp_call_envelopes"] == [
              %{
                "response_format" => %{
                  "type" => "json_schema",
                  "json_schema" => %{
-                   "name" => "DSPyProgramOutputs",
+                   "name" => "outputs",
                    "strict" => true,
                    "schema" => %{
                      "type" => "object",
                      "additionalProperties" => false,
-                     "title" => "DSPyProgramOutputs",
+                     "title" => "Outputs",
                      "required" => ["answer", "tags", "mood"],
                      "properties" => %{
                        "answer" => %{"title" => "Answer", "type" => "string"},
@@ -338,7 +338,9 @@ defmodule GoldenTraceTest do
              }
            ]
 
-    assert schema_tier["dspy_call_envelopes"] == schema_tier["imp_call_envelopes"]
+    assert Imp.DSPyWording.in_imp_words(schema_tier["dspy_call_envelopes"]) ==
+             schema_tier["imp_call_envelopes"]
+
     assert schema_tier["template_parity"]
     assert schema_tier["prediction_parity"]
 

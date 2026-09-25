@@ -180,16 +180,9 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposer do
   defp example_string(signature, example) do
     (signature.inputs ++ signature.outputs)
     |> Enum.map_join("\n", fn field ->
-      "#{field.prefix} #{python_str(Imp.Example.get(example, field.name))}"
+      "#{field.prefix} #{Imp.Adapter.Chat.format_value(Imp.Example.get(example, field.name))}"
     end)
   end
-
-  defp python_str(nil), do: "None"
-  defp python_str(true), do: "True"
-  defp python_str(false), do: "False"
-  defp python_str(value) when is_binary(value), do: value
-  defp python_str(value) when is_number(value), do: to_string(value)
-  defp python_str(value), do: inspect(value)
 
   defp program_inputs!(
          _lm,
@@ -448,91 +441,73 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposer do
     body =
       examples
       |> Enum.with_index()
-      |> Enum.map_join(", ", fn {example, index} -> example_repr(example, "$[#{index}]") end)
+      |> Enum.map_join(", ", fn {example, index} -> example_json(example, "$[#{index}]") end)
 
     "[" <> body <> "]"
   end
 
-  # DSPy summarizes the Example values supplied by the consumer; it does not
-  # require a program-level signature. That distinction matters for ordinary
-  # multi-predictor programs, whose external task contract is not any one
-  # predictor signature. Imp maps do not retain Python insertion order, so the
-  # stable BEAM representation is explicit inputs first, followed by the other
-  # public fields in lexical order. Example.keys/1 deliberately omits `imp_`
-  # fields, keeping recorder identities and metric-owned rows out of proposals.
-  defp example_repr(%Imp.Example{} = example, path) do
-    public_keys = Imp.Example.keys(example)
-    present = MapSet.new(public_keys)
+  @doc false
+  # One example as the dataset summary shows it: a JSON object with its input
+  # fields under "inputs" and its other public fields under "outputs", each in
+  # lexical order. DSPy summarizes the Example values supplied by the
+  # consumer; it does not require a program-level signature, which matters for
+  # ordinary multi-predictor programs whose task contract is not any one
+  # predictor signature. Example.keys/1 omits `imp_` fields, keeping recorder
+  # identities and metric-owned rows out of proposals. Public so the DSPy
+  # differentials can put DSPy's `repr(Example)` into the same words.
+  def example_json(%Imp.Example{} = example, path \\ "$") do
+    input_names = example.input_keys |> List.wrap() |> MapSet.new(&to_string/1)
 
-    input_keys =
-      example.input_keys
-      |> List.wrap()
-      |> Enum.filter(&MapSet.member?(present, &1))
+    {inputs, outputs} =
+      example
+      |> Imp.Example.keys()
+      |> Enum.map(&{to_string(&1), Imp.Example.get(example, &1)})
+      |> Enum.sort_by(&elem(&1, 0))
+      |> Enum.split_with(fn {name, _value} -> MapSet.member?(input_names, name) end)
 
-    input_set = MapSet.new(input_keys)
-
-    remaining_keys =
-      public_keys
-      |> Enum.reject(&MapSet.member?(input_set, &1))
-      |> Enum.sort_by(&to_string/1)
-
-    fields =
-      Enum.map(input_keys ++ remaining_keys, &{&1, Imp.Example.get(example, &1)})
-
-    body =
-      Enum.map_join(fields, ", ", fn {key, value} ->
-        key = to_string(key)
-        "#{py_repr(key, path)}: #{py_repr(value, path <> "." <> key)}"
-      end)
-
-    inputs =
-      example.input_keys
-      |> List.wrap()
-      |> Enum.map(&py_repr(to_string(&1), path <> ".input_keys"))
-      |> Enum.sort()
-      |> Enum.join(", ")
-
-    "Example({#{body}}) (input_keys={#{inputs}})"
+    ~s({"inputs": ) <>
+      json_object(inputs, path) <> ~s(, "outputs": ) <> json_object(outputs, path) <> "}"
   end
 
-  # Python's repr is recursively visible in DSPy 3.2.1's dataset-summary
-  # prompt (`repr(list[Example])`). Jason.OrderedObject is the explicit
-  # insertion-preserving representation for a JSON object on the BEAM; plain
-  # maps retain their observable Enumerable order, because no insertion order
-  # exists to recover after a consumer has constructed a map.
-  defp py_repr(%Jason.OrderedObject{values: values}, path),
-    do: py_dict_repr(values, path)
+  # Jason.OrderedObject is the explicit insertion-preserving representation
+  # for a JSON object on the BEAM; plain maps keep their observable Enumerable
+  # order, because no insertion order exists to recover after a consumer has
+  # constructed a map.
+  defp json_value(%Jason.OrderedObject{values: values}, path), do: json_object(values, path)
 
-  defp py_repr(%{__struct__: module}, path),
+  defp json_value(%{__struct__: module}, path),
     do: unsupported_value!(path, "struct #{inspect(module)}")
 
-  defp py_repr(value, path) when is_map(value),
-    do: py_dict_repr(Enum.to_list(value), path)
+  defp json_value(value, path) when is_map(value), do: json_object(Enum.to_list(value), path)
 
-  defp py_repr(value, path) when is_list(value) do
+  defp json_value(value, path) when is_list(value) do
     body =
       value
       |> Enum.with_index()
-      |> Enum.map_join(", ", fn {item, index} -> py_repr(item, path <> "[#{index}]") end)
+      |> Enum.map_join(", ", fn {item, index} -> json_value(item, path <> "[#{index}]") end)
 
     "[" <> body <> "]"
   end
 
-  defp py_repr(value, path) when is_binary(value), do: python_string_repr!(value, path)
-  defp py_repr(nil, _path), do: "None"
-  defp py_repr(true, _path), do: "True"
-  defp py_repr(false, _path), do: "False"
-  defp py_repr(value, _path) when is_integer(value), do: Integer.to_string(value)
-  defp py_repr(value, _path) when is_float(value), do: Imp.PyFloat.repr(value)
-  defp py_repr(value, path), do: unsupported_value!(path, value_type(value))
+  defp json_value(value, path) when is_binary(value) do
+    unless String.valid?(value), do: unsupported_value!(path, "invalid UTF-8 string")
+    Jason.encode!(value)
+  end
 
-  defp py_dict_repr(pairs, path) do
+  defp json_value(nil, _path), do: "null"
+  defp json_value(true, _path), do: "true"
+  defp json_value(false, _path), do: "false"
+  defp json_value(value, _path) when is_integer(value), do: Integer.to_string(value)
+  defp json_value(value, _path) when is_float(value), do: Imp.PyFloat.repr(value)
+  defp json_value(value, path), do: unsupported_value!(path, value_type(value))
+
+  defp json_object(pairs, path) do
     body =
       pairs
       |> Enum.map_join(", ", fn
         {key, value} when is_binary(key) or is_atom(key) ->
           key = to_string(key)
-          "#{py_repr(key, path)}: #{py_repr(value, map_value_path(path, key))}"
+          "#{Jason.encode!(key)}: #{json_value(value, map_value_path(path, key))}"
 
         {key, _value} ->
           unsupported_value!(path <> ".<key>", "map key #{inspect(key)}")
@@ -544,51 +519,8 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposer do
   defp map_value_path(path, key) do
     if Regex.match?(~r/^[A-Za-z_][A-Za-z0-9_]*$/, key),
       do: path <> "." <> key,
-      else: path <> "[" <> python_string_repr!(key, path) <> "]"
+      else: path <> "[" <> Jason.encode!(key) <> "]"
   end
-
-  defp python_string_repr!(value, path) do
-    unless String.valid?(value), do: unsupported_value!(path, "invalid UTF-8 string")
-
-    quote =
-      if String.contains?(value, "'") and not String.contains?(value, "\""), do: ?\", else: ?'
-
-    escaped =
-      value
-      |> String.to_charlist()
-      |> Enum.map_join(&python_char_repr(&1, quote))
-
-    <<quote>> <> escaped <> <<quote>>
-  end
-
-  defp python_char_repr(?\\, _quote), do: "\\\\"
-  defp python_char_repr(?\t, _quote), do: "\\t"
-  defp python_char_repr(?\n, _quote), do: "\\n"
-  defp python_char_repr(?\r, _quote), do: "\\r"
-  defp python_char_repr(char, char), do: "\\" <> <<char>>
-
-  defp python_char_repr(char, _quote) do
-    if python_printable?(char), do: <<char::utf8>>, else: python_unicode_escape(char)
-  end
-
-  defp python_printable?(32), do: true
-
-  defp python_printable?(char) do
-    case :unicode_util.lookup(char) do
-      %{category: {:other, _}} -> false
-      %{category: {:separator, _}} -> false
-      _ -> true
-    end
-  end
-
-  defp python_unicode_escape(char) when char <= 0xFF,
-    do: "\\x" <> (char |> Integer.to_string(16) |> String.pad_leading(2, "0"))
-
-  defp python_unicode_escape(char) when char <= 0xFFFF,
-    do: "\\u" <> (char |> Integer.to_string(16) |> String.pad_leading(4, "0"))
-
-  defp python_unicode_escape(char),
-    do: "\\U" <> (char |> Integer.to_string(16) |> String.pad_leading(8, "0"))
 
   defp unsupported_value!(path, type) do
     raise ArgumentError,

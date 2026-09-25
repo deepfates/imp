@@ -87,9 +87,7 @@ defmodule Imp.Adapter.FieldConstraints do
 
   defp normalize_key(key), do: key
 
-  # Python f"{value}" as _translate_pydantic_field_constraints applies it.
-  defp py_str(true), do: "True"
-  defp py_str(false), do: "False"
+  # A constraint value in its JSON spelling.
   defp py_str(value) when is_float(value), do: Imp.PyFloat.repr(value)
-  defp py_str(value), do: to_string(value)
+  defp py_str(value), do: Imp.Adapter.Chat.format_value(value)
 end

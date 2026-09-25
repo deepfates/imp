@@ -1074,7 +1074,7 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
              Imp.DSPyWording.in_imp_words(upstream["task_messages"])
 
     first_summary_user = prompt_messages |> hd() |> List.last() |> Map.fetch!("content")
-    assert first_summary_user =~ upstream["first_batch_repr"]
+    assert first_summary_user =~ Imp.DSPyWording.in_imp_words(upstream["first_batch_repr"])
 
     assert Enum.map(Enum.drop(prompt_calls, 3), fn {_messages, opts} -> opts[:rollout_id] end) ==
              upstream["rollout_ids"]
