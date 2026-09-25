@@ -18,14 +18,14 @@ defmodule Imp.Predict.RLM.InterpreterTest do
              Interpreter.execute(interpreter, source)
 
     assert guide =~ "`if condition, do: value, else: value`"
-    assert guide =~ "Enum.at/2"
-    assert guide =~ "String.starts_with?/2"
+    assert guide =~ "Every function of `Enum`, `Keyword`, `List`, `Map` and `String`"
+    assert guide =~ "`String.to_atom`"
     assert guide =~ "Pipelines with `|>` are supported"
     assert guide =~ "string concatenation with `<>`"
 
     for {source, named_trap} <- [
           {"case true do true -> 1 end", "`case`"},
-          {"Enum.find([1, 2], 1)", "`Enum.find`"},
+          {"f = fn x -> x end\nf.(1)", "calling a function stored in a variable"},
           {"hd([1])", "`hd`"},
           {~S|"value: #{1}"|, "binary `<<>>`"}
         ] do
@@ -34,7 +34,7 @@ defmodule Imp.Predict.RLM.InterpreterTest do
     end
   end
 
-  test "every advertised module call executes with representative valid arguments" do
+  test "representative library calls execute and refused functions are not advertised" do
     interpreter = Interpreter.new(%{}, %{}, nil)
 
     samples = %{
@@ -73,18 +73,15 @@ defmodule Imp.Predict.RLM.InterpreterTest do
     }
 
     capabilities = Interpreter.controller_language_capabilities()
+    assert capabilities.library_modules == [:Enum, :Keyword, :List, :Map, :String]
 
-    advertised =
-      for {module, functions} <- [
-            {:String, capabilities.string_functions},
-            {:Enum, capabilities.enum_functions}
-          ],
-          {function, arities} <- functions,
-          arity <- List.wrap(arities),
-          into: MapSet.new(),
-          do: {module, function, arity}
+    for capability <- Map.keys(samples) do
+      assert capability in capabilities.library_functions
+    end
 
-    assert advertised == samples |> Map.keys() |> MapSet.new()
+    for {{module, function}, _reason} <- capabilities.refused_functions do
+      refute Enum.any?(capabilities.library_functions, &match?({^module, ^function, _}, &1))
+    end
 
     for {capability, source} <- samples do
       assert {:ok, _value, _interpreter} = Interpreter.execute(interpreter, source),
@@ -100,14 +97,13 @@ defmodule Imp.Predict.RLM.InterpreterTest do
              Interpreter.execute(interpreter, novel_atom)
   end
 
-  test "Enum.sum and Enum.product are allowlisted aggregations" do
+  test "Enum.sum, Enum.product and Enum.reduce aggregate" do
     interpreter = Interpreter.new(%{numbers: [1, 2, 3, 4, 5]}, %{}, nil)
 
     assert {:ok, 15, interpreter} = Interpreter.execute(interpreter, "Enum.sum(numbers)")
     assert {:ok, 120, interpreter} = Interpreter.execute(interpreter, "Enum.product(numbers)")
 
-    # A lambda-taking Enum function stays out of the fn-less allowlist.
-    assert {:error, {:function_not_allowed, :Enum, :reduce, 3}, _next} =
+    assert {:ok, 15, _next} =
              Interpreter.execute(interpreter, "Enum.reduce(numbers, 0, fn x, acc -> x + acc end)")
   end
 
@@ -284,5 +280,145 @@ missing()|
              Interpreter.resume(continuation, {:ok, String.duplicate("b", 700)})
 
     assert bytes > 1_000
+  end
+
+  describe "library calls" do
+    @tickets [
+      %{"id" => 1, "squad" => "Billing", "priority" => "high"},
+      %{"id" => 2, "squad" => "billing", "priority" => "low"},
+      %{"id" => 3, "squad" => "Search", "priority" => "high"}
+    ]
+
+    test "controller code may call pure Enum, Map, List, String and Keyword functions with functions" do
+      interpreter = Interpreter.new(%{tickets: @tickets}, %{}, nil)
+
+      source = ~S"""
+      high = Enum.filter(tickets, fn t -> t["priority"] == "high" end)
+      pairs = Enum.zip(["a", "b"], [1, 2])
+      per_squad = Enum.frequencies_by(tickets, fn t -> String.downcase(t["squad"]) end)
+      ids = Enum.group_by(tickets, &String.downcase(&1["squad"]), fn %{"id" => id} -> id end)
+      high_count = Enum.count(tickets, fn %{"priority" => p} -> p == "high" end)
+      ranked = Enum.sort_by(per_squad, fn {_squad, n} -> n end, :desc)
+      tally = Enum.reduce(tickets, %{}, fn t, acc -> Map.update(acc, t["squad"], 1, &(&1 + 1)) end)
+      limit = Keyword.get([limit: 1], :limit)
+      submit(%{
+        high: Enum.map(high, & &1["id"]),
+        pairs: pairs,
+        per_squad: per_squad,
+        ids: ids,
+        high_count: high_count,
+        top: List.first(ranked),
+        tally: tally,
+        limited: Enum.take(ranked, limit)
+      })
+      """
+
+      assert {:final, result, _interpreter} = Interpreter.execute(interpreter, source)
+
+      assert result == %{
+               high: [1, 3],
+               pairs: [{"a", 1}, {"b", 2}],
+               per_squad: %{"billing" => 2, "search" => 1},
+               ids: %{"billing" => [1, 2], "search" => [3]},
+               high_count: 2,
+               top: {"billing", 2},
+               tally: %{"Billing" => 1, "billing" => 1, "Search" => 1},
+               limited: [{"billing", 2}]
+             }
+    end
+
+    test "functions match clauses in order, honour guards and may print" do
+      interpreter = Interpreter.new(%{}, %{}, nil)
+
+      source = ~S"""
+      labels = Enum.map([1, -2, 0], fn
+        n when n > 0 -> "positive"
+        0 -> "zero"
+        _ -> "negative"
+      end)
+      Enum.each(labels, fn label -> print(label <> ";") end)
+      labels
+      """
+
+      assert {:ok, ["positive", "negative", "zero"], interpreter} =
+               Interpreter.execute(interpreter, source)
+
+      assert interpreter.output == "positive;negative;zero;"
+
+      assert {:error, {:fn_clause_not_matched, [3]}, _} =
+               Interpreter.execute(interpreter, "Enum.map([3], fn 0 -> 0 end)")
+    end
+
+    test "effectful, atom-creating and nondeterministic calls stay refused" do
+      interpreter = Interpreter.new(%{}, %{"llm_query" => :llm_query}, nil)
+
+      for {source, reason} <- [
+            {~S|File.read("/etc/hosts")|, {:function_not_allowed, :File, :read, 1}},
+            {~S|System.cmd("id", [])|, {:function_not_allowed, :System, :cmd, 2}},
+            {~S|:os.cmd(~c"id")|, {:function_not_allowed, :os, :cmd, 1}},
+            {~S|Process.put(:key, 1)|, {:function_not_allowed, :Process, :put, 2}},
+            {~S|String.to_atom("rlm_new_atom")|, {:function_not_allowed, :String, :to_atom, 1}},
+            {~S|List.to_atom([97])|, {:function_not_allowed, :List, :to_atom, 1}},
+            {~S|Enum.random([1, 2])|, {:function_not_allowed, :Enum, :random, 1}},
+            {~S|apply(File, :read, ["/etc/hosts"])|, {:function_not_allowed, :apply}},
+            {~S|Enum.map(["a"], fn p -> llm_query(p) end)|, {:effect_inside_fn, "llm_query"}},
+            {~S|Enum.map([1], fn x -> submit(%{x: x}) end)|, :submit_inside_fn}
+          ] do
+        assert {:error, ^reason, _} = Interpreter.execute(interpreter, source),
+               "expected #{source} to be refused with #{inspect(reason)}"
+      end
+    end
+
+    test "a map cannot pose as a struct to reach a protocol implementation" do
+      path =
+        Path.join(System.tmp_dir!(), "rlm_forged_struct_#{System.unique_integer([:positive])}")
+
+      File.write!(path, "secret\n")
+      on_exit(fn -> File.rm(path) end)
+      # The struct's field names exist as atoms in any VM that has used File.stream!/1.
+      _ = %File.Stream{}
+
+      fields =
+        ~s|path: "#{path}", modes: [:raw, :read_ahead, :binary], line_or_bytes: :line, raw: true, node: :nonode@nohost|
+
+      interpreter = Interpreter.new(%{}, %{}, nil)
+
+      assert {:error, :struct_literal_not_allowed, _} =
+               Interpreter.execute(
+                 interpreter,
+                 ~s|Enum.join(%{__struct__: :"Elixir.File.Stream", #{fields}})|
+               )
+
+      assert {:error, {:module_value_not_allowed, File.Stream}, _} =
+               Interpreter.execute(
+                 interpreter,
+                 ~s|Enum.join(Map.put(%{#{fields}}, :__struct__, :"Elixir.File.Stream"))|
+               )
+    end
+
+    test "function calls, results and ranges share the step and value budgets" do
+      interpreter = Interpreter.new(%{}, %{}, nil, max_steps: 50, max_value_bytes: 1_000)
+
+      assert {:error, :step_limit_exceeded, _} =
+               Interpreter.execute(interpreter, "Enum.map(1..100, fn x -> x end)")
+
+      assert {:error, {:value_budget_exceeded, _bytes, 1_000}, _} =
+               Interpreter.execute(
+                 interpreter,
+                 ~S|Enum.map(1..3, fn _ -> String.duplicate("a", 400) end)|
+               )
+
+      assert {:error, {:value_budget_exceeded, _bytes, 1_000}, _} =
+               Interpreter.execute(interpreter, ~S|String.duplicate("a", 100_000_000)|)
+
+      assert {:error, {:value_budget_exceeded, 1_000_000_000, 1_000}, _} =
+               Interpreter.execute(interpreter, "Enum.to_list(1..1_000_000_000)")
+
+      assert {:ok, %{"a" => [1, 2]}, _} =
+               Interpreter.execute(
+                 interpreter,
+                 ~S|Enum.reduce([1, 2], %{}, fn x, acc -> Map.update(acc, "a", [x], &(&1 ++ [x])) end)|
+               )
+    end
   end
 end

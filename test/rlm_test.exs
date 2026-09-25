@@ -161,6 +161,19 @@ defmodule RLMPublicSurfaceTest do
     assert [%{action: :direct_submit}] = prediction.metadata.rlm_trace
   end
 
+  test "RLM accepts a typed direct submission that arrives as JSON text" do
+    lm = %{
+      module: Imp.LM.Static,
+      opts: [handler: fn _messages, _opts -> ~s({"answer":"Paris"}) end]
+    }
+
+    rlm = Imp.Predict.RLM.new("question -> answer", lm: lm, max_iterations: 1)
+
+    assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{question: "Capital of France?"})
+    assert Imp.Prediction.get(prediction, :answer) == "Paris"
+    assert [%{action: :direct_submit}] = prediction.metadata.rlm_trace
+  end
+
   test "RLM direct submission rejects fields outside reasoning and required outputs" do
     output = %{"reasoning" => "finished", "answer" => "Paris", "untrusted" => true}
     lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> output end]}

@@ -443,14 +443,22 @@ defmodule Imp.Predict.RLM do
 
   defp maybe_direct_submit(rlm, raw, state, iteration, original_error) do
     output = unwrap_lm_output(raw)
+    required = Enum.map(Imp.Signature.output_names(rlm.signature), &to_string/1)
+
+    # A text LM returns the typed final submission as JSON text.
+    output =
+      with text when is_binary(text) <- output,
+           {:ok, decoded} <- Action.decode(text),
+           true <- direct_submission?(decoded, required) do
+        decoded
+      else
+        _other -> output
+      end
 
     if is_map(output) do
       output = stringify_action_keys(output)
-      required = Enum.map(Imp.Signature.output_names(rlm.signature), &to_string/1)
-      keys = Map.keys(output)
 
-      if Enum.sort(keys) == Enum.sort(required) or
-           Enum.sort(keys) == Enum.sort(["reasoning" | required]) do
+      if direct_submission?(output, required) do
         emit_reasoning(Map.get(output, "reasoning", ""), iteration, :direct_submit)
         fields = Map.take(output, required)
 
@@ -483,6 +491,11 @@ defmodule Imp.Predict.RLM do
         do: controller_action_error(output, state, iteration, original_error),
         else: {:error, original_error}
     end
+  end
+
+  defp direct_submission?(output, required) do
+    keys = output |> stringify_action_keys() |> Map.keys() |> Enum.sort()
+    keys == Enum.sort(required) or keys == Enum.sort(["reasoning" | required])
   end
 
   defp controller_action_error(output, state, iteration, reason) do
