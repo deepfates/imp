@@ -18,8 +18,8 @@ Imp.evaluate(improved, testset, metric, num_threads: 8).score
 #=> 0.75
 ```
 
-The router went from 0.25 to 0.75 on tickets it never saw. Across three runs
-it scored 0.75 to 0.85. Optimizing made no model calls; the only cost is a
+The router went from 0.25 to 0.75 on tickets it never saw. In three more
+runs, each in a fresh VM, it went from 0.2–0.4 to 0.75–0.85. Optimizing made no model calls; the only cost is a
 longer prompt.
 
 `improved` is a new value. `router` is unchanged, so we can compare the two, or
@@ -148,6 +148,9 @@ that directly. Instruction search is for tasks where the model needs to be
 told *how* to work, and it wants a larger budget than a guide should spend.
 [Choosing an optimizer](../diving-deeper/choosing-an-optimizer.md) compares
 the rest.
+
+[Livebook 03](../../livebooks/03_evaluate_and_optimize.livemd) runs these
+optimizers in a notebook, offline or with a key.
 
 ---
 

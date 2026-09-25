@@ -128,12 +128,16 @@ decisions. The next page turns those into a better program.
 
 Twenty examples score in steps of 0.05, and a model's answers vary between
 runs, so read these as levels, not exact values. Across three runs with
-`gpt-5.4-mini`, the router scored 0.25 to 0.3, chain of thought 0.3 to 0.35,
-triage 0.25 to 0.4, and the agent 0.75 to 0.95. The evaluations on this page
+`gpt-5.4-mini`, each in a fresh VM, chain of thought scored 0.3 to 0.35,
+triage 0.25 to 0.4, and the agent 0.75 to 0.95; the router scored 0.2 to 0.4
+across six. The evaluations on this page
 cost about five cents.
 
 [Metrics and evaluation](../diving-deeper/metrics-and-evaluation.md) covers
 richer metrics and what else an evaluation reports.
+
+[Livebook 03](../../livebooks/03_evaluate_and_optimize.livemd) runs
+evaluation and optimization in a notebook, offline or with a key.
 
 ---
 

@@ -32,13 +32,34 @@ else
   # Standalone notebook: install the released package from Hex.
   Mix.install([{:imp, "~> 0.5"}])
 end
-live_provider_enabled? = System.get_env("LIVE_PROVIDER") == "1"
+
+# Live cells run when LIVE_PROVIDER=1 and a key is set: OPENAI_API_KEY, or
+# OPENROUTER_API_KEY for the same model through OpenRouter. In your own code,
+# any ReqLLM model string works.
+live_lm = fn opts ->
+  model = System.get_env("OPENAI_MODEL", "gpt-5.4-mini")
+
+  cond do
+    System.get_env("LIVE_PROVIDER") != "1" ->
+      {:skip, "Set LIVE_PROVIDER=1 and OPENAI_API_KEY to run this cell."}
+
+    key = System.get_env("OPENAI_API_KEY") ->
+      {:ok, Imp.req_llm("openai:" <> model, Keyword.put(opts, :api_key, key))}
+
+    key = System.get_env("OPENROUTER_API_KEY") ->
+      {:ok, Imp.req_llm("openrouter:openai/" <> model, Keyword.put(opts, :api_key, key))}
+
+    true ->
+      {:skip, "Set OPENAI_API_KEY to run this cell."}
+  end
+end
 ```
 
 ## Build Train And Dev Sets
 
-This notebook gives a program a scorecard. Optimizers are only useful after
-examples and metrics say what better means.
+Livebook 02 showed what a program sends. This notebook gives a program a
+scorecard: optimizers are only useful after examples and a metric say what
+better means.
 
 Optimizers need two kinds of examples. The train set is material they can use
 to build candidates. The dev set is the held-out scorecard used to choose
@@ -179,27 +200,7 @@ credentials are present. It proves that the same `evaluate -> optimize ->
 report` path works with a real LM, while keeping the dataset intentionally tiny.
 
 ```elixir
-live_lm = fn opts ->
-  if live_provider_enabled? && System.get_env("OPENAI_API_KEY") && System.get_env("OPENAI_MODEL") do
-    {:ok,
-     Imp.req_llm("openai:#{System.fetch_env!("OPENAI_MODEL")}",
-       Keyword.merge(
-         [
-           api_key: System.fetch_env!("OPENAI_API_KEY"),
-           temperature: 0,
-           max_completion_tokens: 100
-         ],
-         opts
-       )
-     )}
-  else
-    {:skip, "Set LIVE_PROVIDER=1, OPENAI_API_KEY, and OPENAI_MODEL to run the live provider cell."}
-  end
-end
-```
-
-```elixir
-case live_lm.(max_completion_tokens: 100) do
+case live_lm.(max_tokens: 100) do
   {:ok, lm} ->
     live_program =
       Imp.predict(
