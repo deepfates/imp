@@ -472,6 +472,24 @@ Every change here is breaking for code that matches on the old shape.
   a history turn loaded with `Imp.History.load/1`, or a demo field a
   signature does not declare in a saved optimizer artifact.
 
+### Retrieval
+
+- `Imp.Retrieve.Memory` (`Imp.memory/2`) returns only documents that share a
+  word with the query, up to `k`. It returned `k` documents whatever they
+  scored, so a document with no word in common came back with `score: 0`
+  because it came first in the list.
+
+### Observability
+
+- A `:model_response` event says `cached: true` when the answer came from
+  Imp's response cache, with `cost: 0.0` and empty usage, and `cached: false`
+  otherwise (`Imp.Core.LMResponse` has the same `cached` field). A cached
+  answer used to report an empty usage and a `nil` cost, the same as a call
+  whose price was unknown.
+- `Imp.trace/2` collects `[:imp, :module, ...]` events by default, so tracing
+  a program call records it on any LM; with `Imp.LM.Static` it recorded
+  nothing unless `events:` was given.
+
 ## 0.4.0 — 2026-09-17
 
 - `Imp.ACP` and `Imp.MCP.connect/2` are part of Imp. The separate `imp_acp`

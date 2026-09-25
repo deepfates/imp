@@ -119,7 +119,9 @@ defmodule Imp.Retrieve do
 
     `Memory` is useful for examples, tests, Livebooks, and portable save/load
     workflows. It scores documents by token overlap with the query and returns
-    the top `k` documents with an added `:score` field.
+    up to `k` of the documents that share at least one token with it, best
+    first, each with an added `:score` field. A document that shares none is
+    not a match and is not returned.
     """
     @behaviour Imp.Retrieve
 
@@ -166,6 +168,7 @@ defmodule Imp.Retrieve do
         docs =
           docs
           |> Enum.map(fn doc -> {score(doc, query_terms), doc} end)
+          |> Enum.reject(fn {score, _doc} -> score == 0 end)
           |> Enum.sort_by(fn {score, _doc} -> -score end)
           |> Enum.take(k)
           |> Enum.map(fn {score, doc} -> Map.put(doc, :score, score) end)
