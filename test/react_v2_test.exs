@@ -244,7 +244,7 @@ defmodule ReActV2Test do
 
   test "denied and failed tool results reach the model as prose, not Elixir tuples" do
     assert Imp.Adapter.Chat.format_tool_result(
-             {:error, {:tool_authorization_denied, :update_seen, :client_denied}}
+             {:error, {:tool_denied, :update_seen, :client_denied}}
            ) == "Error: update_seen was not allowed; the person declined it."
 
     assert Imp.Adapter.Chat.format_tool_result({:error, {:tool_error, :post, "boom"}}) ==
@@ -786,7 +786,7 @@ defmodule ReActV2Test do
       ])
     end
 
-    no_submit = [guidance: %{finish_tool: nil, input_names: [], output_names: [], tool_names: []}]
+    no_submit = [guidance: %{submit_tool: nil, input_names: [], output_names: [], tool_names: []}]
     signature = Imp.react("question -> answer", []).react.signature
 
     alone =
@@ -843,7 +843,7 @@ defmodule ReActV2Test do
   # and then gave again. A call recorded without an id is matched to its result
   # by name, so the results of the step's other calls are kept.
   test "a rejected or id-less recorded submit is replayed only as what the loop accepted" do
-    no_submit = [guidance: %{finish_tool: nil, input_names: [], output_names: [], tool_names: []}]
+    no_submit = [guidance: %{submit_tool: nil, input_names: [], output_names: [], tool_names: []}]
     signature = Imp.react("question -> answer", []).react.signature
 
     step = fn fields, calls, results ->
@@ -874,7 +874,7 @@ defmodule ReActV2Test do
         )
       ])
       |> Imp.History.dump()
-      |> Imp.History.load()
+      |> Imp.History.load!()
 
     messages = Imp.Adapter.Chat.format(signature, %{history: history, tools: []}, no_submit)
 
@@ -1044,7 +1044,7 @@ defmodule ReActV2Test do
     program = Imp.react("question -> answer", [lookup], lm: lm)
 
     refute Map.has_key?(program.tools, :submit)
-    assert program.react.adapter_opts[:guidance].finish_tool == nil
+    assert program.react.adapter_opts[:guidance].submit_tool == nil
 
     assert {:ok, prediction} = Imp.call(program, %{question: "Capital of France?"})
     assert Imp.get(prediction, :answer) == "Paris"
@@ -1061,7 +1061,7 @@ defmodule ReActV2Test do
     # With several outputs the same roster carries `submit`.
     submit_program = Imp.react(@submit_signature, [lookup])
     assert Map.has_key?(submit_program.tools, :submit)
-    assert submit_program.react.adapter_opts[:guidance].finish_tool == :submit
+    assert submit_program.react.adapter_opts[:guidance].submit_tool == :submit
   end
 
   # A terminal tool ends the turn with the outputs it carries, the shape

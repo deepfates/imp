@@ -1,7 +1,7 @@
-defmodule Imp.Optimizer.RandomSearch.ResumeTest do
+defmodule Imp.Optimizer.BootstrapFewShotWithRandomSearch.ResumeTest do
   use ExUnit.Case, async: false
 
-  alias Imp.Optimizer.{RandomSearch, Report}
+  alias Imp.Optimizer.{BootstrapFewShotWithRandomSearch, Report}
 
   def exact_metric(example, prediction),
     do: Imp.Metrics.exact_match(:answer).(example, prediction)
@@ -12,7 +12,9 @@ defmodule Imp.Optimizer.RandomSearch.ResumeTest do
 
     uninterrupted =
       optimizer
-      |> RandomSearch.compile(program, trainset, devset, restrict: [-3, -2, -1, 0])
+      |> BootstrapFewShotWithRandomSearch.compile(program, trainset, devset,
+        restrict: [-3, -2, -1, 0]
+      )
       |> Report.fetch()
 
     uninterrupted_calls = Agent.get(uninterrupted_counter, & &1)
@@ -22,7 +24,7 @@ defmodule Imp.Optimizer.RandomSearch.ResumeTest do
 
     paused =
       optimizer
-      |> RandomSearch.compile(program, trainset, devset,
+      |> BootstrapFewShotWithRandomSearch.compile(program, trainset, devset,
         restrict: [-3, -2, -1, 0],
         max_candidates: 2
       )
@@ -39,7 +41,7 @@ defmodule Imp.Optimizer.RandomSearch.ResumeTest do
 
     resumed =
       optimizer
-      |> RandomSearch.compile(program, trainset, devset,
+      |> BootstrapFewShotWithRandomSearch.compile(program, trainset, devset,
         restrict: [-3, -2, -1, 0],
         resume_state: checkpoint
       )
@@ -60,7 +62,7 @@ defmodule Imp.Optimizer.RandomSearch.ResumeTest do
 
     checkpoint =
       optimizer
-      |> RandomSearch.compile(program, trainset, devset,
+      |> BootstrapFewShotWithRandomSearch.compile(program, trainset, devset,
         restrict: [-3, -2],
         max_candidates: 0
       )
@@ -76,7 +78,7 @@ defmodule Imp.Optimizer.RandomSearch.ResumeTest do
       )
 
     assert_refused(fn ->
-      RandomSearch.compile(drifted_metric, program, trainset, devset,
+      BootstrapFewShotWithRandomSearch.compile(drifted_metric, program, trainset, devset,
         restrict: [-3, -2],
         resume_state: checkpoint,
         max_candidates: 0
@@ -84,7 +86,11 @@ defmodule Imp.Optimizer.RandomSearch.ResumeTest do
     end)
 
     assert_refused(fn ->
-      RandomSearch.compile(optimizer, %{program | config: [temperature: 0.2]}, trainset, devset,
+      BootstrapFewShotWithRandomSearch.compile(
+        optimizer,
+        %{program | config: [temperature: 0.2]},
+        trainset,
+        devset,
         restrict: [-3, -2],
         resume_state: checkpoint,
         max_candidates: 0
@@ -96,7 +102,7 @@ defmodule Imp.Optimizer.RandomSearch.ResumeTest do
     ]
 
     assert_refused(fn ->
-      RandomSearch.compile(optimizer, program, trainset, changed_devset,
+      BootstrapFewShotWithRandomSearch.compile(optimizer, program, trainset, changed_devset,
         restrict: [-3, -2],
         resume_state: checkpoint,
         max_candidates: 0
@@ -104,7 +110,11 @@ defmodule Imp.Optimizer.RandomSearch.ResumeTest do
     end)
 
     assert_refused(fn ->
-      RandomSearch.compile(%{optimizer | max_rounds: 2}, program, trainset, devset,
+      BootstrapFewShotWithRandomSearch.compile(
+        %{optimizer | max_rounds: 2},
+        program,
+        trainset,
+        devset,
         restrict: [-3, -2],
         resume_state: checkpoint,
         max_candidates: 0
@@ -172,7 +182,7 @@ defmodule Imp.Optimizer.RandomSearch.ResumeTest do
 
     report =
       optimizer
-      |> RandomSearch.compile(program, trainset, devset, restrict: [-3, -2])
+      |> BootstrapFewShotWithRandomSearch.compile(program, trainset, devset, restrict: [-3, -2])
       |> Report.fetch()
 
     refute report.metadata.durable
@@ -180,7 +190,7 @@ defmodule Imp.Optimizer.RandomSearch.ResumeTest do
     assert is_nil(report.metadata.resume_state)
 
     assert_raise ArgumentError, ~r/requires :metric_identity/, fn ->
-      RandomSearch.compile(optimizer, program, trainset, devset,
+      BootstrapFewShotWithRandomSearch.compile(optimizer, program, trainset, devset,
         restrict: [-3, -2],
         max_candidates: 0
       )
@@ -236,7 +246,7 @@ defmodule Imp.Optimizer.RandomSearch.ResumeTest do
   end
 
   defp random_optimizer(metric, identity) do
-    RandomSearch.new(metric,
+    BootstrapFewShotWithRandomSearch.new(metric,
       metric_identity: identity,
       num_candidate_programs: 1,
       max_bootstrapped_demos: 1,

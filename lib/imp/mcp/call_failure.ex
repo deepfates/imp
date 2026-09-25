@@ -59,21 +59,30 @@ defmodule Imp.MCP.CallFailure do
   own, from the connection pool in front of ExMCP: `:timeout` (the caller's
   `:timeout` passed while the request was out), `:no_idle_connection` (every
   connection to the server stayed busy until the timeout), and
-  `:not_connected` (the server has no connection left). `server` is the
-  descriptor's name and `tool` the name the server published.
+  `:not_connected` (the server has no connection left). `server_name` is the
+  descriptor's name, `tool_name` the name the server published, and `index`
+  the position of the descriptor in the list given to `Imp.MCP.connect/2`,
+  which, unlike a name, identifies it.
   """
 
-  @enforce_keys [:outcome, :server, :tool, :reason]
-  defstruct [:outcome, :server, :tool, :reason]
+  @enforce_keys [:outcome, :index, :server_name, :tool_name, :reason]
+  defstruct [:outcome, :index, :server_name, :tool_name, :reason]
 
   @type outcome :: :refused | :auth_refused | :not_sent | :unknown
 
   @type t :: %__MODULE__{
           outcome: outcome(),
-          server: String.t(),
-          tool: String.t(),
+          index: non_neg_integer(),
+          server_name: String.t(),
+          tool_name: String.t(),
           reason: term()
         }
+
+  @typep source :: %{
+           index: non_neg_integer(),
+           server_name: String.t(),
+           tool_name: String.t()
+         }
 
   # JSON-RPC 2.0 section 5.1: parse error, invalid request, method not found.
   # Each rejects the request before a method runs. Every other code, -32602 and
@@ -93,17 +102,17 @@ defmodule Imp.MCP.CallFailure do
   ]
 
   @doc false
-  @spec returned(String.t(), String.t(), term()) :: t()
-  def returned(server, tool, reason),
-    do: %__MODULE__{outcome: classify(reason), server: server, tool: tool, reason: reason}
+  @spec returned(source(), term()) :: t()
+  def returned(source, reason),
+    do: struct!(__MODULE__, Map.merge(source, %{outcome: classify(reason), reason: reason}))
 
   @doc false
-  @spec exited(String.t(), String.t(), term()) :: t()
-  def exited(server, tool, reason) do
+  @spec exited(source(), term()) :: t()
+  def exited(source, reason) do
     # `:noproc` means the client was gone before the call was made; any other
     # exit ended the client while it held the call.
     outcome = if match?({:noproc, _call}, reason), do: :not_sent, else: :unknown
-    %__MODULE__{outcome: outcome, server: server, tool: tool, reason: {:exit, reason}}
+    struct!(__MODULE__, Map.merge(source, %{outcome: outcome, reason: {:exit, reason}}))
   end
 
   defp classify(:not_connected), do: :not_sent

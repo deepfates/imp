@@ -83,7 +83,7 @@ defmodule Imp.Optimizer.MIPROv2 do
     init_temperature: 1.0,
     proposal_response_format: :off,
     max_errors: :infinity,
-    max_concurrency: 1,
+    num_threads: 1,
     timeout: :infinity,
     startup_trials: 10
   ]
@@ -97,7 +97,7 @@ defmodule Imp.Optimizer.MIPROv2 do
     :init_temperature,
     :proposal_response_format,
     :max_errors,
-    :max_concurrency,
+    :num_threads,
     :timeout,
     :startup_trials
   ]
@@ -124,7 +124,7 @@ defmodule Imp.Optimizer.MIPROv2 do
         init_temperature: Keyword.get(runtime_opts, :init_temperature, 1.0),
         proposal_response_format: Keyword.get(runtime_opts, :proposal_response_format, :off),
         max_errors: Keyword.get(runtime_opts, :max_errors, :infinity),
-        max_concurrency: Keyword.get(runtime_opts, :max_concurrency, 1),
+        num_threads: Keyword.get(runtime_opts, :num_threads, 1),
         timeout: Keyword.get(runtime_opts, :timeout, :infinity),
         startup_trials: Keyword.get(runtime_opts, :startup_trials, 10)
       }
@@ -445,7 +445,7 @@ defmodule Imp.Optimizer.MIPROv2 do
             metric_threshold: optimizer.metric_threshold,
             teacher: teacher,
             seed: config.seed,
-            max_concurrency: optimizer.max_concurrency,
+            max_concurrency: optimizer.num_threads,
             timeout: optimizer.timeout,
             max_errors: optimizer.max_errors
           )
@@ -759,7 +759,7 @@ defmodule Imp.Optimizer.MIPROv2 do
   defp evaluate(program, examples, optimizer, config) do
     evaluator =
       Imp.Evaluate.new(examples, optimizer.metric,
-        max_concurrency: optimizer.max_concurrency,
+        num_threads: optimizer.num_threads,
         timeout: optimizer.timeout,
         max_errors: optimizer.max_errors
       )
@@ -944,7 +944,7 @@ defmodule Imp.Optimizer.MIPROv2 do
       datasets: %{trainset: config.trainset, valset: config.valset},
       evaluation: %{
         metric: metric_identity,
-        max_concurrency: optimizer.max_concurrency,
+        max_concurrency: optimizer.num_threads,
         max_errors: optimizer.max_errors,
         timeout: optimizer.timeout
       },
@@ -1269,8 +1269,8 @@ defmodule Imp.Optimizer.MIPROv2 do
             ":dspy_3_2_1 proposer fidelity requires proposal_response_format: :off"
     end
 
-    unless is_integer(optimizer.max_concurrency) and optimizer.max_concurrency > 0,
-      do: raise(ArgumentError, "max_concurrency must be a positive integer")
+    unless is_integer(optimizer.num_threads) and optimizer.num_threads > 0,
+      do: raise(ArgumentError, "num_threads must be a positive integer")
 
     unless optimizer.timeout == :infinity or
              (is_integer(optimizer.timeout) and optimizer.timeout > 0),

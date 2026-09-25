@@ -1021,7 +1021,7 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
           [
             seed: seed,
             generations: generations,
-            max_concurrency: max_concurrency,
+            num_threads: max_concurrency,
             timeout: evaluation_timeout,
             reflection_lm: reflection_lm,
             max_metric_calls: budget,
@@ -1692,7 +1692,7 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
       Imp.Evaluate.run(
         Imp.Evaluate.new(examples, metric,
           max_errors: :infinity,
-          max_concurrency: max_concurrency,
+          num_threads: max_concurrency,
           timeout: timeout,
           deadline: deadline
         ),

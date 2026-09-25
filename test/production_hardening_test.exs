@@ -921,9 +921,9 @@ defmodule ProductionHardeningTest do
                  end
 
     assert_raise ArgumentError,
-                 ~r/Imp\.Predict\.Parallel\.map\/3: invalid value for :max_concurrency option: expected positive integer/,
+                 ~r/Imp\.Predict\.Parallel\.map\/3: invalid value for :num_threads option: expected positive integer/,
                  fn ->
-                   Imp.Predict.Parallel.map(program, [%{question: "a"}], max_concurrency: 0)
+                   Imp.Predict.Parallel.map(program, [%{question: "a"}], num_threads: 0)
                  end
   end
 

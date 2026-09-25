@@ -35,7 +35,7 @@ defmodule ReqLLMBatchTest do
              ReqLLMBatch.run(requests, dispatcher,
                checkpoint: checkpoint,
                max_attempts: 3,
-               max_concurrency: 2
+               num_threads: 2
              )
 
     assert summary.complete?
@@ -114,7 +114,7 @@ defmodule ReqLLMBatchTest do
           ],
           blocking_dispatcher,
           checkpoint: checkpoint,
-          max_concurrency: 1
+          num_threads: 1
         )
       end)
 
@@ -164,7 +164,7 @@ defmodule ReqLLMBatchTest do
     assert {:ok, summary} =
              ReqLLMBatch.run(requests, dispatcher,
                checkpoint: checkpoint,
-               max_concurrency: 2
+               num_threads: 2
              )
 
     assert summary.counts == %{succeeded: 6}

@@ -247,7 +247,7 @@ defmodule Imp.Optimizer.MIPROv2.OptunaMinibatchSearchTest do
       task_lm: task_lm,
       metric_identity: %{"id" => "route-equality", "version" => 1, "config" => %{}},
       startup_trials: 10,
-      max_concurrency: 1,
+      num_threads: 1,
       max_errors: :infinity,
       program_aware_proposer: false,
       data_aware_proposer: true,

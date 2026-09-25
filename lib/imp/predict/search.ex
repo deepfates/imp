@@ -84,7 +84,7 @@ defmodule Imp.Predict.Search do
 
   @option_schema [
     mode: [type: {:in, [:sequential, :concurrent]}, default: :sequential],
-    max_concurrency: [type: :pos_integer, default: System.schedulers_online()],
+    num_threads: [type: :pos_integer, default: System.schedulers_online()],
     timeout: [type: {:or, [:timeout, :pos_integer]}, default: :infinity],
     threshold: [type: {:or, [:integer, :float, nil]}, default: nil],
     fail_budget: [type: {:or, [:non_neg_integer, nil]}, default: nil],
@@ -215,7 +215,7 @@ defmodule Imp.Predict.Search do
     |> Imp.Tasks.async_stream(
       fn indexed -> evaluate_isolated(indexed, evaluator, []) end,
       ordered: false,
-      max_concurrency: opts[:max_concurrency],
+      max_concurrency: opts[:num_threads],
       timeout: opts[:timeout],
       on_timeout: :kill_task,
       zip_input_on_exit: true

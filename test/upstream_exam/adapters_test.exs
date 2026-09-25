@@ -725,7 +725,7 @@ defmodule UpstreamExam.AdaptersTest do
         |> Imp.Signature.dump()
         |> Jason.encode!()
         |> Jason.decode!()
-        |> Imp.Signature.load()
+        |> Imp.Signature.load!()
 
       assert {:ok, prediction} = Imp.Adapter.JSON.parse(restored, ~s({"answer":"42"}), [])
       assert Imp.to_map(prediction) == %{answer: "42", note: "No note", tags: [], maybe: nil}
@@ -1433,7 +1433,7 @@ defmodule UpstreamExam.AdaptersTest do
         |> Imp.Signature.dump()
         |> Jason.encode!()
         |> Jason.decode!()
-        |> Imp.Signature.load()
+        |> Imp.Signature.load!()
 
       assert [%{type: :code, metadata: metadata}] = restored_signature.outputs
       assert Map.get(metadata, "language", Map.get(metadata, :language)) == "elixir"

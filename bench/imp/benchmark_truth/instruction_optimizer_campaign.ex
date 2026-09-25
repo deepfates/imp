@@ -267,7 +267,7 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerCampaign do
     opts =
       config
       |> keywordize()
-      |> Keyword.merge(seed: context.seed, prompt_lm: lm, task_lm: lm, max_concurrency: 1)
+      |> Keyword.merge(seed: context.seed, prompt_lm: lm, task_lm: lm, num_threads: 1)
 
     MIPROv2.new(metric, opts)
     |> MIPROv2.compile(program, context.trainset, context.devset,
@@ -285,7 +285,7 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerCampaign do
       |> Keyword.merge(
         seed: context.seed,
         prompt_lm: lm,
-        max_concurrency: 1,
+        num_threads: 1,
         metric_identity: simba_metric_identity(context)
       )
 

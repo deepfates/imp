@@ -138,7 +138,7 @@ defmodule LocalGEPABanking77.Runner do
           minibatch_size: 4,
           seed: 0,
           use_merge: false,
-          max_concurrency: 1,
+          num_threads: 1,
           timeout: 120_000,
           proposal_timeout: 120_000,
           max_metric_calls: 64,
@@ -250,7 +250,7 @@ defmodule LocalGEPABanking77.Runner do
   defp preflight!(paths) do
     unless sha256_file(paths.data) == @data_sha256, do: raise("Banking77 data digest drift")
     verify_ollama!()
-    job = TrainingJob.load!(paths.job)
+    job = TrainingJob.read!(paths.job)
     {:ok, _manifest} = Imp.Clients.MLXLMTrainer.verify_job(job)
     rows = split_rows!(paths.data)
 
@@ -292,7 +292,7 @@ defmodule LocalGEPABanking77.Runner do
       )
 
     {:ok, rebound} = TrainingJob.rebind(job, source)
-    classifier = rebound |> Imp.ProgramAccess.lm() |> observed(observer, :classifier)
+    classifier = rebound.lm |> observed(observer, :classifier)
     {analyzer, reflection, classifier}
   end
 

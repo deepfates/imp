@@ -278,7 +278,7 @@ defmodule Imp.Optimizer.MIPROv2.OptunaStartupSearchTest do
       exact_optimizer(prompt_lm, task_lm,
         num_candidates: 2,
         num_trials: 0,
-        max_concurrency: 4,
+        num_threads: 4,
         search_fidelity: :dspy_3_2_1_optuna_4_9_0
       )
       |> MIPROv2.compile(program(task_lm), trainset(), validation)
@@ -486,7 +486,7 @@ defmodule Imp.Optimizer.MIPROv2.OptunaStartupSearchTest do
 
     assert {:ok, result} =
              Imp.Experiment.check(program(task_lm), optimizer, data, &__MODULE__.metric/2,
-               evaluation_options: [max_errors: :infinity, max_concurrency: 1]
+               evaluation_options: [max_errors: :infinity, num_threads: 1]
              )
 
     assert result.selected == :baseline
@@ -691,7 +691,7 @@ defmodule Imp.Optimizer.MIPROv2.OptunaStartupSearchTest do
       prompt_lm: prompt_lm,
       task_lm: task_lm,
       startup_trials: 10,
-      max_concurrency: 1,
+      num_threads: 1,
       max_errors: :infinity,
       program_aware_proposer: false,
       data_aware_proposer: true,

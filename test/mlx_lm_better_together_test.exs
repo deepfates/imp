@@ -101,7 +101,7 @@ defmodule Imp.Clients.MLXLMBetterTogetherTest do
           BootstrapFinetune.new(metric,
             trainer: trainer,
             max_demos: 1,
-            max_concurrency: 1
+            num_threads: 1
           ),
         p: %ObservePromptContinuation{owner: self()}
       })
@@ -181,7 +181,7 @@ defmodule Imp.Clients.MLXLMBetterTogetherTest do
     :ok = Imp.Clients.MLXLMDeployment.stop(job)
 
     script = """
-    job = Imp.Clients.TrainingJob.load!(#{inspect(job_path)})
+    job = Imp.Clients.TrainingJob.read!(#{inspect(job_path)})
     program = Imp.read!(#{inspect(program_path)})
     {:ok, rebound} = Imp.Clients.TrainingJob.rebind(job, program)
     {:ok, prediction} = Imp.call(rebound, %{question: "frozen probe"})
@@ -302,7 +302,7 @@ defmodule Imp.Clients.MLXLMBetterTogetherTest do
         strategy: [:w, :p],
         valset_ratio: 0,
         shuffle_trainset_between_steps: false,
-        max_concurrency: 1
+        num_threads: 1
       )
 
     report = Imp.Optimizer.Report.fetch(compiled)
@@ -321,7 +321,7 @@ defmodule Imp.Clients.MLXLMBetterTogetherTest do
     assert fused_path == Path.expand(job.result_model)
 
     persisted_report =
-      report_path |> File.read!() |> Jason.decode!() |> Imp.Optimizer.Report.load()
+      report_path |> File.read!() |> Jason.decode!() |> Imp.Optimizer.Report.load!()
 
     assert persisted_report.metadata.selected_strategy in ["w", "w -> p"]
 

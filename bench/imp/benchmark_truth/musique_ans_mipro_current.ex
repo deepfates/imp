@@ -370,7 +370,7 @@ defmodule Imp.BenchmarkTruth.MusiqueAnsMiproCurrent do
       prompt_lm: prompt_lm,
       task_lm: task_lm,
       max_errors: 10,
-      max_concurrency: 1,
+      num_threads: 1,
       metric_identity: %{
         "id" => "musique-adapted-mean-answer-support-f1",
         "version" => 1,
@@ -390,7 +390,7 @@ defmodule Imp.BenchmarkTruth.MusiqueAnsMiproCurrent do
         aggregation: :mean,
         max_errors: 10,
         failure_score: 0.0,
-        max_concurrency: 1
+        num_threads: 1
       ]
     ]
   end

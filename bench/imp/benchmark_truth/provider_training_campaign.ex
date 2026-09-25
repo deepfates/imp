@@ -124,7 +124,7 @@ defmodule Imp.BenchmarkTruth.ProviderTrainingCampaign do
         state
       end
 
-    job = TrainingJob.load!(checkpoint_path, api_key: api_key)
+    job = TrainingJob.read!(checkpoint_path, api_key: api_key)
 
     {job, state} =
       await_terminal!(job, checkpoint_path, state_path, state, poll_ms, max_polls, api_key)
@@ -279,7 +279,7 @@ defmodule Imp.BenchmarkTruth.ProviderTrainingCampaign do
   end
 
   defp resume_state!(checkpoint_path, state_path, api_key, dataset, model, upload) do
-    job = TrainingJob.load!(checkpoint_path, api_key: api_key)
+    job = TrainingJob.read!(checkpoint_path, api_key: api_key)
 
     unless job.model == model do
       raise "provider training checkpoint model mismatch: expected=#{model} got=#{job.model}"

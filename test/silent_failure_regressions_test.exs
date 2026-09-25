@@ -157,7 +157,7 @@ defmodule SilentFailureRegressionsTest do
       Imp.Evaluate.new(rows, metric,
         timeout: 50,
         deadline: Imp.Deadline.resolve(2_000),
-        max_concurrency: 1
+        num_threads: 1
       )
 
     {result, log} = with_log(fn -> Imp.Evaluate.run(evaluator, program) end)
@@ -196,7 +196,7 @@ defmodule SilentFailureRegressionsTest do
     {result, log} =
       with_log(fn ->
         [example("slow?", "late")]
-        |> Imp.Evaluate.new(metric, timeout: 50, max_concurrency: 1)
+        |> Imp.Evaluate.new(metric, timeout: 50, num_threads: 1)
         |> Imp.Evaluate.run(slow)
       end)
 
@@ -218,7 +218,7 @@ defmodule SilentFailureRegressionsTest do
     rows = [example("guarded?", "yes")]
     metric = fn _example, _prediction -> true end
 
-    for opts <- [[timeout: :infinity], [timeout: 1_000, max_concurrency: 1]] do
+    for opts <- [[timeout: :infinity], [timeout: 1_000, num_threads: 1]] do
       assert_raise Imp.OperationalSafetyError, "evaluation cost guard", fn ->
         rows |> Imp.Evaluate.new(metric, opts) |> Imp.Evaluate.run(program)
       end
@@ -260,7 +260,7 @@ defmodule SilentFailureRegressionsTest do
       if Imp.Example.get(example, :question) == "What is 2+2?", do: 1.0, else: 0.0
     end
 
-    refine = Imp.Predict.Refine.new(program, metric, max_attempts: 3)
+    refine = Imp.Predict.Refine.new(program, metric, n: 3)
 
     assert {:ok, prediction} = Imp.Predict.Refine.call(refine, %{question: "What is 2+2?"})
 
@@ -307,7 +307,7 @@ defmodule SilentFailureRegressionsTest do
 
     refine =
       Imp.Predict.Refine.new(program, metric,
-        max_attempts: 2,
+        n: 2,
         feedback_fn: fn _history -> "try harder" end
       )
 
@@ -456,7 +456,7 @@ defmodule SilentFailureRegressionsTest do
 
   test "P13: GSM8K.metric scores a correct bare-number prediction as true on real fetched data" do
     [example] =
-      Imp.Datasets.GSM8K.load(Path.join([__DIR__, "fixtures", "gsm8k", "gsm8k-test-0-1.jsonl"]))
+      Imp.Datasets.GSM8K.read!(Path.join([__DIR__, "fixtures", "gsm8k", "gsm8k-test-0-1.jsonl"]))
 
     assert Imp.Example.get(example, :canonical_answer) == "18"
     assert Imp.Example.get(example, :answer) =~ "#### 18"

@@ -316,9 +316,10 @@ defmodule Imp.Datasets.DataLoader do
     format: [type: :string]
   ]
 
-  def load(path, input_keys, opts \\ []) do
-    opts = Imp.Options.validate!(opts, @option_schema, "Imp.Datasets.DataLoader.load/3")
-    path = Imp.Datasets.validate_path!(path, "Imp.Datasets.DataLoader.load/3")
+  @doc "Reads a JSONL or CSV file into examples, choosing the format by `:format` or the extension."
+  def read!(path, input_keys, opts \\ []) do
+    opts = Imp.Options.validate!(opts, @option_schema, "Imp.Datasets.DataLoader.read!/3")
+    path = Imp.Datasets.validate_path!(path, "Imp.Datasets.DataLoader.read!/3")
 
     case normalize_format!(Keyword.get(opts, :format, Path.extname(path))) do
       :csv -> Imp.Datasets.csv(path, input_keys)
@@ -331,7 +332,7 @@ defmodule Imp.Datasets.DataLoader do
 
   defp normalize_format!(format) do
     raise ArgumentError,
-          "Imp.Datasets.DataLoader.load/3 supports format .jsonl, jsonl, .json, json, .csv, or csv; got: #{inspect(format)}"
+          "Imp.Datasets.DataLoader.read!/3 supports format .jsonl, jsonl, .json, json, .csv, or csv; got: #{inspect(format)}"
   end
 end
 
@@ -342,7 +343,8 @@ defmodule Imp.Datasets.GSM8K do
     defstruct [:question, :answer, :canonical_answer, :source_task]
   end
 
-  def load(path), do: Imp.Datasets.gsm8k(path)
+  @doc "Reads a GSM8K JSONL file into examples."
+  def read!(path), do: Imp.Datasets.gsm8k(path)
 
   # Fetched GSM8K rows keep the full rationale (ending "#### N") in :answer
   # and the bare number in :canonical_answer. DSPy's gsm8k_metric
@@ -410,7 +412,8 @@ defmodule Imp.Datasets.HotPotQA do
     defstruct [:id, :question, :context, :answer, :supporting_facts, :source_task]
   end
 
-  def load(path), do: Imp.Datasets.hotpotqa(path)
+  @doc "Reads a HotPotQA JSONL file into examples."
+  def read!(path), do: Imp.Datasets.hotpotqa(path)
 end
 
 defmodule Imp.Datasets.MATH do
@@ -420,7 +423,8 @@ defmodule Imp.Datasets.MATH do
     defstruct [:problem, :solution, :answer]
   end
 
-  def load(path), do: Imp.Datasets.jsonl(path, [:problem], record: __MODULE__.Record)
+  @doc "Reads a MATH JSONL file into examples."
+  def read!(path), do: Imp.Datasets.jsonl(path, [:problem], record: __MODULE__.Record)
 end
 
 defmodule Imp.Datasets.Colors do
@@ -430,6 +434,7 @@ defmodule Imp.Datasets.Colors do
     defstruct [:input, :label]
   end
 
-  def load(records),
+  @doc "Builds examples from color records, raising on a malformed one."
+  def load!(records),
     do: Imp.Datasets.from_records(records, [:input], record: __MODULE__.Record)
 end

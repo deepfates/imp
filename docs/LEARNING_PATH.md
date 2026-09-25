@@ -81,7 +81,7 @@ devset =
   ]
   |> Enum.map(&Imp.with_inputs(&1, :ticket))
 
-report = Imp.evaluate(router, devset, Imp.exact_match(:team), max_concurrency: 4, timeout: 60_000)
+report = Imp.evaluate(router, devset, Imp.exact_match(:team), num_threads: 4, timeout: 60_000)
 report.score
 #=> 1.0
 ```
@@ -104,8 +104,8 @@ compiled = Imp.optimize!(router, Imp.Optimizer.LabeledFewShot.new(k: 4), devset)
 `LabeledFewShot` attaches labeled examples as demonstrations and costs
 nothing to compile. This line feeds it the four measurement examples just to
 show the shape; in a real run, train on data you are not scoring against.
-Search optimizers — `RandomSearch`, `MIPROv2`, `GEPA` —
-compare many candidate programs with the same metric. `RandomSearch` fits the
+Search optimizers — `BootstrapFewShotWithRandomSearch`, `MIPROv2`, `GEPA` —
+compare many candidate programs with the same metric. `BootstrapFewShotWithRandomSearch` fits the
 `Imp.optimize!/3` shape above; `MIPROv2` and `GEPA` also require a validation
 set as a fourth argument (`Imp.optimize!/4`). They spend model calls, so they
 can cost dollars and take minutes. Record a baseline, train only on the

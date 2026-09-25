@@ -107,7 +107,7 @@ defmodule Imp.Clients.MLXLMTrainerTest do
     assert Enum.at(argv, index_of(argv, "--model") + 1) == context.model_path
     assert Enum.at(argv, index_of(argv, "--data") + 1) |> Path.basename() == "data"
     assert Enum.at(argv, index_of(argv, "--grad-accumulation-steps") + 1) == "4"
-    assert opts[:cd] |> Path.type() == :absolute
+    assert opts[:cwd] |> Path.type() == :absolute
     refute Enum.any?(argv, &String.contains?(&1, ";"))
     assert_received {:run, "mlx_lm.fuse", fusion_argv, _opts}
 
@@ -123,7 +123,7 @@ defmodule Imp.Clients.MLXLMTrainerTest do
 
     checkpoint = Path.join(context.root, "job.json")
     TrainingJob.save!(first, checkpoint)
-    assert {:ok, ^manifest} = checkpoint |> TrainingJob.load!() |> MLXLMTrainer.verify_job()
+    assert {:ok, ^manifest} = checkpoint |> TrainingJob.read!() |> MLXLMTrainer.verify_job()
 
     assert {:ok, %TrainingJob{id: id, result_model: result_model}} = train(trainer)
     assert id == first.id
@@ -359,7 +359,7 @@ defmodule Imp.Clients.MLXLMTrainerTest do
     fresh_result = Path.join(context.root, "fresh-result.json")
 
     code = """
-    job = Imp.Clients.TrainingJob.load!(#{inspect(job_path)})
+    job = Imp.Clients.TrainingJob.read!(#{inspect(job_path)})
     loaded = Imp.read!(#{inspect(program_path)})
     {:ok, rebound} = Imp.Clients.TrainingJob.rebind(job, loaded)
     {:ok, prediction} = Imp.call(rebound, %{question: "frozen probe"})
@@ -475,7 +475,7 @@ defmodule Imp.Clients.MLXLMTrainerTest do
     assert :ok = Imp.Clients.MLXLMDeployment.stop(job)
 
     code = """
-    job = Imp.Clients.TrainingJob.load!(#{inspect(job_path)})
+    job = Imp.Clients.TrainingJob.read!(#{inspect(job_path)})
     try do
       source = Imp.read!(#{inspect(program_path)})
       {:ok, rebound} = Imp.Clients.TrainingJob.rebind(job, source)
@@ -631,7 +631,7 @@ defmodule Imp.Clients.MLXLMTrainerTest do
     :ok = Imp.save!(program, program_path)
 
     code = """
-    job = Imp.Clients.TrainingJob.load!(#{inspect(job_path)})
+    job = Imp.Clients.TrainingJob.read!(#{inspect(job_path)})
     try do
       program = Imp.read!(#{inspect(program_path)})
       {:ok, rebound} = Imp.Clients.TrainingJob.rebind(job, program)

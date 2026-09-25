@@ -41,7 +41,7 @@ defmodule Imp.MCP.OAuth do
         "auth" => %{"type" => "oauth", "credential" => "readwise"}
       }
 
-  `Imp.MCP.connect(servers, credentials: store, ...)` resolves that to a header
+  `Imp.MCP.connect(servers, credential_store: store, ...)` resolves that to a header
   at connect time. See `Imp.MCP.Connections`.
 
   ## A credential belongs to one server
@@ -163,11 +163,11 @@ defmodule Imp.MCP.OAuth do
     """
 
     @derive {Inspect, only: [:credential, :redirect_uri]}
-    @enforce_keys [:store, :credential, :resource_url, :authorization_url, :redirect_uri, :flow]
+    @enforce_keys [:store, :credential, :server_url, :authorization_url, :redirect_uri, :flow]
     defstruct [
       :store,
       :credential,
-      :resource_url,
+      :server_url,
       :authorization_url,
       :redirect_uri,
       :flow,
@@ -178,7 +178,7 @@ defmodule Imp.MCP.OAuth do
     @type t :: %__MODULE__{
             store: Imp.MCP.OAuth.Store.t(),
             credential: String.t(),
-            resource_url: String.t(),
+            server_url: String.t(),
             authorization_url: String.t(),
             redirect_uri: String.t(),
             flow: term(),
@@ -282,7 +282,7 @@ defmodule Imp.MCP.OAuth do
        %Pending{
          store: store,
          credential: credential,
-         resource_url: server_url,
+         server_url: server_url,
          authorization_url: flow.authorization_url,
          redirect_uri: redirect_uri,
          flow: flow,
@@ -370,7 +370,7 @@ defmodule Imp.MCP.OAuth do
   @doc """
   Materializes a short-lived `Authorization` header for one server.
 
-  `resource_url` is the server the header is for. It must equal the URL the
+  `server_url` is the server the header is for. It must equal the URL the
   grant was authorized for, or this refuses with
   `{:mcp_oauth_credential_binding_mismatch, credential}` — a credential is not
   a bearer token a host can point anywhere.
@@ -386,12 +386,12 @@ defmodule Imp.MCP.OAuth do
   """
   @spec authorization_header(Store.t(), String.t(), String.t()) ::
           {:ok, {String.t(), String.t()}} | {:error, term()}
-  def authorization_header(%Store{} = store, credential, resource_url)
-      when is_binary(credential) and is_binary(resource_url) do
+  def authorization_header(%Store{} = store, credential, server_url)
+      when is_binary(credential) and is_binary(server_url) do
     with {:ok, reference} <- validate_reference(credential) do
       with_lock(store, reference, fn ->
         with {:ok, record} <- read(store, reference),
-             :ok <- bound_to?(record, reference, resource_url),
+             :ok <- bound_to?(record, reference, server_url),
              {:ok, record} <- refresh_if_needed(store, reference, record) do
           case record["access_token"] do
             token when is_binary(token) and token != "" ->
@@ -480,7 +480,9 @@ defmodule Imp.MCP.OAuth do
 
     %{
       "format" => @format,
-      "resource_url" => pending.resource_url,
+      # The stored key keeps OAuth's word for the server (RFC 8707 "resource"),
+      # as credentials already on disk carry it.
+      "resource_url" => pending.server_url,
       "issuer" => flow.issuer,
       "client_id" => flow.client[:client_id],
       "client_secret" => flow.client[:client_secret],
@@ -494,8 +496,8 @@ defmodule Imp.MCP.OAuth do
 
   # A grant belongs to the server it was authorized for. Naming a credential in
   # another server's descriptor must not send that server the token.
-  defp bound_to?(record, credential, resource_url) do
-    if record["resource_url"] == resource_url,
+  defp bound_to?(record, credential, server_url) do
+    if record["resource_url"] == server_url,
       do: :ok,
       else: {:error, {:mcp_oauth_credential_binding_mismatch, credential}}
   end

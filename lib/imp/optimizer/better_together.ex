@@ -23,7 +23,7 @@ defmodule Imp.Optimizer.BetterTogether do
   default weight optimizer has no inferred provider: callers must replace it or
   configure a BootstrapFinetune trainer before a weight-bearing strategy can run.
 
-  `max_errors` and `max_concurrency`, given to `Imp.optimize/5` as invocation
+  `max_errors` and `num_threads`, given to `Imp.optimize/5` as invocation
   options, control BetterTogether's
   baseline and prefix-selection evaluations. Child-specific compile options go
   in `optimizer_compile_args`; for example, COPRO's internal trainset evaluation
@@ -71,7 +71,7 @@ defmodule Imp.Optimizer.BetterTogether do
       type: {:custom, Imp.Evaluate, :validate_max_errors, []},
       default: :infinity
     ],
-    max_concurrency: [type: :pos_integer, default: 1],
+    num_threads: [type: :pos_integer, default: 1],
     training_launch_timeout: [type: :pos_integer, default: 300_000],
     training_timeout: [type: :non_neg_integer, default: 300_000],
     training_poll_interval: [type: :non_neg_integer, default: 1_000],
@@ -85,7 +85,7 @@ defmodule Imp.Optimizer.BetterTogether do
     optimizers =
       if map_size(optimizers) == 0 do
         %{
-          p: Imp.Optimizer.RandomSearch.new(metric),
+          p: Imp.Optimizer.BootstrapFewShotWithRandomSearch.new(metric),
           w: BootstrapFinetune.new(metric)
         }
       else
@@ -269,7 +269,7 @@ defmodule Imp.Optimizer.BetterTogether do
   defp evaluator(metric, valset, opts) do
     Imp.Evaluate.new(valset, metric,
       max_errors: opts[:max_errors],
-      max_concurrency: opts[:max_concurrency]
+      num_threads: opts[:num_threads]
     )
   end
 

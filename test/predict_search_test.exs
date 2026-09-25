@@ -100,7 +100,7 @@ defmodule Imp.Predict.SearchTest do
           {:ok, candidate.id, candidate.id}
         end,
         mode: :concurrent,
-        max_concurrency: 2
+        num_threads: 2
       )
 
     assert Agent.get(tracker, & &1) == %{active: 0, peak: 2}
@@ -141,7 +141,7 @@ defmodule Imp.Predict.SearchTest do
       result =
         Search.run(candidates, evaluator,
           mode: mode,
-          max_concurrency: 2,
+          num_threads: 2,
           timeout: 20
         )
 
@@ -167,7 +167,7 @@ defmodule Imp.Predict.SearchTest do
             %Candidate{id: :must_not_run}, _context -> {:ok, :unexpected, 1.0}
           end,
           mode: mode,
-          max_concurrency: 1
+          num_threads: 1
         )
       end
     end
@@ -195,7 +195,7 @@ defmodule Imp.Predict.SearchTest do
             Process.sleep(:infinity)
         end,
         mode: :concurrent,
-        max_concurrency: 2,
+        num_threads: 2,
         threshold: 1
       )
 
@@ -234,7 +234,7 @@ defmodule Imp.Predict.SearchTest do
             {:ok, :threshold, 1.0}
         end,
         mode: :concurrent,
-        max_concurrency: 2,
+        num_threads: 2,
         threshold: 1.0
       )
 
@@ -303,7 +303,7 @@ defmodule Imp.Predict.SearchTest do
 
     {concurrent_us, concurrent} =
       :timer.tc(fn ->
-        Search.run(candidates, evaluator, mode: :concurrent, max_concurrency: 2)
+        Search.run(candidates, evaluator, mode: :concurrent, num_threads: 2)
       end)
 
     artifact = %{

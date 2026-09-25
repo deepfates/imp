@@ -35,7 +35,7 @@ defmodule ImpOptimizerLifecycles.SIMBA do
           num_candidates: 2,
           max_steps: 4,
           max_demos: 0,
-          max_concurrency: 4,
+          num_threads: 4,
           timeout: 60_000,
           sampling_temperature: 0.7,
           candidate_temperature: 0.3,
@@ -160,7 +160,7 @@ defmodule ImpOptimizerLifecycles.SIMBA do
   defp score(program, rows, metric, opts \\ []) do
     report =
       Imp.evaluate(program, rows, metric,
-        max_concurrency: Keyword.get(opts, :max_concurrency, 8),
+        num_threads: Keyword.get(opts, :max_concurrency, 8),
         timeout: 60_000
       )
 
@@ -227,7 +227,7 @@ defmodule ImpOptimizerLifecycles.SIMBA do
   defp source_instruction,
     do: "Assign the support ticket to the squad that owns it: atlas, harbor, beacon, or quill."
 
-  defp instruction(program), do: Imp.ProgramAccess.task_signature(program).instructions
+  defp instruction(program), do: program.signature.instructions
 
   defp meaning("atlas"), do: "billing, invoices, charges, refunds, and subscriptions"
   defp meaning("harbor"), do: "outages, API errors, performance, and delivery failures"

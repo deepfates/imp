@@ -21,8 +21,8 @@ defmodule Imp.LocalMIPROBanking77ExampleTest do
   test "front door keeps test rows outside optimization and uses a portable parameter artifact" do
     source = File.read!(@source)
 
-    assert source =~ "MIPROv2.compile(baseline, examples(rows.train), examples(rows.selection))"
-    refute source =~ "MIPROv2.compile(baseline, examples(rows.test)"
+    assert source =~ "Imp.optimize!(baseline, &1, examples(rows.train), examples(rows.selection))"
+    refute source =~ "Imp.optimize!(baseline, &1, examples(rows.test)"
     assert source =~ "Artifact.from_optimized_program"
     assert source =~ "Artifact.apply(program!(job, observer))"
     assert source =~ "IMP_MIPRO_FRESH"

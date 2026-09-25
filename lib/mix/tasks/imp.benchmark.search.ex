@@ -34,7 +34,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Search do
     artifact =
       Imp.BenchmarkTruth.Search.run(
         iterations: Keyword.get(opts, :iterations, 10),
-        max_concurrency: Keyword.get(opts, :max_concurrency, 2),
+        num_threads: Keyword.get(opts, :max_concurrency, 2),
         work_ms: Keyword.get(opts, :work_ms, 10)
       )
 

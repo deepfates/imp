@@ -340,7 +340,12 @@ defmodule DocumentationContractTest do
 
     assert %Imp.Evaluate.Result{score: 1.0} = Imp.evaluate(qa_program, devset, metric)
 
-    optimizer = Imp.Optimizer.RandomSearch.new(metric, candidates: 2, demos_per_candidate: 1)
+    optimizer =
+      Imp.Optimizer.BootstrapFewShotWithRandomSearch.new(metric,
+        num_candidate_programs: 2,
+        max_bootstrapped_demos: 1
+      )
+
     compiled = Imp.optimize!(qa_program, optimizer, trainset, devset)
 
     assert %Imp.Optimizer.Report{optimizer: :random_search} =
@@ -529,7 +534,12 @@ defmodule DocumentationContractTest do
 
     assert %Imp.Evaluate.Result{score: 1.0} = Imp.evaluate(program, devset, metric)
 
-    optimizer = Imp.Optimizer.RandomSearch.new(metric, candidates: 4, demos_per_candidate: 1)
+    optimizer =
+      Imp.Optimizer.BootstrapFewShotWithRandomSearch.new(metric,
+        num_candidate_programs: 4,
+        max_bootstrapped_demos: 1
+      )
+
     compiled = Imp.optimize!(program, optimizer, trainset, devset)
 
     assert %Imp.Optimizer.Report{optimizer: :random_search} =

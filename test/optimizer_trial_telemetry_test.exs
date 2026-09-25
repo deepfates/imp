@@ -3,7 +3,7 @@ defmodule OptimizerTrialTelemetryTest do
   # these tests run non-async to keep other optimizer runs out of the mailbox.
   use ExUnit.Case, async: false
 
-  alias Imp.Optimizer.RandomSearch
+  alias Imp.Optimizer.BootstrapFewShotWithRandomSearch
 
   defp program do
     Imp.predict("question -> answer",
@@ -19,16 +19,16 @@ defmodule OptimizerTrialTelemetryTest do
   end
 
   defp run_random_search do
-    RandomSearch.new(
+    BootstrapFewShotWithRandomSearch.new(
       Imp.Metrics.exact_match(:answer),
       num_candidate_programs: 1,
       max_bootstrapped_demos: 1,
       max_labeled_demos: 1
     )
-    |> RandomSearch.compile(program(), trainset(), trainset())
+    |> BootstrapFewShotWithRandomSearch.compile(program(), trainset(), trainset())
   end
 
-  test "subscribe_optimizer_progress delivers trial events for a RandomSearch run" do
+  test "subscribe_optimizer_progress delivers trial events for a BootstrapFewShotWithRandomSearch run" do
     subscription = Imp.subscribe_optimizer_progress()
     on_exit(fn -> Imp.unsubscribe_optimizer_progress(subscription) end)
 

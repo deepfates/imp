@@ -28,7 +28,7 @@ defmodule UpstreamExam.TelepromptTest do
     COPRO,
     Ensemble,
     KNNFewShot,
-    RandomSearch,
+    BootstrapFewShotWithRandomSearch,
     Report
   }
 
@@ -198,7 +198,7 @@ defmodule UpstreamExam.TelepromptTest do
     teacher = simple_program(lm)
 
     optimizer =
-      RandomSearch.new(simple_metric(),
+      BootstrapFewShotWithRandomSearch.new(simple_metric(),
         max_bootstrapped_demos: 1,
         max_labeled_demos: 1,
         num_candidate_programs: 2
@@ -211,7 +211,11 @@ defmodule UpstreamExam.TelepromptTest do
       |> Imp.with_inputs(:input)
     ]
 
-    compiled = RandomSearch.compile(optimizer, student, trainset, nil, teacher: teacher)
+    compiled =
+      BootstrapFewShotWithRandomSearch.compile(optimizer, student, trainset, nil,
+        teacher: teacher
+      )
+
     assert %Imp.Predict{} = compiled
   end
 
@@ -866,13 +870,13 @@ defmodule UpstreamExam.TelepromptTest do
     optimizer = BetterTogether.new(metric)
 
     assert optimizer.metric == metric
-    assert %RandomSearch{} = optimizer.optimizers.p
+    assert %BootstrapFewShotWithRandomSearch{} = optimizer.optimizers.p
     assert %BootstrapFinetune{} = optimizer.optimizers.w
   end
 
   # test_bettertogether_initialization_custom
   test "bettertogether: custom optimizers are kept" do
-    custom_p = RandomSearch.new(bt_metric())
+    custom_p = BootstrapFewShotWithRandomSearch.new(bt_metric())
     custom_w = BootstrapFinetune.new(bt_metric())
 
     optimizer = BetterTogether.new(bt_metric(), %{p: custom_p, w: custom_w})

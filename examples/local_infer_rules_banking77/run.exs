@@ -96,7 +96,7 @@ defmodule LocalInferRulesBanking77.Runner do
           max_errors: :infinity,
           timeout: 120_000
         )
-        |> InferRules.compile(source, examples(rows.train), examples(rows.selection))
+        |> then(&Imp.optimize!(source, &1, examples(rows.train), examples(rows.selection)))
 
       report = Report.fetch(compiled)
       after_optimization = Observer.snapshot(observer)
@@ -144,7 +144,7 @@ defmodule LocalInferRulesBanking77.Runner do
         proposal_calls: report.metadata.proposal_calls,
         proposal_attempts: report.metadata.proposal_attempts,
         candidate_count: report.candidate_count,
-        selected_instruction: Imp.ProgramAccess.task_signature(compiled).instructions,
+        selected_instruction: compiled.signature.instructions,
         selection: %{source: metrics(source_selection), compiled: metrics(compiled_selection)},
         untouched_test: %{source: metrics(source_test), compiled: metrics(compiled_test)},
         fresh_byte_identical: true,
@@ -174,7 +174,7 @@ defmodule LocalInferRulesBanking77.Runner do
     selected = Imp.read!(paths.saved_program)
     {:ok, rebound} = TrainingJob.rebind(job, selected)
     observer = observer!()
-    observed = Imp.with_lm(rebound, observed(Imp.ProgramAccess.lm(rebound), observer, :task))
+    observed = Imp.with_lm(rebound, observed(rebound.lm, observer, :task))
 
     try do
       stage = evaluate(observed, rows.test, observer, "fresh_test")
@@ -201,7 +201,7 @@ defmodule LocalInferRulesBanking77.Runner do
   defp preflight!(paths, persist?) do
     unless sha256_file(paths.data) == @data_sha256, do: raise("Banking77 data digest drift")
     verify_rule_model!()
-    job = TrainingJob.load!(paths.job)
+    job = TrainingJob.read!(paths.job)
     {:ok, _manifest} = MLXLMTrainer.verify_job(job)
     rows = split_rows!(paths.data)
 
@@ -243,7 +243,7 @@ defmodule LocalInferRulesBanking77.Runner do
       )
 
     {:ok, rebound} = TrainingJob.rebind(job, source)
-    runtime_lm = Imp.ProgramAccess.lm(rebound)
+    runtime_lm = rebound.lm
     {Imp.with_lm(rebound, observed(runtime_lm, observer, :task)), runtime_lm}
   end
 
@@ -280,8 +280,8 @@ defmodule LocalInferRulesBanking77.Runner do
       induced_rule_candidates: induced_rule_candidates,
       errors: Report.json_safe(report.errors),
       candidates: Report.json_safe(report.candidates),
-      source_instruction: Imp.ProgramAccess.task_signature(source).instructions,
-      selected_instruction: Imp.ProgramAccess.task_signature(compiled).instructions,
+      source_instruction: source.signature.instructions,
+      selected_instruction: compiled.signature.instructions,
       task_calls: Enum.count(calls, &(&1.role == :task)),
       rule_calls: Enum.count(calls, &(&1.role == :rule)),
       transport_attempts: length(transports)
@@ -311,7 +311,7 @@ defmodule LocalInferRulesBanking77.Runner do
         Enum.count(
           calls,
           &Imp.Adapter.Instructions.rendered_objective?(
-            Imp.ProgramAccess.task_signature(program).instructions,
+            program.signature.instructions,
             &1.messages
           )
         )

@@ -55,7 +55,7 @@ defmodule Imp.Clients.ReqLLMBatch do
 
     * `:checkpoint` - destination for the atomic JSON checkpoint
 
-  Runtime options are `:max_concurrency` (default `4`), `:max_attempts`
+  Runtime options are `:num_threads` (default `4`), `:max_attempts`
   (default `3`), `:timeout` (default `30_000`), and `:validate_output`, an
   optional arity-one callback returning `:ok` or `{:error, reason}`.
   """
@@ -76,7 +76,7 @@ defmodule Imp.Clients.ReqLLMBatch do
   Resumes a batch from its checkpoint.
 
   Persisted requests, attempts, and retry policy are authoritative. Resume
-  accepts only runtime options: `:max_concurrency`, `:timeout`, and
+  accepts only runtime options: `:num_threads`, `:timeout`, and
   `:validate_output`.
   """
   @spec resume(Path.t(), dispatcher(), keyword()) :: {:ok, summary()} | {:error, term()}
@@ -129,7 +129,7 @@ defmodule Imp.Clients.ReqLLMBatch do
         {:ok, summarize(state, runtime.checkpoint)}
 
       runnable ->
-        wave = Enum.take(runnable, runtime.max_concurrency)
+        wave = Enum.take(runnable, runtime.num_threads)
         {state, dispatched} = mark_dispatched(state, wave)
 
         with :ok <- write_checkpoint(runtime.checkpoint, state) do
@@ -147,7 +147,7 @@ defmodule Imp.Clients.ReqLLMBatch do
     requests
     |> Task.async_stream(
       fn request -> invoke_dispatcher(dispatcher, request, runtime.validate_output) end,
-      max_concurrency: runtime.max_concurrency,
+      max_concurrency: runtime.num_threads,
       ordered: true,
       timeout: runtime.timeout,
       on_timeout: :kill_task
@@ -436,17 +436,17 @@ defmodule Imp.Clients.ReqLLMBatch do
   end
 
   defp validate_runtime_options(opts, extra_keys) when is_list(opts) do
-    allowed = [:max_concurrency, :timeout, :validate_output | extra_keys]
+    allowed = [:num_threads, :timeout, :validate_output | extra_keys]
 
     with true <- Keyword.keyword?(opts),
          [] <- Keyword.keys(opts) -- allowed,
-         max_concurrency when is_integer(max_concurrency) and max_concurrency > 0 <-
-           Keyword.get(opts, :max_concurrency, 4),
+         num_threads when is_integer(num_threads) and num_threads > 0 <-
+           Keyword.get(opts, :num_threads, 4),
          timeout when timeout == :infinity or (is_integer(timeout) and timeout > 0) <-
            Keyword.get(opts, :timeout, 30_000),
          validator when is_nil(validator) or is_function(validator, 1) <-
            Keyword.get(opts, :validate_output) do
-      {:ok, %{max_concurrency: max_concurrency, timeout: timeout, validate_output: validator}}
+      {:ok, %{num_threads: num_threads, timeout: timeout, validate_output: validator}}
     else
       _other -> {:error, :invalid_batch_options}
     end

@@ -11,7 +11,7 @@ defmodule Imp.Adapter.Chat do
   field wins. A completion that does not cover every output field is a parse
   error rather than a partial prediction.
 
-  One signature-declared exception: `signature.metadata[:text_step]` names an
+  One signature-declared exception: `signature.metadata[:text_field]` names an
   output field that takes a completion carrying no marker at all. A native tool
   loop asks for a thought and tool calls, and a model that answers a step in
   plain text with no tool call has said something and called nothing — the
@@ -75,7 +75,7 @@ defmodule Imp.Adapter.Chat do
     # ended without editing the turn.
     history_note_renderer: [type: {:fun, 2}],
     # Loop guidance a program passes as data rather than writing into
-    # `signature.instructions`: `%{finish_tool:, input_names:, output_names:,
+    # `signature.instructions`: `%{submit_tool:, input_names:, output_names:,
     # tool_names:}`.
     guidance: [type: {:or, [:map, nil]}],
     # Drop the trailing user message when it is blank. A native tool loop has
@@ -598,7 +598,7 @@ defmodule Imp.Adapter.Chat do
   # instructions so the two have separate owners. The text follows DSPy
   # ReActV2's, with two Imp additions: the task's output fields are listed with
   # their types and descriptions (`:outputs`), which DSPy's step shows only
-  # inside `submit`'s schema; and a `finish_tool` of nil means the loop has no
+  # inside `submit`'s schema; and a `submit_tool` of nil means the loop has no
   # finish tool and the answer is the text the model writes when it stops
   # calling tools, so that line says so instead (`Imp.Predict.ReActV2`).
   defp with_guidance(instructions, nil), do: instructions
@@ -607,7 +607,7 @@ defmodule Imp.Adapter.Chat do
     names = fn key -> guidance |> Map.get(key, []) |> Enum.map_join(", ", &"`#{&1}`") end
 
     finish =
-      case Map.get(guidance, :finish_tool, :submit) do
+      case Map.get(guidance, :submit_tool, :submit) do
         nil ->
           "When the final answer is ready, write it as plain text without calling a tool."
 
@@ -798,7 +798,7 @@ defmodule Imp.Adapter.Chat do
   protocol boundary should use this so the same words reach the person that
   reached the model.
 
-      iex> Imp.Adapter.Chat.format_tool_result({:error, {:tool_authorization_denied, :post, :client_denied}})
+      iex> Imp.Adapter.Chat.format_tool_result({:error, {:tool_denied, :post, :client_denied}})
       "Error: post was not allowed; the person declined it."
   """
   @spec format_tool_result(term()) :: String.t()
@@ -840,13 +840,13 @@ defmodule Imp.Adapter.Chat do
       end)
   end
 
-  defp error_text({:tool_authorization_denied, name, :tool_policy}),
+  defp error_text({:tool_denied, name, :tool_policy}),
     do: "#{name} is not allowed."
 
-  defp error_text({:tool_authorization_denied, name, :client_denied}),
+  defp error_text({:tool_denied, name, :client_denied}),
     do: "#{name} was not allowed; the person declined it."
 
-  defp error_text({:tool_authorization_denied, name, reason}),
+  defp error_text({:tool_denied, name, reason}),
     do: "#{name} was not allowed: #{error_text(reason)}"
 
   # An exit stops the tool wherever it was, which may be after its effect.
@@ -1098,7 +1098,7 @@ defmodule Imp.Adapter.Chat do
   # A loop whose guidance names no finish tool answers in plain text, and has
   # no `submit` for a recorded call to name.
   defp submit_is_text?(%{} = guidance),
-    do: Map.has_key?(guidance, :finish_tool) and is_nil(guidance.finish_tool)
+    do: Map.has_key?(guidance, :submit_tool) and is_nil(guidance.submit_tool)
 
   defp submit_is_text?(_guidance), do: false
 
@@ -1349,27 +1349,27 @@ defmodule Imp.Adapter.Chat do
   # A completion carrying no marker at all is the whole answer for a signature
   # that declared a text-step field, and marker parsing otherwise.
   defp parse_fields(signature, text) do
-    case text_step_field(signature, text) do
+    case text_field_for(signature, text) do
       {:ok, name} -> %{name => String.trim(text)}
       :error -> parse_marker_sections(signature, text)
     end
   end
 
-  # `signature.metadata[:text_step]` names the output field that takes a
+  # `signature.metadata[:text_field]` names the output field that takes a
   # marker-free completion. Only a completion with no `[[ ## field ## ]]` line
   # anywhere qualifies: a partially marked completion is still a parse failure,
   # so a model that half-followed the format is not silently reinterpreted.
   # Native tool calls never reach here — a completion that carried them is a
   # map, not text.
-  defp text_step_field(signature, text) do
+  defp text_field_for(signature, text) do
     with name when not is_nil(name) <-
-           Map.get(signature.metadata, :text_step, Map.get(signature.metadata, "text_step")),
+           Map.get(signature.metadata, :text_field, Map.get(signature.metadata, "text_field")),
          field when not is_nil(field) <- output_field(signature, name),
          true <- String.trim(text) != "",
          true <- marker_free?(text) do
       {:ok, field.name}
     else
-      _no_text_step -> :error
+      _no_text_field -> :error
     end
   end
 

@@ -117,7 +117,7 @@ defmodule MatchedInstructionFamilyIFBench.Usefulness do
           compare_baseline_on_test: true,
           evaluation_options: [
             failure_score: 0.0,
-            max_concurrency: 1,
+            num_threads: 1,
             max_errors: :infinity,
             timeout: 120_000
           ],
@@ -232,7 +232,7 @@ defmodule MatchedInstructionFamilyIFBench.Usefulness do
       use_merge: false,
       reflection_record_mode: :gepa_v0_1_4,
       component_feedback: IFBenchFeedback.callbacks(metric),
-      max_concurrency: 1,
+      num_threads: 1,
       timeout: 120_000,
       proposal_timeout: 120_000,
       raise_on_exception: true,
@@ -259,7 +259,7 @@ defmodule MatchedInstructionFamilyIFBench.Usefulness do
       view_data_batch_size: 10,
       prompt_lm: prompt_lm,
       task_lm: task_lm,
-      max_concurrency: 1,
+      num_threads: 1,
       timeout: 120_000,
       max_errors: 10,
       seed: seed

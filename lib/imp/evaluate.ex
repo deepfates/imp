@@ -201,7 +201,7 @@ defmodule Imp.Evaluate do
   it is logged loudly and the row carries `{:evaluation_task_exit, :timeout}`
   with a `nil` prediction, so a killed call stays distinguishable from a wrong
   answer. A finite `:timeout` is enforced at every concurrency level,
-  including the default `max_concurrency: 1`.
+  including the default `num_threads: 1`.
 
   When `:max_errors` is reached the evaluation halts LOUDLY by raising
   `Imp.EvaluationCancelledError`, mirroring DSPy's `ParallelExecutor`
@@ -220,7 +220,7 @@ defmodule Imp.Evaluate do
     display_progress: false,
     failure_score: 0.0,
     max_errors: :infinity,
-    max_concurrency: 1,
+    num_threads: 1,
     timeout: :infinity,
     deadline: nil
   ]
@@ -231,7 +231,7 @@ defmodule Imp.Evaluate do
           display_progress: boolean(),
           failure_score: number(),
           max_errors: non_neg_integer() | :infinity,
-          max_concurrency: pos_integer(),
+          num_threads: pos_integer(),
           timeout: timeout(),
           deadline: term()
         }
@@ -243,7 +243,7 @@ defmodule Imp.Evaluate do
       type: {:custom, __MODULE__, :validate_max_errors, []},
       default: :infinity
     ],
-    max_concurrency: [type: :pos_integer, default: 1],
+    num_threads: [type: :pos_integer, default: 1],
     timeout: [type: {:or, [:timeout, :pos_integer]}, default: :infinity],
     deadline: [type: :any, default: nil]
   ]
@@ -259,7 +259,7 @@ defmodule Imp.Evaluate do
       display_progress: opts[:display_progress],
       failure_score: opts[:failure_score],
       max_errors: opts[:max_errors],
-      max_concurrency: opts[:max_concurrency],
+      num_threads: opts[:num_threads],
       timeout: opts[:timeout],
       deadline: opts[:deadline]
     }
@@ -281,7 +281,7 @@ defmodule Imp.Evaluate do
   def run(%__MODULE__{} = evaluator, program) do
     Imp.Telemetry.span(
       [:imp, :evaluate],
-      %{max_concurrency: evaluator.max_concurrency},
+      %{num_threads: evaluator.num_threads},
       fn -> run_traced(evaluator, program) end
     )
   end
@@ -317,8 +317,8 @@ defmodule Imp.Evaluate do
 
   # The sequential fast path only applies when no per-row timeout is
   # requested; a finite :timeout must go through the task machinery so the
-  # documented kill contract holds at the default max_concurrency: 1 too.
-  defp run_rows(%__MODULE__{max_concurrency: 1, timeout: :infinity} = evaluator, program) do
+  # documented kill contract holds at the default num_threads: 1 too.
+  defp run_rows(%__MODULE__{num_threads: 1, timeout: :infinity} = evaluator, program) do
     evaluator.devset
     |> Enum.with_index()
     |> Enum.reduce_while({:completed, [], []}, fn {example, index}, {_tag, rows, errors} ->
@@ -384,7 +384,7 @@ defmodule Imp.Evaluate do
 
   defp evaluation_stream(%__MODULE__{} = evaluator, program) do
     effective_concurrency =
-      min(evaluator.max_concurrency, Imp.Settings.snapshot() |> Map.fetch!(:async_max_workers))
+      min(evaluator.num_threads, Imp.Settings.snapshot() |> Map.fetch!(:async_max_workers))
 
     evaluator.devset
     |> Enum.with_index()
@@ -411,7 +411,7 @@ defmodule Imp.Evaluate do
       items,
       fn {example, index} -> evaluate_with_deadline(evaluator, program, example, index) end,
       ordered: true,
-      max_concurrency: evaluator.max_concurrency,
+      max_concurrency: evaluator.num_threads,
       timeout: timeout,
       on_timeout: :kill_task
     )

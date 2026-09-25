@@ -246,7 +246,7 @@ defmodule Imp.Saving do
       "program" => dump(refine.program),
       "metric" => dump_callback!(refine.metric, "Refine metric"),
       "feedback" => dump_optional_callback(refine.feedback_fn, "Refine feedback"),
-      "max_attempts" => refine.max_attempts,
+      "n" => refine.n,
       "threshold" => refine.threshold,
       "fail_count" => refine.fail_count
     }
@@ -415,7 +415,7 @@ defmodule Imp.Saving do
       |> maybe_put_adapter(state)
       |> maybe_put_lm(state)
 
-    Imp.Predict.new(Imp.Signature.load(signature), opts)
+    Imp.Predict.new(Imp.Signature.load!(signature), opts)
   end
 
   defp load_state!(%{"type" => "with_playbook"} = state) do
@@ -447,7 +447,7 @@ defmodule Imp.Saving do
 
   defp load_state!(%{"type" => "program_of_thought"} = state) do
     require_keys!(state, @program_of_thought_required_keys)
-    signature = Imp.Signature.load(Map.fetch!(state, "signature"))
+    signature = Imp.Signature.load!(Map.fetch!(state, "signature"))
     predict = load_state!(Map.fetch!(state, "predict"))
     output_field = Imp.Optimizer.Report.decode_term(Map.fetch!(state, "output_field"))
 
@@ -494,7 +494,7 @@ defmodule Imp.Saving do
       "tool_policy"
     ])
 
-    signature = Imp.Signature.load(state["signature"])
+    signature = Imp.Signature.load!(state["signature"])
     actor = require_predict!(load_state!(state["actor"]), "Avatar actor")
     finisher = require_predict!(load_state!(state["finisher"]), "Avatar finisher")
     tools = load_tools!(state["tools"], "Avatar")
@@ -540,21 +540,19 @@ defmodule Imp.Saving do
   end
 
   defp load_state!(%{"type" => "refine"} = state) do
-    require_keys!(state, [
-      "type",
-      "program",
-      "metric",
-      "feedback",
-      "max_attempts",
-      "threshold",
-      "fail_count"
-    ])
+    # A Refine saved before 0.5.0 names its attempt count "max_attempts".
+    state =
+      case Map.pop(state, "max_attempts") do
+        {nil, state} -> state
+        {attempts, state} -> Map.put_new(state, "n", attempts)
+      end
+
+    require_keys!(state, ["type", "program", "metric", "feedback", "n", "threshold", "fail_count"])
 
     Imp.Predict.Refine.new(
       load_state!(Map.fetch!(state, "program")),
       load_callback!(Map.fetch!(state, "metric"), 2, "Refine metric"),
-      max_attempts:
-        require_non_negative_integer!(Map.fetch!(state, "max_attempts"), "Refine max_attempts"),
+      n: require_non_negative_integer!(Map.fetch!(state, "n"), "Refine n"),
       threshold: require_threshold!(Map.fetch!(state, "threshold"), "Refine threshold"),
       fail_count:
         require_optional_non_negative_integer!(
@@ -600,7 +598,7 @@ defmodule Imp.Saving do
 
     tools = load_tools!(state["tools"], "ReAct")
     mode = load_react_mode!(Map.fetch!(state, "mode"))
-    signature = Imp.Signature.load(state["signature"])
+    signature = Imp.Signature.load!(state["signature"])
     reserved_name = Imp.Predict.ReAct.reserved_tool_name(mode)
     reserved = Imp.Predict.ReAct.reserved_tool(mode, signature)
 
@@ -617,7 +615,7 @@ defmodule Imp.Saving do
   defp load_state!(%{"type" => "react_v2"} = state) do
     require_keys!(state, ["type", "signature", "react", "tools", "max_iters", "tool_policy"])
     tools = load_tools!(state["tools"], "ReActV2")
-    signature = Imp.Signature.load(state["signature"])
+    signature = Imp.Signature.load!(state["signature"])
 
     %Imp.Predict.ReActV2{
       signature: signature,
@@ -628,6 +626,7 @@ defmodule Imp.Saving do
       finish_on: load_finish_on!(state["finish_on"]),
       tool_policy: load_tool_policy!(state["tool_policy"], "ReActV2 tool policy")
     }
+    |> Imp.Predict.ReActV2.restore_loop()
   end
 
   defp load_state!(%{"type" => "code_act"} = state) do
@@ -671,7 +670,7 @@ defmodule Imp.Saving do
     ])
 
     %Imp.Predict.RLM{
-      signature: Imp.Signature.load(state["signature"]),
+      signature: Imp.Signature.load!(state["signature"]),
       lm: decode_lm(state["lm"]),
       sub_lm: decode_lm(state["sub_lm"]),
       adapter: if(state["dynamic_adapter"], do: nil, else: decode_adapter(state["adapter"])),
@@ -823,6 +822,12 @@ defmodule Imp.Saving do
 
   defp load_state!(state) when is_map(state) do
     raise ArgumentError, "saved Imp program is missing required key \"type\""
+  end
+
+  defp load_state!(path) when is_binary(path) do
+    raise ArgumentError,
+          "a saved Imp program is the map Imp.dump/1 returns, got the string #{inspect(path)}; " <>
+            "to read a file Imp.save!/2 wrote, use Imp.read!/1"
   end
 
   defp load_state!(state) do
@@ -1831,7 +1836,7 @@ defmodule Imp.Saving do
       |> maybe_put_adapter(state)
       |> maybe_put_lm(state)
 
-    Imp.Predict.new(Imp.Signature.load(signature), opts)
+    Imp.Predict.new(Imp.Signature.load!(signature), opts)
   end
 
   defp load_parameter_predictor!(state) do

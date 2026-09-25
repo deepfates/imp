@@ -241,6 +241,7 @@ defmodule Imp.MCPOAuthTest do
     store = OAuth.store(directory: tmp_dir, secret: :crypto.strong_rand_bytes(32))
 
     assert {:ok, pending} = OAuth.begin(store, resource_url, credential: "workspace")
+    assert pending.server_url == resource_url
 
     query = pending.authorization_url |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
     assert query["redirect_uri"] == pending.redirect_uri
@@ -269,7 +270,7 @@ defmodule Imp.MCPOAuthTest do
     log =
       capture_log(fn ->
         assert {:ok, imported} =
-                 Imp.MCP.connect([server], trusted_servers: [server], credentials: store)
+                 Imp.MCP.connect([server], trusted_servers: [server], credential_store: store)
 
         assert Enum.map(imported.tools, & &1.name) == ["external_workspace_name"]
         send(self(), {:provenance, imported.provenance})
@@ -325,7 +326,7 @@ defmodule Imp.MCPOAuthTest do
     assert {:error,
             {:mcp_auth_unavailable, "elsewhere",
              {:mcp_oauth_credential_binding_mismatch, "workspace"}}} =
-             Imp.MCP.connect([elsewhere], trusted_servers: [elsewhere], credentials: store)
+             Imp.MCP.connect([elsewhere], trusted_servers: [elsewhere], credential_store: store)
 
     refute_received {:authorization, _headers}
 
@@ -527,7 +528,7 @@ defmodule Imp.MCPOAuthTest do
     assert {:error, {:mcp_auth_unavailable, "protected-workspace", message}} =
              Imp.MCP.connect([server], trusted_servers: [server])
 
-    assert message =~ ":credentials"
+    assert message =~ ":credential_store"
   end
 
   test "an auth value that is not a map says so instead of blaming the transport" do

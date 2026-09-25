@@ -85,7 +85,7 @@ defmodule Banking77MIPRO do
       tip_aware_proposer: true,
       fewshot_aware_proposer: true,
       view_data_batch_size: 10,
-      max_concurrency: 1,
+      num_threads: 1,
       max_errors: 10,
       timeout: 120_000,
       seed: seed
@@ -179,7 +179,7 @@ defmodule Banking77MIPRO do
             "transport_caps" => transport_caps()
           },
           evaluation_options: [
-            max_concurrency: 1,
+            num_threads: 1,
             max_errors: 10,
             timeout: 120_000,
             repetitions: 3,

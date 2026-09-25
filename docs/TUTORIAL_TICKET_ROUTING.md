@@ -89,7 +89,7 @@ Twenty live calls cost well under a cent; this takes a few seconds:
 ```elixir
 metric = Imp.exact_match(:team)
 
-baseline = Imp.evaluate(router, testset, metric, max_concurrency: 8, timeout: 60_000)
+baseline = Imp.evaluate(router, testset, metric, num_threads: 8, timeout: 60_000)
 baseline.score
 #=> 0.3
 ```
@@ -126,7 +126,7 @@ This one runs in milliseconds and makes no model calls. The explicit ordered
 mode selects the first eight training examples (two per squad in the shipped
 set); the optimizer's general default is deterministic sampling. Search optimizers
 spend real model calls comparing many candidate programs — budget dollars and
-minutes for those the way you would for any experiment. `RandomSearch` takes
+minutes for those the way you would for any experiment. `BootstrapFewShotWithRandomSearch` takes
 the same `Imp.optimize!/3` shape; `MIPROv2` also requires a validation set, so
 it uses `Imp.optimize!/4` with your dev split as the fourth argument.
 
@@ -135,7 +135,7 @@ it uses `Imp.optimize!/4` with your dev split as the fourth argument.
 The only score that counts comes from tickets the optimizer never saw:
 
 ```elixir
-optimized = Imp.evaluate(compiled, testset, metric, max_concurrency: 8, timeout: 60_000)
+optimized = Imp.evaluate(compiled, testset, metric, num_threads: 8, timeout: 60_000)
 
 {baseline.score, optimized.score}
 #=> {0.3, 0.95}

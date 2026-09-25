@@ -333,7 +333,7 @@ defmodule LocalGRPOBanking77.Runner do
   defp fresh do
     paths = paths!()
     rows = preflight!(paths, :verify)
-    job = TrainingJob.load!(paths.job)
+    job = TrainingJob.read!(paths.job)
     portable = Imp.read!(paths.program)
     trainer = trainer(paths, {:local_grpo_banking77_fresh, @seed})
     selection = read_json!(Path.join(paths.output, "04-selection.json"))
@@ -356,7 +356,7 @@ defmodule LocalGRPOBanking77.Runner do
       {artifact_path, artifact_sha256} =
         case deployment do
           %TrainingJob{} ->
-            artifact = Imp.ProgramAccess.get_metadata(selected, :training_artifact)
+            artifact = selected.metadata[:training_artifact]
             {artifact.result_model, artifact.artifact_sha256}
 
           %TRLDeployment{} = base ->

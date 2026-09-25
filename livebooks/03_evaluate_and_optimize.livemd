@@ -107,7 +107,7 @@ inspectable optimization report.
 ```elixir
 compiled =
   metric
-  |> Imp.Optimizer.RandomSearch.new(candidates: 3, demos_per_candidate: 1)
+  |> Imp.Optimizer.BootstrapFewShotWithRandomSearch.new(num_candidate_programs: 3, max_bootstrapped_demos: 1)
   |> then(&Imp.optimize!(program, &1, trainset, devset))
 
 {
@@ -240,7 +240,7 @@ case live_lm.(max_completion_tokens: 100) do
     compiled =
       Imp.optimize!(
         live_program,
-        Imp.Optimizer.RandomSearch.new(live_metric, candidates: 2, demos_per_candidate: 1),
+        Imp.Optimizer.BootstrapFewShotWithRandomSearch.new(live_metric, num_candidate_programs: 2, max_bootstrapped_demos: 1),
         live_trainset,
         live_devset
       )

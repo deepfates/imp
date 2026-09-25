@@ -283,7 +283,7 @@ defmodule Imp.BenchmarkTruth.LangProBeHeartDiseaseMiproCurrent do
       prompt_lm: prompt_lm,
       task_lm: task_lm,
       max_errors: 10,
-      max_concurrency: 1,
+      num_threads: 1,
       metric_identity: %{
         "id" => "langprobe-heart-disease-accuracy",
         "version" => 1,
@@ -303,7 +303,7 @@ defmodule Imp.BenchmarkTruth.LangProBeHeartDiseaseMiproCurrent do
         aggregation: :mean,
         max_errors: 10,
         failure_score: 0.0,
-        max_concurrency: 1
+        num_threads: 1
       ]
     ]
   end

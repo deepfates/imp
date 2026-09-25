@@ -190,7 +190,7 @@ defmodule ImpOptimizerLifecycles.Instruction do
   defp score(program, rows, metric, opts \\ []) do
     report =
       Imp.evaluate(program, rows, metric,
-        max_concurrency: Keyword.get(opts, :max_concurrency, 8),
+        num_threads: Keyword.get(opts, :max_concurrency, 8),
         timeout: 60_000
       )
 
@@ -267,7 +267,7 @@ defmodule ImpOptimizerLifecycles.Instruction do
   defp router_instruction,
     do: "Assign the support ticket to the squad that owns it: atlas, harbor, beacon, or quill."
 
-  defp instruction(program), do: Imp.ProgramAccess.task_signature(program).instructions
+  defp instruction(program), do: program.signature.instructions
 
   defp task_lm(budget) do
     @task_model

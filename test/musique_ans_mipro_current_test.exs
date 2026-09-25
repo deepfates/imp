@@ -487,7 +487,7 @@ defmodule Imp.BenchmarkTruth.MusiqueAnsMiproCurrentTest do
           "config" => %{}
         },
         max_errors: 10,
-        max_concurrency: 1,
+        num_threads: 1,
         seed: 9
       )
 
@@ -504,7 +504,7 @@ defmodule Imp.BenchmarkTruth.MusiqueAnsMiproCurrentTest do
                  aggregation: :mean,
                  max_errors: 10,
                  failure_score: 0.0,
-                 max_concurrency: 1
+                 num_threads: 1
                ]
              )
 

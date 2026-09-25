@@ -1482,7 +1482,7 @@ defmodule UpstreamExam.PredictTest do
       end
 
       program = DummyModule.new("question -> answer", count_calls, lm: lm)
-      refine = Imp.refine(program, reward_fn, max_attempts: 3, threshold: 1.0)
+      refine = Imp.refine(program, reward_fn, n: 3, threshold: 1.0)
 
       assert {:ok, result} = Imp.call(refine, %{question: "What is the capital of Belgium?"})
       assert Imp.get(result, :answer) == "Brussels"
@@ -1495,7 +1495,7 @@ defmodule UpstreamExam.PredictTest do
     test "refine with always-failing module is a loud error" do
       always_raise = fn _module, _inputs -> raise "Deliberately failing" end
       program = DummyModule.new("question -> answer", always_raise)
-      refine = Imp.refine(program, fn _, _ -> 1.0 end, max_attempts: 3, threshold: 0.0)
+      refine = Imp.refine(program, fn _, _ -> 1.0 end, n: 3, threshold: 0.0)
 
       assert {:error, _reason} = Imp.call(refine, %{question: "What is the capital of Belgium?"})
     end
@@ -1521,7 +1521,7 @@ defmodule UpstreamExam.PredictTest do
 
       refine =
         Imp.refine(program, fn _, _ -> 1.0 end,
-          max_attempts: 3,
+          n: 3,
           threshold: 0.0,
           fail_count: 1
         )

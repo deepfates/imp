@@ -162,7 +162,7 @@ defmodule ReActV2RequestShapeTest do
 
     assert_received {:rendered,
                      %{
-                       finish_tool: nil,
+                       submit_tool: nil,
                        output_names: [:answer],
                        tool_names: [:look]
                      }}

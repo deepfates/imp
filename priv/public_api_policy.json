@@ -66,8 +66,7 @@
         "Imp.FunctionContract",
         "Imp.Optimizer.Utils",
         "Imp.Options",
-        "Imp.ProgramAccess",
-        "Imp.ToolPolicy"
+        "Imp.ProgramAccess"
       ]
     },
     {
@@ -103,7 +102,6 @@
         "Imp.Optimizer.Artifact",
         "Imp.Optimizer.BootstrapFewShot",
         "Imp.Optimizer.BootstrapFewShotWithRandomSearch",
-        "Imp.Optimizer.BootstrapRS",
         "Imp.Optimizer.COPRO",
         "Imp.Optimizer.Ensemble",
         "Imp.Optimizer.GEPA",
@@ -111,12 +109,12 @@
         "Imp.Optimizer.KNNFewShot",
         "Imp.Optimizer.LabeledFewShot",
         "Imp.Optimizer.MIPROv2",
-        "Imp.Optimizer.RandomSearch",
         "Imp.Optimizer.Report",
         "Imp.Optimizer.SIMBA",
         "Imp.Predict",
         "Imp.Predict.ChainOfThought",
-        "Imp.Retrieve.Memory"
+        "Imp.Retrieve.Memory",
+        "Imp.ToolPolicy"
       ],
       "prefixes": [
         "Imp.Adapter.",

@@ -3,7 +3,11 @@ defmodule AvatarDeploymentPersistenceTest do
 
   test "checksummed Avatar artifact loads in a fresh task and executes rebound callbacks" do
     runner = fn %{country: "France"} -> "Paris" end
-    policy = fn name, _arguments -> name in [:lookup, "lookup"] end
+
+    policy = fn name, _arguments ->
+      if name in [:lookup, "lookup"], do: :allow, else: {:deny, :not_lookup}
+    end
+
     registry = Imp.Saving.Registry.new(lookup_runner: runner, avatar_policy: policy)
     path = temp_path("avatar-deployment")
     on_exit(fn -> File.rm(path) end)

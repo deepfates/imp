@@ -74,7 +74,7 @@ defmodule Imp.ACP.SessionStore do
   def load_history(nil), do: {:ok, nil}
 
   def load_history(history) when is_map(history) do
-    {:ok, Imp.History.load(history)}
+    {:ok, Imp.History.load!(history)}
   rescue
     _exception -> {:error, :invalid_session_history}
   end

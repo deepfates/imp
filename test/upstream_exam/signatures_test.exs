@@ -280,7 +280,7 @@ defmodule UpstreamExam.SignaturesTest do
         |> Imp.Signature.dump()
         |> Jason.encode!()
         |> Jason.decode!()
-        |> Imp.Signature.load()
+        |> Imp.Signature.load!()
 
       assert Imp.Signature.input_names(loaded) == [:context, :question]
       assert Imp.Signature.output_names(loaded) == [:answer]

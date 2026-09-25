@@ -305,7 +305,7 @@ defmodule BootstrapFinetuneTest do
            } =
              BootstrapFinetune.new(&always_pass/2,
                trainer: trainer,
-               max_concurrency: 1
+               num_threads: 1
              )
              |> BootstrapFinetune.compile(program, [train_example()])
 
@@ -332,7 +332,7 @@ defmodule BootstrapFinetuneTest do
         trainer: trainer,
         adapter: adapters,
         train_kwargs: train_kwargs,
-        max_concurrency: 2
+        num_threads: 2
       )
       |> BootstrapFinetune.compile(program, [train_example()])
 

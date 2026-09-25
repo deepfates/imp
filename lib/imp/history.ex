@@ -77,21 +77,21 @@ defmodule Imp.History do
   Malformed tags and map-key collisions introduced by this conversion are
   rejected, and a state without a list `"messages"` raises `ArgumentError`.
   """
-  def load(%{"type" => "history", "messages" => messages}) when is_list(messages) do
+  def load!(%{"type" => "history", "messages" => messages}) when is_list(messages) do
     messages
     |> Imp.Optimizer.Report.decode_term_compatible()
     |> new()
   end
 
-  def load(%{"messages" => messages}) when is_list(messages) do
+  def load!(%{"messages" => messages}) when is_list(messages) do
     messages
     |> Imp.Optimizer.Report.decode_term_compatible()
     |> new()
   end
 
-  def load(state) do
+  def load!(state) do
     raise ArgumentError,
-          "Imp.History.load/1 expects a history map with list \"messages\"; got: #{inspect(state)}"
+          "Imp.History.load!/1 expects a history map with list \"messages\"; got: #{inspect(state)}"
   end
 
   defp normalize_turn!(turn) when is_map(turn) or is_list(turn) do

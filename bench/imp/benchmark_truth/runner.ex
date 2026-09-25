@@ -155,8 +155,8 @@ defmodule Imp.BenchmarkTruth.Runner do
     }
   end
 
-  defp load_examples(:gsm8k, path), do: Imp.Datasets.GSM8K.load(path)
-  defp load_examples(:hotpotqa, path), do: Imp.Datasets.HotPotQA.load(path)
+  defp load_examples(:gsm8k, path), do: Imp.Datasets.GSM8K.read!(path)
+  defp load_examples(:hotpotqa, path), do: Imp.Datasets.HotPotQA.read!(path)
   defp load_examples(:colors, path), do: Imp.Datasets.jsonl(path, [:input])
   defp load_examples(:retrieval_qa, path), do: Imp.Datasets.jsonl(path, [:question])
   defp load_examples(:claim_verification, path), do: Imp.Datasets.jsonl(path, [:claim])
