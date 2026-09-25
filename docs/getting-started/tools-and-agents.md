@@ -124,6 +124,9 @@ Imp.react(
 [ReAct](../diving-deeper/react.md) go further: tool schemas, policies, MCP
 servers, and how the loop ends.
 
+[Livebook 04](../../livebooks/04_tools_agents_mcp_rlm.livemd) runs tools,
+ReAct, MCP imports and RLM in a notebook.
+
 ---
 
 **Next:** [Composing programs →](composing-programs.md)

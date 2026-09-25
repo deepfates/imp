@@ -149,6 +149,9 @@ told *how* to work, and it wants a larger budget than a guide should spend.
 [Choosing an optimizer](../diving-deeper/choosing-an-optimizer.md) compares
 the rest.
 
+[Livebook 03](../../livebooks/03_evaluate_and_optimize.livemd) runs these
+optimizers in a notebook, offline or with a key.
+
 ---
 
 **Next:** [Saving and loading →](save-and-load.md)

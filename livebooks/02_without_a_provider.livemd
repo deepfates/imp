@@ -1,0 +1,212 @@
+# Imp 02: The Same Program Without A Provider
+
+
+```elixir
+imp_checkout? = fn path ->
+  is_binary(path) and File.regular?(Path.join(path, "mix.exs")) and
+    File.regular?(Path.join(path, "lib/imp.ex"))
+end
+
+explicit_repo = System.get_env("IMP_PATH")
+
+if explicit_repo && not imp_checkout?.(Path.expand(explicit_repo)) do
+  raise "IMP_PATH does not point to an Imp source checkout or unpacked package"
+end
+
+repo =
+  [explicit_repo, Path.expand("..", __DIR__), File.cwd!()]
+  |> Enum.reject(&is_nil/1)
+  |> Enum.map(&Path.expand/1)
+  |> Enum.find(imp_checkout?)
+
+if repo do
+  # Prefer the notebook's own Imp checkout even when Livebook was launched
+  # from an unrelated Mix project. Unpacked package archives may omit
+  # mix.lock, so pin it only when the source checkout actually provides it.
+  install_opts =
+    if File.regular?(Path.join(repo, "mix.lock")),
+      do: [lockfile: Path.join(repo, "mix.lock")],
+      else: []
+
+  Mix.install([{:imp, path: repo}], install_opts)
+else
+  # Standalone notebook: install the released package from Hex.
+  Mix.install([{:imp, "~> 0.5"}])
+end
+
+# Live cells run when LIVE_PROVIDER=1 and a key is set: OPENAI_API_KEY, or
+# OPENROUTER_API_KEY for the same model through OpenRouter. In your own code,
+# any ReqLLM model string works.
+live_lm = fn opts ->
+  model = System.get_env("OPENAI_MODEL", "gpt-5.4-mini")
+
+  cond do
+    System.get_env("LIVE_PROVIDER") != "1" ->
+      {:skip, "Set LIVE_PROVIDER=1 and OPENAI_API_KEY to run this cell."}
+
+    key = System.get_env("OPENAI_API_KEY") ->
+      {:ok, Imp.req_llm("openai:" <> model, Keyword.put(opts, :api_key, key))}
+
+    key = System.get_env("OPENROUTER_API_KEY") ->
+      {:ok, Imp.req_llm("openrouter:openai/" <> model, Keyword.put(opts, :api_key, key))}
+
+    true ->
+      {:skip, "Set OPENAI_API_KEY to run this cell."}
+  end
+end
+```
+
+This notebook runs the support-ticket router from
+[Getting started](../docs/getting-started/first-program.md) with a scripted
+model. It needs no key, gives the same answer every time, and shows the exact
+messages Imp sends. The last cell sends those messages to a real model when
+`LIVE_PROVIDER=1` is set.
+
+## The router, with a scripted model
+
+`Imp.LM.Static` stands in for the model. Its handler receives the rendered
+messages and returns the reply; everything else runs as it would against a
+provider.
+
+```elixir
+scripted = Imp.LM.Static.new(handler: fn _messages, _opts -> %{team: "atlas"} end)
+
+signature =
+  Imp.signature(
+    "ticket -> team: enum[atlas,harbor,beacon,quill]",
+    "Route the support ticket to the squad that owns it."
+  )
+
+router = Imp.predict(signature, lm: scripted, adapter: Imp.Adapter.JSON)
+
+{:ok, prediction} = Imp.call(router, %{ticket: "We were charged twice this month."})
+Imp.get(prediction, :team)
+```
+
+## The exact messages
+
+Every prediction keeps the messages that produced it. This is what a
+provider would receive for that call:
+
+```elixir
+for message <- prediction.metadata.trace.messages do
+  IO.puts("--- #{message.role}\n#{message.content}\n")
+end
+
+:ok
+```
+
+The system message comes from the signature: the fields, their types, the
+allowed teams, and the instruction. The user message holds the ticket. Change
+the signature and both change with it; there is no prompt string to keep in
+step.
+
+## Same program, another adapter
+
+The adapter decides how a signature becomes messages. The default,
+`Imp.Adapter.Chat`, marks each field with `[[ ## name ## ]]`, as DSPy does:
+
+```elixir
+{:ok, chat_prediction} =
+  signature
+  |> Imp.predict(lm: scripted)
+  |> Imp.call(%{ticket: "We were charged twice this month."})
+
+chat_prediction.metadata.trace.messages |> List.last() |> Map.fetch!(:content) |> IO.puts()
+
+Imp.get(chat_prediction, :team)
+```
+
+## Reasoning is a declared output
+
+`Imp.chain_of_thought/2` adds a `reasoning` output before the others. It is a
+field like any other, validated and returned:
+
+```elixir
+reasoning_lm =
+  Imp.LM.Static.new(
+    handler: fn _messages, _opts ->
+      %{reasoning: "A duplicate charge is about money.", team: "atlas"}
+    end
+  )
+
+{:ok, thought} =
+  signature
+  |> Imp.chain_of_thought(lm: reasoning_lm, adapter: Imp.Adapter.JSON)
+  |> Imp.call(%{ticket: "We were charged twice this month."})
+
+Imp.to_map(thought)
+```
+
+## A reply that doesn't fit
+
+A handler can return text, as a real model does, and the text goes through the
+adapter's parser. Here the model names a team that doesn't exist. The call
+returns an error; the rest of the application never sees `"billing"`.
+
+```elixir
+confused = Imp.LM.Static.new(handler: fn _messages, _opts -> ~s({"team": "billing"}) end)
+
+result = router |> Imp.with_lm(confused) |> Imp.call(%{ticket: "We were charged twice this month."})
+
+match?({:error, _}, result)
+```
+
+With `json_retries: 1`, Imp sends the reply back with what was wrong and asks
+once more. This model is wrong the first time and right the second, and we
+record what it was sent:
+
+```elixir
+{:ok, sent} = Agent.start_link(fn -> [] end)
+
+second_try =
+  Imp.LM.Static.new(
+    handler: fn messages, _opts ->
+      Agent.update(sent, &(&1 ++ [messages]))
+
+      if length(Agent.get(sent, & &1)) == 1,
+        do: ~s({"team": "billing"}),
+        else: ~s({"team": "atlas"})
+    end
+  )
+
+{:ok, retried} =
+  signature
+  |> Imp.predict(lm: second_try, adapter: Imp.Adapter.JSON, config: [json_retries: 1])
+  |> Imp.call(%{ticket: "We were charged twice this month."})
+
+[_first, retry] = Agent.get(sent, & &1)
+retry |> List.last() |> Map.fetch!(:content) |> IO.puts()
+
+Imp.get(retried, :team)
+```
+
+## The same messages to a real model
+
+This cell swaps the scripted model for a real one and sends the same kind of
+request. It costs a fraction of a cent. The answer can vary between runs;
+the team is always one of the four.
+
+```elixir
+case live_lm.(max_tokens: 200) do
+  {:ok, lm} ->
+    {:ok, live} =
+      router
+      |> Imp.with_lm(lm)
+      |> Imp.call(%{ticket: "We were charged twice this month."})
+
+    team = Imp.get(live, :team)
+
+    unless team in ~w(atlas harbor beacon quill) do
+      raise "the model returned a team outside the signature: #{inspect(team)}"
+    end
+
+    {team, length(live.metadata.trace.messages)}
+
+  skip ->
+    skip
+end
+```
+
+Next: open `livebooks/03_evaluate_and_optimize.livemd` to score the router on
+labeled tickets and improve it.

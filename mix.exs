@@ -26,7 +26,7 @@ defmodule Imp.MixProject do
           Guides: product_docs(),
           "Diving deeper": diving_deeper(),
           Reference: reference(),
-          Livebooks: livebooks(),
+          Tutorials: livebooks(),
           Releases: ["RELEASE_NOTES.md", "CHANGELOG.md"]
         ],
         groups_for_modules: public_api_doc_groups(),
@@ -297,8 +297,10 @@ defmodule Imp.MixProject do
   defp livebooks do
     [
       "livebooks/01_real_lm_front_door.livemd",
+      "livebooks/02_without_a_provider.livemd",
       "livebooks/03_evaluate_and_optimize.livemd",
-      "livebooks/04_tools_agents_mcp_rlm.livemd"
+      "livebooks/04_tools_agents_mcp_rlm.livemd",
+      "livebooks/05_operating_imp.livemd"
     ]
   end
 

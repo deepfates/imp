@@ -1,0 +1,247 @@
+# Imp 05: Operating Imp
+
+
+```elixir
+imp_checkout? = fn path ->
+  is_binary(path) and File.regular?(Path.join(path, "mix.exs")) and
+    File.regular?(Path.join(path, "lib/imp.ex"))
+end
+
+explicit_repo = System.get_env("IMP_PATH")
+
+if explicit_repo && not imp_checkout?.(Path.expand(explicit_repo)) do
+  raise "IMP_PATH does not point to an Imp source checkout or unpacked package"
+end
+
+repo =
+  [explicit_repo, Path.expand("..", __DIR__), File.cwd!()]
+  |> Enum.reject(&is_nil/1)
+  |> Enum.map(&Path.expand/1)
+  |> Enum.find(imp_checkout?)
+
+if repo do
+  # Prefer the notebook's own Imp checkout even when Livebook was launched
+  # from an unrelated Mix project. Unpacked package archives may omit
+  # mix.lock, so pin it only when the source checkout actually provides it.
+  install_opts =
+    if File.regular?(Path.join(repo, "mix.lock")),
+      do: [lockfile: Path.join(repo, "mix.lock")],
+      else: []
+
+  Mix.install([{:imp, path: repo}], install_opts)
+else
+  # Standalone notebook: install the released package from Hex.
+  Mix.install([{:imp, "~> 0.5"}])
+end
+
+# Live cells run when LIVE_PROVIDER=1 and a key is set: OPENAI_API_KEY, or
+# OPENROUTER_API_KEY for the same model through OpenRouter. In your own code,
+# any ReqLLM model string works.
+live_lm = fn opts ->
+  model = System.get_env("OPENAI_MODEL", "gpt-5.4-mini")
+
+  cond do
+    System.get_env("LIVE_PROVIDER") != "1" ->
+      {:skip, "Set LIVE_PROVIDER=1 and OPENAI_API_KEY to run this cell."}
+
+    key = System.get_env("OPENAI_API_KEY") ->
+      {:ok, Imp.req_llm("openai:" <> model, Keyword.put(opts, :api_key, key))}
+
+    key = System.get_env("OPENROUTER_API_KEY") ->
+      {:ok, Imp.req_llm("openrouter:openai/" <> model, Keyword.put(opts, :api_key, key))}
+
+    true ->
+      {:skip, "Set OPENAI_API_KEY to run this cell."}
+  end
+end
+```
+
+This notebook runs the pieces of
+[Running Imp in production](../docs/production.md) against the ticket router:
+bounded calls under a supervisor, what secrets look like in traces and saved
+files, telemetry, and a live check of the real model with usage and caching.
+Everything but the last section runs without a key.
+
+## The router
+
+A scripted model that takes half a second, so the limits below have
+something to bound:
+
+```elixir
+signature =
+  Imp.signature(
+    "ticket -> team: enum[atlas,harbor,beacon,quill]",
+    "Route the support ticket to the squad that owns it."
+  )
+
+slow =
+  Imp.LM.Static.new(
+    handler: fn _messages, _opts ->
+      Process.sleep(500)
+      %{team: "atlas"}
+    end
+  )
+
+router = Imp.predict(signature, lm: slow, adapter: Imp.Adapter.JSON)
+```
+
+## Bounded calls
+
+`Imp.call/2` runs in the process that calls it. To give a call a time limit,
+and to limit how many run at once, run it in a task under a
+`Task.Supervisor`. A call that runs out of time is stopped, and the caller
+gets an error instead of waiting:
+
+```elixir
+{:ok, calls} = Task.Supervisor.start_link(max_children: 2)
+
+route = fn ticket, timeout ->
+  task = Task.Supervisor.async_nolink(calls, fn -> Imp.call(router, %{ticket: ticket}) end)
+
+  case Task.yield(task, timeout) || Task.shutdown(task, :brutal_kill) do
+    {:ok, {:ok, prediction}} -> {:ok, Imp.get(prediction, :team)}
+    {:ok, {:error, reason}} -> {:error, reason}
+    {:exit, reason} -> {:error, {:crashed, reason}}
+    nil -> {:error, :timeout}
+  end
+end
+
+{route.("We were charged twice this month.", 100),
+ route.("We were charged twice this month.", 2_000)}
+```
+
+`max_children: 2` is the concurrency limit. While two calls are running, a
+third is refused rather than queued:
+
+```elixir
+busy = for _ <- 1..2, do: Task.Supervisor.async_nolink(calls, fn -> Process.sleep(300) end)
+refused = Task.Supervisor.start_child(calls, fn -> :never_runs end)
+Enum.each(busy, &Task.await/1)
+
+refused
+```
+
+The [deployment example](https://github.com/deepfates/imp/tree/main/examples/deployment)
+wraps the same pattern in a `ProgramServer` that also reloads parameters while
+serving.
+
+## Secrets in traces
+
+`Imp.trace/2` collects the telemetry events of everything inside it. Values
+under key-like names are redacted before any handler sees them:
+
+```elixir
+echo = Imp.tool(:echo, "Returns its arguments.", fn arguments -> arguments end)
+
+trace =
+  Imp.trace(fn ->
+    Imp.Tool.call(echo, %{api_key: "sk-live", nested: %{token: "secret"}})
+  end)
+
+for {event, _measurements, metadata} <- trace.events, do: {event, metadata.arguments}
+```
+
+Map keys that arrive as strings, from JSON or a form, stay strings. Imp does
+not turn untrusted input into atoms, which the VM never garbage-collects:
+
+```elixir
+key = "external_key_#{System.unique_integer([:positive])}"
+example = Imp.example(%{key => "value"})
+
+{Imp.get(example, key),
+ try do
+   String.to_existing_atom(key)
+ rescue
+   ArgumentError -> :not_an_atom
+ end}
+```
+
+## Saving without secrets
+
+A saved program names its model but never holds the key. We bind a model
+again when we load it:
+
+```elixir
+lm = Imp.req_llm("openai:gpt-5.4-mini", api_key: "sk-not-saved")
+program = Imp.predict(signature, lm: lm, adapter: Imp.Adapter.JSON)
+
+path = Path.join(System.tmp_dir!(), "ticket-router-#{System.unique_integer([:positive])}.json")
+:ok = Imp.save!(program, path)
+saved = File.read!(path)
+loaded = Imp.load!(path)
+File.rm!(path)
+
+{String.contains?(saved, "sk-not-saved"), loaded.lm.model, loaded.lm.opts}
+```
+
+## Telemetry
+
+Imp emits `:telemetry` events for each program call and each model request. A
+handler forwards them to your metrics; this one sends them back to the
+notebook:
+
+```elixir
+notebook = self()
+
+:telemetry.attach_many(
+  "notebook-imp",
+  [[:imp, :module, :stop], [:imp, :lm, :stop]],
+  fn event, %{duration: duration}, _metadata, _config ->
+    send(notebook, {:imp_event, event, System.convert_time_unit(duration, :native, :millisecond)})
+  end,
+  nil
+)
+
+{:ok, _prediction} = Imp.call(router, %{ticket: "Deploys hang at 90%."})
+:telemetry.detach("notebook-imp")
+
+receive_events = fn receive_events, events ->
+  receive do
+    {:imp_event, event, milliseconds} -> receive_events.(receive_events, [{event, milliseconds} | events])
+  after
+    100 -> Enum.reverse(events)
+  end
+end
+
+receive_events.(receive_events, [])
+```
+
+The scripted model makes no request, so only the program event arrives, with
+the half second the model took. A provider client also emits
+`[:imp, :lm, :stop]` for each request.
+
+## Live check
+
+With a key, this cell routes one ticket twice through the real model, with
+usage tracking on. The first call reports its tokens; the second is the same
+request, answered from Imp's response cache, so it reports none. It costs a
+fraction of a cent.
+
+```elixir
+case live_lm.(max_tokens: 200) do
+  {:ok, lm} ->
+    live_router = Imp.with_lm(router, lm)
+
+    Imp.context([track_usage: true], fn ->
+      for _ <- 1..2 do
+        {:ok, prediction} = Imp.call(live_router, %{ticket: "Our SSO login loops back to the sign-in page."})
+        team = Imp.get(prediction, :team)
+
+        unless team in ~w(atlas harbor beacon quill) do
+          raise "the model returned a team outside the signature: #{inspect(team)}"
+        end
+
+        usage =
+          prediction
+          |> Imp.Prediction.get_lm_usage()
+          |> Map.values()
+          |> Enum.map(&Map.take(&1, [:input_tokens, :output_tokens]))
+
+        {team, usage}
+      end
+    end)
+
+  skip ->
+    skip
+end
+```

@@ -135,6 +135,9 @@ cost about five cents.
 [Metrics and evaluation](../diving-deeper/metrics-and-evaluation.md) covers
 richer metrics and what else an evaluation reports.
 
+[Livebook 03](../../livebooks/03_evaluate_and_optimize.livemd) runs
+evaluation and optimization in a notebook, offline or with a key.
+
 ---
 
 **Next:** [Improving →](improving.md)
