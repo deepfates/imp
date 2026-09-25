@@ -206,8 +206,12 @@ User-visible changes to Imp are recorded here.
   provider is named `outputs` (title `Outputs`) instead of
   `DSPyProgramOutputs`. The MIPROv2 proposer's dataset summary shows each
   example as `{"inputs": {...}, "outputs": {...}}` instead of
-  `Example({...}) (input_keys={...})`. How a model's answer is parsed is
-  unchanged.
+  `Example({...}) (input_keys={...})`. GEPA's reflective dataset and SIMBA's
+  program listing use the same words, so an enum shows its allowed values.
+- A non-string answer for a string field is kept as its JSON text (`"true"`,
+  `"[\"x\", \"y\"]"`) where 0.4.0 gave Python's `"True"` and `"['x', 'y']"`;
+  a `null` is no value, so a required field reports it missing and an
+  optional one is `nil`, where 0.4.0 gave the string `"None"`.
 - Each ReActV2 step lists the task's output fields with their types and
   descriptions ("The outputs to produce are: ..."). Before, a model saw an
   output's description only inside `submit`'s parameter schema.
