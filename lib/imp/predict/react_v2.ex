@@ -1294,12 +1294,15 @@ defmodule Imp.Predict.ReActV2 do
 
   # What the adapter needs to say about the loop, as data. `finish_tool` is the
   # tool that ends the turn, so a renderer never has to know its name, and nil
-  # when the signature has no `submit` and the answer is plain text.
+  # when the signature has no `submit` and the answer is plain text. `outputs`
+  # are the task's output fields, so each step says what every output means;
+  # otherwise their descriptions reach the model only inside `submit`'s schema.
   defp guidance(signature, tools) do
     %{
       finish_tool: if(single_text_output?(signature), do: nil, else: :submit),
       input_names: Imp.Signature.input_names(signature),
       output_names: Imp.Signature.output_names(signature),
+      outputs: signature.outputs,
       tool_names: tools |> Map.keys() |> Enum.sort()
     }
   end
