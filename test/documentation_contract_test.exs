@@ -165,7 +165,7 @@ defmodule DocumentationContractTest do
         "CHANGELOG.md",
         "docs/coming-from-dspy.md",
         "docs/LEARNING_PATH.md",
-        "docs/PRODUCTION_OPERATIONS.md",
+        "docs/production.md",
         "examples/deployment/README.md",
         "examples/provider_free_ticket_router/README.md"
       ] ++ Path.wildcard("livebooks/*.livemd")
@@ -228,15 +228,19 @@ defmodule DocumentationContractTest do
 
     assert product_docs == [
              "docs/LEARNING_PATH.md",
-             "docs/PRODUCTION_OPERATIONS.md",
-             "docs/TRAJECTORIES.md",
              "docs/TUTORIAL_TICKET_ROUTING.md",
              "docs/coming-from-dspy.md",
              "docs/diving-deeper/adapters.md",
+             "docs/diving-deeper/choosing-an-optimizer.md",
+             "docs/diving-deeper/metrics-and-evaluation.md",
              "docs/diving-deeper/modules-and-composition.md",
              "docs/diving-deeper/react.md",
+             "docs/diving-deeper/runs-and-supervision.md",
+             "docs/diving-deeper/saving-and-artifacts.md",
+             "docs/diving-deeper/settings-and-context.md",
              "docs/diving-deeper/signatures.md",
-             "docs/diving-deeper/tools-and-mcp.md"
+             "docs/diving-deeper/tools-and-mcp.md",
+             "docs/production.md"
            ]
 
     extras =

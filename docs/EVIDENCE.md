@@ -92,4 +92,4 @@ results are withdrawn rather than rescored.
 
 Execution traces, bounded native run observations, cancellation evidence and
 portable ATIF trajectories are described in
-[Execution evidence and ATIF](TRAJECTORIES.md).
+[Runs and supervision](diving-deeper/runs-and-supervision.md).

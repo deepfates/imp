@@ -30,7 +30,7 @@ defmodule PackageContractTest do
                    "README.md",
                    "docs/coming-from-dspy.md",
                    "docs/LEARNING_PATH.md",
-                   "docs/PRODUCTION_OPERATIONS.md",
+                   "docs/production.md",
                    "examples/provider_free_ticket_router/README.md",
                    "examples/provider_free_ticket_router/mix.exs",
                    "examples/provider_free_ticket_router/run.exs",

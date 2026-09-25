@@ -5,7 +5,7 @@ defmodule LearningPathContractTest do
     "README.md",
     "docs/LEARNING_PATH.md",
     "docs/coming-from-dspy.md",
-    "docs/PRODUCTION_OPERATIONS.md",
+    "docs/production.md",
     "examples/deployment/README.md"
   ]
 

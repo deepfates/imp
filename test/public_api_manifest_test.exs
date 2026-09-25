@@ -364,7 +364,12 @@ defmodule PublicAPIManifestTest do
     references =
       [
         "README.md",
-        "docs/PRODUCTION_OPERATIONS.md",
+        "docs/production.md",
+        "docs/diving-deeper/choosing-an-optimizer.md",
+        "docs/diving-deeper/metrics-and-evaluation.md",
+        "docs/diving-deeper/runs-and-supervision.md",
+        "docs/diving-deeper/saving-and-artifacts.md",
+        "docs/diving-deeper/settings-and-context.md",
         "docs/LEARNING_PATH.md",
         "docs/coming-from-dspy.md",
         "livebooks/03_evaluate_and_optimize.livemd"
