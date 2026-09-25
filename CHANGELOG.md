@@ -410,6 +410,13 @@ User-visible changes to Imp are recorded here.
   `{:module_call_failed, Imp.Predict.RLM, ...}` whenever the variable's name
   was not already an atom. An unexpected error inside the interpreter now
   fails the turn the same way, as `{:interpreter_error, message}`.
+- The RLM controller prompt names one reply shape, `{"reasoning", "code"}`,
+  for every turn including the last, which calls `submit/1` from code. It
+  also offered a bare JSON object of the outputs as a final answer, which a
+  text reply never in fact got. The controller's first reply almost always
+  failed to parse: gpt-5.4 sends several JSON objects in one reply (its
+  action twice, or several actions written ahead of their outputs). Such a
+  reply now runs the first object that carries code, as a REPL would.
 
 ### Errors and shapes
 

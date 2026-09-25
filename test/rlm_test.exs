@@ -90,6 +90,58 @@ defmodule RLMPublicSurfaceTest do
     assert system_prompt =~ Imp.Predict.RLM.Interpreter.controller_language_guide()
   end
 
+  # The prompt names one reply shape. Offering a second one (a bare JSON
+  # answer) led models to send both, joined, on their first turn.
+  test "the controller prompt names one reply shape" do
+    parent = self()
+
+    lm = %{
+      module: Imp.LM.Static,
+      opts: [
+        handler: fn messages, _opts ->
+          send(parent, {:controller_system_prompt, hd(messages).content})
+          %{code: ~S|submit(%{answer: "done"})|}
+        end
+      ]
+    }
+
+    rlm = Imp.Predict.RLM.new("question -> answer", lm: lm)
+    assert {:ok, _prediction} = Imp.Predict.RLM.call(rlm, %{question: "q"})
+    assert_receive {:controller_system_prompt, system_prompt}
+    assert system_prompt =~ "Every reply is that one JSON object, including the last"
+    refute system_prompt =~ "also accepted"
+  end
+
+  test "a reply of the code object joined to an answer object runs the code" do
+    for reply <- [
+          ~S|{"reasoning":"compute it","code":"submit(%{answer: \"Paris\"})"}| <>
+            "\n" <> ~S|{"answer":"Paris"}|,
+          ~S|{"answer":"Paris"}{"reasoning":"a } in a string","code":"submit(%{answer: \"Paris\"})"}|
+        ] do
+      lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> reply end]}
+      rlm = Imp.Predict.RLM.new("question -> answer", lm: lm, max_iterations: 1)
+
+      assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{question: "Capital of France?"})
+      assert Imp.Prediction.get(prediction, :answer) == "Paris"
+      assert [%{action: :submit}] = prediction.metadata.rlm_trace
+    end
+  end
+
+  # gpt-5.4 answered the RLM page's first turn with its action repeated, or
+  # with several actions written ahead of their outputs.
+  test "a reply of several code objects runs the first" do
+    first = ~S|{"reasoning":"a","code":"submit(%{answer: \"A\"})"}|
+    second = ~S|{"reasoning":"b","code":"submit(%{answer: \"B\"})"}|
+
+    for reply <- [first <> "\n\n" <> first, first <> "\n\n" <> second] do
+      lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> reply end]}
+      rlm = Imp.Predict.RLM.new("question -> answer", lm: lm, max_iterations: 1)
+
+      assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{question: "q"})
+      assert Imp.Prediction.get(prediction, :answer) == "A"
+    end
+  end
+
   test "RLM unwraps canonical LM envelopes for controller and sub-LM outputs" do
     actions = [
       Jason.encode!(%{reasoning: "query", code: ~S|result = llm_query("question")|}),
