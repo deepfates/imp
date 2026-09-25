@@ -13,6 +13,15 @@ defmodule Imp.Predict.RLM.Interpreter do
     defstruct [:kind, :name, :arguments]
   end
 
+  defmodule Fn do
+    @moduledoc false
+    # An anonymous function written by controller code: its clauses stay AST
+    # and run through the interpreter, so a library function that calls it
+    # never runs code the interpreter did not evaluate.
+    @enforce_keys [:arity, :clauses]
+    defstruct [:arity, :clauses]
+  end
+
   @default_max_steps 10_000
   @default_max_output_chars 8_000
   @default_max_source_bytes 32_000
@@ -45,40 +54,44 @@ defmodule Imp.Predict.RLM.Interpreter do
   ]
   @unary_operators [:+, :-, :!, :not]
 
-  @string_functions %{
-    length: 1,
-    slice: [2, 3],
-    split: [1, 2],
-    trim: 1,
-    trim_leading: 1,
-    trim_trailing: 1,
-    downcase: 1,
-    upcase: 1,
-    replace: 3,
-    contains?: 2,
-    starts_with?: 2,
-    ends_with?: 2
+  # Controller code may call every public function of these modules except
+  # the refused ones below. They are pure apart from the functions they are
+  # given, and those are interpreter functions (`Fn`), which cannot reach an
+  # effect. A map may not pose as a struct (see `check_library_argument/2`),
+  # so protocol dispatch inside these modules reaches only plain data.
+  @library_modules %{Enum: Enum, Keyword: Keyword, List: List, Map: Map, String: String}
+  @refused_functions %{
+    # Atoms are never garbage-collected; generated code must not mint them.
+    {:String, :to_atom} => "creates atoms",
+    {:List, :to_atom} => "creates atoms",
+    # A lazy stream carries native closures into the variable space.
+    {:String, :splitter} => "returns a lazy stream",
+    # These read and advance the process's random state, so a repaired cell
+    # would not recompute the same value.
+    {:Enum, :random} => "is nondeterministic",
+    {:Enum, :shuffle} => "is nondeterministic",
+    {:Enum, :take_random} => "is nondeterministic"
   }
-  @enum_functions %{
-    at: [2, 3],
-    slice: 2,
-    take: 2,
-    drop: 2,
-    chunk_every: [2, 3],
-    join: [1, 2],
-    count: 1,
-    reverse: 1,
-    uniq: 1,
-    concat: 1,
-    member?: 2,
-    min: 1,
-    max: 1,
-    # Aggregations that take no function argument. Generated code cannot write
-    # a lambda, so `Enum.reduce/3` is out of reach and these are listed
-    # explicitly.
-    sum: 1,
-    product: 1
-  }
+  @library_functions for {alias_name, module} <- @library_modules,
+                         {function, arity} <- module.__info__(:functions),
+                         not Map.has_key?(@refused_functions, {alias_name, function}),
+                         into: MapSet.new(),
+                         do: {alias_name, function, arity}
+  # Library functions whose function argument returns an accumulator rather
+  # than an element of the result; each return is bounded on its own instead
+  # of adding to the call's running total.
+  @accumulator_functions [
+    {:Enum, :reduce},
+    {:Enum, :reduce_while},
+    {:Enum, :chunk_while},
+    {:List, :foldl},
+    {:List, :foldr}
+  ]
+  # Pure data structs that library calls may receive. Any other struct, and
+  # any other Elixir module named as a value, is refused.
+  @data_structs [Range, MapSet, Date, Time, NaiveDateTime, DateTime]
+  @fn_frame {__MODULE__, :fn_frame}
+  @fn_failure {__MODULE__, :fn_failure}
 
   defstruct vars: %{},
             protected_vars: %{},
@@ -93,7 +106,8 @@ defmodule Imp.Predict.RLM.Interpreter do
             effect_journal: [],
             effect_results: [],
             effect_requests: [],
-            steps: 0
+            steps: 0,
+            in_function: false
 
   @type t :: %__MODULE__{}
 
@@ -102,8 +116,9 @@ defmodule Imp.Predict.RLM.Interpreter do
     %{
       binary_operators: @binary_operators,
       unary_operators: @unary_operators,
-      string_functions: @string_functions,
-      enum_functions: @enum_functions
+      library_modules: @library_modules |> Map.keys() |> Enum.sort(),
+      library_functions: @library_functions,
+      refused_functions: @refused_functions
     }
   end
 
@@ -112,9 +127,9 @@ defmodule Imp.Predict.RLM.Interpreter do
     """
     The controller executes a small Elixir-shaped language, not general Elixir.
     Supported values and data are strings, numbers, booleans, nil, existing atom literals, lists, maps, tuples, and integer ranges; unfamiliar atom literals are represented as strings rather than creating VM atoms. Supported control is variable assignment, `if condition, do: value, else: value`, and bounded `for item <- items, do: expression` comprehensions. Pipelines with `|>` are supported. Supported operators are #{format_operators(@binary_operators ++ @unary_operators)}. Use `Access.get(container, key)` or `container[key]` for map/list/string access.
-    Only these String calls are available: #{format_allowlist(:String, @string_functions)}.
-    Only these Enum calls are available: #{format_allowlist(:Enum, @enum_functions)}.
-    Important traps: `case`, anonymous functions, arbitrary module calls, `Enum.find`, and `hd` are not supported. Use `if` instead of `case`, a comprehension plus `Enum.at(values, 0)` instead of `Enum.find` or `hd`, and string concatenation with `<>` instead of interpolation or binary `<<>>` syntax. String literals themselves are supported.
+    Every function of `Enum`, `Keyword`, `List`, `Map` and `String` is available except #{format_refused()}. Other modules cannot be called.
+    Anonymous functions (`fn x -> ... end`, with several clauses, guards, and tuple, list or map patterns) and captures (`&String.downcase/1`, `&(&1 + 1)`) can be passed to those functions. Inside a function, `print` works but registered tools, the task built-ins and `submit` do not; call those from a `for` comprehension instead.
+    Important traps: `case`, `hd`, and calling a function stored in a variable are not supported. Use `if` or a multi-clause `fn` instead of `case`, `List.first` instead of `hd`, and string concatenation with `<>` instead of interpolation or binary `<<>>` syntax. String literals themselves are supported.
     Registered tools and the built-ins named in the task prompt are the only effectful calls. A failed cell rolls back its assignments while retaining already-completed effects for deterministic repair.
     """
     |> String.trim()
@@ -402,6 +417,10 @@ defmodule Imp.Predict.RLM.Interpreter do
     eval_pairs(pairs, state, [])
   end
 
+  defp eval_node({:fn, _, clauses}, state), do: build_fn(clauses, state)
+
+  defp eval_node({:&, _, [capture]}, state), do: build_capture(capture, state)
+
   defp eval_node({:if, _, [condition, clauses]}, state) when is_list(clauses) do
     with {:ok, condition, state} <- eval(condition, state) do
       branch =
@@ -453,10 +472,28 @@ defmodule Imp.Predict.RLM.Interpreter do
   end
 
   defp eval_node({{:., _, [{:__aliases__, _, [module]}, function]}, _, args}, state)
-       when module in [:String, :Enum, "String", "Enum"] and
-              (is_atom(function) or is_binary(function)) and is_list(args) do
+       when (is_atom(function) or is_binary(function)) and is_list(args) and
+              (is_map_key(@library_modules, module) or is_binary(module)) do
     eval_allowlisted(module, function, args, state)
   end
+
+  defp eval_node({{:., _, [container, key]}, metadata, []}, state)
+       when is_atom(key) or is_binary(key) do
+    if Keyword.get(metadata, :no_parens, false) and not match?({:__aliases__, _, _}, container) do
+      with {:ok, container, state} <- eval(container, state) do
+        case container do
+          %{^key => value} -> {:ok, value, state}
+          _ -> {:error, {:key_not_found, key}, state}
+        end
+      end
+    else
+      eval_module_call(container, key, [], state)
+    end
+  end
+
+  defp eval_node({{:., _, [module, function]}, _, args}, state)
+       when (is_atom(function) or is_binary(function)) and is_list(args),
+       do: eval_module_call(module, function, args, state)
 
   defp eval_node({:print, _, [expression]}, state) do
     with {:ok, value, state} <- eval(expression, state) do
@@ -466,6 +503,9 @@ defmodule Imp.Predict.RLM.Interpreter do
       {:ok, value, %{state | output: state.output <> addition}}
     end
   end
+
+  defp eval_node({:submit, _, args}, %{in_function: true} = state) when is_list(args),
+    do: {:error, :submit_inside_fn, state}
 
   defp eval_node({:submit, _, args}, state) when is_list(args) do
     with {:ok, values, state} <- eval_arguments(args, state),
@@ -496,6 +536,19 @@ defmodule Imp.Predict.RLM.Interpreter do
 
   defp eval_node(ast, state), do: {:error, {:unsupported_expression, Macro.to_string(ast)}, state}
 
+  defp eval_module_call(module, function, args, state) do
+    module =
+      case module do
+        {:__aliases__, _, parts} -> Enum.map_join(parts, ".", &to_string/1)
+        module when is_atom(module) or is_binary(module) -> to_string(module)
+        module -> Macro.to_string(module)
+      end
+
+    {:error,
+     {:function_not_allowed, existing_atom_or_string(module), normalize_known_name(function),
+      length(args)}, state}
+  end
+
   defp eval_sequence([], state, value), do: {:ok, value, state}
 
   defp eval_sequence([expression | rest], state, _value) do
@@ -523,6 +576,8 @@ defmodule Imp.Predict.RLM.Interpreter do
 
   defp eval_pairs([{key, value} | rest], state, pairs) do
     with {:ok, key, state} <- eval(key, state),
+         :ok <-
+           if(key == :__struct__, do: {:error, :struct_literal_not_allowed, state}, else: :ok),
          {:ok, value, state} <- eval(value, state) do
       eval_pairs(rest, state, [{key, value} | pairs])
     end
@@ -687,32 +742,282 @@ defmodule Imp.Predict.RLM.Interpreter do
   defp eval_allowlisted(module, function, args, state) do
     module = normalize_known_name(module)
     function = normalize_known_name(function)
-    allowed = if module == :String, do: @string_functions, else: @enum_functions
-    target = if module == :String, do: String, else: Enum
-    arities = List.wrap(Map.get(allowed, function))
 
-    if length(args) in arities do
-      with {:ok, values, state} <- eval_arguments(args, state) do
-        try do
-          with :ok <- check_transformation_budget(module, function, values, state) do
-            {:ok, apply(target, function, values), state}
-          end
-        rescue
-          error -> {:error, {:transformation_error, Exception.message(error)}, state}
-        end
+    if {module, function, length(args)} in @library_functions do
+      with {:ok, values, state} <- eval_arguments(args, state),
+           :ok <- check_library_arguments(values, state),
+           :ok <- check_transformation_budget(module, function, values, state) do
+        apply_library(module, function, values, state)
       end
     else
       {:error, {:function_not_allowed, module, function, length(args)}, state}
     end
   end
 
-  defp format_allowlist(module, functions) do
-    functions
-    |> Enum.sort_by(fn {name, _arities} -> to_string(name) end)
-    |> Enum.flat_map(fn {name, arities} ->
-      Enum.map(List.wrap(arities), &"#{module}.#{name}/#{&1}")
+  # Interpreter functions run inside a native library call, which cannot
+  # thread interpreter state. The call's step count, output and the running
+  # size of its function results live in a frame in the process dictionary
+  # for the duration of the call, and are folded back into the state after
+  # it; the previous frame is restored so calls may nest.
+  defp apply_library(module, function, values, state) do
+    outer = Process.get(@fn_frame)
+
+    Process.put(@fn_frame, %{
+      steps: state.steps,
+      output: state.output,
+      bytes: 0,
+      counted: {module, function} not in @accumulator_functions
+    })
+
+    try do
+      value =
+        apply(Map.fetch!(@library_modules, module), function, native_arguments(values, state))
+
+      frame = Process.get(@fn_frame)
+      {:ok, value, %{state | steps: frame.steps, output: frame.output}}
+    rescue
+      error -> {:error, {:transformation_error, Exception.message(error)}, state}
+    catch
+      :throw, {@fn_failure, reason} -> {:error, reason, state}
+    after
+      if outer, do: Process.put(@fn_frame, outer), else: Process.delete(@fn_frame)
+    end
+  end
+
+  defp native_arguments(values, state), do: Enum.map(values, &native_function(&1, state))
+
+  defp native_function(%Fn{arity: 0} = function, state),
+    do: fn -> call_fn(function, [], state) end
+
+  defp native_function(%Fn{arity: 1} = function, state),
+    do: fn a -> call_fn(function, [a], state) end
+
+  defp native_function(%Fn{arity: 2} = function, state),
+    do: fn a, b -> call_fn(function, [a, b], state) end
+
+  defp native_function(%Fn{arity: 3} = function, state),
+    do: fn a, b, c -> call_fn(function, [a, b, c], state) end
+
+  defp native_function(value, _state), do: value
+
+  defp call_fn(%Fn{clauses: clauses}, args, state) do
+    frame = Process.get(@fn_frame)
+    state = %{state | steps: frame.steps, output: frame.output, in_function: true}
+
+    result =
+      with {:ok, body, state} <- select_clause(clauses, args, state) do
+        eval(body, state)
+      end
+
+    case result do
+      {:ok, value, next} ->
+        bytes = if frame.counted, do: frame.bytes + :erlang.external_size(value), else: 0
+
+        if bytes > state.max_value_bytes,
+          do: throw({@fn_failure, {:value_budget_exceeded, bytes, state.max_value_bytes}})
+
+        Process.put(@fn_frame, %{frame | steps: next.steps, output: next.output, bytes: bytes})
+        value
+
+      {:error, reason, _state} ->
+        throw({@fn_failure, reason})
+    end
+  end
+
+  defp select_clause([], args, state), do: {:error, {:fn_clause_not_matched, args}, state}
+
+  defp select_clause([{params, guard, body} | rest], args, state) do
+    with {:ok, vars} <- bind_all(params, args, state.vars),
+         {:ok, true, state} <- eval_guard(guard, %{state | vars: vars}) do
+      {:ok, body, state}
+    else
+      :error -> select_clause(rest, args, state)
+      {:ok, false, _state} -> select_clause(rest, args, state)
+      {:error, reason, _state} -> {:error, reason, state}
+    end
+  end
+
+  defp eval_guard(nil, state), do: {:ok, true, state}
+
+  defp eval_guard(guard, state) do
+    with {:ok, value, state} <- eval(guard, state), do: {:ok, truthy?(value), state}
+  end
+
+  defp bind_all([], [], vars), do: {:ok, vars}
+
+  defp bind_all([pattern | patterns], [value | values], vars) do
+    with {:ok, vars} <- bind(pattern, value, vars), do: bind_all(patterns, values, vars)
+  end
+
+  defp bind_all(_patterns, _values, _vars), do: :error
+
+  defp bind({name, _, context}, value, vars)
+       when (is_atom(name) or is_binary(name)) and (is_atom(context) or is_nil(context)) do
+    if String.starts_with?(to_string(name), "_"),
+      do: {:ok, vars},
+      else: {:ok, Map.put(vars, name, value)}
+  end
+
+  defp bind({:=, _, [left, right]}, value, vars) do
+    with {:ok, vars} <- bind(left, value, vars), do: bind(right, value, vars)
+  end
+
+  defp bind({:{}, _, patterns}, value, vars) when is_tuple(value),
+    do: bind_all(patterns, Tuple.to_list(value), vars)
+
+  defp bind({:%{}, _, pairs}, value, vars) when is_map(value) do
+    Enum.reduce_while(pairs, {:ok, vars}, fn {key, pattern}, {:ok, vars} ->
+      with {:ok, item} <- Map.fetch(value, key),
+           {:ok, vars} <- bind(pattern, item, vars) do
+        {:cont, {:ok, vars}}
+      else
+        :error -> {:halt, :error}
+      end
     end)
-    |> Enum.join(", ")
+  end
+
+  defp bind({left, right}, {a, b}, vars), do: bind_all([left, right], [a, b], vars)
+
+  defp bind(patterns, value, vars) when is_list(patterns) and is_list(value) do
+    case List.last(patterns) do
+      {:|, _, [head, tail]} ->
+        count = length(patterns) - 1
+
+        if length(value) > count do
+          {items, rest} = Enum.split(value, count)
+          bind_all(Enum.drop(patterns, -1) ++ [head, tail], items ++ [hd(rest), tl(rest)], vars)
+        else
+          :error
+        end
+
+      _ ->
+        bind_all(patterns, value, vars)
+    end
+  end
+
+  defp bind(literal, value, vars)
+       when is_binary(literal) or is_number(literal) or is_atom(literal) do
+    if literal === value, do: {:ok, vars}, else: :error
+  end
+
+  defp bind(_pattern, _value, _vars), do: :error
+
+  defp build_fn(clauses, state) do
+    clauses =
+      Enum.map(clauses, fn
+        {:->, _, [[{:when, _, params_and_guard}], body]} ->
+          {params, [guard]} = Enum.split(params_and_guard, -1)
+          {params, guard, body}
+
+        {:->, _, [params, body]} ->
+          {params, nil, body}
+      end)
+
+    case clauses |> Enum.map(fn {params, _, _} -> length(params) end) |> Enum.uniq() do
+      [arity] when arity <= 3 -> {:ok, %Fn{arity: arity, clauses: clauses}, state}
+      _ -> {:error, :fn_arity_not_supported, state}
+    end
+  end
+
+  defp build_capture({:/, _, [call, arity]}, state)
+       when is_integer(arity) and arity in 0..3 do
+    params = for index <- 1..arity//1, do: {"&#{index}", [], nil}
+
+    case call do
+      {{:., _, [_module, function]} = callee, _, []} when is_atom(function) ->
+        {:ok, %Fn{arity: arity, clauses: [{params, nil, {callee, [], params}}]}, state}
+
+      {name, _, context} when is_atom(name) and is_atom(context) ->
+        {:ok, %Fn{arity: arity, clauses: [{params, nil, {name, [], params}}]}, state}
+
+      _ ->
+        build_capture_expression({:/, [], [call, arity]}, state)
+    end
+  end
+
+  defp build_capture(expression, state), do: build_capture_expression(expression, state)
+
+  defp build_capture_expression(expression, state) do
+    {body, arity} =
+      Macro.prewalk(expression, 0, fn
+        {:&, _, [index]}, arity when is_integer(index) ->
+          {{"&#{index}", [], nil}, max(arity, index)}
+
+        node, arity ->
+          {node, arity}
+      end)
+
+    if arity in 1..3 do
+      params = for index <- 1..arity, do: {"&#{index}", [], nil}
+      {:ok, %Fn{arity: arity, clauses: [{params, nil, body}]}, state}
+    else
+      {:error, :invalid_capture, state}
+    end
+  end
+
+  # A library call dispatches protocols on its arguments, so an argument must
+  # be plain data: no struct outside `@data_structs` and no other Elixir module
+  # name, which could be a forged struct's module or a sorter module whose
+  # `compare/2` would run. A range is bounded because library functions
+  # materialize it before the result's size can be checked.
+  defp check_library_arguments(values, state) do
+    Enum.reduce_while(values, :ok, fn value, :ok ->
+      case check_library_argument(value, state) do
+        :ok -> {:cont, :ok}
+        {:error, reason} -> {:halt, {:error, reason, state}}
+      end
+    end)
+  end
+
+  defp check_library_argument(%Fn{}, _state), do: :ok
+
+  defp check_library_argument(%Range{first: first, last: last, step: step} = range, state)
+       when is_integer(first) and is_integer(last) and is_integer(step) do
+    # Materialized, each element takes at least one byte of the value budget.
+    size = Range.size(range)
+    max_bytes = state.max_value_bytes
+    if size <= max_bytes, do: :ok, else: {:error, {:value_budget_exceeded, size, max_bytes}}
+  end
+
+  defp check_library_argument(%{__struct__: module} = struct, state)
+       when module in @data_structs and module != Range do
+    struct |> Map.from_struct() |> check_library_argument(state)
+  end
+
+  defp check_library_argument(%{__struct__: module}, _state),
+    do: {:error, {:module_value_not_allowed, module}}
+
+  defp check_library_argument(value, state) when is_map(value) do
+    Enum.reduce_while(value, :ok, fn {key, item}, :ok ->
+      with :ok <- check_library_argument(key, state),
+           :ok <- check_library_argument(item, state) do
+        {:cont, :ok}
+      else
+        error -> {:halt, error}
+      end
+    end)
+  end
+
+  defp check_library_argument([head | tail], state) do
+    with :ok <- check_library_argument(head, state), do: check_library_argument(tail, state)
+  end
+
+  defp check_library_argument(value, state) when is_tuple(value),
+    do: value |> Tuple.to_list() |> check_library_argument(state)
+
+  defp check_library_argument(value, _state) when is_atom(value) and value not in @data_structs do
+    if String.starts_with?(Atom.to_string(value), "Elixir."),
+      do: {:error, {:module_value_not_allowed, value}},
+      else: :ok
+  end
+
+  defp check_library_argument(_value, _state), do: :ok
+
+  defp format_refused do
+    @refused_functions
+    |> Map.keys()
+    |> Enum.sort()
+    |> Enum.map_join(", ", fn {module, function} -> "`#{module}.#{function}`" end)
   end
 
   defp format_operators(operators) do
@@ -726,24 +1031,33 @@ defmodule Imp.Predict.RLM.Interpreter do
       Map.get(state.callbacks, name) ||
         if(is_atom(name), do: Map.get(state.callbacks, Atom.to_string(name)))
 
-    if effect do
-      with {:ok, values, state} <- eval_arguments(args, state) do
-        request = %Effect{kind: effect, name: to_string(name), arguments: values}
-        occurrence = Enum.count(state.effect_requests, &(&1 == request))
+    cond do
+      effect && state.in_function ->
+        {:error, {:effect_inside_fn, to_string(name)}, state}
 
-        case effect_result(state.effect_results, request, occurrence) do
-          :error ->
-            {:effect, request, state}
+      effect ->
+        invoke_effect(effect, name, args, state)
 
-          {:ok, {:ok, value}} ->
-            {:ok, value, %{state | effect_requests: [request | state.effect_requests]}}
+      true ->
+        {:error, {:function_not_allowed, name}, state}
+    end
+  end
 
-          {:ok, {:error, reason}} ->
-            {:error, reason, %{state | effect_requests: [request | state.effect_requests]}}
-        end
+  defp invoke_effect(effect, name, args, state) do
+    with {:ok, values, state} <- eval_arguments(args, state) do
+      request = %Effect{kind: effect, name: to_string(name), arguments: values}
+      occurrence = Enum.count(state.effect_requests, &(&1 == request))
+
+      case effect_result(state.effect_results, request, occurrence) do
+        :error ->
+          {:effect, request, state}
+
+        {:ok, {:ok, value}} ->
+          {:ok, value, %{state | effect_requests: [request | state.effect_requests]}}
+
+        {:ok, {:error, reason}} ->
+          {:error, reason, %{state | effect_requests: [request | state.effect_requests]}}
       end
-    else
-      {:error, {:function_not_allowed, name}, state}
     end
   end
 
@@ -798,6 +1112,26 @@ defmodule Imp.Predict.RLM.Interpreter do
       {:error, bytes} -> value_budget_error(bytes, state)
       :unknown -> :ok
     end
+  end
+
+  defp check_transformation_budget(:String, :duplicate, [string, count], state)
+       when is_binary(string) and is_integer(count) and count >= 0,
+       do: check_projected_budget(byte_size(string) * count + 6, state)
+
+  defp check_transformation_budget(:List, :duplicate, [value, count], state)
+       when is_integer(count) and count >= 0,
+       do: check_projected_budget(:erlang.external_size(value) * count + 6, state)
+
+  defp check_transformation_budget(:String, function, [string, count | padding], state)
+       when function in [:pad_leading, :pad_trailing] and is_binary(string) and
+              is_integer(count) and count >= 0 do
+    padding_bytes =
+      case padding do
+        [pad] when is_binary(pad) -> max(byte_size(pad), 1)
+        _ -> 1
+      end
+
+    check_projected_budget(byte_size(string) + count * padding_bytes + 6, state)
   end
 
   defp check_transformation_budget(_module, _function, _values, _state), do: :ok

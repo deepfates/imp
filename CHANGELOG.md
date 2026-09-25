@@ -4,6 +4,18 @@ User-visible changes to Imp are recorded here.
 
 ## 0.5.0 — not yet released
 
+### Security
+
+- An LM client, an HTTP retriever and the MLflow and W&B trackers print with
+  their credentials redacted, and so does a program holding such an LM.
+  `Imp.req_llm(model, api_key: key)` printed the key in IEx, in log lines and
+  in crash reports.
+- RLM controller code cannot build a map that poses as a struct. A map
+  literal with a `__struct__` key is refused, and a library call refuses any
+  struct other than ranges, `MapSet` and the calendar types, and any other
+  Elixir module named as a value: `Enum.join` over a map shaped like a
+  `File.Stream` read the named file.
+
 ### Installing
 
 - Imp is a Hex package: `{:imp, "~> 0.5"}`. Every dependency comes from Hex,
@@ -350,6 +362,16 @@ User-visible changes to Imp are recorded here.
   slow calls succeeded; through Imp's pool, 8 of 8). A caller's own `:finch`
   or `:connect_options` in `req_http_options` is left alone. Streaming still
   uses ReqLLM's pool.
+- RLM controller code may call every function of `Enum`, `Keyword`, `List`,
+  `Map` and `String` except `String.to_atom`, `List.to_atom`,
+  `String.splitter`, `Enum.random`, `Enum.shuffle` and `Enum.take_random`, and
+  may pass them anonymous functions and captures, which the interpreter runs
+  under the cell's step and value budgets. Registered tools, `llm_query` and
+  `submit` stay outside such functions. Other module calls return
+  `{:function_not_allowed, module, function, arity}`.
+- RLM accepts a controller reply that is JSON text holding exactly the
+  required outputs as the final submission, as its prompt says; it was
+  accepted only when the LM returned a map.
 
 ### Signatures
 
