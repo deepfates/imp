@@ -151,11 +151,11 @@ defmodule Imp.TelemetryLineageContractTest do
   end
 
   test "the old callbacks setting fails loudly instead of pretending to observe work" do
-    assert_raise ArgumentError, ~r/does not support :callbacks.*:telemetry\.attach\/4/s, fn ->
+    assert_raise ArgumentError, ~r/:callbacks is not a setting.*:telemetry\.attach\/4/s, fn ->
       Imp.configure(callbacks: [fn -> send(self(), :should_not_run) end])
     end
 
-    assert_raise ArgumentError, ~r/does not support :callbacks/, fn ->
+    assert_raise ArgumentError, ~r/:callbacks is not a setting/, fn ->
       Imp.configure(%{"callbacks" => []})
     end
 

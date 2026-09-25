@@ -61,14 +61,14 @@ defmodule OTPStateSemanticsTest do
   end
 
   test "settings contexts snapshot all effective values at entry" do
-    Imp.configure(lm: :before, retriever: :before)
+    Imp.configure(lm: :before, adapter: :before)
     parent = self()
 
     mutator =
       Task.async(fn ->
         receive do
           :mutate ->
-            Imp.configure(lm: :after, retriever: :after, two_step_extraction_lm: :later)
+            Imp.configure(lm: :after, adapter: :after, two_step_extraction_lm: :later)
             send(parent, :mutated)
         end
       end)
@@ -85,7 +85,7 @@ defmodule OTPStateSemanticsTest do
 
     Task.await(mutator)
     assert captured.lm == :before
-    assert captured.retriever == :before
+    assert captured.adapter == :before
     assert captured.tenant == :outer
     assert captured.request_id == :inner
     refute Map.has_key?(captured, :two_step_extraction_lm)
@@ -93,7 +93,7 @@ defmodule OTPStateSemanticsTest do
   end
 
   test "Imp tasks snapshot complete effective settings at submission" do
-    Imp.configure(lm: :global_before, retriever: :before)
+    Imp.configure(lm: :global_before, adapter: :before)
     parent = self()
 
     task =
@@ -113,17 +113,17 @@ defmodule OTPStateSemanticsTest do
       end)
 
     assert_receive {:snapshot_worker_ready, worker_pid}
-    Imp.configure(lm: :global_after, retriever: :after, two_step_extraction_lm: :later)
+    Imp.configure(lm: :global_after, adapter: :after, two_step_extraction_lm: :later)
     send(worker_pid, :read_snapshot)
 
     assert {base, nested} = Task.await(task)
     assert base.lm == :outer
-    assert base.retriever == :before
+    assert base.adapter == :before
     assert base.tenant == :inner
     refute Map.has_key?(base, :two_step_extraction_lm)
     assert nested.tenant == :worker_nested
     assert nested.lm == :outer
-    assert nested.retriever == :before
+    assert nested.adapter == :before
   end
 
   test "async_max_workers requires a positive integer" do
@@ -136,39 +136,44 @@ defmodule OTPStateSemanticsTest do
     end
   end
 
-  test "max_errors defaults to ten and settings reject unresolved values" do
-    assert Imp.settings().max_errors == 10
+  test "max_errors and retriever are not settings, and saying so names their place" do
+    refute Map.has_key?(Imp.settings(), :max_errors)
+    refute Map.has_key?(Imp.settings(), :retriever)
 
-    assert_raise ArgumentError, ~r/:max_errors option to match/, fn ->
-      Imp.configure(max_errors: -1)
+    for {key, place} <- [max_errors: ~r/COPRO\.compile\/5/, retriever: ~r/Imp\.rag/] do
+      assert_raise ArgumentError, ~r/#{inspect(key)} is not a setting/, fn ->
+        Imp.configure([{key, 1}])
+      end
+
+      assert_raise ArgumentError, place, fn ->
+        Imp.configure(%{Atom.to_string(key) => 1})
+      end
+
+      # context/2 carries keys of the caller's own, but not one that reads as
+      # an Imp setting and would be ignored.
+      assert_raise ArgumentError, ~r/#{inspect(key)} is not a setting/, fn ->
+        Imp.context([{key, 1}], fn -> :ok end)
+      end
     end
-
-    assert_raise ArgumentError, ~r/:max_errors option to match/, fn ->
-      Imp.context([max_errors: nil], fn -> :ok end)
-    end
-
-    assert Imp.settings().max_errors == 10
-    assert Imp.context([max_errors: 0], fn -> Imp.settings().max_errors end) == 0
-    assert Imp.context([max_errors: :infinity], fn -> Imp.settings().max_errors end) == :infinity
   end
 
   test "known string setting keys canonicalize safely and reject mixed-form collisions" do
-    Imp.configure(%{"max_errors" => 4, "async_max_workers" => 3})
+    Imp.configure(%{"track_usage" => true, "async_max_workers" => 3})
 
-    assert Imp.settings().max_errors == 4
+    assert Imp.settings().track_usage == true
     assert Imp.settings().async_max_workers == 3
-    refute Map.has_key?(Imp.settings(), "max_errors")
+    refute Map.has_key?(Imp.settings(), "track_usage")
     refute Map.has_key?(Imp.settings(), "async_max_workers")
 
-    assert Imp.context(%{"max_errors" => :infinity, "lm" => :string_lm}, fn ->
-             {Imp.settings().max_errors, Imp.settings().lm}
-           end) == {:infinity, :string_lm}
+    assert Imp.context(%{"async_max_workers" => 2, "lm" => :string_lm}, fn ->
+             {Imp.settings().async_max_workers, Imp.settings().lm}
+           end) == {2, :string_lm}
 
-    assert_raise ArgumentError, ~r/:max_errors option to match/, fn ->
-      Imp.configure(%{"max_errors" => -1})
+    assert_raise ArgumentError, ~r/:async_max_workers option: expected positive integer/, fn ->
+      Imp.configure(%{"async_max_workers" => -1})
     end
 
-    colliding = Map.put(%{"max_errors" => 5}, :max_errors, 6)
+    colliding = Map.put(%{"async_max_workers" => 5}, :async_max_workers, 6)
 
     assert_raise ArgumentError, ~r/colliding setting keys/, fn ->
       Imp.configure(colliding)

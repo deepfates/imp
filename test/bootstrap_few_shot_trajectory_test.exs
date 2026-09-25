@@ -485,7 +485,7 @@ defmodule Imp.Optimizer.BootstrapFewShotTrajectoryTest do
     assert [demo] = compiled.demos
     assert Imp.Example.get(demo, :answer) == "generated"
     assert Imp.Optimizer.Report.fetch(compiled).metadata.max_errors == 10
-    assert Imp.Optimizer.Report.fetch(compiled).metadata.max_errors_source == :settings
+    assert Imp.Optimizer.Report.fetch(compiled).metadata.max_errors_source == :default
   end
 
   test "resets compiled student state without resetting the independent default teacher" do
@@ -596,39 +596,26 @@ defmodule Imp.Optimizer.BootstrapFewShotTrajectoryTest do
     refute Map.has_key?(Imp.Settings.get(), :teacher_marker)
   end
 
-  test "process-local max_errors inheritance yields to an explicit optimizer value" do
+  test "max_errors is ten unless the optimizer is given one, and is not a teacher setting" do
     program = Imp.predict("question -> answer")
     trainset = [Imp.example(question: "q", answer: "a") |> Imp.with_inputs(:question)]
 
-    inherited =
-      Imp.context([max_errors: 3], fn ->
-        Imp.Optimizer.BootstrapFewShot.new(max_bootstrapped_demos: 0)
-        |> Imp.Optimizer.BootstrapFewShot.compile(program, trainset)
-      end)
+    defaulted =
+      Imp.Optimizer.BootstrapFewShot.new(max_bootstrapped_demos: 0)
+      |> Imp.Optimizer.BootstrapFewShot.compile(program, trainset)
       |> Imp.Optimizer.Report.fetch()
 
     explicit =
-      Imp.context([max_errors: 3], fn ->
-        Imp.Optimizer.BootstrapFewShot.new(max_bootstrapped_demos: 0, max_errors: 7)
-        |> Imp.Optimizer.BootstrapFewShot.compile(program, trainset)
-      end)
+      Imp.Optimizer.BootstrapFewShot.new(max_bootstrapped_demos: 0, max_errors: 7)
+      |> Imp.Optimizer.BootstrapFewShot.compile(program, trainset)
       |> Imp.Optimizer.Report.fetch()
 
-    teacher_context =
-      Imp.context([max_errors: 3], fn ->
-        Imp.Optimizer.BootstrapFewShot.new(
-          max_bootstrapped_demos: 0,
-          teacher_settings: [max_errors: 6]
-        )
-        |> Imp.Optimizer.BootstrapFewShot.compile(program, trainset)
-      end)
-      |> Imp.Optimizer.Report.fetch()
-
-    assert {inherited.metadata.max_errors, inherited.metadata.max_errors_source} == {3, :settings}
+    assert {defaulted.metadata.max_errors, defaulted.metadata.max_errors_source} == {10, :default}
     assert {explicit.metadata.max_errors, explicit.metadata.max_errors_source} == {7, :explicit}
 
-    assert {teacher_context.metadata.max_errors, teacher_context.metadata.max_errors_source} ==
-             {6, :teacher_settings}
+    assert_raise ArgumentError, ~r/:max_errors is not a setting/, fn ->
+      Imp.Optimizer.BootstrapFewShot.new(teacher_settings: [max_errors: 6])
+    end
   end
 
   test "a zero-valued threshold uses metric truthiness, including 0.0" do

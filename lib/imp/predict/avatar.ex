@@ -42,7 +42,7 @@ defmodule Imp.Predict.Avatar do
   def new(signature, tools, opts \\ []) do
     signature = Imp.Signature.ensure(signature)
     validate_reserved_fields!(signature)
-    opts = Imp.Options.validate!(opts, @option_schema, "Imp.Predict.Avatar.new/3")
+    opts = Imp.Predict.Options.validate!(opts, @option_schema, "Imp.Predict.Avatar.new/3")
     tools = Imp.Tool.index_tools!(tools, "Imp.Predict.Avatar.new/3")
 
     if Imp.Tool.resolve_name(tools, "Finish") do

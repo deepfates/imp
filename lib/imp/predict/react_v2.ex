@@ -230,7 +230,10 @@ defmodule Imp.Predict.ReActV2 do
   @spec new(Imp.Signature.t() | String.t(), [Imp.Tool.t()], keyword()) :: t()
   def new(signature, tools, opts \\ []) do
     signature = Imp.Signature.ensure(signature)
-    opts = Imp.Options.validate!(opts, @option_schema, "Imp.Predict.ReActV2.new/3")
+
+    opts =
+      Imp.Predict.Options.validate!(opts, @option_schema, "Imp.Predict.ReActV2.new/3")
+
     tools = Imp.Tool.index_tools!(tools, "Imp.Predict.ReActV2.new/3")
 
     if Imp.Tool.resolve_name(tools, :submit) do

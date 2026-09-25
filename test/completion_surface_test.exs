@@ -31,7 +31,7 @@ defmodule CompletionSurfaceTest do
   end
 
   setup do
-    Imp.configure(lm: nil, adapter: Imp.Adapter.Chat, retriever: nil)
+    Imp.configure(lm: nil, adapter: Imp.Adapter.Chat)
     # Restore global Imp.Settings to defaults on exit so this module never
     # leaves non-default settings for a later module. See dee-fqsr.
     on_exit(&Imp.Settings.reset/0)

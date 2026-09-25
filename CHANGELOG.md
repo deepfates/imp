@@ -330,9 +330,18 @@ User-visible changes to Imp are recorded here.
   that ignored the temperature; a request option given at the top level (such
   as `:temperature`, `:max_tokens` or `:n`) is now refused with a message that
   says to put it under `config:`. Settings of a caller's own, such as a request
-  id, go through `Imp.context/2`, which still carries any key; both check
-  Imp's own settings the same way, so `:track_usage` and
-  `:warn_on_type_mismatch` must now be booleans.
+  id, go through `Imp.context/2`. Both check Imp's own settings the same way,
+  so `:track_usage` and `:warn_on_type_mismatch` must now be booleans. ReAct,
+  ReActV2, Avatar, CodeAct, ProgramOfThought, MultiChainComparison and
+  `Imp.Optimizer.Avatar` give the same `config:` message.
+- `:max_errors` and `:retriever` are no longer settings. Nothing read
+  `:retriever`; give a retriever to the program (`Imp.rag/3`). `:max_errors`
+  was read only by BootstrapFewShot, RandomSearch and COPRO, as the fallback
+  for their own `:max_errors`; given none, they now use 10, the setting's old
+  default, and their reports say `max_errors_source: :default` where they said
+  `:settings` or `:teacher_settings`. `Imp.configure/1`, `Imp.context/2` and an
+  optimizer's `:teacher_settings` refuse either key with a message naming where
+  it belongs.
 
 ### Errors and shapes
 

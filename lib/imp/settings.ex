@@ -24,20 +24,10 @@ defmodule Imp.Settings do
       default: Imp.Adapter.Chat,
       doc: "The adapter a program without its own `:adapter` uses."
     ],
-    retriever: [
-      type: :any,
-      default: nil,
-      doc: "The default retriever."
-    ],
     async_max_workers: [
       type: :pos_integer,
       default: 8,
       doc: "How many Imp tasks run at once."
-    ],
-    max_errors: [
-      type: {:or, [{:in, [:infinity]}, :non_neg_integer]},
-      default: 10,
-      doc: "How many failed examples an optimizer tolerates, or `:infinity`."
     ],
     track_usage: [
       type: :boolean,
@@ -62,9 +52,17 @@ defmodule Imp.Settings do
   # Validation must not fill in defaults: `configure/1` merges only the keys
   # it is given.
   @validation_schema for {key, spec} <- @schema, do: {key, Keyword.delete(spec, :default)}
-  # `"callbacks"` is canonicalized so that it meets the refusal that names
-  # telemetry as the replacement.
-  @known_string_keys Map.new([{:callbacks, []} | @schema], fn {key, _spec} ->
+  # Keys that are not settings but look like one, with where each belongs.
+  # `configure/1` and `context/2` refuse them rather than carry a value
+  # nothing reads.
+  @not_settings [
+    callbacks: "attach handlers with :telemetry.attach/4 to Imp's [:imp, ...] events instead",
+    max_errors:
+      "pass :max_errors to BootstrapFewShot.new/2, RandomSearch.new/2, " <>
+        "COPRO.compile/5 or Imp.Evaluate.new/3",
+    retriever: "give the retriever to the program, as in Imp.rag(program, retriever)"
+  ]
+  @known_string_keys Map.new(@not_settings ++ @schema, fn {key, _spec} ->
                        {Atom.to_string(key), key}
                      end)
   @context_key :imp_context_stack
@@ -157,6 +155,12 @@ defmodule Imp.Settings do
   do not inherit process-local settings automatically; Imp-owned task helpers
   capture one complete effective snapshot when supervised async work is submitted.
 
+  Besides Imp's settings (listed under `configure/1`), a context carries keys of
+  the caller's own, such as a request id, readable with `get/0` and `fetch!/1`.
+  Imp's own settings are type-checked as `configure/1` checks them, and a key
+  that is not a setting but reads like one (`:max_errors`, `:retriever`,
+  `:callbacks`) raises `ArgumentError` rather than being carried unread.
+
       iex> Imp.Settings.context([lm: :outer], fn ->
       ...>   Imp.Settings.context([adapter: :inner], fn ->
       ...>     {Imp.Settings.get().lm, Imp.Settings.get().adapter}
@@ -202,6 +206,21 @@ defmodule Imp.Settings do
   def context(opts, _fun) do
     raise ArgumentError,
           "Imp.context/2 expects settings as a map or settings pair list; got: #{inspect(opts)}"
+  end
+
+  @doc false
+  # A NimbleOptions custom type for options that are handed to `context/2`
+  # later, such as an optimizer's `:teacher_settings`, so that they are refused
+  # when given rather than when first used.
+  def validate_overrides(overrides) do
+    if Keyword.keyword?(overrides) do
+      normalize_settings(overrides, "settings overrides")
+      {:ok, overrides}
+    else
+      {:error, "expected a keyword list of settings, got: #{inspect(overrides)}"}
+    end
+  rescue
+    error in ArgumentError -> {:error, Exception.message(error)}
   end
 
   @doc false
@@ -300,13 +319,12 @@ defmodule Imp.Settings do
     end
   end
 
-  defp put_validated_setting(_normalized, :callbacks, value, context) do
-    raise ArgumentError,
-          "#{context} does not support :callbacks (got #{inspect(value)}); " <>
-            "attach handlers with :telemetry.attach/4 to Imp's [:imp, ...] events instead"
-  end
-
   defp put_validated_setting(normalized, key, value, context) when is_atom(key) do
+    if instead = @not_settings[key] do
+      raise ArgumentError,
+            "#{context}: #{inspect(key)} is not a setting (got #{inspect(value)}); #{instead}"
+    end
+
     if key in Keyword.keys(@schema) do
       Imp.Options.validate!([{key, value}], @validation_schema, context)
     end

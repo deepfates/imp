@@ -26,7 +26,7 @@ defmodule ImpFacadeTest do
   end
 
   setup do
-    Imp.configure(lm: nil, adapter: Imp.Adapter.Chat, retriever: nil)
+    Imp.configure(lm: nil, adapter: Imp.Adapter.Chat)
     # Restore the global Imp.Settings Agent to defaults after every test (a
     # non-default :lm set below must not leak into later modules). See dee-fqsr.
     on_exit(&Imp.Settings.reset/0)

@@ -667,7 +667,7 @@ defmodule Imp.Optimizer.COPROFidelityTest do
     assert length(report.errors) == 2
   end
 
-  test "nil eval max_errors inherits process settings and explicit eval options win" do
+  test "nil eval max_errors is ten and explicit eval options win" do
     optimizer =
       COPRO.new(Imp.Metrics.exact_match(:answer),
         breadth: 2,
@@ -676,19 +676,13 @@ defmodule Imp.Optimizer.COPROFidelityTest do
         extra_instructions: ["Candidate instruction."]
       )
 
-    inherited =
-      Imp.context([max_errors: 5], fn ->
-        COPRO.compile(optimizer, constant_program(), trainset(), [])
-      end)
-      |> Report.fetch()
+    defaulted = COPRO.compile(optimizer, constant_program(), trainset(), []) |> Report.fetch()
 
     explicit =
-      Imp.context([max_errors: 5], fn ->
-        COPRO.compile(optimizer, constant_program(), trainset(), [], max_errors: 9)
-      end)
+      COPRO.compile(optimizer, constant_program(), trainset(), [], max_errors: 9)
       |> Report.fetch()
 
-    assert {inherited.metadata.max_errors, inherited.metadata.max_errors_source} == {5, :settings}
+    assert {defaulted.metadata.max_errors, defaulted.metadata.max_errors_source} == {10, :default}
     assert {explicit.metadata.max_errors, explicit.metadata.max_errors_source} == {9, :explicit}
   end
 

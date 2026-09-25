@@ -104,6 +104,10 @@ Ordinary Imp startup starts no protocol endpoint.
   `ArgumentError` for an option or setting they do not know. Request options
   such as `:temperature` go under `config:`; a setting of your own goes
   through `Imp.context/2`.
+- `:max_errors` and `:retriever` are no longer settings, and
+  `Imp.configure/1` and `Imp.context/2` refuse them. Pass `:max_errors` to
+  BootstrapFewShot, RandomSearch or COPRO (10 when not given) and a retriever
+  to the program.
 - ReActV2 emits no `:final` event; `:run_finished` carries the prediction.
   `Imp.Trajectory.to_atif/2`'s `extra.outcome` is `extra.terminal_event`, and
   a tool result's `extra.outcome` is the recorded `Imp.Tool.outcome/1`

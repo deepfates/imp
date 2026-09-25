@@ -90,4 +90,29 @@ defmodule Imp.ConstructorOptionsTest do
       assert Imp.context([request_id: "r-1"], fn -> Imp.settings().request_id end) == "r-1"
     end
   end
+
+  describe "constructors that build a Predict" do
+    test "give the same config: hint for a top-level request option" do
+      sig = "question -> answer"
+      metric = fn _example, _prediction -> 1.0 end
+
+      constructors = [
+        {"Imp.Predict.ReAct.new/3", fn -> Imp.Predict.ReAct.new(sig, [], temperature: 0) end},
+        {"Imp.Predict.ReActV2.new/3", fn -> Imp.Predict.ReActV2.new(sig, [], temperature: 0) end},
+        {"Imp.Predict.Avatar.new/3", fn -> Imp.Predict.Avatar.new(sig, [], temperature: 0) end},
+        {"Imp.Predict.CodeAct.new/3", fn -> Imp.Predict.CodeAct.new(sig, [], temperature: 0) end},
+        {"Imp.Predict.ProgramOfThought.new/2",
+         fn -> Imp.Predict.ProgramOfThought.new(sig, temperature: 0) end},
+        {"Imp.Predict.MultiChainComparison.new/2",
+         fn -> Imp.Predict.MultiChainComparison.new(sig, temperature: 0) end},
+        {"Imp.Optimizer.Avatar.new/2", fn -> Imp.Optimizer.Avatar.new(metric, temperature: 0) end}
+      ]
+
+      for {name, build} <- constructors do
+        error = assert_raise ArgumentError, build
+        assert Exception.message(error) =~ name
+        assert Exception.message(error) =~ "config: [temperature: 0]"
+      end
+    end
+  end
 end
