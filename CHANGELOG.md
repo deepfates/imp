@@ -449,6 +449,12 @@ User-visible changes to Imp are recorded here.
   one level by default; `max_recursion_depth: 0` makes `rlm_query*` a one-shot
   sub-LM query, as the standalone runtime's `max_depth=1` does.
 
+- An arity-3 metric receives `nil` as its trace from `Imp.evaluate/4` and the
+  optimizers' validation scoring, and the program's trace while an optimizer
+  bootstraps demos, as DSPy's `trace=None` has it. Before, evaluation passed
+  the trace too, so a ported metric that scores continuously when evaluated
+  and passes or fails when compiling gave its compile-time answer.
+
 ### Errors and shapes
 
 Every change here is breaking for code that matches on the old shape.

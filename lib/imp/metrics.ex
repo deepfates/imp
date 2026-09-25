@@ -12,6 +12,13 @@ defmodule Imp.Metrics do
   Use the small built-ins for deterministic local tasks and write ordinary
   functions when the task needs domain judgment.
 
+  A metric takes `(example, prediction)` or `(example, prediction, trace)`.
+  The trace is `nil` when a program is evaluated (`Imp.evaluate/4`, and the
+  validation scoring optimizers do through it), and the program's trace when an
+  optimizer bootstraps demos from it, as DSPy's `trace=None` switch has it: a
+  metric can score continuously for evaluation and pass or fail a demo while
+  compiling.
+
   ## Example
 
       iex> metric = Imp.Metrics.exact_match(:answer)
