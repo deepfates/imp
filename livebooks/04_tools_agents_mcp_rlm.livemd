@@ -171,7 +171,7 @@ case live_lm.(max_completion_tokens: 180) do
         end
       end)
     answer = Imp.get(live_prediction, :answer)
-    history = Imp.get(live_prediction, :history)
+    history = live_prediction.metadata.history
 
     unless answer == "Paris" and Enum.any?(history, &(&1.tool == :lookup)) do
       raise "live ReAct call returned an invalid result: #{inspect(Imp.to_map(live_prediction))}"

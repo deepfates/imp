@@ -73,7 +73,8 @@ defmodule Imp.MCP do
   to read. Its text items are joined; its structured content stands in as plain
   data when there is no text. For an `Imp.MCP.CallFailure`, a JSON-RPC error is
   the server's message, and otherwise the sentence follows its outcome: a
-  refused call says the server refused it, a call that was not sent says so,
+  refused call says the server refused it, a call whose credential was
+  refused says so, a call that was not sent says so,
   and a call whose outcome is unknown says it got no answer, why, and that it
   may have been carried out, because a timeout, a closed or failed connection,
   a broken stream, or a server that stopped waiting for its tool does not say
@@ -103,6 +104,9 @@ defmodule Imp.MCP do
 
       {:error, :refused} ->
         "the server refused the call."
+
+      {:error, :auth_refused} ->
+        "the server refused the credential, so it was not carried out."
 
       {:error, :not_sent} when reason != :not_connected ->
         "it was not sent, so it was not carried out."

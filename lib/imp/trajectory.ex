@@ -7,7 +7,18 @@ defmodule Imp.Trajectory do
   marked as copied context; every model request is also listed in
   `extra.model_requests`. A model response step carries the observed typed
   output. Lifecycle events and capture gaps become entries in
-  `extra.diagnostics` rather than dialogue steps.
+  `extra.diagnostics` rather than dialogue steps. `extra.terminal_event` is
+  the kind of the event that ended the run (`"run_finished"`, `"run_failed"`,
+  `"run_cancelled"`), or `"unknown"` when the events hold none.
+
+  A tool result's `extra.outcome`, on the result and on its call step, is the
+  `t:Imp.Tool.outcome/0` the loop recorded on the `:tool_result` event
+  (`metadata.outcome`); an event that carries none, and a call whose result was
+  not captured, is `"unknown"`.
+
+  Stored event maps are read by their `"kind"`. A kind that is not one of
+  `Imp.Run.Event.kinds/0`, such as one a host emitted itself, keeps its stored
+  string and becomes a diagnostic entry.
 
   Semantic tool dispatches have `llm_call_count: 0`; a model response leaves the
   count null, because a request may have been served from a cache. Inference
@@ -24,22 +35,6 @@ defmodule Imp.Trajectory do
   """
 
   alias Imp.Run.Event
-
-  @kinds [
-    :run_started,
-    :run_finished,
-    :run_failed,
-    :run_cancelled,
-    :model_request,
-    :model_response,
-    :tools_sent,
-    :tool_call,
-    :tool_result,
-    :reasoning,
-    :final,
-    :capture_gap,
-    :context_projected
-  ]
 
   @doc "Builds a JSON-encodable ATIF document from one run's ordered events or stored event maps."
   def to_atif(events, opts \\ []) when is_list(events) do
@@ -77,7 +72,7 @@ defmodule Imp.Trajectory do
       steps:
         Enum.with_index(steps, 1) |> Enum.map(fn {step, id} -> Map.put(step, :step_id, id) end),
       extra: %{
-        outcome: if(terminal, do: terminal.kind, else: :unknown),
+        terminal_event: if(terminal, do: terminal.kind, else: :unknown),
         model_requests: state.requests,
         diagnostics: state.diagnostics,
         capture: "Native Imp execution observations; model inference counts are unknown"
@@ -256,20 +251,18 @@ defmodule Imp.Trajectory do
   defp truncated?(event), do: get(get(event.metadata, :capture) || %{}, :truncated) == true
 
   defp result_outcome(event) do
-    cond do
-      truncated?(event) -> :unknown
-      not is_nil(event.error) -> :error
-      true -> :returned
-    end
+    recorded = get(event.metadata, :outcome)
+    Enum.find(Imp.Tool.outcomes(), :unknown, &(&1 == recorded or to_string(&1) == recorded))
   end
 
   defp native_event(%Event{} = event), do: event
 
   defp native_event(map) when is_map(map) do
-    kind = Enum.find(@kinds, :other, &(to_string(&1) == get(map, :kind)))
+    stored = get(map, :kind)
+    kind = Enum.find(Event.kinds(), stored, &(to_string(&1) == stored))
 
     attrs =
-      Map.new(Map.keys(Map.from_struct(%Event{run_id: "", sequence: 0, kind: :other})), fn key ->
+      Map.new(Map.keys(Map.from_struct(%Event{run_id: "", sequence: 0, kind: nil})), fn key ->
         {key, get(map, key)}
       end)
 

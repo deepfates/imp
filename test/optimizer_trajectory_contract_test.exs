@@ -100,13 +100,14 @@ defmodule Imp.Optimizer.TrajectoryContractTest do
       ToolCallResults.new([ToolResult.new(:lookup, "France", id: "call-native")])
 
     prediction =
-      Imp.Prediction.new(%{
-        answer: "France",
-        history: [
-          %{tool: :lookup, arguments: %{city: "Paris"}, result: "France"},
-          %{next_thought: "confirm", tool_calls: calls, tool_call_results: results}
-        ]
-      })
+      Imp.Prediction.new(%{answer: "France"},
+        metadata: %{
+          history: [
+            %{tool: :lookup, arguments: %{city: "Paris"}, result: "France"},
+            %{next_thought: "confirm", tool_calls: calls, tool_call_results: results}
+          ]
+        }
+      )
 
     trajectory = Trajectory.project(:react, prediction)
 
@@ -118,7 +119,7 @@ defmodule Imp.Optimizer.TrajectoryContractTest do
            ]
 
     assert Enum.map(trajectory.events, & &1.sequence) == [0, 1, 2, 3]
-    assert trajectory.trace == Imp.Prediction.get(prediction, :history)
+    assert trajectory.trace == prediction.metadata[:history]
     assert Trajectory.validate!(trajectory) == trajectory
   end
 

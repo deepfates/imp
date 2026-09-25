@@ -158,51 +158,54 @@ defmodule Imp.Tool do
       reported, such as an MCP error result; the tool said what happened.
     * `:refused` — declined before anything ran: Imp's own checks (an unknown
       tool, a malformed call, arguments that fail the schema, a tool policy, a
-      host's authorization, submit outputs that do not fit) or, for an MCP
-      tool, the server or its HTTP layer.
+      host's authorization, submit outputs that do not fit), recorded by the
+      loop that made them; for an MCP tool, the server or its HTTP layer; or
+      an MCP error result that declares it.
+    * `:auth_refused` — the credential was refused before anything ran: an
+      MCP server's HTTP 401, a failed OAuth flow, or an MCP error result that
+      declares it. Renewing the credential and trying once more may succeed.
     * `:not_sent` — an MCP request that never left.
     * `:unknown` — the tool may have acted and there is no answer to say
       whether it did: a tool function that raised, threw or exited, an RLM
-      budget that stopped or refused the call, or an MCP call with no
-      trustworthy answer. Check before repeating it.
-
-  A tool policy that denies with its own error term, or an
-  `Imp.OperationalSafetyError`, reads as `:result`, because that term cannot be
-  told apart from the same term returned by a tool that ran. A policy that
-  denies with `false` reads as `:refused`.
+      budget that stopped or refused the call, an MCP call with no trustworthy
+      answer, or an MCP error result that declares it. Check before repeating
+      it.
   """
-  @type outcome :: :result | :refused | :not_sent | :unknown
+  @type outcome :: :result | :refused | :auth_refused | :not_sent | :unknown
+
+  @outcomes [:result, :refused, :auth_refused, :not_sent, :unknown]
+
+  @doc "Every `t:outcome/0`."
+  @spec outcomes() :: [outcome()]
+  def outcomes, do: @outcomes
 
   @doc """
   The outcome of a tool call, read from the value the call returned.
 
   Pass what `call/2` returned, or the `{:error, reason}` a ReActV2 or RLM loop
-  recorded for the call. `Imp.MCP.CallFailure` carries the outcome of an MCP
-  call that got no answer; see it for the MCP cases.
+  recorded for the call. A tool function can return any term, including one
+  that looks like an Imp refusal, so a value alone never reads as `:refused`
+  unless something that knows declared it: an `Imp.MCP.CallFailure`, which
+  Imp builds where ExMCP's error arrives, or an MCP error result whose
+  `structuredContent.outcome` is `"refused"`, `"auth_refused"` or
+  `"unknown"`. Imp's own refusals are decided by the loop that made them,
+  which records the outcome on the call's `:tool_result` event as
+  `metadata.outcome`; read that rather than this for a recorded call.
 
       iex> Imp.Tool.outcome("Paris")
       :result
-      iex> Imp.Tool.outcome({:error, {:unknown_tool, "frobnicate"}})
-      :refused
       iex> Imp.Tool.outcome({:error, {:tool_error, :lookup, {:exit, :killed}}})
+      :unknown
+      iex> Imp.Tool.outcome({:error, {:mcp_tool_error, %{
+      ...>   "isError" => true,
+      ...>   "content" => [%{"type" => "text", "text" => "error: write outcome unknown"}],
+      ...>   "structuredContent" => %{"code" => "write_outcome_unknown", "outcome" => "unknown"}
+      ...> }}})
       :unknown
   """
   @spec outcome(term()) :: outcome()
   def outcome({:error, reason}), do: error_outcome(reason)
   def outcome(_value), do: :result
-
-  @refusals [
-    :unknown_tool,
-    :malformed_tool_call,
-    :missing_required,
-    :schema_validation,
-    :tool_denied,
-    :tool_policy_error,
-    :tool_authorization_denied,
-    :missing_output_fields,
-    :invalid_submit_outputs,
-    :invalid_submit_arguments
-  ]
 
   # RLM runs each tool inside its budget. A budget error can come before the
   # tool starts or after RLM stopped a tool that was still running, and the
@@ -210,6 +213,7 @@ defmodule Imp.Tool do
   @rlm_budget_errors [:rlm_time_budget_exceeded, :rlm_cancelled, :rlm_max_llm_calls]
 
   defp error_outcome(%Imp.MCP.CallFailure{outcome: outcome}), do: outcome
+  defp error_outcome({:mcp_tool_error, envelope}), do: declared_outcome(envelope)
   defp error_outcome({:rlm_tool_error, reason}), do: error_outcome(reason)
   defp error_outcome({:rlm_effect_exit, _reason}), do: :unknown
   defp error_outcome(reason) when reason in @rlm_budget_errors, do: :unknown
@@ -218,12 +222,27 @@ defmodule Imp.Tool do
     do: :unknown
 
   defp error_outcome({:tool_error, _name, _reason}), do: :unknown
-
-  defp error_outcome(reason)
-       when is_tuple(reason) and tuple_size(reason) > 0 and elem(reason, 0) in @refusals,
-       do: :refused
-
   defp error_outcome(_reason), do: :result
+
+  # An MCP error result is the tool's own answer. A server that knows more
+  # than that says so in `structuredContent.outcome`, in the words of this
+  # type: Kite marks a write that may have been applied `"unknown"`, and its
+  # `Kite.Effects.Failure` kinds are these names. Nothing else in the envelope
+  # is read as a claim about whether the tool acted.
+  @declared %{"refused" => :refused, "auth_refused" => :auth_refused, "unknown" => :unknown}
+
+  defp declared_outcome(envelope) when is_map(envelope) do
+    with structured when is_map(structured) <- field(envelope, :structuredContent),
+         declared when is_binary(declared) <- field(structured, :outcome) do
+      Map.get(@declared, declared, :result)
+    else
+      _none -> :result
+    end
+  end
+
+  defp declared_outcome(_envelope), do: :result
+
+  defp field(map, key), do: Map.get(map, key, Map.get(map, Atom.to_string(key)))
 
   @doc false
   def validate_input(%__MODULE__{} = tool, input), do: do_validate_input(tool, input)

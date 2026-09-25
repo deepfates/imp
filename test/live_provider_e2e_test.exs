@@ -151,7 +151,7 @@ defmodule LiveProviderE2ETest do
              })
 
     assert Imp.Prediction.get(prediction, :answer) == "Paris"
-    history = Imp.Prediction.get(prediction, :history)
+    history = prediction.metadata[:history]
     assert Enum.any?(history, &(&1.tool == :lookup and &1.result == "Paris"))
     assert Enum.any?(history, &(&1.tool == :submit))
   end
@@ -235,7 +235,7 @@ defmodule LiveProviderE2ETest do
     assert {:ok, prediction} = Imp.call(agent, %{question: "What is France's capital?"})
     assert Imp.get(prediction, :answer) == "Paris"
 
-    history = Imp.get(prediction, :history)
+    history = prediction.metadata[:history]
     assert Enum.any?(history, &(&1.tool == :lookup_capital and &1.result == "Paris"))
     assert Enum.any?(history, &(&1.tool == :submit))
 
@@ -357,7 +357,7 @@ defmodule LiveProviderE2ETest do
 
     assert {:ok, prediction} = Imp.call(program, %{question: "Capital of France?"})
     assert Imp.get(prediction, :answer) == "Paris", inspect(prediction, pretty: true)
-    assert Imp.get(prediction, :termination_reason) in [:submit, :forced_submit]
+    assert prediction.metadata[:termination_reason] in [:submit, :forced_submit]
   end
 
   test "live provider drives symbolic RLM code with observable budget" do

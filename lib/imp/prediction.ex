@@ -84,6 +84,24 @@ defmodule Imp.Prediction do
   def to_map(%__MODULE__{fields: fields}), do: fields
 
   @doc """
+  Whether the program that made this prediction ended with its outputs.
+
+  An `Imp.Predict.ReActV2` turn that was interrupted and could not answer says
+  so with `termination_reason: :incomplete` in the prediction's metadata, and
+  its fields hold no outputs. Every other prediction is complete.
+
+      iex> Imp.Prediction.complete?(Imp.Prediction.new(%{answer: "Paris"}))
+      true
+      iex> Imp.Prediction.complete?(
+      ...>   Imp.Prediction.new(%{}, metadata: %{termination_reason: :incomplete})
+      ...> )
+      false
+  """
+  @spec complete?(t()) :: boolean()
+  def complete?(%__MODULE__{metadata: metadata}),
+    do: Map.get(metadata, :termination_reason) != :incomplete
+
+  @doc """
   Returns the LM usage ledger for this prediction.
 
   Ports DSPy's `Prediction.get_lm_usage()`: a map of model key (for example

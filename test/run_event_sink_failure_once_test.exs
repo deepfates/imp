@@ -71,6 +71,7 @@ defmodule Imp.RunEventSinkFailureOnceTest do
   defp reports do
     receive do
       {:imp_run_event_sink_failed, _run_id, failure} -> [failure | reports()]
+      {:imp_run_event_undelivered, _run_id, event} -> [event | reports()]
     after
       0 -> []
     end

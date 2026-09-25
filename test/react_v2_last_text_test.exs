@@ -49,8 +49,8 @@ defmodule ReActV2LastTextTest do
 
     assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
     assert Imp.get(prediction, :answer) == prose
-    assert Imp.get(prediction, :termination_reason) == :last_text
-    assert Imp.get(prediction, :termination_cause) == :max_iters
+    assert prediction.metadata[:termination_reason] == :last_text
+    assert prediction.metadata[:termination_cause] == :max_iters
 
     [{_first, first_opts}, {_second, _}, {last, last_opts}] = requests(3)
     refute_received {:request, 4, _messages, _opts}
@@ -65,7 +65,7 @@ defmodule ReActV2LastTextTest do
     refute Enum.any?(user_contents(last), &(&1 =~ "step"))
 
     # The prose is this turn's history event, as an answered step's is.
-    messages = prediction |> Imp.get(:history) |> Imp.History.messages()
+    messages = prediction.metadata[:history] |> Imp.History.messages()
     assert Enum.any?(messages, &(Map.get(&1, :next_thought) == prose))
   end
 
@@ -77,7 +77,7 @@ defmodule ReActV2LastTextTest do
       Imp.react_v2("intent -> answer", [look()],
         lm: recording_lm(owner, "The thing is there."),
         max_iters: 1,
-        last_text_note: note
+        last_request_note: note
       )
 
     assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
@@ -86,7 +86,7 @@ defmodule ReActV2LastTextTest do
     [_first, {last, _}] = requests(2)
     assert List.last(user_contents(last)) =~ note
 
-    history = Imp.get(prediction, :history)
+    history = prediction.metadata[:history]
     assert Enum.any?(Imp.History.messages(history), &(Map.get(&1, :intent) == note))
   end
 
@@ -118,8 +118,8 @@ defmodule ReActV2LastTextTest do
 
     assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
     assert Imp.get(prediction, :answer) == nil
-    assert Imp.get(prediction, :termination_reason) == :last_text
-    refute Imp.get(prediction, :termination_error)
+    assert prediction.metadata[:termination_reason] == :last_text
+    refute prediction.metadata[:termination_error]
   end
 
   test "the last request and its completion are recorded as events" do
@@ -144,7 +144,7 @@ defmodule ReActV2LastTextTest do
     kinds = run_event_kinds([])
     assert Enum.count(kinds, &(&1 == :model_request)) == 2
     assert Enum.count(kinds, &(&1 == :model_response)) == 2
-    assert Enum.count(kinds, &(&1 == :final)) == 1
+    assert List.last(kinds) == :run_finished
   end
 
   defp run_event_kinds(kinds) do
@@ -172,12 +172,12 @@ defmodule ReActV2LastTextTest do
         end
       )
 
-    program = Imp.react_v2("intent -> answer", [look()], lm: lm, last_text_note: "Last one.")
+    program = Imp.react_v2("intent -> answer", [look()], lm: lm, last_request_note: "Last one.")
 
     assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
     assert Imp.get(prediction, :answer) == "I could not look, so from memory: it is there."
-    assert Imp.get(prediction, :termination_reason) == :last_text
-    assert Imp.get(prediction, :termination_cause) == :prediction_error
+    assert prediction.metadata[:termination_reason] == :last_text
+    assert prediction.metadata[:termination_cause] == :prediction_error
 
     [_failed, {last, last_opts}] = requests(2)
     assert last_opts[:tool_choice] == "auto"
@@ -197,8 +197,8 @@ defmodule ReActV2LastTextTest do
     program = Imp.react_v2("intent -> answer", [look()], lm: lm)
 
     assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
-    assert Imp.get(prediction, :termination_cause) == :prediction_error
-    assert %{initial: _first, last_text: _last} = error = Imp.get(prediction, :termination_error)
+    assert prediction.metadata[:termination_cause] == :prediction_error
+    assert %{initial: _first, last_text: _last} = error = prediction.metadata[:termination_error]
     assert Map.keys(error) |> Enum.sort() == [:initial, :last_text]
   end
 
@@ -220,7 +220,7 @@ defmodule ReActV2LastTextTest do
 
     assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
     assert Imp.get(prediction, :answer) == nil
-    assert Imp.get(prediction, :termination_reason) == :answered
+    assert prediction.metadata[:termination_reason] == :answered
     assert [{_only, _opts}] = requests(1)
     refute_received {:request, 2, _, _}
   end
@@ -261,8 +261,8 @@ defmodule ReActV2LastTextTest do
 
     assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
     assert Imp.get(prediction, :answer) == "Answered after all."
-    assert Imp.get(prediction, :termination_reason) == :last_text
-    assert Imp.get(prediction, :termination_cause) == :prediction_error
+    assert prediction.metadata[:termination_reason] == :last_text
+    assert prediction.metadata[:termination_cause] == :prediction_error
     assert_received {:tool_choice, "auto"}
     assert_received {:tool_choice, "auto"}
   end
@@ -281,21 +281,24 @@ defmodule ReActV2LastTextTest do
       Imp.react_v2("intent -> answer", [slow_look],
         lm: recording_lm(owner, "never asked"),
         max_iters: 1,
-        last_text_note: "Last one."
+        last_request_note: "Last one."
       )
 
     assert {:ok, prediction} =
              Imp.Deadline.with_deadline(10, fn -> Imp.call(program, %{intent: "hello"}) end)
 
-    assert Imp.get(prediction, :termination_reason) == :deadline_exceeded
-    assert Imp.get(prediction, :termination_cause) == :max_iters
-    assert Imp.get(prediction, :answer) == nil
+    # The turn was interrupted at the step limit, and what left it without an
+    # answer is the deadline.
+    assert prediction.metadata[:termination_reason] == :incomplete
+    assert prediction.metadata[:termination_cause] == :deadline_exceeded
+    assert prediction.fields == %{}
+    refute Imp.Prediction.complete?(prediction)
 
     [_first] = requests(1)
     refute_received {:request, 2, _messages, _opts}
 
     # The note is what the model would have been told; no request, no note.
-    history = Imp.get(prediction, :history)
+    history = prediction.metadata[:history]
     refute Enum.any?(Imp.History.messages(history), &(Map.get(&1, :intent) == "Last one."))
   end
 
@@ -325,12 +328,12 @@ defmodule ReActV2LastTextTest do
     refute_received :looked
 
     assert Imp.get(prediction, :answer) == "One more look, then: it is there."
-    assert Imp.get(prediction, :termination_reason) == :last_text
+    assert prediction.metadata[:termination_reason] == :last_text
 
     assert [%{id: "late", name: "look", arguments: %{where: "shelf"}}] =
-             Imp.get(prediction, :unexecuted_tool_calls)
+             prediction.metadata[:unexecuted_tool_calls]
 
-    [_first, last] = Imp.History.messages(Imp.get(prediction, :history))
+    [_first, last] = Imp.History.messages(prediction.metadata[:history])
     assert last.answer == "One more look, then: it is there."
     assert last.tool_calls.tool_calls == []
   end
@@ -370,11 +373,11 @@ defmodule ReActV2LastTextTest do
     assert_received {:tool_choice, 2, "auto"}
     refute_received :identity_status_ran
     assert Imp.get(prediction, :answer) == nil
-    assert Imp.get(prediction, :termination_reason) == :last_text
-    assert Imp.get(prediction, :termination_cause) == :prediction_error
+    assert prediction.metadata[:termination_reason] == :last_text
+    assert prediction.metadata[:termination_cause] == :prediction_error
 
     assert [%{id: "wanted", name: "identity_status"}] =
-             Imp.get(prediction, :unexecuted_tool_calls)
+             prediction.metadata[:unexecuted_tool_calls]
   end
 
   # `tool_choice: "none"` makes some models write the call they wanted as text
@@ -410,34 +413,20 @@ defmodule ReActV2LastTextTest do
     end
   end
 
-  test "each note is refused for the signature it does not belong to" do
-    assert_raise ArgumentError,
-                 ~r/:last_text_note needs a signature with exactly one output/,
-                 fn ->
-                   Imp.react_v2("intent -> answer, confidence: float", [look()],
-                     last_text_note: "Now."
-                   )
-                 end
-
-    assert_raise ArgumentError, ~r/:forced_submit_notice needs a signature with submit/, fn ->
-      Imp.react_v2("intent -> answer", [look()], forced_submit_notice: "Now.")
-    end
-  end
-
   test "dump and load round-trip the note, and a loaded program has no submit" do
     runner = fn _arguments -> %{"seen" => true} end
     registry = Imp.Saving.Registry.new(look_runner: runner)
     tool = Imp.tool(:look, "Look at a thing", runner)
 
     dumped =
-      Imp.react_v2("intent -> answer", [tool], last_text_note: "Answer now.")
+      Imp.react_v2("intent -> answer", [tool], last_request_note: "Answer now.")
       |> Imp.dump(registry: registry)
 
-    assert dumped["last_text_note"] == "Answer now."
+    assert dumped["last_request_note"] == "Answer now."
     refute Map.has_key?(dumped, "on_max_iters")
 
     loaded = Imp.load(dumped, registry: registry)
-    assert loaded.last_text_note == "Answer now."
+    assert loaded.last_request_note == "Answer now."
     refute Map.has_key?(loaded.tools, :submit)
 
     with_submit =

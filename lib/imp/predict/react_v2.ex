@@ -14,22 +14,53 @@ defmodule Imp.Predict.ReActV2 do
   exactly as DSPy's ReActV2 has it. The name `submit` is reserved for every
   signature, so a user tool cannot take it.
 
+  ## The prediction
+
+  The prediction's fields are the signature's outputs and nothing else, so an
+  output may be called anything, `history` included. How the turn went is in
+  its metadata:
+
+    * `:history` — the turn's full `Imp.History`, to pass back as the
+      `:history` input of the next call.
+    * `:termination_reason` — how the turn ended (below).
+    * `:termination_cause` — present whenever the turn was interrupted: for
+      `:last_text`, `:forced_submit` and `:extracted`, the interruption that led
+      to the last request. For `:incomplete`, the same interruption, unless
+      the turn's context window was full or its `Imp.Deadline` had passed,
+      which would refuse any further request too and so are named instead;
+      `termination_error` holds the errors of the requests that failed. One of `:max_iters`, `:parse_error`, `:prediction_error`,
+      `:invalid_answer`, `:empty_tool_calls`, `:context_window_exceeded` and
+      `:deadline_exceeded`.
+    * `:termination_error` — for `:incomplete`, the redacted errors of the
+      requests that failed.
+    * `:finished_by_tool` — the terminal tool that ended the turn.
+    * `:unexecuted_tool_calls` — tool calls the last request made that were
+      not run.
+    * `:context_projection` — how many prior episodes were left out of a
+      request (see below).
+
+  `Imp.Prediction.complete?/1` is false exactly when the reason is
+  `:incomplete`.
+
   ## How a turn ends
 
-    * Text (one text output). A step that says something and calls no tool is
-      the answer, in that one request: `termination_reason: :answered`.
-    * `submit` (every other signature). The model calls `submit` with the
-      signature's outputs: `termination_reason: :submit`.
-    * A terminal tool. `finish_on` maps a tool name to
+    * `:answered` (one text output). A step that says something and calls no
+      tool is the answer, in that one request.
+    * `:submit` (every other signature). The model calls `submit` with the
+      signature's outputs.
+    * `:finished_by_tool`. `finish_on` maps a tool name to
       `fn arguments, result, inputs -> {:finish, outputs} | :continue end`. It
       runs after that tool's call executes; `{:finish, outputs}` validates
-      `outputs` against the signature exactly as a `submit` would and finishes
-      with `termination_reason: :finished_by_tool` and `finished_by_tool` naming
-      the tool. `:continue` leaves the loop running. When one step calls several
-      terminal tools, the first in call order finishes the run; the rest still
-      execute and are recorded, and a `submit` in the same step still wins.
-      Outputs that fail validation are recorded as that call's result, the same
-      error a bad `submit` records, and the loop continues.
+      `outputs` against the signature exactly as a `submit` would and ends the
+      turn, with `finished_by_tool` naming the tool. `:continue` leaves the
+      loop running. When one step calls several terminal tools, the first in
+      call order finishes the run; the rest still execute and are recorded,
+      and a `submit` in the same step still wins. Outputs that fail validation
+      are recorded as that call's result, the same error a bad `submit`
+      records, and the loop continues.
+    * `:last_text`, `:forced_submit`, `:extracted`. The turn was interrupted
+      and its last request answered (below).
+    * `:incomplete`. The turn was interrupted and has no answer.
 
   ## When a turn is interrupted
 
@@ -40,11 +71,11 @@ defmodule Imp.Predict.ReActV2 do
 
   With one text output, a step that calls no tool and says nothing is not an
   interruption: it is an empty answer, and the turn ends there
-  (`termination_reason: :answered`). Saying nothing is how a model declines
-  to answer, and asking it again would make declining cost a second request.
+  (`:answered`). Saying nothing is how a model declines to answer, and asking
+  it again would make declining cost a second request.
 
   With one text output, every interruption takes the same path: one more
-  request, and its text is the answer, with `termination_reason: :last_text`.
+  request, and its text is the answer (`:last_text`).
   The request is a step like any other: the same tools and the same
   `tool_choice: "auto"`. A provider may refuse a history of tool calls when no
   tools are declared (Anthropic does), and a changed roster changes the prompt
@@ -54,27 +85,23 @@ defmodule Imp.Predict.ReActV2 do
   and that text would become the answer. If the model calls a tool, the call
   is not run; the completion's text, if any, is the answer, and the calls are
   kept in `unexecuted_tool_calls`. A completion that says nothing is an empty
-  answer rather than an error.
-  `:last_text_note` puts one line of host text in front of that request as a
-  user message; Imp writes no sentence of its own. If the process's
-  `Imp.Deadline` has already passed, no request is made and the prediction
-  ends with `termination_reason: :deadline_exceeded` and no answer. Either
-  way `termination_cause` names the interruption.
+  answer rather than an error. If the process's `Imp.Deadline` has already
+  passed, no request is made and the turn is `:incomplete` with
+  `termination_cause: :deadline_exceeded`.
 
   With `submit`, an interruption forces one more request with `tool_choice`
-  naming `submit` (`termination_reason: :forced_submit`), as DSPy does.
-  `:forced_submit_notice`, a string or a 1-arity function of the termination
-  reason, adds one user-visible turn in front of that request saying why. If a
-  provider cannot honor that tool contract, a tools-disabled typed extractor
-  derives the task outputs from the original inputs and accumulated history.
+  naming `submit` (`:forced_submit`), as DSPy does. If a provider cannot honor
+  that tool contract, a tools-disabled typed extractor derives the task
+  outputs from the original inputs and accumulated history (`:extracted`).
 
-  The last request says nothing about why it is being made unless a note is
-  given. Each note is kept in the returned history like any other turn. A note
-  given for the other kind of signature is refused at construction.
+  The last request says nothing about why it is being made unless
+  `:last_request_note` is given: one line of host text put in front of it as a
+  user message and kept in the returned history like any other turn. Imp
+  writes no sentence of its own.
 
   A request refused because the context window is full is not an
   interruption of this kind: a further request would be refused the same way,
-  so the prediction ends at once with `termination_reason:
+  so the turn ends at once as `:incomplete` with `termination_cause:
   :context_window_exceeded` (see below).
 
   A step's outputs are `next_thought` and `tool_calls`. The provider holds the
@@ -113,8 +140,7 @@ defmodule Imp.Predict.ReActV2 do
   defstruct [
     :signature,
     :react,
-    :forced_submit_notice,
-    :last_text_note,
+    :last_request_note,
     tools: %{},
     max_iters: 20,
     tool_policy: :allow,
@@ -171,22 +197,14 @@ defmodule Imp.Predict.ReActV2 do
       default: :allow,
       doc: "Which tool calls may run; see `Imp.ToolPolicy`."
     ],
-    forced_submit_notice: [
-      type: {:or, [{:fun, 1}, :string, nil]},
-      default: nil,
-      doc:
-        "For a signature that has `submit`: what the model is told when the loop " <>
-          "makes it submit. A string, or a function of the termination reason that " <>
-          "returns one. `nil` says nothing. Refused for a signature with one text output."
-    ],
-    last_text_note: [
+    last_request_note: [
       type: {:or, [:string, nil]},
       default: nil,
       doc:
-        "For a signature with exactly one `:string` output: one line of host text " <>
-          "put in front of the last request of an interrupted turn and kept in the " <>
-          "history. `nil` says nothing; Imp writes no sentence of its own. Refused " <>
-          "for any other signature."
+        "One line of host text put in front of the last request of an interrupted " <>
+          "turn, as a user message, and kept in the history: the last text-only " <>
+          "request for a signature with one text output, the forced `submit` for " <>
+          "every other. `nil` says nothing; Imp writes no sentence of its own."
     ],
     finish_on: [
       type: {:custom, __MODULE__, :validate_finish_on, []},
@@ -219,7 +237,6 @@ defmodule Imp.Predict.ReActV2 do
       raise ArgumentError, "submit is reserved by Imp.Predict.ReActV2"
     end
 
-    validate_notes!(signature, opts)
     tools = put_submit(tools, signature)
 
     react_signature =
@@ -267,30 +284,9 @@ defmodule Imp.Predict.ReActV2 do
       tools: tools,
       max_iters: opts[:max_iters],
       tool_policy: opts[:tool_policy],
-      forced_submit_notice: opts[:forced_submit_notice],
-      last_text_note: opts[:last_text_note],
+      last_request_note: opts[:last_request_note],
       finish_on: resolve_finish_on!(opts[:finish_on], tools)
     }
-  end
-
-  # Each note belongs to one of the two ways an interrupted turn ends, and a
-  # note given for the other one would never be said.
-  defp validate_notes!(signature, opts) do
-    cond do
-      single_text_output?(signature) and opts[:forced_submit_notice] != nil ->
-        raise ArgumentError,
-              "Imp.Predict.ReActV2.new/3: :forced_submit_notice needs a signature with submit; " <>
-                "a signature with one text output has none, so use :last_text_note"
-
-      not single_text_output?(signature) and opts[:last_text_note] != nil ->
-        raise ArgumentError,
-              "Imp.Predict.ReActV2.new/3: :last_text_note needs a signature with " <>
-                "exactly one output of type :string, got: " <>
-                inspect(Imp.Signature.output_names(signature))
-
-      true ->
-        :ok
-    end
   end
 
   @doc false
@@ -424,7 +420,7 @@ defmodule Imp.Predict.ReActV2 do
       {:ok, prediction, history} ->
         calls = prediction |> Imp.get(:tool_calls, []) |> normalize_calls(turn)
 
-        # Text that is the answer is not a thought: the `:final` event carries
+        # Text that is the answer is not a thought: the prediction carries
         # it, and a `:reasoning` event would say it a second time.
         if calls.tool_calls == [] do
           # The step called nothing. What it said is part of the run, so it is
@@ -463,11 +459,9 @@ defmodule Imp.Predict.ReActV2 do
                 finished_by ->
                   {tool_name, outputs} = finished_by
 
-                  final_prediction(
-                    Map.put(outputs, :finished_by_tool, tool_name),
-                    history,
-                    :finished_by_tool
-                  )
+                  final_prediction(outputs, history, :finished_by_tool, %{
+                    finished_by_tool: tool_name
+                  })
 
                 true ->
                   run(react, history, inputs, %{}, turn + 1, max_iters, execution)
@@ -484,7 +478,7 @@ defmodule Imp.Predict.ReActV2 do
             history,
             inputs,
             pending,
-            termination_reason(reason),
+            interruption(reason),
             turn,
             reason,
             execution
@@ -511,7 +505,7 @@ defmodule Imp.Predict.ReActV2 do
          initial_error,
          execution
        ) do
-    history = append_forced_submit_notice(react, history, reason)
+    {history, pending} = note_after_inputs(history, pending, react)
 
     case forced_submit_prediction(react, history, pending) do
       {:ok, prediction, history} ->
@@ -537,10 +531,7 @@ defmodule Imp.Predict.ReActV2 do
         })
 
       {:error, forced_error, history} ->
-        reason =
-          if context_window_exceeded?(forced_error), do: :context_window_exceeded, else: reason
-
-        incomplete_prediction(history, reason, %{
+        incomplete_prediction(history, failed_last_request_cause(reason, forced_error), %{
           initial: initial_error,
           forced_submit: forced_error
         })
@@ -557,7 +548,7 @@ defmodule Imp.Predict.ReActV2 do
   # none is made.
   defp last_text(react, history, pending, cause, turn, initial_error) do
     if deadline_passed?() do
-      incomplete_prediction(history, :deadline_exceeded, initial_error, cause)
+      incomplete_prediction(history, :deadline_exceeded, initial_error)
     else
       {history, pending} = note_after_inputs(history, pending, react)
 
@@ -568,25 +559,18 @@ defmodule Imp.Predict.ReActV2 do
           no_calls = %ToolCalls{tool_calls: []}
           history = append_last_step(history, pending, prediction, no_calls, outputs)
 
-          outputs
-          |> Map.put(:termination_cause, cause)
-          |> put_unexecuted(calls)
-          |> final_prediction(history, :last_text)
+          final_prediction(
+            outputs,
+            history,
+            :last_text,
+            put_unexecuted(%{termination_cause: cause}, calls)
+          )
 
         {:error, reason, history} ->
-          termination =
-            cond do
-              deadline_passed?() -> :deadline_exceeded
-              context_window_exceeded?(reason) -> :context_window_exceeded
-              true -> cause
-            end
-
-          incomplete_prediction(
-            history,
-            termination,
-            %{initial: initial_error, last_text: reason},
-            cause
-          )
+          incomplete_prediction(history, failed_last_request_cause(cause, reason), %{
+            initial: initial_error,
+            last_text: reason
+          })
       end
     end
   end
@@ -594,26 +578,38 @@ defmodule Imp.Predict.ReActV2 do
   # The note is the last thing the model reads. Inputs no step has spent yet
   # (the first step failed) would otherwise render after it, so they go into
   # the history first, as the user turn they are.
-  defp note_after_inputs(history, pending, %{last_text_note: note} = react)
+  defp note_after_inputs(history, pending, %{last_request_note: note} = react)
        when is_binary(note) and note != "" and map_size(pending) > 0 do
     history = history |> append_history(pending) |> append_note(react.signature, note)
     {history, %{}}
   end
 
   defp note_after_inputs(history, pending, react),
-    do: {append_note(history, react.signature, react.last_text_note), pending}
+    do: {append_note(history, react.signature, react.last_request_note), pending}
 
   defp deadline_passed?, do: Imp.Deadline.expired?(Imp.Deadline.current())
 
-  defp put_unexecuted(outputs, %ToolCalls{tool_calls: []}), do: outputs
+  # The cause of a turn whose last request failed: the interruption that led to
+  # that request, unless the request failed because the turn is out of time or
+  # its context window is full. Those two would refuse any further request the
+  # same way, so they are what the caller has to change.
+  defp failed_last_request_cause(interruption, error) do
+    cond do
+      deadline_passed?() -> :deadline_exceeded
+      context_window_exceeded?(error) -> :context_window_exceeded
+      true -> interruption
+    end
+  end
 
-  defp put_unexecuted(outputs, %ToolCalls{tool_calls: calls}) do
+  defp put_unexecuted(metadata, %ToolCalls{tool_calls: []}), do: metadata
+
+  defp put_unexecuted(metadata, %ToolCalls{tool_calls: calls}) do
     unexecuted =
       Enum.map(calls, fn call ->
         %{id: call.id, name: call.name, arguments: Imp.Tool.normalize_arguments(call.arguments)}
       end)
 
-    Map.put(outputs, :unexecuted_tool_calls, Imp.Redaction.redact(unexecuted))
+    Map.put(metadata, :unexecuted_tool_calls, Imp.Redaction.redact(unexecuted))
   end
 
   defp last_text_outputs(signature, prediction) do
@@ -627,12 +623,9 @@ defmodule Imp.Predict.ReActV2 do
     end
   end
 
-  # The notice is what the model is told, so it goes into the durable history
+  # The note is what the model is told, so it goes into the durable history
   # rather than into one request: the record of the run carries it, and the
-  # prompt renders it as the last user message before the forced request.
-  defp append_forced_submit_notice(react, history, reason),
-    do: append_note(history, react.signature, notice_text(react.forced_submit_notice, reason))
-
+  # prompt renders it as the last user message before the last request.
   defp append_note(history, signature, text) when is_binary(text) and text != "" do
     case Imp.Signature.input_names(signature) do
       [first | _rest] -> append_history(history, %{first => text})
@@ -641,10 +634,6 @@ defmodule Imp.Predict.ReActV2 do
   end
 
   defp append_note(history, _signature, _none), do: history
-
-  defp notice_text(nil, _reason), do: nil
-  defp notice_text(text, _reason) when is_binary(text), do: text
-  defp notice_text(fun, reason) when is_function(fun, 1), do: fun.(reason)
 
   defp forced_submit_prediction(react, history, pending) do
     forced = forced_submit_program(react, %{type: "tool", name: "submit"})
@@ -705,7 +694,7 @@ defmodule Imp.Predict.ReActV2 do
           history = append_history(history, event)
 
           if final,
-            do: final_prediction(final, history, :forced_submit),
+            do: final_prediction(final, history, :forced_submit, %{termination_cause: reason}),
             else: incomplete_prediction(history, reason, initial_error)
       end
     end
@@ -761,12 +750,7 @@ defmodule Imp.Predict.ReActV2 do
 
         case Imp.Schema.validate_fields(react.signature.outputs, final) do
           :ok ->
-            final =
-              final
-              |> Map.put(:completion_mode, :typed_extraction)
-              |> Map.put(:termination_cause, reason)
-
-            final_prediction(final, history, :forced_submit)
+            final_prediction(final, history, :extracted, %{termination_cause: reason})
 
           {:error, errors} ->
             incomplete_prediction(history, reason, %{
@@ -776,12 +760,7 @@ defmodule Imp.Predict.ReActV2 do
         end
 
       {:error, extraction_error, history} ->
-        reason =
-          if context_window_exceeded?(extraction_error),
-            do: :context_window_exceeded,
-            else: reason
-
-        incomplete_prediction(history, reason, %{
+        incomplete_prediction(history, failed_last_request_cause(reason, extraction_error), %{
           initial: initial_error,
           extraction: extraction_error
         })
@@ -929,12 +908,12 @@ defmodule Imp.Predict.ReActV2 do
         {:cancel, reason} ->
           {:halt, {:cancel, reason}}
 
-        {result, error?} ->
-          # A terminal tool has already run; the hook only reads what it did.
-          # So the outcome is taken before it: outputs the hook cannot fit make
-          # the result an error, not the call a refusal.
-          outcome = if error?, do: Imp.Tool.outcome(result), else: :result
-
+        # The outcome is decided where the call was refused or dispatched: a
+        # tool can return any term, so its value alone cannot say it was
+        # refused. A terminal tool has already run and the hook only reads
+        # what it did, so outputs the hook cannot fit make the result an
+        # error, not the call a refusal.
+        {result, error?, outcome} ->
           {result, error?, finished_by} =
             finish_on_result(react, call, result, error?, inputs, finished_by)
 
@@ -1030,7 +1009,7 @@ defmodule Imp.Predict.ReActV2 do
          %ToolCall{name: @malformed_tool_call, arguments: %{received: received}},
          _execution
        ),
-       do: {{:error, {:malformed_tool_call, received}}, true}
+       do: {{:error, {:malformed_tool_call, received}}, true, :refused}
 
   defp execute_call(react, %ToolCall{name: requested, arguments: arguments} = call, execution) do
     name = Imp.Tool.resolve_name(react.tools, requested)
@@ -1038,7 +1017,7 @@ defmodule Imp.Predict.ReActV2 do
 
     cond do
       is_nil(name) ->
-        {{:error, {:unknown_tool, requested}}, true}
+        {{:error, {:unknown_tool, requested}}, true, :refused}
 
       true ->
         tool = Map.fetch!(react.tools, name)
@@ -1047,7 +1026,7 @@ defmodule Imp.Predict.ReActV2 do
              :ok <- Imp.Tool.validate_input(tool, arguments) do
           authorize_and_call(react, tool, call, arguments, execution)
         else
-          {:error, reason} -> {{:error, reason}, true}
+          {:error, reason} -> {{:error, reason}, true, :refused}
         end
     end
   end
@@ -1055,8 +1034,10 @@ defmodule Imp.Predict.ReActV2 do
   defp malformed_call?(%ToolCall{name: @malformed_tool_call}), do: true
   defp malformed_call?(%ToolCall{}), do: false
 
-  defp authorize_and_call(react, %{name: :submit}, _call, arguments, _execution),
-    do: validate_submit(react.signature, arguments)
+  defp authorize_and_call(react, %{name: :submit}, _call, arguments, _execution) do
+    {result, error?} = validate_submit(react.signature, arguments)
+    {result, error?, if(error?, do: :refused, else: :result)}
+  end
 
   defp authorize_and_call(_react, tool, call, arguments, execution) do
     request = %Imp.Execution.Authorization{
@@ -1073,7 +1054,8 @@ defmodule Imp.Predict.ReActV2 do
         safe_tool_call(tool, arguments)
 
       {:deny, reason} ->
-        {{:error, {:tool_authorization_denied, tool.name, Imp.Redaction.redact(reason)}}, true}
+        {{:error, {:tool_authorization_denied, tool.name, Imp.Redaction.redact(reason)}}, true,
+         :refused}
 
       {:cancel, reason} ->
         {:cancel, reason}
@@ -1082,13 +1064,13 @@ defmodule Imp.Predict.ReActV2 do
 
   defp safe_tool_call(tool, arguments) do
     case Imp.Tool.call(tool, arguments) do
-      {:error, reason} -> {{:error, reason}, true}
-      result -> {result, false}
+      {:error, _reason} = error -> {error, true, Imp.Tool.outcome(error)}
+      result -> {result, false, :result}
     end
   rescue
-    error -> {{:error, {:tool_error, tool.name, Exception.message(error)}}, true}
+    error -> {{:error, {:tool_error, tool.name, Exception.message(error)}}, true, :unknown}
   catch
-    kind, reason -> {{:error, {:tool_error, tool.name, {kind, reason}}}, true}
+    kind, reason -> {{:error, {:tool_error, tool.name, {kind, reason}}}, true, :unknown}
   end
 
   defp validate_submit(signature, arguments) when is_map(arguments) do
@@ -1131,30 +1113,26 @@ defmodule Imp.Predict.ReActV2 do
     |> maybe_put(:reasoning_details, Map.get(prediction.metadata, :reasoning_details))
   end
 
-  defp final_prediction(final, history, reason) do
-    prediction =
-      final
-      |> Map.put(:history, history.full)
+  # The prediction's fields are the signature's outputs and nothing else, so
+  # an output may take any name; how the turn went is metadata.
+  defp final_prediction(outputs, history, reason, metadata \\ %{}) do
+    metadata =
+      metadata
+      |> Map.merge(%{history: history.full, termination_reason: reason})
       |> projection_metadata(history)
-      |> Map.put(:termination_reason, reason)
-      |> Imp.Prediction.new()
 
-    :ok = Imp.Run.emit(:final, component: __MODULE__, output: prediction)
-    {:ok, prediction}
+    {:ok, Imp.Prediction.new(outputs, metadata: metadata)}
   end
 
-  defp incomplete_prediction(history, reason, error, cause \\ nil) do
-    fields = projection_metadata(%{history: history.full, termination_reason: reason}, history)
-    fields = if cause, do: Map.put(fields, :termination_cause, cause), else: fields
+  defp incomplete_prediction(history, cause, error) do
+    metadata = %{termination_cause: cause}
 
-    fields =
+    metadata =
       if error,
-        do: Map.put(fields, :termination_error, Imp.Redaction.redact(error)),
-        else: fields
+        do: Map.put(metadata, :termination_error, Imp.Redaction.redact(error)),
+        else: metadata
 
-    prediction = Imp.Prediction.new(fields)
-    :ok = Imp.Run.emit(:final, component: __MODULE__, output: prediction)
-    {:ok, prediction}
+    final_prediction(%{}, history, :incomplete, metadata)
   end
 
   defp emit_reasoning(prediction, turn, metadata \\ []) do
@@ -1176,9 +1154,9 @@ defmodule Imp.Predict.ReActV2 do
 
   defp submit?(%ToolCall{name: name}), do: to_string(name) == "submit"
 
-  defp termination_reason(%Imp.ContextWindowExceededError{}), do: :context_window_exceeded
-  defp termination_reason(%Imp.AdapterParseError{}), do: :parse_error
-  defp termination_reason(_reason), do: :prediction_error
+  defp interruption(%Imp.ContextWindowExceededError{}), do: :context_window_exceeded
+  defp interruption(%Imp.AdapterParseError{}), do: :parse_error
+  defp interruption(_reason), do: :prediction_error
 
   # Full history remains the durable result. Only whole prior episode groups are
   # eligible for prompt projection; tool observations appended in this call are

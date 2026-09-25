@@ -7410,8 +7410,7 @@
       "source": "lib/imp/predict/react_v2.ex",
       "struct_fields": [
         "finish_on",
-        "forced_submit_notice",
-        "last_text_note",
+        "last_request_note",
         "max_iters",
         "react",
         "signature",
@@ -7492,6 +7491,7 @@
       "callbacks": [],
       "category": "stable",
       "functions": [
+        "complete?/1",
         "fetch!/2",
         "from_example/2",
         "get/3",
@@ -7506,6 +7506,9 @@
       "module": "Imp.Prediction",
       "signatures": {
         "functions": {
+          "complete?/1": [
+            "complete?(prediction)"
+          ],
           "fetch!/2": [
             "fetch!(prediction, key)"
           ],
@@ -7916,6 +7919,7 @@
       "callbacks": [],
       "category": "experimental",
       "functions": [
+        "kinds/0",
         "to_map/1"
       ],
       "kind": "struct",
@@ -7923,11 +7927,15 @@
       "module": "Imp.Run.Event",
       "signatures": {
         "functions": {
+          "kinds/0": [
+            "kinds()"
+          ],
           "to_map/1": [
             "to_map(event)"
           ]
         },
         "types": {
+          "kind/0": [],
           "t/0": []
         }
       },
@@ -7947,6 +7955,10 @@
         "tool_name"
       ],
       "types": [
+        {
+          "kind": "type",
+          "name": "kind/0"
+        },
         {
           "kind": "type",
           "name": "t/0"
@@ -8406,6 +8418,7 @@
         "new/4",
         "normalize_arguments/1",
         "outcome/1",
+        "outcomes/0",
         "resolve_name/2",
         "validate_tools/1"
       ],
@@ -8428,6 +8441,9 @@
           ],
           "outcome/1": [
             "outcome(arg1)"
+          ],
+          "outcomes/0": [
+            "outcomes()"
           ],
           "resolve_name/2": [
             "resolve_name(tools, name)"

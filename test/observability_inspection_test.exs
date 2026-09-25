@@ -17,12 +17,10 @@ defmodule Imp.ObservabilityInspectionTest do
 
     prediction =
       Imp.Prediction.new(
-        %{
-          answer: "Paris",
-          history: [%{tool: :lookup, input: %{token: @secret}, result: "Paris"}]
-        },
+        %{answer: "Paris"},
         score: 1.0,
         metadata: %{
+          history: [%{tool: :lookup, input: %{token: @secret}, result: "Paris"}],
           trace: %{messages: [%{role: :user, content: @secret}], raw: "Paris"},
           rlm_trace: [%{iteration: 1, action: :tool, input: @secret, output: "Paris"}],
           optimizer_report: report
@@ -39,17 +37,20 @@ defmodule Imp.ObservabilityInspectionTest do
              :optimizer_candidate
            ]
 
-    assert inspection.summary.fields == ["answer", "history"]
+    assert inspection.summary.fields == ["answer"]
     assert inspection.summary.entry_count == 4
     assert Kernel.inspect(inspection) =~ "[REDACTED]"
     refute Kernel.inspect(inspection) =~ @secret
   end
 
-  # Each of these is a ReActV2 turn that ended with its answer; only the way it
-  # ended differs. A turn that ran out of steps, time or context has none.
+  # Each of these is a tool loop turn that ended with its answer; only the way
+  # it ended differs. A turn that ran out of steps, time or context has none.
   test "a prediction that ended with its answer is complete however the turn ended" do
-    for reason <- [:submit, :forced_submit, :answered, :last_text, :finished_by_tool] do
-      prediction = Imp.Prediction.new(%{answer: "Paris", termination_reason: reason})
+    for reason <- [:submit, :forced_submit, :extracted, :answered, :last_text, :finished_by_tool] do
+      prediction =
+        Imp.Prediction.new(%{answer: "Paris"}, metadata: %{termination_reason: reason})
+
+      assert Imp.Prediction.complete?(prediction)
 
       assert %Inspection{status: :ok} = Imp.Observability.inspect_artifact(prediction),
              "#{reason} should be complete"
@@ -57,11 +58,14 @@ defmodule Imp.ObservabilityInspectionTest do
       assert %Status{state: :succeeded} = Imp.Observability.status(prediction)
     end
 
-    for reason <- [:max_iters, :deadline_exceeded, :context_window_exceeded] do
-      prediction = Imp.Prediction.new(%{termination_reason: reason})
-      assert %Inspection{status: :incomplete} = Imp.Observability.inspect_artifact(prediction)
-      assert %Status{state: :failed} = Imp.Observability.status(prediction)
-    end
+    prediction =
+      Imp.Prediction.new(%{},
+        metadata: %{termination_reason: :incomplete, termination_cause: :max_iters}
+      )
+
+    refute Imp.Prediction.complete?(prediction)
+    assert %Inspection{status: :incomplete} = Imp.Observability.inspect_artifact(prediction)
+    assert %Status{state: :failed} = Imp.Observability.status(prediction)
   end
 
   test "provider inspection mirrors recent prompt, messages, outputs, and timestamps" do

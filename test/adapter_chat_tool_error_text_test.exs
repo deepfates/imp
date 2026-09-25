@@ -160,16 +160,24 @@ defmodule Imp.Adapter.ChatToolErrorTextTest do
                "Error: no answer came back; the connection failed, so it may have been carried out."
     end
 
-    test "an HTTP refusal says the server refused the call" do
+    test "an HTTP refusal says the server refused the call, or its credential" do
+      forbidden = %{
+        type: :transport_error,
+        message: "Failed to send request: {:http_error, 403, \"\"}"
+      }
+
       unauthorized = %{
         type: :transport_error,
         message: "Failed to send request: {:unauthorized, 401, \"\", nil}"
       }
 
+      assert Chat.format_tool_result({:error, CallFailure.returned("kite", "reply", forbidden)}) ==
+               "Error: the server refused the call."
+
       assert Chat.format_tool_result(
                {:error, CallFailure.returned("kite", "reply", unauthorized)}
              ) ==
-               "Error: the server refused the call."
+               "Error: the server refused the credential, so it was not carried out."
     end
 
     test "a broken stream after delivery says the call may have been carried out" do

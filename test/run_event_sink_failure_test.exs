@@ -173,8 +173,9 @@ defmodule Imp.RunEventSinkFailureTest do
   end
 
   # A sink that is still holding an event when the run is stopped: that event
-  # may or may not be stored, and the ones queued behind it were never handed
-  # over. Both are reported, before `stop/1` returns.
+  # may or may not be stored, so it is a sink failure, and the ones queued
+  # behind it were never handed over, so they are undelivered. Both are
+  # reported, before `stop/1` returns.
   @tag timeout: 20_000
   test "stopping a run reports the event in the sink and every event never handed to it" do
     owner = self()
@@ -200,13 +201,11 @@ defmodule Imp.RunEventSinkFailureTest do
     assert_received {:imp_run_event_sink_failed, _run_id,
                      %{sequence: 1, kind: :model_response, reason: :in_sink_when_stopped}}
 
-    assert_received {:imp_run_event_sink_failed, _run_id,
-                     %{sequence: 2, kind: :tool_call, reason: :never_handed_to_sink}}
-
-    assert_received {:imp_run_event_sink_failed, _run_id,
-                     %{sequence: 3, kind: :tool_result, reason: :never_handed_to_sink}}
-
+    assert_received {:imp_run_event_undelivered, _run_id, %{sequence: 2, kind: :tool_call}}
+    assert_received {:imp_run_event_undelivered, _run_id, %{sequence: 3, kind: :tool_result}}
     refute_received {:imp_run_event_sink_failed, _run_id, %{sequence: 0}}
+    refute_received {:imp_run_event_sink_failed, _run_id, %{sequence: 2}}
+    refute_received {:imp_run_event_undelivered, _run_id, %{sequence: 1}}
   end
 
   test "cancelling a run reports the events it cut off" do
@@ -231,8 +230,7 @@ defmodule Imp.RunEventSinkFailureTest do
                      %{sequence: 1, reason: :in_sink_when_stopped}}
 
     # The run_cancelled event recorded at cancel was never handed over.
-    assert_received {:imp_run_event_sink_failed, _run_id,
-                     %{sequence: 2, kind: :run_cancelled, reason: :never_handed_to_sink}}
+    assert_received {:imp_run_event_undelivered, _run_id, %{sequence: 2, kind: :run_cancelled}}
   end
 
   test "a run whose sink kept up reports nothing when stopped" do
@@ -242,6 +240,7 @@ defmodule Imp.RunEventSinkFailureTest do
     :ok = Imp.Run.stop(run)
     end_task(run)
     refute_received {:imp_run_event_sink_failed, _run_id, _failure}
+    refute_received {:imp_run_event_undelivered, _run_id, _event}
   end
 
   # The sink's process can die outright, not just raise: here the sink is
@@ -273,8 +272,7 @@ defmodule Imp.RunEventSinkFailureTest do
     assert_received {:imp_run_event_sink_failed, _run_id,
                      %{sequence: 1, kind: :model_response, reason: :in_sink_when_stopped}}
 
-    assert_received {:imp_run_event_sink_failed, _run_id,
-                     %{sequence: 2, kind: :tool_call, reason: :never_handed_to_sink}}
+    assert_received {:imp_run_event_undelivered, _run_id, %{sequence: 2, kind: :tool_call}}
   end
 
   # Waits for the task to be gone, so it holds no place in Imp's task pool

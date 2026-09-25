@@ -59,8 +59,9 @@ defmodule ReActContractTest do
 
     assert {:ok, prediction} = Imp.Predict.ReAct.call(agent, %{question: "capital?"})
     assert Imp.Prediction.get(prediction, :answer) == "Paris"
-    assert Imp.Prediction.get(prediction, :termination_reason) == :forced_submit
-    assert [%{tool: :submit}] = Imp.Prediction.get(prediction, :history)
+    assert prediction.metadata[:termination_reason] == :forced_submit
+    assert prediction.metadata[:termination_cause] == :empty_tool_calls
+    assert [%{tool: :submit}] = prediction.metadata[:history]
   end
 
   test "max iteration exhaustion is an error with trace history" do
@@ -287,7 +288,7 @@ defmodule ReActContractTest do
     assert [
              %{tool: :lookup, arguments: %{query: "capital"}, result: "Paris"},
              %{tool: :submit, arguments: %{answer: "Paris"}, result: %{answer: "Paris"}}
-           ] = Imp.Prediction.get(prediction, :history)
+           ] = prediction.metadata[:history]
   end
 
   test "tool argument normalization keeps unknown provider keys as strings" do
@@ -392,7 +393,7 @@ defmodule ReActContractTest do
     assert {:ok, prediction} = Imp.Predict.ReAct.call(agent, %{question: "q"})
     assert Imp.Prediction.get(prediction, :answer) == "done"
     refute_received :side_effect_ran
-    assert [%{tool: :submit}] = Imp.Prediction.get(prediction, :history)
+    assert [%{tool: :submit}] = prediction.metadata[:history]
   end
 
   # ------------------------------------------------------------------
@@ -512,13 +513,14 @@ defmodule ReActContractTest do
     # Extraction (a separate ChainOfThought) yields reasoning + the outputs.
     assert Imp.Prediction.get(prediction, :answer) == "Paris"
     assert Imp.Prediction.get(prediction, :reasoning) == "The lookup observation says Paris."
-    assert Imp.Prediction.get(prediction, :termination_reason) == :finish
+    assert prediction.metadata[:termination_reason] == :finish
+    refute Map.has_key?(prediction.metadata, :termination_cause)
 
     # History is derived from the trajectory: the real tool call, then finish.
     assert [
              %{tool: :lookup, arguments: %{query: "capital-france"}, result: "Paris"},
              %{tool: :finish, result: "Completed."}
-           ] = Imp.Prediction.get(prediction, :history)
+           ] = prediction.metadata[:history]
 
     assert Process.get(:react_actions) == []
 
@@ -559,8 +561,9 @@ defmodule ReActContractTest do
 
     assert {:ok, prediction} = Imp.Predict.ReAct.call(agent, %{question: "q"})
     assert Imp.Prediction.get(prediction, :answer) == "observed"
-    assert Imp.Prediction.get(prediction, :termination_reason) == :max_iters
-    assert [%{tool: :lookup, result: "observed"}] = Imp.Prediction.get(prediction, :history)
+    assert prediction.metadata[:termination_reason] == :extracted
+    assert prediction.metadata[:termination_cause] == :max_iters
+    assert [%{tool: :lookup, result: "observed"}] = prediction.metadata[:history]
   end
 
   test "dspy_3_2_1: truncates the oldest tool call but retains the remaining call" do
@@ -597,7 +600,7 @@ defmodule ReActContractTest do
     # the one complete call that remains, so extraction and returned history
     # retain that useful observation.
     assert [%{tool: :lookup, arguments: %{query: "second"}, result: "second"}] =
-             Imp.Prediction.get(prediction, :history)
+             prediction.metadata[:history]
 
     assert Process.get(:react_context_responses) == []
 
@@ -655,10 +658,11 @@ defmodule ReActContractTest do
 
     assert {:ok, prediction} = Imp.Predict.ReAct.call(agent, %{question: "q"})
     assert Imp.Prediction.get(prediction, :answer) == "fact"
-    assert Imp.Prediction.get(prediction, :termination_reason) == :parse_failure
+    assert prediction.metadata[:termination_reason] == :extracted
+    assert prediction.metadata[:termination_cause] == :parse_error
 
     assert [%{tool: :lookup, arguments: %{query: "fact"}, result: "fact"}] =
-             Imp.Prediction.get(prediction, :history)
+             prediction.metadata[:history]
 
     assert Process.get(:react_single_call_context_responses) == []
 
@@ -701,7 +705,7 @@ defmodule ReActContractTest do
 
     assert {:ok, prediction} = Imp.Predict.ReAct.call(agent, %{question: "q"})
     assert Imp.Prediction.get(prediction, :answer) == "done"
-    assert [%{tool: :finish, result: "Completed."}] = Imp.Prediction.get(prediction, :history)
+    assert [%{tool: :finish, result: "Completed."}] = prediction.metadata[:history]
 
     messages =
       for _ <- 1..6, do: receive(do: ({:react_extraction_context_messages, value} -> value))
@@ -738,7 +742,7 @@ defmodule ReActContractTest do
     assert [
              %{tool: :lookup, result: "Execution error in lookup: provider exploded"},
              %{tool: :finish, result: "Completed."}
-           ] = Imp.Prediction.get(prediction, :history)
+           ] = prediction.metadata[:history]
 
     assert Process.get(:react_actions) == []
   end
@@ -763,7 +767,7 @@ defmodule ReActContractTest do
     assert [
              %{tool: :lookup, result: "Execution error in lookup: not found"},
              %{tool: :finish, result: "Completed."}
-           ] = Imp.Prediction.get(prediction, :history)
+           ] = prediction.metadata[:history]
   end
 
   # DSPy's MCP boundary raises on an error result and ReAct shows the exception;
@@ -794,7 +798,7 @@ defmodule ReActContractTest do
     assert [
              %{tool: :lookup, result: "Execution error in lookup: no record at that uri"},
              %{tool: :finish, result: "Completed."}
-           ] = Imp.Prediction.get(prediction, :history)
+           ] = prediction.metadata[:history]
   end
 
   test "dspy_3_2_1: an invalid/missing action is a parse failure that extracts" do
@@ -818,9 +822,10 @@ defmodule ReActContractTest do
 
     assert {:ok, prediction} = Imp.Predict.ReAct.call(agent, %{question: "q"})
     assert Imp.Prediction.get(prediction, :answer) == "fallback"
-    assert Imp.Prediction.get(prediction, :termination_reason) == :parse_failure
+    assert prediction.metadata[:termination_reason] == :extracted
+    assert prediction.metadata[:termination_cause] == :parse_error
     # Nothing was appended to the trajectory before the failed action.
-    assert Imp.Prediction.get(prediction, :history) == []
+    assert prediction.metadata[:history] == []
   end
 
   test "dspy_3_2_1: tool policy stays fail-fast (Imp safety extension)" do

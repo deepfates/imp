@@ -24,16 +24,17 @@ defmodule Imp.Run do
 
   Stopping or cancelling a run ends delivery. `stop/1` first waits up to five
   seconds for the sink to finish what it has; `cancel_with_events/3` does not
-  wait. Every event the sink had not finished with is then reported the same
-  way, with `reason` `:in_sink_when_stopped` for the event the sink was
-  holding (it may have been stored) and `:never_handed_to_sink` for each event
-  after it. `kind` is `nil` for an event the snapshot no longer holds. These
-  reports are in the owner's mailbox when `stop/1` or `cancel_with_events/3`
-  returns, after any report the sink's own failures produced, in sequence
-  order, and each event is reported at most once. The same reports are sent
-  when the sink's process dies outright, for example because it was linked
-  to a process that crashed; the run's control then ends too, and so does the
-  run: an effect in flight has its cancellation called with
+  wait. The event the sink was holding is then reported as a sink failure
+  with `reason` `:in_sink_when_stopped`, because it may have been stored, and
+  each event after it, which the sink never received, is reported as
+  `{:imp_run_event_undelivered, run_id, %{sequence: sequence, kind: kind}}`.
+  `kind` is `nil` for an event the snapshot no longer holds. These reports
+  are in the owner's mailbox when `stop/1` or `cancel_with_events/3` returns,
+  after any report the sink's own failures produced, in sequence order, and
+  each event is reported at most once. The same reports are sent when the
+  sink's process dies outright, for example because it was linked to a
+  process that crashed; the run's control then ends too, and so does the run:
+  an effect in flight has its cancellation called with
   `{:run_control_ended, reason}` and the task is killed.
 
   `events/1` reads the retained native sequence independently of sink progress.
@@ -55,19 +56,15 @@ defmodule Imp.Run do
   tool list as sent, so a run's record holds every request whole without
   repeating a roster that does not change.
 
-  Capture defaults to 64 KiB per event and a 512-event, 4 MiB snapshot;
-  `:max_event_bytes`, `:max_events` and `:max_snapshot_bytes` override them at
-  start. Each takes a positive integer or `:infinity`, which removes that bound
-  entirely: with `:max_event_bytes` set to `:infinity` an event reaches the sink
-  and the snapshot whole however large it is, and with `:max_events` and
-  `:max_snapshot_bytes` set to `:infinity` nothing is ever evicted. A host that
-  must keep a complete record of a run sets all three. An oversized event
-  payload becomes a digest and size marker before sink delivery. A failed
-  event keeps a small error marker in its place, with the validated HTTP
-  status, provider code and retryability when present and when the marker fits,
-  never the error message or the request and response bodies. Snapshot
-  eviction adds a `:capture_gap` marker. A sink receives every bounded event;
-  the snapshot is a bounded recent window.
+  Capture is bounded by `start/3`'s `:max_event_bytes`, `:max_events` and
+  `:max_snapshot_bytes`. An oversized event payload becomes a digest and size
+  marker before sink delivery. A failed event keeps a small error marker in its
+  place, with the validated HTTP status, provider code and retryability when
+  present and when the marker fits, never the error message or the request and
+  response bodies. Snapshot eviction adds a `:capture_gap` marker. A sink
+  receives every bounded event; the snapshot is a bounded recent window.
+
+  `Imp.Run.Event.kinds/0` lists every event kind.
   """
 
   alias Imp.Run.Control
@@ -78,6 +75,65 @@ defmodule Imp.Run do
   defstruct [:task, :control, :id]
 
   @type t :: %__MODULE__{task: Task.t(), control: pid(), id: String.t()}
+
+  @bound {:or, [:pos_integer, {:in, [:infinity]}]}
+
+  @start_schema [
+    event_sink: [
+      type: {:fun, 1},
+      doc:
+        "Called with each `Imp.Run.Event`, in order, from one delivery process. " <>
+          "Its return value is ignored; see the module documentation for what a " <>
+          "sink that fails causes. When absent, events are only kept in the snapshot."
+    ],
+    authorize: [
+      type: {:or, [{:fun, 1}, nil]},
+      default: nil,
+      doc:
+        "Decides each ReActV2 and RLM tool call before it runs: a function of an " <>
+          "`Imp.Execution.Authorization` returning `:allow`, `{:deny, reason}` or " <>
+          "`{:cancel, reason}`. When absent, tool calls are not asked about."
+    ],
+    authorization_timeout: [
+      type: :pos_integer,
+      default: 30_000,
+      doc:
+        "Milliseconds `:authorize` has for one decision; a decision that takes " <>
+          "longer is `{:deny, :authorization_timeout}`."
+    ],
+    admission: [
+      type: {:custom, __MODULE__, :validate_admission, []},
+      doc:
+        "`{pool, limit}`: count the run in the host's pool `pool`, where at most " <>
+          "`limit` runs hold a place at once, instead of the machine-wide pool. A " <>
+          "full pool returns `{:error, :busy}` at once."
+    ],
+    id: [
+      type: :string,
+      doc: "The run's id. When absent, a random one is made."
+    ],
+    max_event_bytes: [
+      type: @bound,
+      default: 65_536,
+      doc:
+        "Largest event, in bytes of its external term format, delivered and kept " <>
+          "whole; a larger one becomes a digest and size marker. `:infinity` never " <>
+          "measures an event."
+    ],
+    max_events: [
+      type: @bound,
+      default: 512,
+      doc: "Events the snapshot keeps; older ones are evicted. `:infinity` evicts none."
+    ],
+    max_snapshot_bytes: [
+      type: @bound,
+      default: 4_194_304,
+      doc:
+        "Bytes the snapshot keeps; older events are evicted. `:infinity` evicts none. " <>
+          "A host that must keep a complete record of a run sets all three bounds " <>
+          "to `:infinity`."
+    ]
+  ]
 
   @doc """
   Starts an unlinked supervised program run owned by the calling process.
@@ -97,24 +153,22 @@ defmodule Imp.Run do
   machine-wide pool as usual, except a stream the run enumerates itself
   (`Imp.Tasks.async_stream/3`), which runs one item at a time on the run's own
   place, as it does for any run.
+
+  An option this function does not know raises `ArgumentError`, so a
+  misspelled `:authorize` cannot start a run whose tool calls nobody is asked
+  about.
+
+  ## Options
+
+  #{NimbleOptions.docs(@start_schema)}
   """
   @spec start(struct(), map() | keyword(), keyword()) :: {:ok, t()} | {:error, term()}
-  def start(program, inputs, opts \\ []) when is_list(opts) do
+  def start(program, inputs, opts \\ []) do
+    opts = Imp.Options.validate!(opts, @start_schema, "Imp.Run.start/3")
     event_sink = Keyword.get(opts, :event_sink, fn _event -> :ok end)
-    authorize = Keyword.get(opts, :authorize)
-    authorization_timeout = Keyword.get(opts, :authorization_timeout, 30_000)
-    admission = Keyword.get(opts, :admission)
-
-    unless is_function(event_sink, 1) do
-      raise ArgumentError, ":event_sink must be an arity-1 function"
-    end
-
-    unless is_nil(admission) or
-             match?({_pool, limit} when is_integer(limit) and limit > 0, admission) do
-      raise ArgumentError,
-            ":admission must be {pool, limit} with a positive integer limit, got: " <>
-              inspect(admission)
-    end
+    authorize = opts[:authorize]
+    authorization_timeout = opts[:authorization_timeout]
+    admission = opts[:admission]
 
     id = Keyword.get_lazy(opts, :id, &new_id/0)
     owner = self()
@@ -132,7 +186,8 @@ defmodule Imp.Run do
              owner: self(),
              id: id,
              event_sink: event_sink,
-             capture: Keyword.take(opts, [:max_events, :max_event_bytes, :max_snapshot_bytes])
+             limits:
+               Map.new(Keyword.take(opts, [:max_events, :max_event_bytes, :max_snapshot_bytes]))
            ) do
       body = fn ->
         with_context(control, fn ->
@@ -161,6 +216,13 @@ defmodule Imp.Run do
       end
     end
   end
+
+  @doc false
+  def validate_admission({_pool, limit} = admission) when is_integer(limit) and limit > 0,
+    do: {:ok, admission}
+
+  def validate_admission(other),
+    do: {:error, "expected {pool, limit} with a positive integer limit, got: #{inspect(other)}"}
 
   defp start_task(body, nil), do: {:ok, Imp.Tasks.async_nolink(body)}
   defp start_task(body, {pool, limit}), do: Imp.Tasks.async_nolink_in_pool(body, pool, limit)
@@ -306,7 +368,63 @@ defmodule Imp.Run do
 end
 
 defmodule Imp.Run.Event do
-  @moduledoc "A single ordered, protocol-neutral execution event."
+  @moduledoc """
+  A single ordered, protocol-neutral execution event.
+
+  `kinds/0` is the complete list of kinds Imp emits:
+
+    * `:run_started`, `:run_finished`, `:run_failed`, `:run_cancelled` — the
+      run's lifecycle. Exactly one of the last three ends a run;
+      `:run_finished` carries the program's prediction as its `output`.
+    * `:model_request`, `:model_response` — one `Imp.LM.request/2` call.
+    * `:tools_sent` — the tool definitions a request sent, once per run per
+      distinct roster.
+    * `:tool_call`, `:tool_result` — one tool call a ReActV2 or RLM loop
+      made, and what came of it; `metadata.outcome` is the call's
+      `t:Imp.Tool.outcome/0`.
+    * `:reasoning` — a thought the model reported.
+    * `:context_projected` — older episodes left out of one request after a
+      provider refused it for length.
+    * `:capture_gap` — events evicted from the snapshot.
+
+  A host may emit kinds of its own inside a run with `Imp.Run.emit/2`; they
+  are atoms not in `kinds/0`. `Imp.Trajectory.to_atif/2` reads a stored event
+  whose kind it does not know with the kind kept as the stored string.
+  """
+
+  @kinds [
+    :run_started,
+    :run_finished,
+    :run_failed,
+    :run_cancelled,
+    :model_request,
+    :model_response,
+    :tools_sent,
+    :tool_call,
+    :tool_result,
+    :reasoning,
+    :context_projected,
+    :capture_gap
+  ]
+
+  @typedoc "One of `kinds/0`."
+  @type kind ::
+          :run_started
+          | :run_finished
+          | :run_failed
+          | :run_cancelled
+          | :model_request
+          | :model_response
+          | :tools_sent
+          | :tool_call
+          | :tool_result
+          | :reasoning
+          | :context_projected
+          | :capture_gap
+
+  @doc "Every event kind Imp emits, in the order the module documentation lists them."
+  @spec kinds() :: [kind()]
+  def kinds, do: @kinds
 
   @enforce_keys [:run_id, :sequence, :kind]
   defstruct [
@@ -332,7 +450,7 @@ defmodule Imp.Run.Event do
   @type t :: %__MODULE__{
           run_id: String.t(),
           sequence: non_neg_integer(),
-          kind: atom(),
+          kind: kind() | atom() | String.t(),
           component: module() | atom() | String.t() | nil,
           timestamp: String.t() | nil,
           input: term(),
@@ -401,16 +519,7 @@ defmodule Imp.Run.Control do
   @impl true
   def init(opts) do
     owner = Keyword.fetch!(opts, :owner)
-    capture = Keyword.get(opts, :capture, [])
-
-    limits = %{
-      max_events: Keyword.get(capture, :max_events, 512),
-      max_event_bytes: Keyword.get(capture, :max_event_bytes, 65_536),
-      max_snapshot_bytes: Keyword.get(capture, :max_snapshot_bytes, 4_194_304)
-    }
-
-    unless Enum.all?(limits, fn {_, n} -> bound?(n) end),
-      do: raise(ArgumentError, "run capture limits must be positive integers or :infinity")
+    limits = Keyword.fetch!(opts, :limits)
 
     # Delivery is linked, and its death must reach `terminate/2` so that what
     # it had not delivered is reported.
@@ -585,6 +694,11 @@ defmodule Imp.Run.Control do
     %{state | reported: failure.sequence + 1}
   end
 
+  defp report_never_handed(state, event) do
+    send(state.owner, {:imp_run_event_undelivered, state.id, event})
+    %{state | reported: event.sequence + 1}
+  end
+
   # Delivery sends a failure here before it records the event as finished,
   # and it is dead, so every failure it sent is already in this mailbox.
   defp report_pending_failures(state) do
@@ -598,7 +712,7 @@ defmodule Imp.Run.Control do
   # Delivery is dead, so its progress no longer moves. Every event it had not
   # finished and that was not reported as failed is reported now: the one the
   # sink was holding may have been stored, and the ones after it were never
-  # handed over.
+  # handed over, so they are reported as undelivered rather than as failures.
   defp report_undelivered(state) do
     {handed, finished} = EventDelivery.progress(state.progress)
     first = max(finished, state.reported)
@@ -610,8 +724,11 @@ defmodule Imp.Run.Control do
           do: {event.sequence, event.kind}
 
     Enum.reduce(first..(state.sequence - 1)//1, state, fn sequence, state ->
-      reason = if sequence < handed, do: :in_sink_when_stopped, else: :never_handed_to_sink
-      report(state, %{sequence: sequence, kind: Map.get(kinds, sequence), reason: reason})
+      event = %{sequence: sequence, kind: Map.get(kinds, sequence)}
+
+      if sequence < handed,
+        do: report(state, Map.put(event, :reason, :in_sink_when_stopped)),
+        else: report_never_handed(state, event)
     end)
   end
 
@@ -646,9 +763,6 @@ defmodule Imp.Run.Control do
     }
     |> bound_snapshot()
   end
-
-  defp bound?(:infinity), do: true
-  defp bound?(n), do: is_integer(n) and n > 0
 
   # `:infinity` is the absence of a bound, not a very large one: the event is
   # never measured, so a host that wants the whole record pays no digest cost.

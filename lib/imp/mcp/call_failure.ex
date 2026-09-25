@@ -10,9 +10,12 @@ defmodule Imp.MCP.CallFailure do
     * `:refused` — declined before anything ran. The server answered with a
       JSON-RPC error that rejects the request before any method runs (parse
       error, invalid request, method not found), or the HTTP layer refused it
-      with a 4xx status (401 and 403 included). Nothing ran, so repeating the
-      call is safe; whether it will succeed depends on why it was refused (a
-      408 or 429 may pass later, a 404 will not).
+      with a 4xx status other than 401 (403 included). Nothing ran, so
+      repeating the call is safe; whether it will succeed depends on why it
+      was refused (a 408 or 429 may pass later, a 404 will not).
+    * `:auth_refused` — the credential was refused before anything ran: an
+      HTTP 401, or an OAuth flow that failed. Nothing ran; renewing the
+      credential and trying once more may succeed.
     * `:not_sent` — the request never left: the connection could not be
       opened, the address could not be resolved, the client was not connected,
       the client process was already gone, or every connection to an HTTP
@@ -59,7 +62,7 @@ defmodule Imp.MCP.CallFailure do
   @enforce_keys [:outcome, :server, :tool, :reason]
   defstruct [:outcome, :server, :tool, :reason]
 
-  @type outcome :: :refused | :not_sent | :unknown
+  @type outcome :: :refused | :auth_refused | :not_sent | :unknown
 
   @type t :: %__MODULE__{
           outcome: outcome(),
@@ -129,16 +132,20 @@ defmodule Imp.MCP.CallFailure do
   defp transport_outcome(%Mint.HTTPError{}), do: :not_sent
   defp transport_outcome(reason) when reason in @unsent_reasons, do: :not_sent
   defp transport_outcome({:security_violation, _error}), do: :not_sent
-  defp transport_outcome({:unauthorized, 401, _body, _challenge}), do: :refused
-  defp transport_outcome({:oauth_failed, _reason}), do: :refused
+  # An ExMCP auth provider reports a refused credential as `:forbidden` or
+  # `:scope_step_up_exhausted`; those would read as `:unknown` below. Imp
+  # configures no auth provider, so neither reaches here today; one that is
+  # configured should map them to `:auth_refused`.
+  defp transport_outcome({:unauthorized, 401, _body, _challenge}), do: :auth_refused
+  defp transport_outcome({:oauth_failed, _reason}), do: :auth_refused
   defp transport_outcome({:http_error, status, _body}), do: status_outcome(status)
   defp transport_outcome(_reason), do: :unknown
 
   defp transport_text_outcome("%Mint.TransportError{" <> _), do: :not_sent
   defp transport_text_outcome("%Mint.HTTPError{" <> _), do: :not_sent
   defp transport_text_outcome("{:security_violation, " <> _), do: :not_sent
-  defp transport_text_outcome("{:unauthorized, 401, " <> _), do: :refused
-  defp transport_text_outcome("{:oauth_failed, " <> _), do: :refused
+  defp transport_text_outcome("{:unauthorized, 401, " <> _), do: :auth_refused
+  defp transport_text_outcome("{:oauth_failed, " <> _), do: :auth_refused
 
   defp transport_text_outcome("{:http_error, " <> rest) do
     case Integer.parse(rest) do
@@ -153,8 +160,10 @@ defmodule Imp.MCP.CallFailure do
 
   defp transport_text_outcome(_text), do: :unknown
 
-  # A 4xx status says the request was rejected as sent. A 5xx says a server on
-  # the path failed with it, which may be after the MCP server acted.
+  # A 4xx status says the request was rejected as sent, and a 401 that the
+  # credential was. A 5xx says a server on the path failed with it, which may
+  # be after the MCP server acted.
+  defp status_outcome(401), do: :auth_refused
   defp status_outcome(status) when status in 400..499, do: :refused
   defp status_outcome(_status), do: :unknown
 end

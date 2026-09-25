@@ -63,8 +63,8 @@ defmodule Imp.DeploymentAgentOptimizationExampleTest do
     assert {:ok, prediction} = Imp.call(updated, %{request: "Refund duplicate charge on A-104"})
     assert Imp.get(prediction, :answer) == "Refund queued for A-104"
 
-    assert Imp.get(prediction, :termination_reason) == :answered
-    [event, _answer] = Imp.get(prediction, :history).messages
+    assert prediction.metadata[:termination_reason] == :answered
+    [event, _answer] = prediction.metadata[:history].messages
 
     assert Enum.any?(event.tool_call_results, fn result ->
              result.name == "billing_remediation" and result.result == "REFUND_QUEUED:A-104"

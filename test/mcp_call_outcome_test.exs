@@ -1,9 +1,10 @@
 defmodule Imp.MCPCallOutcomeTest do
-  # A tool call's outcome is one of four: the tool answered (`:result`), the
-  # server or Imp declined before anything ran (`:refused`), the request never
-  # left (`:not_sent`), or it left and no trustworthy answer came back
-  # (`:unknown`). Each case here drives the real ExMCP client against a real
-  # server and reads the outcome Imp decided, never the shape of the term.
+  # A tool call's outcome is one of five: the tool answered (`:result`), the
+  # server or Imp declined before anything ran (`:refused`), the server refused
+  # the credential (`:auth_refused`), the request never left (`:not_sent`), or
+  # it left and no trustworthy answer came back (`:unknown`). Each case here
+  # drives the real ExMCP client against a real server and reads the outcome
+  # Imp decided, never the shape of the term.
   use ExUnit.Case, async: false
 
   alias Imp.MCP.CallFailure
@@ -19,7 +20,7 @@ defmodule Imp.MCPCallOutcomeTest do
     use ExMCP.Server.Handler
     def init(_), do: {:ok, %{}}
 
-    @tools ~w(answer tool_error crash slow invalid_params no_method)
+    @tools ~w(answer tool_error declared_unknown crash slow invalid_params no_method)
 
     def handle_list_tools(_cursor, state) do
       tools =
@@ -36,6 +37,17 @@ defmodule Imp.MCPCallOutcomeTest do
 
     defp call("answer", state), do: {:ok, %{"content" => [text("done")]}, state}
     defp call("tool_error", state), do: {:error, "the tool said no", state}
+
+    # Kite's error result for a write that may have been applied.
+    defp call("declared_unknown", state) do
+      {:ok,
+       %{
+         "content" => [text("error: write outcome unknown; the action may have completed.")],
+         "isError" => true,
+         "structuredContent" => %{"code" => "write_outcome_unknown", "outcome" => "unknown"}
+       }, state}
+    end
+
     defp call("crash", _state), do: raise("the handler crashed")
 
     defp call("slow", state) do
@@ -143,6 +155,28 @@ defmodule Imp.MCPCallOutcomeTest do
       assert envelope["isError"] == true
       assert Imp.Tool.outcome(result) == :result
     end
+
+    test "an MCP error result that declares its outcome is read as it declares" do
+      {_imported, tools} = http_tools(http_server())
+
+      assert {:error, {:mcp_tool_error, envelope}} = result = call(tools, "declared_unknown")
+      assert envelope["structuredContent"]["outcome"] == "unknown"
+      assert Imp.Tool.outcome(result) == :unknown
+
+      for {declared, outcome} <- [
+            {"refused", :refused},
+            {"auth_refused", :auth_refused},
+            {"unknown", :unknown},
+            {"not_sent", :result},
+            {"partial", :result}
+          ] do
+        envelope = %{isError: true, structuredContent: %{outcome: declared}}
+        assert Imp.Tool.outcome({:error, {:mcp_tool_error, envelope}}) == outcome, declared
+      end
+
+      # Structured content is the tool's data; only an error result's is read.
+      assert Imp.Tool.outcome(%{"structuredContent" => %{"outcome" => "unknown"}}) == :result
+    end
   end
 
   describe "declined before anything ran" do
@@ -157,17 +191,22 @@ defmodule Imp.MCPCallOutcomeTest do
       assert Imp.Tool.outcome(result) == :refused
     end
 
-    test "an HTTP 401 or 403 on the call is a refusal" do
+    test "an HTTP 403 on the call is a refusal, and a 401 refuses the credential" do
       server = http_server()
       {_imported, tools} = http_tools(server)
 
-      for status <- [401, 403] do
-        gate(server, status)
-        assert {:error, %CallFailure{outcome: :refused}} = call(tools, "answer")
-      end
+      gate(server, 403)
+      assert {:error, %CallFailure{outcome: :refused}} = call(tools, "answer")
+
+      gate(server, 401)
+      assert {:error, %CallFailure{outcome: :auth_refused} = failure} = call(tools, "answer")
+      assert Imp.MCP.failure_text(failure) =~ "refused the credential"
     end
 
-    test "Imp's own validation and a host's authorization refuse before the tool runs" do
+    # A tool can return any term, including one shaped like Imp's own
+    # refusals, so a value alone never reads as a refusal: the loop that
+    # refused the call records it.
+    test "a term shaped like a refusal that a tool returned is the tool's answer" do
       for reason <- [
             {:unknown_tool, "frobnicate"},
             {:malformed_tool_call, %{}},
@@ -177,7 +216,7 @@ defmodule Imp.MCPCallOutcomeTest do
             {:tool_denied, :post},
             {:rlm_tool_error, {:tool_denied, :post}}
           ] do
-        assert Imp.Tool.outcome({:error, reason}) == :refused, inspect(reason)
+        assert Imp.Tool.outcome({:error, reason}) == :result, inspect(reason)
       end
     end
   end
@@ -354,7 +393,11 @@ defmodule Imp.MCPCallOutcomeTest do
       cases = [
         {{:transport_error, %Mint.TransportError{reason: :econnrefused}}, :not_sent},
         {{:transport_error, :dns_failed}, :not_sent},
-        {{:transport_error, {:unauthorized, 401, "", nil}}, :refused},
+        {{:transport_error, {:unauthorized, 401, "", nil}}, :auth_refused},
+        {{:transport_error, {:http_error, 401, ""}}, :auth_refused},
+        {{:transport_error, {:oauth_failed, :invalid_grant}}, :auth_refused},
+        {transport_text({:unauthorized, 401, "", nil}), :auth_refused},
+        {{:transport_error, {:http_error, 403, ""}}, :refused},
         {{:transport_error, {:http_error, 429, ""}}, :refused},
         {{:transport_error, {:http_error, 502, ""}}, :unknown},
         {{:transport_error, {:http_receive_failed, %Mint.TransportError{reason: :closed}}},
@@ -454,6 +497,71 @@ defmodule Imp.MCPCallOutcomeTest do
       Imp.Run.cancel(run)
     end
 
+    # The refusal is decided where the call is refused: a policy that denies
+    # with its own term refuses the call, and a tool that returns a term
+    # shaped like a refusal has answered.
+    test "ReActV2 records a refusal where it refused the call, not from the term" do
+      echo = Imp.Tool.new(:echo, "echo", fn _ -> {:error, {:unknown_tool, "frobnicate"}} end)
+      post = Imp.Tool.new(:post, "post", fn _ -> "posted" end)
+
+      lm =
+        Imp.LM.Static.new(
+          handler: fn messages, _opts ->
+            if List.last(messages)[:role] == :tool,
+              do: "done",
+              else: %{
+                tool_calls: [
+                  %{id: "echo-1", name: "echo", arguments: %{}},
+                  %{id: "post-1", name: "post", arguments: %{}}
+                ]
+              }
+          end
+        )
+
+      policy = fn
+        :post, _args -> {:error, :not_today}
+        _name, _args -> true
+      end
+
+      program =
+        Imp.react_v2("question -> answer", [echo, post],
+          lm: lm,
+          max_iters: 2,
+          tool_policy: policy
+        )
+
+      assert outcomes(program) == %{"echo-1" => :result, "post-1" => :refused}
+    end
+
+    test "RLM records a refusal where it refused the call, not from the term" do
+      echo = Imp.Tool.new(:echo, "echo", fn _ -> {:error, {:unknown_tool, "frobnicate"}} end)
+      post = Imp.Tool.new(:post, "post", fn _ -> "posted" end)
+      {:ok, turns} = Agent.start_link(fn -> [~S|echo(%{})|, ~S|post(%{})|] end)
+
+      lm =
+        Imp.LM.Static.new(
+          handler: fn _messages, _opts ->
+            Agent.get_and_update(turns, fn
+              [code | rest] -> {%{code: code}, rest}
+              [] -> {%{code: ~S|submit(%{answer: "done"})|}, []}
+            end)
+          end
+        )
+
+      program =
+        Imp.Predict.RLM.new("question -> answer",
+          lm: lm,
+          tools: [echo, post],
+          tool_policy: fn
+            :post, _args -> {:error, :not_today}
+            _name, _args -> true
+          end,
+          max_iterations: 3
+        )
+
+      assert outcomes_by_name(program) == %{echo: :result, post: :refused}
+    end
+
     test "an MCP call failure serializes with its outcome beside the untouched reason" do
       failure = CallFailure.returned("kite", "reply", :timeout)
 
@@ -470,6 +578,20 @@ defmodule Imp.MCPCallOutcomeTest do
                  error: failure
                })["error"]
     end
+  end
+
+  defp outcomes(program),
+    do: program |> tool_results() |> Map.new(&{&1.tool_call_id, &1.metadata.outcome})
+
+  defp outcomes_by_name(program),
+    do: program |> tool_results() |> Map.new(&{&1.tool_name, &1.metadata.outcome})
+
+  defp tool_results(program) do
+    {:ok, run} = Imp.Run.start(program, %{question: "q"})
+    assert {:ok, _prediction} = Task.await(run.task, 10_000)
+    events = Imp.Run.events(run)
+    :ok = Imp.Run.stop(run)
+    Enum.filter(events, &(&1.kind == :tool_result))
   end
 
   defp transport_text(reason),

@@ -201,8 +201,8 @@ defmodule ReActV2Test do
              |> Imp.call(%{question: "What runtime?"})
 
     assert Imp.get(prediction, :answer) == "BEAM"
-    assert Imp.get(prediction, :termination_reason) == :submit
-    assert %Imp.History{messages: [event]} = Imp.get(prediction, :history)
+    assert prediction.metadata[:termination_reason] == :submit
+    assert %Imp.History{messages: [event]} = prediction.metadata[:history]
     assert Enum.map(event.tool_calls.tool_calls, & &1.id) == ["lookup-1", "missing-1", "submit-1"]
 
     assert [lookup_result, missing_result, submit_result] = event.tool_call_results
@@ -271,7 +271,7 @@ defmodule ReActV2Test do
              |> Imp.call(%{question: "recover"})
 
     assert Imp.get(prediction, :answer) == "recovered"
-    assert %Imp.History{messages: [first, _second]} = Imp.get(prediction, :history)
+    assert %Imp.History{messages: [first, _second]} = prediction.metadata[:history]
     assert Enum.all?(first.tool_call_results, & &1.error)
   end
 
@@ -298,7 +298,7 @@ defmodule ReActV2Test do
     assert_received {:write, %{path: "notes.txt"}}
     refute_received {:write, %{"command" => "cat"}}
 
-    assert %Imp.History{messages: [malformed, _recovered]} = Imp.get(prediction, :history)
+    assert %Imp.History{messages: [malformed, _recovered]} = prediction.metadata[:history]
     assert [result] = malformed.tool_call_results
     assert result.error
 
@@ -323,7 +323,7 @@ defmodule ReActV2Test do
              |> Imp.call(%{question: "answer"})
 
     assert Imp.get(prediction, :answer) == "forced"
-    assert Imp.get(prediction, :termination_reason) == :forced_submit
+    assert prediction.metadata[:termination_reason] == :forced_submit
     assert_received {:lm_call, _normal_opts}
     assert_received {:lm_call, forced_opts}
     assert Keyword.fetch!(forced_opts, :tool_choice) == %{type: "tool", name: "submit"}
@@ -352,7 +352,7 @@ defmodule ReActV2Test do
              |> Imp.call(%{question: "Capital of France?"})
 
     assert Imp.get(prediction, :answer) == "Paris"
-    assert Imp.get(prediction, :termination_reason) == :forced_submit
+    assert prediction.metadata[:termination_reason] == :forced_submit
 
     # The ordinary call carries the effort as OpenRouter's nested object (a
     # request step), not as ReqLLM's top-level option.
@@ -382,7 +382,7 @@ defmodule ReActV2Test do
              |> Imp.call(%{question: "Capital of France?"})
 
     assert Imp.get(prediction, :answer) == "Paris"
-    assert Imp.get(prediction, :termination_reason) == :forced_submit
+    assert prediction.metadata[:termination_reason] == :forced_submit
 
     assert_received {:native_tool_request, _initial_messages, initial_opts}
     assert initial_opts[:tool_choice] == "auto"
@@ -418,7 +418,7 @@ defmodule ReActV2Test do
              |> Imp.call(%{question: "Capital of France?"})
 
     assert Imp.get(prediction, :answer) == "Paris"
-    assert Imp.get(prediction, :termination_reason) == :forced_submit
+    assert prediction.metadata[:termination_reason] == :forced_submit
 
     assert_received {:required_only_tool_request, _initial_messages, initial_opts}
     assert initial_opts[:tool_choice] == "auto"
@@ -453,7 +453,8 @@ defmodule ReActV2Test do
              )
              |> Imp.call(%{question: "Capital of France?"})
 
-    assert Imp.get(prediction, :termination_reason) == :max_iters
+    assert prediction.metadata[:termination_reason] == :incomplete
+    assert prediction.metadata[:termination_cause] == :max_iters
     assert_received {:required_only_tool_request, _initial_messages, _initial_opts}
     assert_received {:required_only_tool_request, _named_messages, _named_opts}
     refute_received {:required_only_tool_request, _fallback_messages, _fallback_opts}
@@ -482,9 +483,9 @@ defmodule ReActV2Test do
              |> Imp.call(%{question: "Capital of France?"})
 
     assert Imp.get(prediction, :answer) == "Paris"
-    assert Imp.get(prediction, :termination_reason) == :forced_submit
-    assert Imp.get(prediction, :completion_mode) == :typed_extraction
-    assert Imp.get(prediction, :termination_cause) == :max_iters
+    assert prediction.metadata[:termination_reason] == :extracted
+    assert prediction.metadata[:termination_cause] == :max_iters
+    assert Map.keys(prediction.fields) |> Enum.sort() == [:answer, :confidence]
 
     requests =
       for _ <- 1..5 do
@@ -545,8 +546,9 @@ defmodule ReActV2Test do
              )
              |> Imp.call(%{question: "Capital of France?"})
 
-    assert Imp.get(prediction, :answer) == nil
-    assert Imp.get(prediction, :termination_reason) == :max_iters
+    assert prediction.fields == %{}
+    assert prediction.metadata[:termination_reason] == :incomplete
+    assert prediction.metadata[:termination_cause] == :max_iters
 
     # Four requests, not five: the prose the required-only fallback returns is
     # read as a thought that called nothing, so no JSON-adapter re-ask fires.
@@ -584,7 +586,7 @@ defmodule ReActV2Test do
                |> Imp.call(%{question: "q"})
 
       assert Imp.get(prediction, :answer) in ["atom", "string", "recipient"]
-      assert [event] = Imp.get(prediction, :history).messages
+      assert [event] = prediction.metadata[:history].messages
 
       assert [%{id: "call_0_0", name: "submit"}] = event.tool_calls.tool_calls
     end
@@ -610,8 +612,8 @@ defmodule ReActV2Test do
                Imp.call(program, Map.put(%{question: "q"}, max_iters_key, 1))
 
       assert Imp.get(prediction, :answer) == "last words"
-      assert Imp.get(prediction, :termination_reason) == :last_text
-      assert Imp.get(prediction, :termination_cause) == :max_iters
+      assert prediction.metadata[:termination_reason] == :last_text
+      assert prediction.metadata[:termination_cause] == :max_iters
       assert_received {:lm_call, _normal_opts}
       assert_received {:lm_call, _forced_opts}
       refute_received {:lm_call, _extra_opts}
@@ -643,8 +645,9 @@ defmodule ReActV2Test do
              |> Imp.call(%{question: "q"})
 
     assert Imp.get(prediction, :answer) == nil
-    assert Imp.get(prediction, :termination_reason) == :max_iters
-    assert %Imp.History{messages: [event]} = Imp.get(prediction, :history)
+    assert prediction.metadata[:termination_reason] == :incomplete
+    assert prediction.metadata[:termination_cause] == :max_iters
+    assert %Imp.History{messages: [event]} = prediction.metadata[:history]
 
     assert [
              %{
@@ -681,7 +684,7 @@ defmodule ReActV2Test do
              Imp.Predict.ReActV2.new(signature, [], lm: lm, max_iters: 1)
              |> Imp.call(%{question: "q"})
 
-    assert %Imp.History{messages: [event]} = Imp.get(incomplete, :history)
+    assert %Imp.History{messages: [event]} = incomplete.metadata[:history]
 
     assert [%{error: true, result: {:error, {:missing_output_fields, [:count, :maybe]}}}] =
              event.tool_call_results
@@ -700,7 +703,7 @@ defmodule ReActV2Test do
              Imp.Predict.ReActV2.new(signature, [], lm: invalid_lm, max_iters: 1)
              |> Imp.call(%{question: "q"})
 
-    assert %Imp.History{messages: [invalid_event]} = Imp.get(invalid, :history)
+    assert %Imp.History{messages: [invalid_event]} = invalid.metadata[:history]
 
     assert [%{error: true, result: {:error, {:invalid_submit_outputs, _reason}}}] =
              invalid_event.tool_call_results
@@ -720,8 +723,8 @@ defmodule ReActV2Test do
              |> Imp.call(%{question: "next", history: history})
 
     assert Imp.get(prediction, :answer) == "continued"
-    assert Imp.get(prediction, :termination_reason) == :last_text
-    assert %Imp.History{messages: [prior, current]} = Imp.get(prediction, :history)
+    assert prediction.metadata[:termination_reason] == :last_text
+    assert %Imp.History{messages: [prior, current]} = prediction.metadata[:history]
     assert prior.question == "prior"
     assert current.answer == "continued"
   end
@@ -979,9 +982,9 @@ defmodule ReActV2Test do
              |> Imp.call(%{question: "Capital of France?"})
 
     assert Imp.get(prediction, :answer) == prose
-    assert Imp.get(prediction, :termination_reason) == :answered
+    assert prediction.metadata[:termination_reason] == :answered
 
-    messages = prediction |> Imp.get(:history) |> Imp.History.messages()
+    messages = prediction.metadata[:history] |> Imp.History.messages()
     assert Enum.any?(messages, &(Map.get(&1, :next_thought) == prose))
 
     assert_received {:lm_call, _only_call}
@@ -1014,7 +1017,7 @@ defmodule ReActV2Test do
 
     assert Imp.get(prediction, :answer) == "Paris"
     assert Imp.get(prediction, :confidence) == 0.9
-    assert Imp.get(prediction, :termination_reason) == :forced_submit
+    assert prediction.metadata[:termination_reason] == :forced_submit
 
     assert_received {:lm_call, _normal}
     assert_received {:lm_call, _forced}
@@ -1044,9 +1047,9 @@ defmodule ReActV2Test do
 
     assert {:ok, prediction} = Imp.call(program, %{question: "Capital of France?"})
     assert Imp.get(prediction, :answer) == "Paris"
-    assert Imp.get(prediction, :termination_reason) == :answered
+    assert prediction.metadata[:termination_reason] == :answered
 
-    assert %Imp.History{messages: [first, second]} = Imp.get(prediction, :history)
+    assert %Imp.History{messages: [first, second]} = prediction.metadata[:history]
     assert [%{error: true, result: {:error, {:unknown_tool, "submit"}}}] = first.tool_call_results
     # The answered step's event carries the output, as a submit's event does.
     assert second.answer == "Paris"
@@ -1090,10 +1093,10 @@ defmodule ReActV2Test do
              |> Imp.call(%{question: "Capital of France?"})
 
     assert Imp.get(prediction, :answer) == "Paris"
-    assert Imp.get(prediction, :termination_reason) == :finished_by_tool
-    assert Imp.get(prediction, :finished_by_tool) == "reply"
+    assert prediction.metadata[:termination_reason] == :finished_by_tool
+    assert prediction.metadata[:finished_by_tool] == "reply"
 
-    assert %Imp.History{messages: [event]} = Imp.get(prediction, :history)
+    assert %Imp.History{messages: [event]} = prediction.metadata[:history]
 
     assert [%{id: "r1", name: "reply", result: "sent: Paris", error: false}] =
              event.tool_call_results
@@ -1123,8 +1126,8 @@ defmodule ReActV2Test do
              |> Imp.call(%{question: "Capital of France?"})
 
     assert Imp.get(prediction, :answer) == "Paris"
-    assert Imp.get(prediction, :termination_reason) == :answered
-    assert %Imp.History{messages: [first, _second]} = Imp.get(prediction, :history)
+    assert prediction.metadata[:termination_reason] == :answered
+    assert %Imp.History{messages: [first, _second]} = prediction.metadata[:history]
     assert [%{name: "reply", error: false}] = first.tool_call_results
   end
 
@@ -1147,9 +1150,9 @@ defmodule ReActV2Test do
              |> Imp.call(%{question: "Capital of France?"})
 
     assert Imp.get(prediction, :answer) == "Paris"
-    assert Imp.get(prediction, :termination_reason) == :answered
+    assert prediction.metadata[:termination_reason] == :answered
 
-    assert %Imp.History{messages: [first, _second]} = Imp.get(prediction, :history)
+    assert %Imp.History{messages: [first, _second]} = prediction.metadata[:history]
 
     assert [%{error: true, result: {:error, {:missing_output_fields, [:answer]}}}] =
              first.tool_call_results
@@ -1268,7 +1271,7 @@ defmodule ReActV2Test do
     assert {:ok, prediction} =
              Imp.react_v2(@submit_signature, [lookup],
                lm: lm,
-               forced_submit_notice: "Submit now."
+               last_request_note: "Submit now."
              )
              |> Imp.call(%{question: "Capital of France?"})
 
@@ -1327,6 +1330,46 @@ defmodule ReActV2Test do
              messages,
              &(&1[:role] == :assistant and to_string(&1[:content]) == "Thinking out loud.")
            )
+  end
+
+  test "a forced submit that fails after the deadline has passed is cut short by the deadline" do
+    counter = :counters.new(1, [])
+
+    # The deadline passes during the first step's tool call; the forced
+    # submit that follows fails.
+    slow_lookup =
+      Imp.tool(:lookup, "Look something up", fn _arguments ->
+        Process.sleep(20)
+        "found"
+      end)
+
+    lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          :counters.add(counter, 1, 1)
+
+          if :counters.get(counter, 1) == 1 do
+            %{
+              next_thought: "look first",
+              tool_calls: [%{id: "c1", name: "lookup", arguments: %{}}]
+            }
+          else
+            raise "provider timed out"
+          end
+        end
+      )
+
+    program = Imp.react_v2(@submit_signature, [slow_lookup], lm: lm, max_iters: 1)
+
+    assert {:ok, prediction} =
+             Imp.Deadline.with_deadline(10, fn ->
+               Imp.call(program, %{question: "Capital of France?"})
+             end)
+
+    # The same answer the one-text-output path gives: what left the turn
+    # without an answer is the deadline, not the step limit before it.
+    assert prediction.metadata[:termination_reason] == :incomplete
+    assert prediction.metadata[:termination_cause] == :deadline_exceeded
   end
 
   defp action_lm(actions, notify \\ nil) do

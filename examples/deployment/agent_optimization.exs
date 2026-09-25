@@ -266,8 +266,8 @@ defmodule ImpDeployment.AgentOptimization.Runner do
           {
             true,
             Imp.get(prediction, :answer, "") |> to_string(),
-            Imp.get(prediction, :termination_reason),
-            Imp.get(prediction, :termination_error)
+            prediction.metadata[:termination_reason],
+            prediction.metadata[:termination_error]
           }
 
         {:error, reason} ->
