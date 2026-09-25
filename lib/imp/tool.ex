@@ -69,6 +69,7 @@ defmodule Imp.Tool do
           "Imp.Tool.new/4 expects a unary function as the tool runner; got: #{inspect(run)}"
   end
 
+  @doc false
   def validate_tools(tools) when is_list(tools) do
     case Enum.find(tools, &(not match?(%__MODULE__{}, &1))) do
       nil ->

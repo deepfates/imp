@@ -49,6 +49,7 @@ defmodule Imp.Predict.Refine do
     }
   end
 
+  @doc false
   def validate_feedback_fn(nil), do: {:ok, nil}
   def validate_feedback_fn(feedback_fn) when is_function(feedback_fn, 1), do: {:ok, feedback_fn}
 

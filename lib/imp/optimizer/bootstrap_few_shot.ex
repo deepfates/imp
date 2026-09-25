@@ -72,10 +72,12 @@ defmodule Imp.Optimizer.BootstrapFewShot do
     struct(__MODULE__, Map.new(opts) |> Map.put(:metric, metric))
   end
 
+  @doc false
   def validate_optional_number(nil), do: {:ok, nil}
   def validate_optional_number(value) when is_number(value), do: {:ok, value}
   def validate_optional_number(_value), do: {:error, "expected nil, an integer, or a float"}
 
+  @doc false
   def validate_optional_max_errors(nil), do: {:ok, nil}
   def validate_optional_max_errors(value), do: Imp.Evaluate.validate_max_errors(value)
 
@@ -108,6 +110,7 @@ defmodule Imp.Optimizer.BootstrapFewShot do
     error in ArgumentError -> {:error, Exception.message(error)}
   end
 
+  @doc false
   def compile(%__MODULE__{} = optimizer, student, trainset, opts \\ []) when is_list(opts) do
     opts = validate_compile_options!(opts)
     trainset = Enum.to_list(trainset)

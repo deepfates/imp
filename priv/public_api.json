@@ -40,8 +40,8 @@
     },
     {
       "category": "internal",
-      "module": "Imp.Deadline",
-      "source": "lib/imp/deadline.ex"
+      "module": "Imp.Clients.TRLProtocol",
+      "source": "lib/imp/clients/trl_protocol.ex"
     },
     {
       "category": "internal",
@@ -57,11 +57,6 @@
       "category": "internal",
       "module": "Imp.FunctionContract",
       "source": "lib/imp/function_contract.ex"
-    },
-    {
-      "category": "internal",
-      "module": "Imp.Observability.Inspection",
-      "source": "lib/imp/observability/inspection.ex"
     },
     {
       "category": "internal",
@@ -95,11 +90,6 @@
     },
     {
       "category": "internal",
-      "module": "Imp.Optimize.Anything.Result",
-      "source": "lib/imp/optimize/anything/result.ex"
-    },
-    {
-      "category": "internal",
       "module": "Imp.Optimizer.Avatar.EvalResult",
       "source": "lib/imp/optimizer/avatar_models.ex"
     },
@@ -112,11 +102,6 @@
       "category": "internal",
       "module": "Imp.Optimizer.GEPA.Adapter",
       "source": "lib/imp/optimizer/gepa/adapter.ex"
-    },
-    {
-      "category": "internal",
-      "module": "Imp.Optimizer.GEPA.Callback",
-      "source": "lib/imp/optimizer/gepa/callback.ex"
     },
     {
       "category": "internal",
@@ -255,16 +240,6 @@
     },
     {
       "category": "internal",
-      "module": "Imp.Optimizer.Parameter.Change",
-      "source": "lib/imp/optimizer/parameter/change.ex"
-    },
-    {
-      "category": "internal",
-      "module": "Imp.Optimizer.Parameter.Set",
-      "source": "lib/imp/optimizer/parameter/set.ex"
-    },
-    {
-      "category": "internal",
       "module": "Imp.Optimizer.Playbook.Result",
       "source": "lib/imp/optimizer/playbook.ex"
     },
@@ -310,6 +285,11 @@
     },
     {
       "category": "internal",
+      "module": "Imp.Optimizer.Utils",
+      "source": "lib/imp/optimizer/utils.ex"
+    },
+    {
+      "category": "internal",
       "module": "Imp.Options",
       "source": "lib/imp/options.ex"
     },
@@ -325,11 +305,6 @@
     },
     {
       "category": "internal",
-      "module": "Imp.Predict.RLM.SandboxSerializable",
-      "source": "lib/imp/predict/rlm/sandbox_serializable.ex"
-    },
-    {
-      "category": "internal",
       "module": "Imp.Predict.Search.Candidate",
       "source": "lib/imp/predict/search.ex"
     },
@@ -342,11 +317,6 @@
       "category": "internal",
       "module": "Imp.ProgramAccess",
       "source": "lib/imp/program_access.ex"
-    },
-    {
-      "category": "internal",
-      "module": "Imp.Tasks",
-      "source": "lib/imp/tasks.ex"
     },
     {
       "category": "internal",
@@ -683,7 +653,7 @@
     },
     {
       "callbacks": [],
-      "category": "experimental",
+      "category": "stable",
       "functions": [
         "capabilities/1",
         "run/1",
@@ -818,55 +788,7 @@
     },
     {
       "callbacks": [],
-      "category": "experimental",
-      "functions": [
-        "import_tools/2"
-      ],
-      "kind": "module",
-      "macros": [],
-      "module": "Imp.ACP.MCP",
-      "signatures": {
-        "functions": {
-          "import_tools/2": [
-            "import_tools(servers, opts \\\\ [])"
-          ]
-        }
-      },
-      "source": "lib/imp/acp/mcp.ex",
-      "struct_fields": [],
-      "types": []
-    },
-    {
-      "callbacks": [],
-      "category": "experimental",
-      "functions": [],
-      "kind": "struct",
-      "macros": [],
-      "module": "Imp.ACP.MCP.Import",
-      "signatures": {
-        "types": {
-          "t/0": []
-        }
-      },
-      "source": "lib/imp/acp/mcp.ex",
-      "struct_fields": [
-        "annotations",
-        "cleanup",
-        "provenance",
-        "tool_kinds",
-        "tools",
-        "unavailable"
-      ],
-      "types": [
-        {
-          "kind": "type",
-          "name": "t/0"
-        }
-      ]
-    },
-    {
-      "callbacks": [],
-      "category": "experimental",
+      "category": "stable",
       "functions": [
         "derive/1",
         "derive_all/1"
@@ -902,8 +824,7 @@
       "category": "spi",
       "functions": [
         "format/4",
-        "parse/4",
-        "validate_adapter/1"
+        "parse/4"
       ],
       "kind": "behaviour",
       "macros": [],
@@ -919,9 +840,6 @@
           ],
           "parse/4": [
             "parse(adapter, signature, raw, opts \\\\ [])"
-          ],
-          "validate_adapter/1": [
-            "validate_adapter(module)"
           ]
         }
       },
@@ -1757,8 +1675,7 @@
         "dump/1",
         "generate/3",
         "generate_async/3",
-        "new/2",
-        "validate_req_module/1"
+        "new/2"
       ],
       "kind": "struct",
       "macros": [],
@@ -1779,9 +1696,6 @@
           ],
           "new/2": [
             "new(model_spec, opts \\\\ [])"
-          ],
-          "validate_req_module/1": [
-            "validate_req_module(module)"
           ]
         },
         "types": {
@@ -1964,90 +1878,6 @@
       "callbacks": [],
       "category": "experimental",
       "functions": [
-        "artifact!/1",
-        "artifact/1",
-        "canonical_json/1",
-        "checkpoint!/1",
-        "checkpoint/1",
-        "digest/1",
-        "engine_identity/0",
-        "receipt!/1",
-        "receipt/1",
-        "schema_version/0",
-        "session!/1",
-        "session/1",
-        "update!/1",
-        "update/1",
-        "validate/1"
-      ],
-      "kind": "module",
-      "macros": [],
-      "module": "Imp.Clients.TRLProtocol",
-      "signatures": {
-        "functions": {
-          "artifact!/1": [
-            "artifact!(attrs)"
-          ],
-          "artifact/1": [
-            "artifact(attrs)"
-          ],
-          "canonical_json/1": [
-            "canonical_json(value)"
-          ],
-          "checkpoint!/1": [
-            "checkpoint!(attrs)"
-          ],
-          "checkpoint/1": [
-            "checkpoint(attrs)"
-          ],
-          "digest/1": [
-            "digest(value)"
-          ],
-          "engine_identity/0": [
-            "engine_identity()"
-          ],
-          "receipt!/1": [
-            "receipt!(attrs)"
-          ],
-          "receipt/1": [
-            "receipt(attrs)"
-          ],
-          "schema_version/0": [
-            "schema_version()"
-          ],
-          "session!/1": [
-            "session!(attrs)"
-          ],
-          "session/1": [
-            "session(attrs)"
-          ],
-          "update!/1": [
-            "update!(attrs)"
-          ],
-          "update/1": [
-            "update(attrs)"
-          ],
-          "validate/1": [
-            "validate(value)"
-          ]
-        },
-        "types": {
-          "envelope/0": []
-        }
-      },
-      "source": "lib/imp/clients/trl_protocol.ex",
-      "struct_fields": [],
-      "types": [
-        {
-          "kind": "type",
-          "name": "envelope/0"
-        }
-      ]
-    },
-    {
-      "callbacks": [],
-      "category": "experimental",
-      "functions": [
         "new/1"
       ],
       "kind": "struct",
@@ -2166,8 +1996,7 @@
         "reinforcement_step/4",
         "start_reinforcement/3",
         "supports_method/2",
-        "terminate_reinforcement/2",
-        "validate_provider/1"
+        "terminate_reinforcement/2"
       ],
       "kind": "behaviour",
       "macros": [],
@@ -2225,9 +2054,6 @@
           ],
           "terminate_reinforcement/2": [
             "terminate_reinforcement(provider, session)"
-          ],
-          "validate_provider/1": [
-            "validate_provider(provider)"
           ]
         }
       },
@@ -2713,57 +2539,6 @@
       "functions": [],
       "kind": "struct",
       "macros": [],
-      "module": "Imp.Core.ToolCall",
-      "signatures": {
-        "types": {
-          "t/0": []
-        }
-      },
-      "source": "lib/imp/core.ex",
-      "struct_fields": [
-        "arguments",
-        "id",
-        "name"
-      ],
-      "types": [
-        {
-          "kind": "type",
-          "name": "t/0"
-        }
-      ]
-    },
-    {
-      "callbacks": [],
-      "category": "stable",
-      "functions": [],
-      "kind": "struct",
-      "macros": [],
-      "module": "Imp.Core.ToolResult",
-      "signatures": {
-        "types": {
-          "t/0": []
-        }
-      },
-      "source": "lib/imp/core.ex",
-      "struct_fields": [
-        "id",
-        "is_error",
-        "name",
-        "result"
-      ],
-      "types": [
-        {
-          "kind": "type",
-          "name": "t/0"
-        }
-      ]
-    },
-    {
-      "callbacks": [],
-      "category": "stable",
-      "functions": [],
-      "kind": "struct",
-      "macros": [],
       "module": "Imp.Core.User",
       "signatures": {
         "types": {
@@ -2791,8 +2566,7 @@
         "gsm8k/1",
         "hotpotqa/1",
         "jsonl/3",
-        "split/2",
-        "validate_train_fraction/1"
+        "split/2"
       ],
       "kind": "module",
       "macros": [],
@@ -2816,9 +2590,6 @@
           ],
           "split/2": [
             "split(examples, opts \\\\ [])"
-          ],
-          "validate_train_fraction/1": [
-            "validate_train_fraction(value)"
           ]
         }
       },
@@ -2956,6 +2727,50 @@
       "types": []
     },
     {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "current/0",
+        "expired?/1",
+        "remaining/1",
+        "resolve/1",
+        "with_deadline/2"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Deadline",
+      "signatures": {
+        "functions": {
+          "current/0": [
+            "current()"
+          ],
+          "expired?/1": [
+            "expired?(deadline)"
+          ],
+          "remaining/1": [
+            "remaining(absolute)"
+          ],
+          "resolve/1": [
+            "resolve(timeout)"
+          ],
+          "with_deadline/2": [
+            "with_deadline(timeout, fun)"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/deadline.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
       "callbacks": [
         {
           "name": "embed/2",
@@ -2964,8 +2779,7 @@
       ],
       "category": "spi",
       "functions": [
-        "embed/3",
-        "validate_texts!/2"
+        "embed/3"
       ],
       "kind": "behaviour",
       "macros": [],
@@ -2977,9 +2791,6 @@
         "functions": {
           "embed/3": [
             "embed(embedder, texts, opts \\\\ [])"
-          ],
-          "validate_texts!/2": [
-            "validate_texts!(texts, context)"
           ]
         }
       },
@@ -3053,8 +2864,7 @@
       "category": "stable",
       "functions": [
         "new/3",
-        "run/2",
-        "validate_max_errors/1"
+        "run/2"
       ],
       "kind": "struct",
       "macros": [],
@@ -3066,9 +2876,6 @@
           ],
           "run/2": [
             "run(evaluator, program)"
-          ],
-          "validate_max_errors/1": [
-            "validate_max_errors(value)"
           ]
         },
         "types": {
@@ -3478,7 +3285,7 @@
     },
     {
       "callbacks": [],
-      "category": "stable",
+      "category": "experimental",
       "functions": [
         "run/3",
         "start/3",
@@ -3514,7 +3321,7 @@
     },
     {
       "callbacks": [],
-      "category": "stable",
+      "category": "experimental",
       "functions": [],
       "kind": "struct",
       "macros": [],
@@ -3687,8 +3494,7 @@
       "functions": [
         "post/5",
         "request/6",
-        "stream/5",
-        "validate_transport/1"
+        "stream/5"
       ],
       "kind": "behaviour",
       "macros": [],
@@ -3708,9 +3514,6 @@
           ],
           "stream/5": [
             "stream(transport, url, headers, body, opts \\\\ [])"
-          ],
-          "validate_transport/1": [
-            "validate_transport(transport)"
           ]
         },
         "types": {
@@ -3804,8 +3607,7 @@
       "category": "spi",
       "functions": [
         "generate/3",
-        "request/2",
-        "validate_lm/1"
+        "request/2"
       ],
       "kind": "behaviour",
       "macros": [],
@@ -3822,9 +3624,6 @@
           ],
           "request/2": [
             "request(lm, request)"
-          ],
-          "validate_lm/1": [
-            "validate_lm(module)"
           ]
         }
       },
@@ -3995,11 +3794,10 @@
     },
     {
       "callbacks": [],
-      "category": "experimental",
+      "category": "stable",
       "functions": [
         "connect/2",
-        "failure_text/1",
-        "import_tools/1"
+        "failure_text/1"
       ],
       "kind": "module",
       "macros": [],
@@ -4011,9 +3809,6 @@
           ],
           "failure_text/1": [
             "failure_text(reason)"
-          ],
-          "import_tools/1": [
-            "import_tools(catalog)"
           ]
         }
       },
@@ -4023,7 +3818,7 @@
     },
     {
       "callbacks": [],
-      "category": "experimental",
+      "category": "stable",
       "functions": [],
       "kind": "struct",
       "macros": [],
@@ -4054,75 +3849,12 @@
     },
     {
       "callbacks": [],
-      "category": "experimental",
-      "functions": [
-        "list_tools/1",
-        "new/1"
-      ],
-      "kind": "struct",
-      "macros": [],
-      "module": "Imp.MCP.Catalog",
-      "signatures": {
-        "functions": {
-          "list_tools/1": [
-            "list_tools(catalog)"
-          ],
-          "new/1": [
-            "new(tools)"
-          ]
-        }
-      },
-      "source": "lib/imp/mcp.ex",
-      "struct_fields": [
-        "tools"
-      ],
-      "types": []
-    },
-    {
-      "callbacks": [],
-      "category": "experimental",
-      "functions": [
-        "close/1",
-        "list_tools/1",
-        "new/2"
-      ],
-      "kind": "struct",
-      "macros": [],
-      "module": "Imp.MCP.Client",
-      "signatures": {
-        "functions": {
-          "close/1": [
-            "close(client)"
-          ],
-          "list_tools/1": [
-            "list_tools(client)"
-          ],
-          "new/2": [
-            "new(server, opts \\\\ [])"
-          ]
-        }
-      },
-      "source": "lib/imp/mcp.ex",
-      "struct_fields": [
-        "import"
-      ],
-      "types": []
-    },
-    {
-      "callbacks": [],
-      "category": "experimental",
-      "functions": [
-        "import_tools/2"
-      ],
+      "category": "stable",
+      "functions": [],
       "kind": "module",
       "macros": [],
       "module": "Imp.MCP.Connections",
       "signatures": {
-        "functions": {
-          "import_tools/2": [
-            "import_tools(servers, opts \\\\ [])"
-          ]
-        },
         "types": {
           "context/0": [],
           "server/0": []
@@ -4143,35 +3875,7 @@
     },
     {
       "callbacks": [],
-      "category": "experimental",
-      "functions": [
-        "close/1",
-        "list_tools/1",
-        "new/2"
-      ],
-      "kind": "module",
-      "macros": [],
-      "module": "Imp.MCP.HTTPClient",
-      "signatures": {
-        "functions": {
-          "close/1": [
-            "close(client)"
-          ],
-          "list_tools/1": [
-            "list_tools(client)"
-          ],
-          "new/2": [
-            "new(url, opts \\\\ [])"
-          ]
-        }
-      },
-      "source": "lib/imp/mcp.ex",
-      "struct_fields": [],
-      "types": []
-    },
-    {
-      "callbacks": [],
-      "category": "experimental",
+      "category": "stable",
       "functions": [],
       "kind": "struct",
       "macros": [],
@@ -4306,62 +4010,6 @@
           "name": "t/0"
         }
       ]
-    },
-    {
-      "callbacks": [],
-      "category": "experimental",
-      "functions": [
-        "close/1",
-        "list_tools/1",
-        "new/2"
-      ],
-      "kind": "module",
-      "macros": [],
-      "module": "Imp.MCP.StdioClient",
-      "signatures": {
-        "functions": {
-          "close/1": [
-            "close(client)"
-          ],
-          "list_tools/1": [
-            "list_tools(client)"
-          ],
-          "new/2": [
-            "new(command, opts \\\\ [])"
-          ]
-        }
-      },
-      "source": "lib/imp/mcp.ex",
-      "struct_fields": [],
-      "types": []
-    },
-    {
-      "callbacks": [],
-      "category": "experimental",
-      "functions": [
-        "close/1",
-        "list_tools/1",
-        "new/2"
-      ],
-      "kind": "module",
-      "macros": [],
-      "module": "Imp.MCP.StreamableHTTPClient",
-      "signatures": {
-        "functions": {
-          "close/1": [
-            "close(client)"
-          ],
-          "list_tools/1": [
-            "list_tools(client)"
-          ],
-          "new/2": [
-            "new(url, opts \\\\ [])"
-          ]
-        }
-      },
-      "source": "lib/imp/mcp.ex",
-      "struct_fields": [],
-      "types": []
     },
     {
       "callbacks": [],
@@ -4610,6 +4258,44 @@
     {
       "callbacks": [],
       "category": "stable",
+      "functions": [
+        "json_safe/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Observability.Inspection",
+      "signatures": {
+        "functions": {
+          "json_safe/1": [
+            "json_safe(inspection)"
+          ]
+        },
+        "types": {
+          "entry/0": [],
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/observability/inspection.ex",
+      "struct_fields": [
+        "entries",
+        "kind",
+        "status",
+        "summary"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "entry/0"
+        },
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
       "functions": [],
       "kind": "struct",
       "macros": [],
@@ -4713,6 +4399,76 @@
       "source": "lib/imp/optimize/anything.ex",
       "struct_fields": [],
       "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "experimental",
+      "functions": [
+        "best_candidate/1",
+        "best_index/1",
+        "best_refiner_prompt/1",
+        "from_map/1",
+        "from_state/2",
+        "to_map/1"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Optimize.Anything.Result",
+      "signatures": {
+        "functions": {
+          "best_candidate/1": [
+            "best_candidate(result)"
+          ],
+          "best_index/1": [
+            "best_index(result)"
+          ],
+          "best_refiner_prompt/1": [
+            "best_refiner_prompt(result)"
+          ],
+          "from_map/1": [
+            "from_map(map)"
+          ],
+          "from_state/2": [
+            "from_state(state, opts \\\\ [])"
+          ],
+          "to_map/1": [
+            "to_map(result)"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/optimize/anything/result.ex",
+      "struct_fields": [
+        "best_outputs_valset",
+        "candidate_side_information",
+        "candidates",
+        "checkpoint",
+        "discovery_evaluation_counts",
+        "full_evaluations",
+        "history",
+        "instance_frontier",
+        "mode",
+        "objective_frontier",
+        "objective_scores",
+        "parents",
+        "reflection_calls",
+        "rejected",
+        "run_dir",
+        "seed",
+        "stop_reason",
+        "string_candidate_key",
+        "total_metric_calls",
+        "validation_scores",
+        "validation_subscores"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
     },
     {
       "callbacks": [
@@ -4861,7 +4617,7 @@
     },
     {
       "callbacks": [],
-      "category": "experimental",
+      "category": "stable",
       "functions": [
         "apply/4",
         "candidate/3",
@@ -4949,7 +4705,6 @@
       "callbacks": [],
       "category": "experimental",
       "functions": [
-        "compile/3",
         "new/2"
       ],
       "kind": "struct",
@@ -4957,9 +4712,6 @@
       "module": "Imp.Optimizer.Avatar",
       "signatures": {
         "functions": {
-          "compile/3": [
-            "compile(optimizer, student, trainset)"
-          ],
           "new/2": [
             "new(metric, opts \\\\ [])"
           ]
@@ -4983,31 +4735,15 @@
       "callbacks": [],
       "category": "experimental",
       "functions": [
-        "compile/5",
-        "new/2",
-        "validate_optimizer_compile_args/1",
-        "validate_strategy/1",
-        "validate_valset_ratio/1"
+        "new/2"
       ],
       "kind": "struct",
       "macros": [],
       "module": "Imp.Optimizer.BetterTogether",
       "signatures": {
         "functions": {
-          "compile/5": [
-            "compile(bt, student, trainset, valset, opts \\\\ [])"
-          ],
           "new/2": [
             "new(metric, optimizers \\\\ %{})"
-          ],
-          "validate_optimizer_compile_args/1": [
-            "validate_optimizer_compile_args(value)"
-          ],
-          "validate_strategy/1": [
-            "validate_strategy(strategy)"
-          ],
-          "validate_valset_ratio/1": [
-            "validate_valset_ratio(value)"
           ]
         },
         "types": {
@@ -5033,23 +4769,17 @@
     },
     {
       "callbacks": [],
-      "category": "experimental",
+      "category": "stable",
       "functions": [
-        "compile/4",
         "new/0",
         "new/1",
-        "new/2",
-        "validate_optional_max_errors/1",
-        "validate_optional_number/1"
+        "new/2"
       ],
       "kind": "struct",
       "macros": [],
       "module": "Imp.Optimizer.BootstrapFewShot",
       "signatures": {
         "functions": {
-          "compile/4": [
-            "compile(optimizer, student, trainset, opts \\\\ [])"
-          ],
           "new/0": [
             "new()"
           ],
@@ -5058,12 +4788,6 @@
           ],
           "new/2": [
             "new(metric, opts)"
-          ],
-          "validate_optional_max_errors/1": [
-            "validate_optional_max_errors(value)"
-          ],
-          "validate_optional_number/1": [
-            "validate_optional_number(value)"
           ]
         }
       },
@@ -5082,7 +4806,7 @@
     },
     {
       "callbacks": [],
-      "category": "experimental",
+      "category": "stable",
       "functions": [
         "compile/5",
         "new/2"
@@ -5108,23 +4832,15 @@
       "callbacks": [],
       "category": "experimental",
       "functions": [
-        "compile/3",
-        "new/2",
-        "validate_teacher/1"
+        "new/2"
       ],
       "kind": "struct",
       "macros": [],
       "module": "Imp.Optimizer.BootstrapFinetune",
       "signatures": {
         "functions": {
-          "compile/3": [
-            "compile(optimizer, program, trainset)"
-          ],
           "new/2": [
             "new(metric, opts \\\\ [])"
-          ],
-          "validate_teacher/1": [
-            "validate_teacher(teachers)"
           ]
         }
       },
@@ -5148,7 +4864,7 @@
     },
     {
       "callbacks": [],
-      "category": "experimental",
+      "category": "stable",
       "functions": [
         "compile/5",
         "new/2"
@@ -5227,29 +4943,17 @@
     },
     {
       "callbacks": [],
-      "category": "experimental",
+      "category": "stable",
       "functions": [
-        "compile/5",
-        "new/2",
-        "validate_optional_max_errors/1",
-        "validate_optional_positive/1"
+        "new/2"
       ],
       "kind": "struct",
       "macros": [],
       "module": "Imp.Optimizer.COPRO",
       "signatures": {
         "functions": {
-          "compile/5": [
-            "compile(optimizer, program, trainset, devset \\\\ [], eval_opts \\\\ [])"
-          ],
           "new/2": [
             "new(metric, opts \\\\ [])"
-          ],
-          "validate_optional_max_errors/1": [
-            "validate_optional_max_errors(value)"
-          ],
-          "validate_optional_positive/1": [
-            "validate_optional_positive(value)"
           ]
         }
       },
@@ -5314,11 +5018,10 @@
     },
     {
       "callbacks": [],
-      "category": "experimental",
+      "category": "stable",
       "functions": [
         "compile/2",
-        "new/1",
-        "validate_reduce_fn/1"
+        "new/1"
       ],
       "kind": "struct",
       "macros": [],
@@ -5330,9 +5033,6 @@
           ],
           "new/1": [
             "new(opts \\\\ [])"
-          ],
-          "validate_reduce_fn/1": [
-            "validate_reduce_fn(reduce_fn)"
           ]
         }
       },
@@ -5347,24 +5047,17 @@
     },
     {
       "callbacks": [],
-      "category": "experimental",
+      "category": "stable",
       "functions": [
-        "compile/5",
         "compile_with_artifact/5",
         "compile_with_report/5",
-        "new/2",
-        "validate_artifact_id/1",
-        "validate_feedback_fn/1",
-        "validate_proposal_concurrency/1"
+        "new/2"
       ],
       "kind": "struct",
       "macros": [],
       "module": "Imp.Optimizer.GEPA",
       "signatures": {
         "functions": {
-          "compile/5": [
-            "compile(optimizer, program, trainset, devset, opts \\\\ [])"
-          ],
           "compile_with_artifact/5": [
             "compile_with_artifact(optimizer, program, trainset, devset, opts \\\\ [])"
           ],
@@ -5373,15 +5066,6 @@
           ],
           "new/2": [
             "new(metric, opts \\\\ [])"
-          ],
-          "validate_artifact_id/1": [
-            "validate_artifact_id(value)"
-          ],
-          "validate_feedback_fn/1": [
-            "validate_feedback_fn(feedback_fn)"
-          ],
-          "validate_proposal_concurrency/1": [
-            "validate_proposal_concurrency(value)"
           ]
         }
       },
@@ -5520,11 +5204,290 @@
       ]
     },
     {
+      "callbacks": [
+        {
+          "name": "on_budget_updated/1",
+          "optional": true
+        },
+        {
+          "name": "on_budget_updated/2",
+          "optional": true
+        },
+        {
+          "name": "on_candidate_accepted/1",
+          "optional": true
+        },
+        {
+          "name": "on_candidate_accepted/2",
+          "optional": true
+        },
+        {
+          "name": "on_candidate_rejected/1",
+          "optional": true
+        },
+        {
+          "name": "on_candidate_rejected/2",
+          "optional": true
+        },
+        {
+          "name": "on_candidate_selected/1",
+          "optional": true
+        },
+        {
+          "name": "on_candidate_selected/2",
+          "optional": true
+        },
+        {
+          "name": "on_combee_aggregation/1",
+          "optional": true
+        },
+        {
+          "name": "on_combee_aggregation/2",
+          "optional": true
+        },
+        {
+          "name": "on_combee_batch_selected/1",
+          "optional": true
+        },
+        {
+          "name": "on_combee_batch_selected/2",
+          "optional": true
+        },
+        {
+          "name": "on_error/1",
+          "optional": true
+        },
+        {
+          "name": "on_error/2",
+          "optional": true
+        },
+        {
+          "name": "on_evaluation_end/1",
+          "optional": true
+        },
+        {
+          "name": "on_evaluation_end/2",
+          "optional": true
+        },
+        {
+          "name": "on_evaluation_skipped/1",
+          "optional": true
+        },
+        {
+          "name": "on_evaluation_skipped/2",
+          "optional": true
+        },
+        {
+          "name": "on_evaluation_start/1",
+          "optional": true
+        },
+        {
+          "name": "on_evaluation_start/2",
+          "optional": true
+        },
+        {
+          "name": "on_iteration_end/1",
+          "optional": true
+        },
+        {
+          "name": "on_iteration_end/2",
+          "optional": true
+        },
+        {
+          "name": "on_iteration_start/1",
+          "optional": true
+        },
+        {
+          "name": "on_iteration_start/2",
+          "optional": true
+        },
+        {
+          "name": "on_merge_accepted/1",
+          "optional": true
+        },
+        {
+          "name": "on_merge_accepted/2",
+          "optional": true
+        },
+        {
+          "name": "on_merge_attempted/1",
+          "optional": true
+        },
+        {
+          "name": "on_merge_attempted/2",
+          "optional": true
+        },
+        {
+          "name": "on_merge_rejected/1",
+          "optional": true
+        },
+        {
+          "name": "on_merge_rejected/2",
+          "optional": true
+        },
+        {
+          "name": "on_minibatch_sampled/1",
+          "optional": true
+        },
+        {
+          "name": "on_minibatch_sampled/2",
+          "optional": true
+        },
+        {
+          "name": "on_optimization_end/1",
+          "optional": true
+        },
+        {
+          "name": "on_optimization_end/2",
+          "optional": true
+        },
+        {
+          "name": "on_optimization_start/1",
+          "optional": true
+        },
+        {
+          "name": "on_optimization_start/2",
+          "optional": true
+        },
+        {
+          "name": "on_pareto_front_updated/1",
+          "optional": true
+        },
+        {
+          "name": "on_pareto_front_updated/2",
+          "optional": true
+        },
+        {
+          "name": "on_proposal_end/1",
+          "optional": true
+        },
+        {
+          "name": "on_proposal_end/2",
+          "optional": true
+        },
+        {
+          "name": "on_proposal_start/1",
+          "optional": true
+        },
+        {
+          "name": "on_proposal_start/2",
+          "optional": true
+        },
+        {
+          "name": "on_reflective_dataset_built/1",
+          "optional": true
+        },
+        {
+          "name": "on_reflective_dataset_built/2",
+          "optional": true
+        },
+        {
+          "name": "on_state_saved/1",
+          "optional": true
+        },
+        {
+          "name": "on_state_saved/2",
+          "optional": true
+        },
+        {
+          "name": "on_valset_evaluated/1",
+          "optional": true
+        },
+        {
+          "name": "on_valset_evaluated/2",
+          "optional": true
+        }
+      ],
+      "category": "spi",
+      "functions": [
+        "events/0"
+      ],
+      "kind": "behaviour",
+      "macros": [],
+      "module": "Imp.Optimizer.GEPA.Callback",
+      "signatures": {
+        "callbacks": {
+          "on_budget_updated/1": [],
+          "on_budget_updated/2": [],
+          "on_candidate_accepted/1": [],
+          "on_candidate_accepted/2": [],
+          "on_candidate_rejected/1": [],
+          "on_candidate_rejected/2": [],
+          "on_candidate_selected/1": [],
+          "on_candidate_selected/2": [],
+          "on_combee_aggregation/1": [],
+          "on_combee_aggregation/2": [],
+          "on_combee_batch_selected/1": [],
+          "on_combee_batch_selected/2": [],
+          "on_error/1": [],
+          "on_error/2": [],
+          "on_evaluation_end/1": [],
+          "on_evaluation_end/2": [],
+          "on_evaluation_skipped/1": [],
+          "on_evaluation_skipped/2": [],
+          "on_evaluation_start/1": [],
+          "on_evaluation_start/2": [],
+          "on_iteration_end/1": [],
+          "on_iteration_end/2": [],
+          "on_iteration_start/1": [],
+          "on_iteration_start/2": [],
+          "on_merge_accepted/1": [],
+          "on_merge_accepted/2": [],
+          "on_merge_attempted/1": [],
+          "on_merge_attempted/2": [],
+          "on_merge_rejected/1": [],
+          "on_merge_rejected/2": [],
+          "on_minibatch_sampled/1": [],
+          "on_minibatch_sampled/2": [],
+          "on_optimization_end/1": [],
+          "on_optimization_end/2": [],
+          "on_optimization_start/1": [],
+          "on_optimization_start/2": [],
+          "on_pareto_front_updated/1": [],
+          "on_pareto_front_updated/2": [],
+          "on_proposal_end/1": [],
+          "on_proposal_end/2": [],
+          "on_proposal_start/1": [],
+          "on_proposal_start/2": [],
+          "on_reflective_dataset_built/1": [],
+          "on_reflective_dataset_built/2": [],
+          "on_state_saved/1": [],
+          "on_state_saved/2": [],
+          "on_valset_evaluated/1": [],
+          "on_valset_evaluated/2": []
+        },
+        "functions": {
+          "events/0": [
+            "events()"
+          ]
+        },
+        "types": {
+          "callback/0": [],
+          "callbacks/0": [],
+          "event/0": []
+        }
+      },
+      "source": "lib/imp/optimizer/gepa/callback.ex",
+      "struct_fields": [],
+      "types": [
+        {
+          "kind": "type",
+          "name": "callback/0"
+        },
+        {
+          "kind": "type",
+          "name": "callbacks/0"
+        },
+        {
+          "kind": "type",
+          "name": "event/0"
+        }
+      ]
+    },
+    {
       "callbacks": [],
       "category": "experimental",
       "functions": [
-        "compile/3",
-        "compile/4",
         "new/2"
       ],
       "kind": "struct",
@@ -5532,12 +5495,6 @@
       "module": "Imp.Optimizer.GRPO",
       "signatures": {
         "functions": {
-          "compile/3": [
-            "compile(optimizer, program, trainset)"
-          ],
-          "compile/4": [
-            "compile(optimizer, program, trainset, opts)"
-          ],
           "new/2": [
             "new(reward_fn, opts \\\\ [])"
           ]
@@ -5635,11 +5592,8 @@
     },
     {
       "callbacks": [],
-      "category": "experimental",
+      "category": "stable",
       "functions": [
-        "compile/3",
-        "compile/4",
-        "compile/5",
         "new/2"
       ],
       "kind": "struct",
@@ -5647,15 +5601,6 @@
       "module": "Imp.Optimizer.InferRules",
       "signatures": {
         "functions": {
-          "compile/3": [
-            "compile(optimizer, program, trainset)"
-          ],
-          "compile/4": [
-            "compile(optimizer, program, trainset, devset)"
-          ],
-          "compile/5": [
-            "compile(optimizer, program, trainset, devset, opts)"
-          ],
           "new/2": [
             "new(metric, opts \\\\ [])"
           ]
@@ -5740,7 +5685,7 @@
     },
     {
       "callbacks": [],
-      "category": "experimental",
+      "category": "stable",
       "functions": [
         "compile/3",
         "new/3"
@@ -5767,9 +5712,8 @@
     },
     {
       "callbacks": [],
-      "category": "experimental",
+      "category": "stable",
       "functions": [
-        "compile/3",
         "new/1"
       ],
       "kind": "struct",
@@ -5777,9 +5721,6 @@
       "module": "Imp.Optimizer.LabeledFewShot",
       "signatures": {
         "functions": {
-          "compile/3": [
-            "compile(optimizer, program, trainset)"
-          ],
           "new/1": [
             "new(opts \\\\ [])"
           ]
@@ -5795,11 +5736,8 @@
     },
     {
       "callbacks": [],
-      "category": "experimental",
+      "category": "stable",
       "functions": [
-        "compile/3",
-        "compile/4",
-        "compile/5",
         "new/2",
         "operational_error!/3",
         "operational_error/3"
@@ -5809,15 +5747,6 @@
       "module": "Imp.Optimizer.MIPROv2",
       "signatures": {
         "functions": {
-          "compile/3": [
-            "compile(optimizer, program, opts)"
-          ],
-          "compile/4": [
-            "compile(optimizer, program, trainset, valset)"
-          ],
-          "compile/5": [
-            "compile(optimizer, program, trainset, valset, opts)"
-          ],
           "new/2": [
             "new(metric, opts \\\\ [])"
           ],
@@ -5910,6 +5839,101 @@
       "callbacks": [],
       "category": "experimental",
       "functions": [
+        "dump/1",
+        "load!/1",
+        "new/4"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Optimizer.Parameter.Change",
+      "signatures": {
+        "functions": {
+          "dump/1": [
+            "dump(change)"
+          ],
+          "load!/1": [
+            "load!(state)"
+          ],
+          "new/4": [
+            "new(id, kind, value, opts \\\\ [])"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/optimizer/parameter/change.ex",
+      "struct_fields": [
+        "base_digest",
+        "id",
+        "kind",
+        "value"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "experimental",
+      "functions": [
+        "apply_changes/2",
+        "diff/2",
+        "dump/1",
+        "fetch/2",
+        "load!/1",
+        "new/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Optimizer.Parameter.Set",
+      "signatures": {
+        "functions": {
+          "apply_changes/2": [
+            "apply_changes(set, changes)"
+          ],
+          "diff/2": [
+            "diff(source, target)"
+          ],
+          "dump/1": [
+            "dump(set)"
+          ],
+          "fetch/2": [
+            "fetch(set, id)"
+          ],
+          "load!/1": [
+            "load!(state)"
+          ],
+          "new/2": [
+            "new(id, parameters)"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/optimizer/parameter/set.ex",
+      "struct_fields": [
+        "hash",
+        "id",
+        "parameters",
+        "parent_hash",
+        "revision"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "experimental",
+      "functions": [
         "compile/6",
         "new/1",
         "observed_weaknesses/2",
@@ -5984,45 +6008,17 @@
     },
     {
       "callbacks": [],
-      "category": "experimental",
+      "category": "stable",
       "functions": [
-        "compile/5",
-        "new/2",
-        "validate_optional_integer/1",
-        "validate_optional_max_errors/1",
-        "validate_optional_non_negative/1",
-        "validate_optional_number/1",
-        "validate_optional_positive/1",
-        "validate_restrict/1"
+        "new/2"
       ],
       "kind": "struct",
       "macros": [],
       "module": "Imp.Optimizer.RandomSearch",
       "signatures": {
         "functions": {
-          "compile/5": [
-            "compile(optimizer, student, trainset, valset \\\\ nil, opts \\\\ [])"
-          ],
           "new/2": [
             "new(metric, opts \\\\ [])"
-          ],
-          "validate_optional_integer/1": [
-            "validate_optional_integer(value)"
-          ],
-          "validate_optional_max_errors/1": [
-            "validate_optional_max_errors(value)"
-          ],
-          "validate_optional_non_negative/1": [
-            "validate_optional_non_negative(value)"
-          ],
-          "validate_optional_number/1": [
-            "validate_optional_number(value)"
-          ],
-          "validate_optional_positive/1": [
-            "validate_optional_positive(value)"
-          ],
-          "validate_restrict/1": [
-            "validate_restrict(values)"
           ]
         }
       },
@@ -6047,7 +6043,7 @@
     },
     {
       "callbacks": [],
-      "category": "experimental",
+      "category": "stable",
       "functions": [
         "attach/2",
         "decode_term/1",
@@ -6102,11 +6098,8 @@
     },
     {
       "callbacks": [],
-      "category": "experimental",
+      "category": "stable",
       "functions": [
-        "compile/3",
-        "compile/4",
-        "compile/5",
         "new/2"
       ],
       "kind": "struct",
@@ -6114,15 +6107,6 @@
       "module": "Imp.Optimizer.SIMBA",
       "signatures": {
         "functions": {
-          "compile/3": [
-            "compile(optimizer, program, trainset)"
-          ],
-          "compile/4": [
-            "compile(optimizer, program, trainset, final_set_or_opts)"
-          ],
-          "compile/5": [
-            "compile(optimizer, program, trainset, final_set, opts)"
-          ],
           "new/2": [
             "new(metric, opts \\\\ [])"
           ]
@@ -6216,7 +6200,6 @@
       "callbacks": [],
       "category": "experimental",
       "functions": [
-        "compile/4",
         "new/2"
       ],
       "kind": "struct",
@@ -6224,9 +6207,6 @@
       "module": "Imp.Optimizer.SignatureOptimizer",
       "signatures": {
         "functions": {
-          "compile/4": [
-            "compile(optimizer, program, trainset, devset)"
-          ],
           "new/2": [
             "new(metric, opts \\\\ [])"
           ]
@@ -6441,38 +6421,6 @@
         }
       },
       "source": "lib/imp/optimizer/trajectory.ex",
-      "struct_fields": [],
-      "types": []
-    },
-    {
-      "callbacks": [],
-      "category": "experimental",
-      "functions": [
-        "bootstrap_trace_data/4",
-        "create_minibatch/3",
-        "create_n_fewshot_demo_sets/5",
-        "eval_candidate_program/5"
-      ],
-      "kind": "module",
-      "macros": [],
-      "module": "Imp.Optimizer.Utils",
-      "signatures": {
-        "functions": {
-          "bootstrap_trace_data/4": [
-            "bootstrap_trace_data(program, dataset, metric, opts \\\\ [])"
-          ],
-          "create_minibatch/3": [
-            "create_minibatch(trainset, batch_size, rng)"
-          ],
-          "create_n_fewshot_demo_sets/5": [
-            "create_n_fewshot_demo_sets(program, num_candidate_sets, trainset, metric, opts \\\\ [])"
-          ],
-          "eval_candidate_program/5": [
-            "eval_candidate_program(batch_size, trainset, candidate_program, evaluator, opts \\\\ [])"
-          ]
-        }
-      },
-      "source": "lib/imp/optimizer/utils.ex",
       "struct_fields": [],
       "types": []
     },
@@ -6934,8 +6882,7 @@
       "category": "experimental",
       "functions": [
         "default_normalize/1",
-        "majority/2",
-        "validate_normalize/1"
+        "majority/2"
       ],
       "kind": "module",
       "macros": [],
@@ -6947,9 +6894,6 @@
           ],
           "majority/2": [
             "majority(predictions, opts \\\\ [])"
-          ],
-          "validate_normalize/1": [
-            "validate_normalize(normalize)"
           ]
         }
       },
@@ -7032,8 +6976,7 @@
       "category": "experimental",
       "functions": [
         "call/2",
-        "new/3",
-        "validate_feedback_fn/1"
+        "new/3"
       ],
       "kind": "struct",
       "macros": [],
@@ -7045,9 +6988,6 @@
           ],
           "new/3": [
             "new(program, metric, opts \\\\ [])"
-          ],
-          "validate_feedback_fn/1": [
-            "validate_feedback_fn(feedback_fn)"
           ]
         }
       },
@@ -7151,8 +7091,7 @@
       "category": "experimental",
       "functions": [
         "call/2",
-        "new/2",
-        "validate_m/1"
+        "new/2"
       ],
       "kind": "struct",
       "macros": [],
@@ -7164,9 +7103,6 @@
           ],
           "new/2": [
             "new(signature, opts \\\\ [])"
-          ],
-          "validate_m/1": [
-            "validate_m(m)"
           ]
         }
       },
@@ -7261,8 +7197,7 @@
       "callbacks": [],
       "category": "experimental",
       "functions": [
-        "new/2",
-        "validate_output_field/1"
+        "new/2"
       ],
       "kind": "struct",
       "macros": [],
@@ -7271,9 +7206,6 @@
         "functions": {
           "new/2": [
             "new(signature, opts \\\\ [])"
-          ],
-          "validate_output_field/1": [
-            "validate_output_field(field)"
           ]
         },
         "types": {
@@ -7387,6 +7319,42 @@
       "callbacks": [],
       "category": "experimental",
       "functions": [
+        "load/1",
+        "new/3"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Predict.RLM.SandboxSerializable",
+      "signatures": {
+        "functions": {
+          "load/1": [
+            "load(sandbox_serializable)"
+          ],
+          "new/3": [
+            "new(name, loader, opts \\\\ [])"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/predict/rlm/sandbox_serializable.ex",
+      "struct_fields": [
+        "loader",
+        "metadata",
+        "name"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "experimental",
+      "functions": [
         "new/3"
       ],
       "kind": "struct",
@@ -7459,8 +7427,7 @@
       "category": "experimental",
       "functions": [
         "call/2",
-        "new/3",
-        "validate_feedback_fn/1"
+        "new/3"
       ],
       "kind": "struct",
       "macros": [],
@@ -7472,9 +7439,6 @@
           ],
           "new/3": [
             "new(program, metric, opts \\\\ [])"
-          ],
-          "validate_feedback_fn/1": [
-            "validate_feedback_fn(feedback_fn)"
           ]
         }
       },
@@ -7528,7 +7492,6 @@
         "get_lm_usage/1",
         "new/2",
         "put/3",
-        "set_lm_usage/2",
         "to_map/1"
       ],
       "kind": "struct",
@@ -7556,9 +7519,6 @@
           ],
           "put/3": [
             "put(prediction, key, value)"
-          ],
-          "set_lm_usage/2": [
-            "set_lm_usage(prediction, usage)"
           ],
           "to_map/1": [
             "to_map(prediction)"
@@ -7702,8 +7662,7 @@
       "functions": [
         "default_keys/0",
         "drop_credentials/1",
-        "redact/2",
-        "validate_keys/1"
+        "redact/2"
       ],
       "kind": "module",
       "macros": [],
@@ -7718,9 +7677,6 @@
           ],
           "redact/2": [
             "redact(value, keys \\\\ [:api_key, :authorization, :proxy_authorization, :auth, :bearer, :session, :token, :api_token, :auth_token, :bearer_token, :refresh_token, :id_token, :session_token, :password, :secret, :access_token, :access_key, :access_key_id, :secret_key, :secret_access_key, :client_secret, :private_key, :private_token, :service_account_key, :credential, :credentials, :\"x-api-key\"])"
-          ],
-          "validate_keys/1": [
-            "validate_keys(keys)"
           ]
         }
       },
@@ -7804,9 +7760,7 @@
       "category": "stable",
       "functions": [
         "new/2",
-        "normalize_doc/1",
-        "validate_retry_backoff/1",
-        "validate_retry_statuses/1"
+        "normalize_doc/1"
       ],
       "kind": "struct",
       "macros": [],
@@ -7818,12 +7772,6 @@
           ],
           "normalize_doc/1": [
             "normalize_doc(doc)"
-          ],
-          "validate_retry_backoff/1": [
-            "validate_retry_backoff(value)"
-          ],
-          "validate_retry_statuses/1": [
-            "validate_retry_statuses(statuses)"
           ]
         }
       },
@@ -7897,18 +7845,25 @@
       "callbacks": [],
       "category": "experimental",
       "functions": [
+        "barrier/3",
         "cancel/3",
         "cancel_with_events/3",
         "emit/2",
         "events/1",
+        "new_event_id/1",
+        "register_cancellable/1",
         "start/3",
-        "stop/1"
+        "stop/1",
+        "unregister_cancellable/1"
       ],
       "kind": "struct",
       "macros": [],
       "module": "Imp.Run",
       "signatures": {
         "functions": {
+          "barrier/3": [
+            "barrier(run, receiver, tag)"
+          ],
           "cancel/3": [
             "cancel(run, reason \\\\ :cancelled, timeout \\\\ 5000)"
           ],
@@ -7921,11 +7876,20 @@
           "events/1": [
             "events(run)"
           ],
+          "new_event_id/1": [
+            "new_event_id(prefix \\\\ \"event\")"
+          ],
+          "register_cancellable/1": [
+            "register_cancellable(fun)"
+          ],
           "start/3": [
             "start(program, inputs, opts \\\\ [])"
           ],
           "stop/1": [
             "stop(run)"
+          ],
+          "unregister_cancellable/1": [
+            "unregister_cancellable(ref)"
           ]
         },
         "types": {
@@ -8282,9 +8246,7 @@
       "functions": [
         "collect/3",
         "incremental_fields/2",
-        "stream/3",
-        "validate_chunker/1",
-        "validate_stream_listeners/1"
+        "stream/3"
       ],
       "kind": "module",
       "macros": [],
@@ -8299,12 +8261,6 @@
           ],
           "stream/3": [
             "stream(program, inputs, opts \\\\ [])"
-          ],
-          "validate_chunker/1": [
-            "validate_chunker(chunker)"
-          ],
-          "validate_stream_listeners/1": [
-            "validate_stream_listeners(listeners)"
           ]
         }
       },
@@ -8347,12 +8303,7 @@
       "functions": [
         "attach/2",
         "new/1",
-        "record/2",
-        "validate_adapter/1",
-        "validate_callback/1",
-        "validate_field/1",
-        "validate_framing/1",
-        "validate_name/1"
+        "record/2"
       ],
       "kind": "struct",
       "macros": [],
@@ -8367,21 +8318,6 @@
           ],
           "record/2": [
             "record(listener, event)"
-          ],
-          "validate_adapter/1": [
-            "validate_adapter(adapter)"
-          ],
-          "validate_callback/1": [
-            "validate_callback(callback)"
-          ],
-          "validate_field/1": [
-            "validate_field(field)"
-          ],
-          "validate_framing/1": [
-            "validate_framing(framing)"
-          ],
-          "validate_name/1": [
-            "validate_name(name)"
           ]
         }
       },
@@ -8417,24 +8353,36 @@
     },
     {
       "callbacks": [],
-      "category": "stable",
+      "category": "experimental",
       "functions": [
-        "execute/3",
-        "span/3"
+        "async/1",
+        "async_nolink/1"
       ],
       "kind": "module",
       "macros": [],
-      "module": "Imp.Telemetry",
+      "module": "Imp.Tasks",
       "signatures": {
         "functions": {
-          "execute/3": [
-            "execute(event, measurements, metadata)"
+          "async/1": [
+            "async(fun)"
           ],
-          "span/3": [
-            "span(event_prefix, metadata, fun)"
+          "async_nolink/1": [
+            "async_nolink(fun)"
           ]
         }
       },
+      "source": "lib/imp/tasks.ex",
+      "struct_fields": [],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.Telemetry",
+      "signatures": {},
       "source": "lib/imp/telemetry.ex",
       "struct_fields": [],
       "types": []
@@ -8449,8 +8397,7 @@
         "normalize_arguments/1",
         "outcome/1",
         "outcomes/0",
-        "resolve_name/2",
-        "validate_tools/1"
+        "resolve_name/2"
       ],
       "kind": "struct",
       "macros": [],
@@ -8477,9 +8424,6 @@
           ],
           "resolve_name/2": [
             "resolve_name(tools, name)"
-          ],
-          "validate_tools/1": [
-            "validate_tools(tools)"
           ]
         },
         "types": {
@@ -9391,8 +9335,7 @@
         "fail!/3",
         "new!/1",
         "reusable?/3",
-        "validate!/1",
-        "validate_complete_group!/5"
+        "validate!/1"
       ],
       "kind": "struct",
       "macros": [],
@@ -9416,9 +9359,6 @@
           ],
           "validate!/1": [
             "validate!(rollout)"
-          ],
-          "validate_complete_group!/5": [
-            "validate_complete_group!(rollouts, group_id, cycle, expected_size, prompt_count \\\\ nil)"
           ]
         },
         "types": {
@@ -9551,91 +9491,19 @@
       "callbacks": [],
       "category": "experimental",
       "functions": [
-        "charge_budget/3",
-        "claim_cached/4",
-        "claim_rollout/3",
-        "complete/3",
-        "complete_rollout/6",
-        "complete_slow_step/2",
         "new!/4",
-        "next_cycle/2",
-        "put_dataset/2",
-        "put_intent/2",
-        "put_lookahead/2",
-        "put_reuse_cache/2",
-        "put_rollout/2",
-        "reconcile_intent/4",
-        "record_event/2",
-        "revise_prompts/3",
-        "set_stage/2",
-        "terminate/3",
-        "validate!/1",
-        "validate_complete_group!/2"
+        "validate!/1"
       ],
       "kind": "struct",
       "macros": [],
       "module": "Imp.Training.FastSlow.State",
       "signatures": {
         "functions": {
-          "charge_budget/3": [
-            "charge_budget(state, key, amount)"
-          ],
-          "claim_cached/4": [
-            "claim_cached(state, problem_id, input_digest, prompt_digest)"
-          ],
-          "claim_rollout/3": [
-            "claim_rollout(state, rollout_id, claim_id)"
-          ],
-          "complete/3": [
-            "complete(state, dataset, details \\\\ %{})"
-          ],
-          "complete_rollout/6": [
-            "complete_rollout(state, rollout_id, claim_id, output, score, metrics)"
-          ],
-          "complete_slow_step/2": [
-            "complete_slow_step(state, payload)"
-          ],
           "new!/4": [
             "new!(config, theta_payload, prompt_candidates, options \\\\ [])"
           ],
-          "next_cycle/2": [
-            "next_cycle(state, dataset)"
-          ],
-          "put_dataset/2": [
-            "put_dataset(state, dataset)"
-          ],
-          "put_intent/2": [
-            "put_intent(state, intent)"
-          ],
-          "put_lookahead/2": [
-            "put_lookahead(state, lookahead)"
-          ],
-          "put_reuse_cache/2": [
-            "put_reuse_cache(state, cache)"
-          ],
-          "put_rollout/2": [
-            "put_rollout(state, rollout)"
-          ],
-          "reconcile_intent/4": [
-            "reconcile_intent(state, id, reconciliation, result \\\\ nil)"
-          ],
-          "record_event/2": [
-            "record_event(state, event)"
-          ],
-          "revise_prompts/3": [
-            "revise_prompts(state, candidates, metadata \\\\ %{})"
-          ],
-          "set_stage/2": [
-            "set_stage(state, next)"
-          ],
-          "terminate/3": [
-            "terminate(state, reason, details \\\\ %{})"
-          ],
           "validate!/1": [
             "validate!(state)"
-          ],
-          "validate_complete_group!/2": [
-            "validate_complete_group!(state, group_id)"
           ]
         },
         "types": {

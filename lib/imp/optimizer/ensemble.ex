@@ -192,6 +192,7 @@ defmodule Imp.Optimizer.Ensemble do
 
   defp validate_size!(_size, _programs), do: :ok
 
+  @doc false
   def validate_reduce_fn(nil), do: {:ok, nil}
   def validate_reduce_fn(reduce_fn) when is_function(reduce_fn, 1), do: {:ok, reduce_fn}
 

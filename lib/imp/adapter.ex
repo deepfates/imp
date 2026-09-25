@@ -5,6 +5,7 @@ defmodule Imp.Adapter do
   @callback parse(Imp.Signature.t(), term(), keyword()) ::
               {:ok, Imp.Prediction.t()} | {:error, term()}
 
+  @doc false
   def validate_adapter(nil), do: {:ok, nil}
 
   def validate_adapter(module) when is_atom(module) do

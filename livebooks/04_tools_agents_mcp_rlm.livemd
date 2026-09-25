@@ -73,28 +73,15 @@ Policy lives where the model chooses actions: any react-family program takes
 instead of an execution. The ReAct section below shows the action loop; use a
 deny policy when you want to exercise this boundary directly.
 
-## MCP Catalog Import
+## MCP Import
 
-Catalog import turns external tool descriptions into Imp tools so the rest of
-the system does not care whether a tool was handwritten or discovered.
-
-Schemas use the MCP spec dialect: camelCase `"inputSchema"` with an optional
-`"description"` (snake_case `:input_schema` remains an in-process fallback).
-
-```elixir
-catalog =
-  Imp.MCP.Catalog.new([
-    %{
-      "name" => "remote_lookup",
-      "description" => "lookup through an imported catalog",
-      "inputSchema" => %{"required" => ["key"]},
-      "run" => fn %{key: "capital"} -> %{value: "Paris"} end
-    }
-  ])
-
-[tool] = Imp.MCP.import_tools(catalog)
-Imp.Tool.call(tool, %{key: "capital"})
-```
+`Imp.MCP.connect/2` dials the MCP servers you authorize and returns their tools
+as ordinary `Imp.Tool` values, so the rest of the system does not care whether
+a tool was handwritten or discovered. Each imported tool keeps where it came
+from in `tool.metadata.mcp`, and the import carries one `cleanup` function that
+closes every connection it opened. `Imp.MCP.Connections` documents the server
+descriptors and every option; a program takes `import.tools` like any other
+tool list.
 
 ## ReAct
 

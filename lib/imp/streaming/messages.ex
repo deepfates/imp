@@ -128,12 +128,14 @@ defmodule Imp.Streaming.Messages do
       )
     end
 
+    @doc false
     def validate_callback(nil), do: {:ok, nil}
     def validate_callback(callback) when is_function(callback, 1), do: {:ok, callback}
 
     def validate_callback(callback),
       do: {:error, "expected nil or an arity-1 function, got: #{inspect(callback)}"}
 
+    @doc false
     def validate_field(nil), do: {:ok, nil}
     def validate_field(field) when is_atom(field), do: {:ok, Atom.to_string(field)}
     def validate_field(field) when is_binary(field) and byte_size(field) > 0, do: {:ok, field}
@@ -141,6 +143,7 @@ defmodule Imp.Streaming.Messages do
     def validate_field(field),
       do: {:error, "expected nil, an atom, or a non-empty string, got: #{inspect(field)}"}
 
+    @doc false
     def validate_name(nil), do: {:ok, nil}
     def validate_name(name) when is_atom(name), do: {:ok, Atom.to_string(name)}
     def validate_name(name) when is_binary(name), do: {:ok, name}
@@ -148,11 +151,13 @@ defmodule Imp.Streaming.Messages do
     def validate_name(name),
       do: {:error, "expected nil, an atom, or a string, got: #{inspect(name)}"}
 
+    @doc false
     def validate_adapter(adapter) when is_atom(adapter), do: {:ok, adapter}
 
     def validate_adapter(adapter),
       do: {:error, "expected an adapter module, got: #{inspect(adapter)}"}
 
+    @doc false
     def validate_framing(nil), do: {:ok, nil}
 
     def validate_framing(%{start: start, end: ending} = framing)

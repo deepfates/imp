@@ -15,13 +15,7 @@ defmodule Imp.Telemetry do
   @context_key :imp_telemetry_span_stack
   @acting_for_key :imp_telemetry_acting_for
 
-  @doc """
-  Emits a redacted telemetry event when the optional `:telemetry` dependency is available.
-
-      iex> Imp.Telemetry.execute([:imp, :example], %{count: 1}, %{api_key: "sk-test-secret-1234567890"})
-      :ok
-
-  """
+  @doc false
   def execute(event, measurements, metadata) do
     measurements = Imp.Redaction.redact(measurements)
     metadata = metadata |> inherit_lineage() |> Imp.Redaction.redact()
@@ -33,13 +27,7 @@ defmodule Imp.Telemetry do
     :ok
   end
 
-  @doc """
-  Runs a zero-arity function inside start/stop/exception telemetry events.
-
-      iex> Imp.Telemetry.span([:imp, :example], %{operation: :demo}, fn -> {:ok, 42} end)
-      {:ok, 42}
-
-  """
+  @doc false
   def span(event_prefix, metadata, fun) when is_function(fun, 0) do
     started = System.monotonic_time()
     previous = context()

@@ -439,6 +439,52 @@ Every change here is breaking for code that matches on the old shape.
   a history turn loaded with `Imp.History.load/1`, or a demo field a
   signature does not declare in a saved optimizer artifact.
 
+### Public surface: what is exported
+
+- Gone, with what to use instead:
+  - `Imp.MCP.Client`, `Imp.MCP.HTTPClient`, `Imp.MCP.StreamableHTTPClient`,
+    `Imp.MCP.StdioClient`, `Imp.MCP.Catalog` and `Imp.MCP.import_tools`:
+    `Imp.MCP.connect/2`, which returns the tools and one `cleanup`. A tool
+    schema spelled `:input_schema` is no longer accepted; MCP's
+    `"inputSchema"` is.
+  - `Imp.ACP.MCP` and `Imp.ACP.MCP.Import`: `Imp.MCP.connect/2`, and
+    `Imp.ACP.ToolKind.derive_all(import.annotations)` for `:tool_kinds`.
+  - `Imp.Core.ToolCall` and `Imp.Core.ToolResult`, which nothing built, and
+    `Imp.MCP.json_rpc_result` and `Imp.MCP.initialize_params`, which
+    nothing called.
+- No longer documented, because they are Imp's own machinery:
+  `Imp.Clients.TRLProtocol`, `Imp.Optimizer.Utils`,
+  `Imp.Telemetry.execute` and `span`, `Imp.Prediction.set_lm_usage`,
+  `Imp.MCP.Connections.import_tools` (use `Imp.MCP.connect/2`), the
+  transition functions of `Imp.Training.FastSlow.State`, and the `validate_*`
+  option validators. `compile/N` on an optimizer that `Imp.optimize/3,4,5` or
+  `Imp.train/4` runs is no longer documented either: call those, which take
+  the same datasets and invocation options with one argument order.
+  `KNNFewShot`, `Ensemble`, `Playbook` and `InstructionSearch` keep
+  `compile`, because the facade does not run constructors or workflows.
+- Now documented: `Imp.Deadline`, `Imp.Observability.Inspection` (what
+  `Imp.Observability.inspect_artifact/2` returns, with `json_safe/1`),
+  `Imp.Run.barrier/3`, `Imp.Run.new_event_id/1`,
+  `Imp.Run.register_cancellable/1` and `unregister_cancellable/1`,
+  `Imp.Tasks.async/1` and `async_nolink/1` (tasks that carry the caller's
+  settings, run and telemetry context), and the modules public
+  functions return or call: `Imp.Predict.RLM.SandboxSerializable`,
+  `Imp.Optimize.Anything.Result`, `Imp.Optimizer.Parameter.Set` and
+  `Imp.Optimizer.Parameter.Change`, and `Imp.Optimizer.GEPA.Callback`.
+- `Imp.MCP`, `Imp.MCP.Connections`, `Imp.MCP.Import`, `Imp.MCP.CallFailure`,
+  `Imp.ACP` and `Imp.ACP.ToolKind` are stable, and so are the LabeledFewShot,
+  BootstrapFewShot, random search, KNNFewShot, COPRO, MIPROv2, GEPA, SIMBA,
+  InferRules and Ensemble optimizers, `Imp.Optimizer.Artifact` and
+  `Imp.Optimizer.Report`: stable means they do not break within 0.x without a
+  deprecation. `Imp.ExternalCommand` and `Imp.Tasks` are experimental. The
+  documentation lists the MCP
+  and ACP modules in a group of their own instead of under experimental
+  optimizers.
+- An ACP agent started without `:agent_info` introduces itself as `imp` at
+  Imp's version, not as `imp-acp` `0.1.0`.
+- Plug is no longer a dependency of Imp. The demo MCP servers, its only user,
+  are not in the package.
+
 ## 0.4.0 — 2026-09-17
 
 - `Imp.ACP` and `Imp.MCP.connect/2` are part of Imp. The separate `imp_acp`

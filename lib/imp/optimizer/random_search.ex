@@ -103,10 +103,12 @@ defmodule Imp.Optimizer.RandomSearch do
     }
   end
 
+  @doc false
   def validate_optional_number(nil), do: {:ok, nil}
   def validate_optional_number(value) when is_number(value), do: {:ok, value}
   def validate_optional_number(_value), do: {:error, "expected nil, an integer, or a float"}
 
+  @doc false
   def validate_optional_non_negative(nil), do: {:ok, nil}
 
   def validate_optional_non_negative(value) when is_integer(value) and value >= 0,
@@ -115,17 +117,21 @@ defmodule Imp.Optimizer.RandomSearch do
   def validate_optional_non_negative(_value),
     do: {:error, "expected non negative integer"}
 
+  @doc false
   def validate_optional_integer(nil), do: {:ok, nil}
   def validate_optional_integer(value) when is_integer(value), do: {:ok, value}
   def validate_optional_integer(_value), do: {:error, "expected integer"}
 
+  @doc false
   def validate_optional_positive(nil), do: {:ok, nil}
   def validate_optional_positive(value) when is_integer(value) and value > 0, do: {:ok, value}
   def validate_optional_positive(_value), do: {:error, "expected nil or a positive integer"}
 
+  @doc false
   def validate_optional_max_errors(nil), do: {:ok, nil}
   def validate_optional_max_errors(value), do: Imp.Evaluate.validate_max_errors(value)
 
+  @doc false
   def validate_restrict(nil), do: {:ok, nil}
 
   def validate_restrict(values) when is_list(values) do
@@ -167,6 +173,7 @@ defmodule Imp.Optimizer.RandomSearch do
     error in ArgumentError -> {:error, Exception.message(error)}
   end
 
+  @doc false
   def compile(%__MODULE__{} = optimizer, student, trainset, valset \\ nil, opts \\ [])
       when is_list(opts) do
     opts = validate_compile_options!(opts)

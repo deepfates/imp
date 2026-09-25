@@ -85,6 +85,7 @@ defmodule Imp.Clients.ReqLLM do
     }
   end
 
+  @doc false
   def validate_req_module(module) when is_atom(module), do: {:ok, module}
 
   def validate_req_module(module) do

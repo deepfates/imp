@@ -192,7 +192,8 @@ defmodule PublicAPIManifestTest do
 
     assert "Imp" in stable
     assert "Imp.Signature" in stable
-    assert "Imp.Optimizer.GEPA" in experimental
+    assert "Imp.Optimizer.GEPA" in stable
+    assert "Imp.Optimizer.GRPO" in experimental
     assert "Imp.Optimize.Anything" in experimental
     assert "Imp.Optimizer" in extension
 

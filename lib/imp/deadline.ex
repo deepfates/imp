@@ -7,8 +7,14 @@ defmodule Imp.Deadline do
   provider calls) resolves its timeout against the current process deadline
   with `resolve/1`, so a nested call can never outlive its parent's budget.
 
-  This module owns the process-dictionary slot. `Imp.Evaluate`, LM clients,
-  and the optimizers all depend on it; it depends on nothing.
+  A host bounds a piece of work by running it inside `with_deadline/2`. What
+  reads the bound: `Imp.Clients.ReqLLM` caps each request's
+  `:receive_timeout` to the time left, `Imp.Predict.ReActV2` makes no further
+  request once it has passed. `Imp.Evaluate`'s `:deadline` option and GEPA's
+  coordinator bind a deadline in the workers they start. The binding belongs to the calling process
+  and is not inherited by a process it spawns, so a host that runs a program in
+  another process, such as `Imp.Run`'s task, binds it again inside that
+  process.
   """
 
   @key {__MODULE__, :deadline}

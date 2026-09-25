@@ -57,9 +57,9 @@
   # defensive clause/guard: ReqLLM.Response types `usage` as map() on the
   # struct, but its schema defaults the field to nil and Response.usage/1 is
   # `map() | nil`, so the nil clause is reachable at runtime.
-  {"lib/imp/clients/req_llm.ex", :guard_fail, 1586},
-  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {1614, 8}},
-  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {153, 7}},
+  {"lib/imp/clients/req_llm.ex", :guard_fail, 1587},
+  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {1615, 8}},
+  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {154, 7}},
   # defensive error clause on an always-ok internal call
   {"lib/imp/clients/training.ex", :pattern_match, {1215, 13}},
   # defensive error clause on an always-ok internal call
@@ -67,13 +67,13 @@
   # defensive fallback paired with the 1199 clause
   {"lib/imp/clients/training.ex", :pattern_match_cov, {1287, 7}},
   # defensive fallback paired with the 904 clause
-  {"lib/imp/clients/training.ex", :pattern_match_cov, {1536, 8}},
+  {"lib/imp/clients/training.ex", :pattern_match_cov, {1537, 8}},
   # defensive error clause on an always-ok internal call
-  {"lib/imp/optimizer/better_together.ex", :pattern_match, {1280, 8}},
+  {"lib/imp/optimizer/better_together.ex", :pattern_match, {1285, 8}},
   # defensive error clause on an always-ok internal call
-  {"lib/imp/optimizer/better_together.ex", :pattern_match, {1283, 8}},
+  {"lib/imp/optimizer/better_together.ex", :pattern_match, {1288, 8}},
   # defensive fallback paired with the clauses above
-  {"lib/imp/optimizer/better_together.ex", :pattern_match_cov, {1295, 8}},
+  {"lib/imp/optimizer/better_together.ex", :pattern_match_cov, {1300, 8}},
   # raise-only helper: every raise_parallel_worker_error/1 clause raises
   # (engine.ex:2469-2530); the catch-all covers these shapes at runtime
   {"lib/imp/optimizer/gepa/engine.ex", :call, {3961, 35}},
@@ -90,11 +90,11 @@
   # :rand seed format ([first | second]) at the seed_s call
   {"lib/imp/optimizer/sampling.ex", :improper_list_constr, {24, 11}},
   # defensive clause for non-covered bucket shapes
-  {"lib/imp/optimizer/simba.ex", :pattern_match_cov, {695, 8}},
+  {"lib/imp/optimizer/simba.ex", :pattern_match_cov, {698, 8}},
   # defensive clause for non-covered trace entries
   {"lib/imp/optimizer/trajectory.ex", :pattern_match_cov, {270, 8}},
   # MapSet opacity on the redaction key set
-  {"lib/imp/redaction.ex", :call_without_opaque, {508, 51}},
+  {"lib/imp/redaction.ex", :call_without_opaque, {495, 51}},
   # behaviour callback specs term(); impl narrows to %__MODULE__{} on
   # purpose so bad input crashes loudly
   {"lib/imp/retrieve.ex", :callback_arg_type_mismatch, {158, 9}},
@@ -103,7 +103,7 @@
   # defensive fallback paired with the 106 clause
   {"lib/imp/retrieve.ex", :pattern_match_cov, {114, 8}},
   # behaviour callback specs term(); impl narrows on purpose (see retrieve.ex)
-  {"lib/imp/retrievers/http.ex", :callback_arg_type_mismatch, {95, 7}},
+  {"lib/imp/retrievers/http.ex", :callback_arg_type_mismatch, {97, 7}},
   # MapSet opacity on run-id sets typed through MLflow JSON
   {"lib/imp/tracking/mlflow.ex", :call_without_opaque, {361, 8}},
   # defensive clause dialyzer pins to the module head (line 1)
@@ -201,7 +201,7 @@
   {"bench/imp/benchmark_truth/openrouter_free_guard.ex", :pattern_match_cov, {319, 8}},
   {"bench/imp/benchmark_truth/openrouter_free_guard.ex", :pattern_match_cov, {400, 8}},
   {"lib/imp/clients/mlx_lm_deployment.ex", :pattern_match, 1},
-  {"lib/imp/clients/training.ex", :pattern_match, {1535, 8}},
+  {"lib/imp/clients/training.ex", :pattern_match, {1536, 8}},
   {"lib/imp/clients/trl_deployment.ex", :unknown_type, {29, 42}},
   {"lib/imp/clients/trl_deployment.ex", :unknown_type, {72, 30}},
   {"lib/imp/clients/trl_trainer.ex", :pattern_match_cov, {339, 20}},
@@ -209,7 +209,7 @@
   # unreachable; keep the public URL validator defensive at this trust boundary.
   {"lib/imp/optimizer/budget.ex", :pattern_match, 1},
   {"lib/imp/optimizer/gepa/random.ex", :improper_list_constr, {91, 17}},
-  {"lib/imp/optimizer/mipro_v2.ex", :no_return, {150, 7}},
+  {"lib/imp/optimizer/mipro_v2.ex", :no_return, {159, 7}},
   {"lib/imp/optimizer/mipro_v2/python_random.ex", :call_without_opaque, {131, 55}},
   # MapSet opacity: the recursive sampler threads a MapSet accumulator whose
   # initial literal type dialyzer refuses to unify with the opaque internal
@@ -221,7 +221,6 @@
   {"bench/imp/benchmark_truth/multimodal_runner.ex", :pattern_match_cov, {340, 16}},
   {"lib/imp/adapter/chat.ex", :pattern_match_cov, {788, 8}},
   {"lib/imp/adapter/xml.ex", :pattern_match_cov, {673, 8}},
-  {"lib/imp/mcp.ex", :pattern_match_cov, {518, 8}},
   {"lib/imp/optimizer/artifact.ex", :call_without_opaque, {745, 52}},
   {"lib/imp/optimizer/artifact.ex", :call_without_opaque, {909, 53}},
   {"lib/imp/optimizer/playbook.ex", :pattern_match_cov, {1014, 8}},

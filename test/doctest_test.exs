@@ -9,6 +9,7 @@ defmodule ImpDoctestTest do
   doctest Imp.Example
   doctest Imp.Metrics
   doctest Imp.Module
+  doctest Imp.Observability.Inspection
   doctest Imp.Optimizer.RandomSearch
   doctest Imp.Prediction
   doctest Imp.Predict.Aggregation

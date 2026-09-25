@@ -114,7 +114,7 @@ defmodule Imp.Prediction do
   """
   def get_lm_usage(%__MODULE__{metadata: metadata}), do: Map.get(metadata, :lm_usage, %{})
 
-  @doc "Returns a copy of the prediction with the LM usage ledger set (see `get_lm_usage/1`)."
+  @doc false
   def set_lm_usage(%__MODULE__{metadata: metadata} = prediction, usage) when is_map(usage),
     do: %{prediction | metadata: Map.put(metadata, :lm_usage, usage)}
 

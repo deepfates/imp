@@ -129,7 +129,6 @@ defmodule Imp.MixProject do
       {:saxy, "~> 1.6"},
       {:telemetry, "~> 1.3"},
       {:bandit, "~> 1.0", only: :test},
-      {:plug, "~> 1.16"},
       {:mox, "~> 1.2", only: :test},
       {:stream_data, "~> 1.1", only: :test},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
@@ -169,6 +168,13 @@ defmodule Imp.MixProject do
     Path.wildcard("lib/mix/tasks/**/*.ex") ++
       Path.wildcard("lib/imp/benchmark*.ex") ++
       [
+        # The demo MCP servers the demo tasks and the tests run. Nothing the
+        # package ships uses them, and they were its only use of Plug, which is
+        # therefore not a dependency of Imp; the source checkout gets it
+        # through ExMCP.
+        "lib/imp/acp/demo_mcp_http_plug.ex",
+        "lib/imp/acp/demo_mcp_oauth_plug.ex",
+        "lib/imp/acp/demo_mcp_server.ex",
         "lib/imp/optimizer/playbook/campaign.ex",
         "lib/imp/optimizer/playbook/equation_search.ex"
       ]
@@ -293,10 +299,18 @@ defmodule Imp.MixProject do
       |> :json.decode()
       |> Map.fetch!("modules")
 
+    # The protocol adapters are grouped by what they are rather than by their
+    # support level, which `priv/public_api.json` records per module.
+    {protocols, modules} =
+      Enum.split_with(modules, fn %{"module" => module} ->
+        module in ["Imp.ACP", "Imp.MCP"] or String.starts_with?(module, ["Imp.ACP.", "Imp.MCP."])
+      end)
+
     by_category = Enum.group_by(modules, & &1["category"], & &1["module"])
 
     [
       {"Stable center", Map.get(by_category, "facade", []) ++ Map.get(by_category, "stable", [])},
+      {"MCP and ACP", Enum.map(protocols, & &1["module"])},
       {"Experimental optimizers and advanced workflows",
        Map.get(by_category, "experimental", [])},
       {"Extension interfaces", Map.get(by_category, "spi", [])}

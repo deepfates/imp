@@ -154,12 +154,15 @@ defmodule Imp.Optimizer.InferRules do
     error in ArgumentError -> {:error, Exception.message(error)}
   end
 
+  @doc false
   def compile(%__MODULE__{} = optimizer, program, trainset),
     do: compile(optimizer, program, trainset, nil, [])
 
+  @doc false
   def compile(%__MODULE__{} = optimizer, program, trainset, devset),
     do: compile(optimizer, program, trainset, devset, [])
 
+  @doc false
   def compile(%__MODULE__{} = optimizer, program, trainset, devset, opts)
       when is_list(opts) do
     opts = validate_compile_options!(opts)

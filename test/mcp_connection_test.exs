@@ -259,12 +259,12 @@ defmodule Imp.MCPConnectionTest do
 
   test "HTTP convenience constructor has explicit close and keeps metadata" do
     server = server("fixture")
-    client = Imp.MCP.HTTPClient.new(server["url"])
-    on_exit(fn -> Imp.MCP.Client.close(client) end)
-    [tool] = Imp.MCP.import_tools(client)
+    client = Imp.Test.MCPConnect.http!(server["url"])
+    on_exit(fn -> client.cleanup.() end)
+    [tool] = client.tools
     assert tool.metadata.mcp.tool_name == "look"
     assert Imp.Tool.call(tool, %{}) == "observed"
-    assert :ok = Imp.MCP.Client.close(client)
+    assert :ok = client.cleanup.()
     assert {:error, _} = Imp.Tool.call(tool, %{})
   end
 
@@ -289,9 +289,9 @@ defmodule Imp.MCPConnectionTest do
       )
 
     on_exit(fn -> Plug.Cowboy.shutdown(ref) end)
-    client = Imp.MCP.HTTPClient.new("http://127.0.0.1:#{port}", result_mode: :structured)
-    on_exit(fn -> Imp.MCP.Client.close(client) end)
-    [tool] = Imp.MCP.import_tools(client)
+    client = Imp.Test.MCPConnect.http!("http://127.0.0.1:#{port}", result_mode: :structured)
+    on_exit(fn -> client.cleanup.() end)
+    [tool] = client.tools
     assert {:error, {:mcp_tool_error, failure}} = error = Imp.Tool.call(tool, %{})
 
     # The record keeps the envelope; the model reads the tool's own words.
@@ -330,13 +330,13 @@ defmodule Imp.MCPConnectionTest do
     on_exit(fn -> Plug.Cowboy.shutdown(ref) end)
 
     client =
-      Imp.MCP.HTTPClient.new("http://127.0.0.1:#{port}",
+      Imp.Test.MCPConnect.http!("http://127.0.0.1:#{port}",
         timeout: 2000,
         call_meta: fn _ -> %{"progressToken" => "probe"} end
       )
 
-    on_exit(fn -> Imp.MCP.Client.close(client) end)
-    [tool] = Imp.MCP.import_tools(client)
+    on_exit(fn -> client.cleanup.() end)
+    [tool] = client.tools
 
     assert {:error,
             %Imp.MCP.CallFailure{
@@ -596,7 +596,7 @@ defmodule Imp.MCPConnectionTest do
 
   test "removed transport knobs refuse with their names rather than silently doing nothing" do
     assert_raise ArgumentError, ~r/transport/, fn ->
-      Imp.MCP.HTTPClient.new("http://127.0.0.1:1", transport: :old_mock)
+      Imp.Test.MCPConnect.http!("http://127.0.0.1:1", transport: :old_mock)
     end
   end
 end

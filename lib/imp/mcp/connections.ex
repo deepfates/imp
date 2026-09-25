@@ -8,7 +8,7 @@ defmodule Imp.MCP.Import do
   in `tools`.
 
   `index` is the position of the dropped descriptor in the list given to
-  `import_tools/2`, and it is the only thing in the entry that identifies which
+  `Imp.MCP.connect/2`, and it is the only thing in the entry that identifies which
   descriptor was left out. A name does not: names are not required to be unique,
   and a descriptor with no `"name"` is reported as `"unnamed"`. `server` is for
   the message an operator reads; `index` is for the caller deciding which of its
@@ -254,19 +254,12 @@ defmodule Imp.MCP.Connections do
   @http_request_timeout 30_000
   @http_stream_idle_timeout 60_000
 
-  @doc """
-  Connects authorized servers and imports all discovered tools.
+  @doc false
+  # `Imp.MCP.connect/2` is the entry point; this module documents its options.
+  @spec connect([server()], keyword()) :: {:ok, Import.t()} | {:error, term()}
+  def connect(servers, opts \\ [])
 
-  Returns an `Imp.MCP.Import` carrying the tools, the annotations each
-  server declared for them, and stable source provenance independent of model-facing names.
-
-  With `on_failure: :drop` a server that cannot be connected is left out and
-  named in the import's `unavailable` list instead of failing the import.
-  """
-  @spec import_tools([server()], keyword()) :: {:ok, Import.t()} | {:error, term()}
-  def import_tools(servers, opts \\ [])
-
-  def import_tools(servers, opts) when is_list(servers) and is_list(opts) do
+  def connect(servers, opts) when is_list(servers) and is_list(opts) do
     validate_options!(opts)
     owner = Keyword.get(opts, :owner, self())
 
@@ -305,7 +298,7 @@ defmodule Imp.MCP.Connections do
     end
   end
 
-  def import_tools(servers, _opts), do: {:error, {:invalid_mcp_servers, shape(servers)}}
+  def connect(servers, _opts), do: {:error, {:invalid_mcp_servers, shape(servers)}}
 
   defp ensure_runtime([]), do: :ok
 
@@ -765,7 +758,7 @@ defmodule Imp.MCP.Connections do
     |> case do
       {:ok, sourced_schemas, unavailable} ->
         with {:ok, schemas} <- name_tools(sourced_schemas, opts) do
-          {:ok, Imp.MCP.import_tools(schemas), declared_annotations(schemas),
+          {:ok, Imp.MCP.ToolSchemas.to_tools!(schemas), declared_annotations(schemas),
            Enum.reverse(unavailable)}
         end
 

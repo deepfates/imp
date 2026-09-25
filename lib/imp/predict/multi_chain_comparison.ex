@@ -78,6 +78,7 @@ defmodule Imp.Predict.MultiChainComparison do
     }
   end
 
+  @doc false
   def validate_m(m) when is_integer(m) and m > 0, do: {:ok, m}
 
   def validate_m(m) do

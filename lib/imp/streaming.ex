@@ -377,6 +377,7 @@ defmodule Imp.Streaming do
     raise ArgumentError, "#{context}: expected keyword options, got: #{inspect(opts)}"
   end
 
+  @doc false
   def validate_chunker(nil), do: {:ok, nil}
   def validate_chunker(chunker) when is_function(chunker, 1), do: {:ok, chunker}
 
@@ -384,6 +385,7 @@ defmodule Imp.Streaming do
     {:error, "expected nil or an arity-1 function, got: #{inspect(chunker)}"}
   end
 
+  @doc false
   def validate_stream_listeners(listeners) when is_list(listeners) do
     if Enum.all?(listeners, &match?(%Imp.Streaming.Messages.StreamListener{}, &1)) do
       {:ok, listeners}
