@@ -1106,6 +1106,35 @@ defmodule ReActV2Test do
     refute_received {:lm_call, _second}
   end
 
+  # A string signature keeps a field name as a string when its atom does not
+  # exist yet; `finish_on` may return that field under the atom, which exists
+  # by then. The outputs are matched to the signature by text.
+  test "finish_on outputs keyed by an atom fill a field the signature names by a string" do
+    name = "contact_" <> Integer.to_string(System.unique_integer([:positive]))
+    signature = Imp.signature("ticket -> team, " <> name)
+    assert Enum.any?(signature.outputs, &(&1.name == name))
+    field = String.to_atom(name)
+
+    reply = Imp.tool(:reply, "Reply", fn _arguments -> "sent" end)
+
+    lm = action_lm([%{tool_calls: [%{id: "r1", name: "reply", arguments: %{}}]}])
+
+    assert {:ok, prediction} =
+             Imp.react_v2(signature, [reply],
+               lm: lm,
+               max_iters: 1,
+               finish_on: %{
+                 reply: fn _arguments, _result, _inputs ->
+                   {:finish, %{:team => "atlas", field => "Maya"}}
+                 end
+               }
+             )
+             |> Imp.call(%{ticket: "t"})
+
+    assert prediction.metadata[:termination_reason] == :finished_by_tool
+    assert Imp.get(prediction, name) == "Maya"
+  end
+
   test "finish_on returning :continue leaves the loop running" do
     parent = self()
     reply = Imp.tool(:reply, "reply", fn _arguments -> "sent" end)

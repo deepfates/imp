@@ -301,19 +301,20 @@ User-visible changes to Imp are recorded here.
   answer is not also emitted as a `:reasoning` event. A signature with several
   outputs, one non-text output, or one constrained text output (an `enum`, a
   pattern, an answer shape) keeps DSPy's `submit` unchanged, so the allowed
-  values reach the model in its schema. Text that the one text output does
-  not accept ends the turn `:incomplete` with `termination_cause:
-  :invalid_answer`, never a complete prediction with a `nil` output.
+  values reach the model in its schema; a step of such a signature that
+  writes text instead of calling `submit` is the `:empty_tool_calls`
+  interruption, and a turn that ends without a valid `submit` is
+  `:incomplete`.
 - A step of a one-text-output signature that calls nothing and says nothing
   is an empty answer: the turn ends there with `termination_reason:
   :answered` and no further request, because saying nothing is how a model
   declines to answer.
 - An interrupted turn of a one-text-output signature (the step limit, a
-  failed request, text the output does not accept) makes one more
+  failed request) makes one more
   request with the same tools as every step and `tool_choice: "auto"`, and its
   text is the answer, with `termination_reason: :last_text`
   and `termination_cause` naming the interruption (`:max_iters`,
-  `:prediction_error`, `:parse_error`, `:invalid_answer`). A completion that says nothing is an empty answer rather
+  `:prediction_error`, `:parse_error`). A completion that says nothing is an empty answer rather
   than an error. A tool call the model makes on that request anyway is not
   run; the text is the answer and the calls are listed in
   `unexecuted_tool_calls`. If the process's `Imp.Deadline` has already

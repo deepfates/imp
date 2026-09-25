@@ -31,8 +31,7 @@ defmodule Imp.Predict.ReActV2 do
       the turn's context window was full or its `Imp.Deadline` had passed,
       which would refuse any further request too and so are named instead;
       `termination_error` holds the errors of the requests that failed. One of `:max_iters`, `:parse_error`, `:prediction_error`,
-      `:invalid_answer`, `:empty_tool_calls`, `:context_window_exceeded` and
-      `:deadline_exceeded`.
+      `:empty_tool_calls`, `:context_window_exceeded` and `:deadline_exceeded`.
     * `:termination_error` — for `:incomplete`, the redacted errors of the
       requests that failed.
     * `:finished_by_tool` — the terminal tool that ended the turn.
@@ -68,9 +67,8 @@ defmodule Imp.Predict.ReActV2 do
   ## When a turn is interrupted
 
   A turn is interrupted when it reaches `max_iters`, when a step's request
-  fails (`:prediction_error`, `:parse_error`), or when a step calls no tool and
-  gives no answer (`:invalid_answer` for text the output does not
-  accept, and `:empty_tool_calls` for a signature with `submit`).
+  fails (`:prediction_error`, `:parse_error`), or when a step of a signature
+  with `submit` calls no tool (`:empty_tool_calls`).
 
   With one text output, a step that calls no tool and says nothing is not an
   interruption: it is an empty answer, and the turn ends there
@@ -594,23 +592,15 @@ defmodule Imp.Predict.ReActV2 do
           calls = prediction |> Imp.get(:tool_calls, []) |> normalize_calls(turn)
           no_calls = %ToolCalls{tool_calls: []}
 
-          case last_text_outputs(react.signature, prediction) do
-            {:ok, outputs} ->
-              history = append_last_step(history, pending, prediction, no_calls, outputs)
+          outputs = last_text_outputs(react.signature, prediction)
+          history = append_last_step(history, pending, prediction, no_calls, outputs)
 
-              final_prediction(
-                outputs,
-                history,
-                :last_text,
-                put_unexecuted(%{termination_cause: cause}, calls)
-              )
-
-            # Text the output does not accept is no answer, and a nil where
-            # the signature requires a value is not a complete prediction.
-            :invalid ->
-              history = append_last_step(history, pending, prediction, no_calls, nil)
-              incomplete_prediction(history, :invalid_answer, initial_error)
-          end
+          final_prediction(
+            outputs,
+            history,
+            :last_text,
+            put_unexecuted(%{termination_cause: cause}, calls)
+          )
 
         {:error, reason, history} ->
           incomplete_prediction(history, failed_last_request_cause(cause, reason), %{
@@ -658,11 +648,11 @@ defmodule Imp.Predict.ReActV2 do
     Map.put(metadata, :unexecuted_tool_calls, Imp.Redaction.redact(unexecuted))
   end
 
+  # Only a signature with one unconstrained text output reaches the last
+  # text request, and any text is its answer.
   defp last_text_outputs(signature, prediction) do
-    case parse_text(signature, prediction) do
-      {:ok, outputs} -> {:ok, outputs}
-      {:none, _cause} -> :invalid
-    end
+    {:ok, outputs} = parse_text(signature, prediction)
+    outputs
   end
 
   # The note is what the model is told, so it goes into the durable history
@@ -1021,19 +1011,18 @@ defmodule Imp.Predict.ReActV2 do
   # A step that stops calling tools and says something has answered, when the
   # task declares exactly one unconstrained text output for that text to be.
   # Several outputs, one that is not text, or one with constraints cannot be
-  # filled from text alone and take the forced submit. The text still goes
-  # through the parse a `submit`'s arguments go through. What is not an answer
-  # carries the interruption it is.
+  # filled from text alone and take the forced submit. Any text is a valid
+  # value of an unconstrained text output, so the text is the answer as it
+  # is. A signature with `submit` has no text answer: that step is the
+  # `:empty_tool_calls` interruption.
   defp parse_text(signature, prediction) do
-    with {:text, [%Imp.Signature.Field{name: name}]} <- text_output(signature),
-         {:written, text} when is_binary(text) and text != "" <-
-           {:written, Imp.get(prediction, :next_thought)},
-         {:ok, parsed} <- Imp.Adapter.Chat.parse(signature, %{name => text}, []) do
-      {:ok, Imp.Prediction.to_map(parsed)}
+    with {:text, [%Imp.Signature.Field{name: name}]} <- text_output(signature) do
+      case Imp.get(prediction, :next_thought) do
+        text when is_binary(text) and text != "" -> {:ok, %{name => text}}
+        _nothing -> {:ok, %{name => nil}}
+      end
     else
       :submit -> {:none, :empty_tool_calls}
-      {:written, _nothing} -> {:ok, %{hd(signature.outputs).name => nil}}
-      {:error, _reason} -> {:none, :invalid_answer}
     end
   end
 
