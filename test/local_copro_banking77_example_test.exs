@@ -1,11 +1,11 @@
 defmodule Imp.LocalCOPROBanking77ExampleTest do
   use ExUnit.Case, async: true
 
-  @source "examples/local_copro_banking77/run.exs"
-  @readme "examples/local_copro_banking77/README.md"
-  @stopped "examples/local_copro_banking77/exercised-pre-fenced-json-fix-stopped-result.json"
-  @duplicate_stopped "examples/local_copro_banking77/exercised-post-fenced-json-fix-duplicate-stopped-result.json"
-  @structured_stopped "examples/local_copro_banking77/exercised-structured-duplicate-stopped-result.json"
+  @source "research/local_copro_banking77/run.exs"
+  @readme "research/local_copro_banking77/README.md"
+  @stopped "research/local_copro_banking77/exercised-pre-fenced-json-fix-stopped-result.json"
+  @duplicate_stopped "research/local_copro_banking77/exercised-post-fenced-json-fix-duplicate-stopped-result.json"
+  @structured_stopped "research/local_copro_banking77/exercised-structured-duplicate-stopped-result.json"
 
   test "front door follows pinned COPRO trainset selection semantics" do
     source = File.read!(@source)
@@ -60,7 +60,7 @@ defmodule Imp.LocalCOPROBanking77ExampleTest do
     assert File.regular?(@source)
 
     package_files = Mix.Project.config()[:package][:files]
-    refute Enum.any?(package_files, &String.starts_with?(&1, "examples/local_copro_banking77/"))
+    refute Enum.any?(package_files, &String.starts_with?(&1, "research/local_copro_banking77/"))
   end
 
   test "retained pre-fix fence admission does not claim heldout behavior" do

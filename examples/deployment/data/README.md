@@ -14,7 +14,7 @@ selection and held-out requests are written inline in that script — a dozen
 short support requests about accounts, billing and security, invented for the
 example. They are MIT, like the rest of this repository, and they are far too
 few and too tidy to support a claim about agent behavior in general. See row R6
-in [benchmarks/RESULTS.md](../../../benchmarks/RESULTS.md).
+in [research/RESULTS.md](../../../research/RESULTS.md).
 
 The repository's MIT license covers our code and our derived split files. It
 does not replace the licenses above for the underlying corpora.

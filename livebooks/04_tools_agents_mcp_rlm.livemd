@@ -366,5 +366,5 @@ case live_lm.(max_completion_tokens: 100, response_format: %{type: "json_object"
 end
 ```
 
-Next: open `livebooks/05_operate_and_live_checks.livemd` to configure live
-providers, redaction, persistence, and runtime limits.
+Next: the production guide (`docs/production.md`) covers live providers,
+redaction, persistence, and runtime limits.

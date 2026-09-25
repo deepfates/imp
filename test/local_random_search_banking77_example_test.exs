@@ -1,8 +1,8 @@
 defmodule Imp.LocalRandomSearchBanking77ExampleTest do
   use ExUnit.Case, async: false
 
-  @source "examples/local_random_search_banking77/run.exs"
-  @result "examples/local_random_search_banking77/exercised-result.json"
+  @source "research/local_random_search_banking77/run.exs"
+  @result "research/local_random_search_banking77/exercised-result.json"
 
   setup_all do
     previous = System.get_env("IMP_RANDOM_SEARCH_DEFINE_ONLY")

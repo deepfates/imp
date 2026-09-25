@@ -1,7 +1,7 @@
 defmodule LocalGEPAIFBenchCrossTaskExampleTest do
   use ExUnit.Case, async: true
 
-  @root "examples/local_gepa_ifbench_cross_task"
+  @root "research/local_gepa_ifbench_cross_task"
 
   test "contract binds the pinned source-disjoint IFBench treatment" do
     contract = (@root <> "/contract.json") |> File.read!() |> Jason.decode!()
