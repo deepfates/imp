@@ -15,7 +15,7 @@ defmodule Imp.Signature.Field do
   Nested types use the string grammar, for example `"array[string]"` or
   `"array[object]"`; tuple forms such as `{:array, :string}` are not accepted.
   Constraints are maps such as `%{enum: ["red", "blue"]}`, `%{minimum: 0}`,
-  or `%{maximum: 1}`. `default` fills an absent value. `optional: true` permits
+  or `%{maximum: 1}`, keyed by their JSON Schema names; `min` and `max` raise. `default` fills an absent value. `optional: true` permits
   omission and represents it as `nil`.
 
       iex> field = Imp.Signature.Field.new(%{
@@ -100,6 +100,8 @@ defmodule Imp.Signature.Field do
 
   @doc "Adds output-validation constraints to a field."
   def constrained(%__MODULE__{} = field, constraints) do
+    _checked = Imp.Schema.normalize_constraints(constraints)
+
     %__MODULE__{field | metadata: Map.put(field.metadata, :constraints, constraints)}
   end
 
@@ -114,6 +116,7 @@ defmodule Imp.Signature.Field do
 
     metadata =
       if constraints do
+        _checked = Imp.Schema.normalize_constraints(constraints)
         Map.put(metadata, :constraints, constraints)
       else
         metadata

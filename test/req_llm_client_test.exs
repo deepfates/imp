@@ -581,7 +581,7 @@ defmodule ReqLLMClientTest do
                 type: :object,
                 properties: %{
                   answer: %{type: :string, enum: ["yes", "no"]},
-                  confidence: %{type: :number, min: 0, max: 1}
+                  confidence: %{type: :number, minimum: 0, maximum: 1}
                 }
               }
             }
