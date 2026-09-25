@@ -486,7 +486,8 @@ defmodule Imp.Schema do
     Map.new(constraints, fn {key, value} ->
       case normalize_constraint_key(key) do
         :properties when is_map(value) ->
-          {:properties, Map.new(value, fn {name, spec} -> {name, normalize_constraints(spec)} end)}
+          {:properties,
+           Map.new(value, fn {name, spec} -> {name, normalize_constraints(spec)} end)}
 
         key ->
           {key, normalize_constraint_value(value)}
