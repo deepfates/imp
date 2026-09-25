@@ -88,8 +88,10 @@ names mean, and it stays put.
 
 A field name written as an atom stays an atom. A name that arrives as text,
 from the string form or from JSON, becomes an atom only if that atom already
-exists in the VM, so Imp never creates atoms from data. Read values with
-`Imp.get/2`, which matches a field by its name either way.
+exists in the VM, so Imp never creates atoms from data. Examples and
+predictions keep their keys as given: `Imp.example(%{"team" => "atlas"})`
+stores the string `"team"`. Read values with `Imp.get/2`, which matches a
+field by its name either way.
 
 ## API walkthrough
 
