@@ -13,30 +13,63 @@ defmodule Imp.Settings do
   use Agent
 
   @name __MODULE__
-  @defaults %{
-    lm: nil,
-    adapter: Imp.Adapter.Chat,
-    retriever: nil,
-    async_max_workers: 8,
-    max_errors: 10,
-    track_usage: false,
-    # DSPy `warn_on_type_mismatch` (settings.py, default True): log a warning
-    # when a provided input value does not match the field's declared type.
-    warn_on_type_mismatch: true
-  }
+  @schema [
+    lm: [
+      type: :any,
+      default: nil,
+      doc: "The LM a program without its own `:lm` calls."
+    ],
+    adapter: [
+      type: :any,
+      default: Imp.Adapter.Chat,
+      doc: "The adapter a program without its own `:adapter` uses."
+    ],
+    retriever: [
+      type: :any,
+      default: nil,
+      doc: "The default retriever."
+    ],
+    async_max_workers: [
+      type: :pos_integer,
+      default: 8,
+      doc: "How many Imp tasks run at once."
+    ],
+    max_errors: [
+      type: {:or, [{:in, [:infinity]}, :non_neg_integer]},
+      default: 10,
+      doc: "How many failed examples an optimizer tolerates, or `:infinity`."
+    ],
+    track_usage: [
+      type: :boolean,
+      default: false,
+      doc: "Whether each prediction carries its LM usage (`Imp.Prediction.get_lm_usage/1`)."
+    ],
+    # DSPy `warn_on_type_mismatch` (settings.py, default True).
+    warn_on_type_mismatch: [
+      type: :boolean,
+      default: true,
+      doc: "Whether an input value that does not match its field's declared type logs a warning."
+    ],
+    two_step_extraction_lm: [
+      type: :any,
+      doc: "The LM `Imp.Adapter.TwoStep` extracts outputs with, when not given to the adapter."
+    ]
+  ]
+  @defaults for {key, spec} <- @schema,
+                Keyword.has_key?(spec, :default),
+                into: %{},
+                do: {key, spec[:default]}
+  # Validation must not fill in defaults: `configure/1` merges only the keys
+  # it is given.
+  @validation_schema for {key, spec} <- @schema, do: {key, Keyword.delete(spec, :default)}
+  # `"callbacks"` is canonicalized so that it meets the refusal that names
+  # telemetry as the replacement.
+  @known_string_keys Map.new([{:callbacks, []} | @schema], fn {key, _spec} ->
+                       {Atom.to_string(key), key}
+                     end)
   @context_key :imp_context_stack
   @snapshot_key :imp_settings_snapshot
   @unset :imp_settings_unset
-  @known_string_keys %{
-    "adapter" => :adapter,
-    "async_max_workers" => :async_max_workers,
-    "callbacks" => :callbacks,
-    "lm" => :lm,
-    "max_errors" => :max_errors,
-    "retriever" => :retriever,
-    "track_usage" => :track_usage,
-    "warn_on_type_mismatch" => :warn_on_type_mismatch
-  }
 
   def start_link(_opts), do: Agent.start_link(fn -> @defaults end, name: @name)
 
@@ -46,9 +79,18 @@ defmodule Imp.Settings do
   Use this for application-level defaults such as the LM client or adapter. For
   request, test, Livebook cell, or task-local overrides, prefer `context/2` so
   the override is restored automatically.
+
+  Takes a keyword list or a map; a map may use string keys. An unknown setting
+  raises `ArgumentError`. `context/2` also carries keys of the caller's own,
+  such as a request id.
+
+  ## Settings
+
+  #{NimbleOptions.docs(@schema)}
   """
   def configure(opts) when is_list(opts) or is_map(opts) do
     updates = normalize_settings(opts, "Imp.configure/1")
+    reject_unknown_settings!(updates, "Imp.configure/1")
     ensure_started()
     Agent.update(@name, &Map.merge(&1, updates))
     :ok
@@ -258,32 +300,34 @@ defmodule Imp.Settings do
     end
   end
 
-  defp put_validated_setting(normalized, :async_max_workers, value, _context)
-       when is_integer(value) and value > 0,
-       do: Map.put(normalized, :async_max_workers, value)
-
-  defp put_validated_setting(_normalized, :async_max_workers, value, context) do
-    raise ArgumentError,
-          "#{context} expects :async_max_workers to be a positive integer; got: #{inspect(value)}"
-  end
-
-  defp put_validated_setting(normalized, :max_errors, value, _context)
-       when value == :infinity or (is_integer(value) and value >= 0),
-       do: Map.put(normalized, :max_errors, value)
-
-  defp put_validated_setting(_normalized, :max_errors, value, context) do
-    raise ArgumentError,
-          "#{context} expects :max_errors to be :infinity or a non-negative integer; got: #{inspect(value)}"
-  end
-
   defp put_validated_setting(_normalized, :callbacks, value, context) do
     raise ArgumentError,
           "#{context} does not support :callbacks (got #{inspect(value)}); " <>
             "attach handlers with :telemetry.attach/4 to Imp's [:imp, ...] events instead"
   end
 
+  defp put_validated_setting(normalized, key, value, context) when is_atom(key) do
+    if key in Keyword.keys(@schema) do
+      Imp.Options.validate!([{key, value}], @validation_schema, context)
+    end
+
+    Map.put(normalized, key, value)
+  end
+
   defp put_validated_setting(normalized, key, value, _context),
     do: Map.put(normalized, key, value)
+
+  defp reject_unknown_settings!(settings, context) do
+    case Map.keys(settings) -- Keyword.keys(@schema) do
+      [] ->
+        :ok
+
+      unknown ->
+        raise ArgumentError,
+              "#{context}: unknown settings #{inspect(unknown)}, known settings are: " <>
+                "#{inspect(Keyword.keys(@schema))}. Imp.context/2 carries settings of your own."
+    end
+  end
 
   defp restore_process_value(key, @unset), do: Process.delete(key)
   defp restore_process_value(key, value), do: Process.put(key, value)

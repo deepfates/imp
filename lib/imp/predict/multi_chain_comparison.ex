@@ -55,7 +55,11 @@ defmodule Imp.Predict.MultiChainComparison do
     signature = Imp.Signature.ensure(signature)
     last_key = signature |> Imp.Signature.output_names() |> List.last()
     m = Keyword.get(opts, :m, Keyword.get(opts, :M, 3))
-    predict_opts = Keyword.put(opts, :config, Keyword.put_new(opts[:config], :temperature, 0.7))
+
+    predict_opts =
+      opts
+      |> Imp.Predict.Predict.take_options()
+      |> Keyword.put(:config, Keyword.put_new(opts[:config], :temperature, 0.7))
 
     comparison_signature =
       Enum.reduce(1..m, signature, fn index, acc ->
