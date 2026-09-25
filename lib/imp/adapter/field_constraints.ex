@@ -41,7 +41,7 @@ defmodule Imp.Adapter.FieldConstraints do
       for {key, phrase} <- @phrases,
           value = Map.get(constraints, key),
           value != nil,
-          do: phrase <> py_str(value)
+          do: phrase <> Imp.Adapter.Chat.format_value(value)
 
     case parts do
       [] -> nil
@@ -86,8 +86,4 @@ defmodule Imp.Adapter.FieldConstraints do
        do: String.to_existing_atom(key)
 
   defp normalize_key(key), do: key
-
-  # A constraint value in its JSON spelling.
-  defp py_str(value) when is_float(value), do: Imp.PyFloat.repr(value)
-  defp py_str(value), do: Imp.Adapter.Chat.format_value(value)
 end

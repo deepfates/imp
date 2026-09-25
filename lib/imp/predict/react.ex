@@ -863,19 +863,10 @@ defmodule Imp.Predict.ReAct do
   end
 
   # Mirrors dspy.adapters.utils.format_field_value under a str-annotated field:
-  # a list becomes a numbered blob list; a dict/list JSON value is dumped with
-  # Python's json.dumps spacing; everything else is stringified.
+  # a list becomes a numbered blob list; any other value renders as the
+  # adapters render values (`Imp.Adapter.Chat.format_value/1`).
   defp format_trajectory_value(value) when is_list(value), do: format_input_list(value)
-  defp format_trajectory_value(value) when is_map(value), do: python_json(value)
-  defp format_trajectory_value(value) when is_binary(value), do: value
-  # A bare scalar observation takes its JSON spelling (`true`, `false`,
-  # `null`), and a float its shortest fixed-or-exponent form (1000000.0, not
-  # Elixir's 1.0e6).
-  defp format_trajectory_value(true), do: "true"
-  defp format_trajectory_value(false), do: "false"
-  defp format_trajectory_value(nil), do: "null"
-  defp format_trajectory_value(value) when is_float(value), do: Imp.PyFloat.repr(value)
-  defp format_trajectory_value(value), do: to_string(value)
+  defp format_trajectory_value(value), do: Imp.Adapter.Chat.format_value(value)
 
   defp format_input_list([]), do: "N/A"
   defp format_input_list([single]), do: format_blob(single)
@@ -895,24 +886,6 @@ defmodule Imp.Predict.ReAct do
   end
 
   defp format_blob(blob), do: format_blob(to_string(blob))
-
-  # Python json.dumps(..., ensure_ascii=False) with default separators (", " and
-  # ": "). Only maps/lists get the spacing; scalars defer to Jason.
-  defp python_json(value) when is_map(value) do
-    "{" <>
-      Enum.map_join(value, ", ", fn {key, value} ->
-        "#{Jason.encode!(to_string(key))}: #{python_json(value)}"
-      end) <> "}"
-  end
-
-  defp python_json(value) when is_list(value),
-    do: "[" <> Enum.map_join(value, ", ", &python_json/1) <> "]"
-
-  # Python json.dumps renders floats with the same repr algorithm str() uses
-  # (`{"p": 1000000.0}`, not Jason's `1.0e6`); scalars otherwise defer to Jason,
-  # whose bool/null/int/string output already matches json.dumps (dee-h7nw).
-  defp python_json(value) when is_float(value), do: Imp.PyFloat.repr(value)
-  defp python_json(value), do: Jason.encode!(value)
 
   defp extract_final(agent, inputs, history, reason) do
     extractor = extraction_program(agent)

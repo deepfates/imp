@@ -312,7 +312,6 @@ defmodule Imp.Adapter.Chat do
   # ("true", "[\"x\", \"y\"]", "1000000.0"). A null is not a value: it stays
   # nil, so the field's required or optional declaration decides.
   defp coerce_value(nil, :string), do: nil
-  defp coerce_value(value, :string) when is_float(value), do: Imp.PyFloat.repr(value)
   defp coerce_value(value, :string), do: format_value(value)
 
   defp coerce_value(value, :integer) when is_binary(value) do
@@ -909,6 +908,8 @@ defmodule Imp.Adapter.Chat do
   def format_value(nil), do: "null"
   def format_value(true), do: "true"
   def format_value(false), do: "false"
+  # The shortest form that reads back as the same float: 1000000.0, not 1.0e6.
+  def format_value(value) when is_float(value), do: Imp.PyFloat.repr(value)
 
   def format_value(value) when is_atom(value) or is_number(value) or is_boolean(value),
     do: to_string(value)
