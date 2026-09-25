@@ -454,6 +454,9 @@ defmodule Imp.Schema do
           {:properties,
            Map.new(value, fn {name, spec} -> {name, normalize_constraints(spec)} end)}
 
+        :enum when is_list(value) ->
+          {:enum, check_enum_members!(value)}
+
         key ->
           {key, normalize_constraint_value(value)}
       end
@@ -507,6 +510,23 @@ defmodule Imp.Schema do
        do: String.to_existing_atom(key)
 
   defp normalize_constraint_key(key), do: key
+
+  # An answer arrives as text and a signature saves as JSON, where an atom
+  # becomes a string, so an atom member would never match an answer, or would
+  # match before a save and not after.
+  defp check_enum_members!(members) do
+    if Enum.any?(members, &atom_member?/1) do
+      raise ArgumentError,
+            "enum members must be strings, numbers or booleans, got #{inspect(members)}; " <>
+              "write #{inspect(Enum.map(members, &member_text/1))}"
+    end
+
+    members
+  end
+
+  defp atom_member?(member), do: is_atom(member) and not is_boolean(member) and not is_nil(member)
+
+  defp member_text(member), do: if(atom_member?(member), do: Atom.to_string(member), else: member)
 
   defp refuse_key(key) do
     instead = if to_string(key) == "min", do: "minimum", else: "maximum"

@@ -340,4 +340,27 @@ defmodule SchemaConstraintsTest do
       end
     end
   end
+
+  # An answer arrives as text and a signature saves as JSON, where an atom
+  # becomes a string: an atom member would never match, or would match before
+  # a save and not after. So enum members are JSON values, and an atom is
+  # refused when the field is built.
+  test "an enum with atom members is refused, naming the members" do
+    error =
+      assert_raise ArgumentError, fn ->
+        Field.new(%{name: :team, constraints: %{enum: [:atlas, :harbor]}}, :output)
+      end
+
+    assert error.message =~ ~s(["atlas", "harbor"])
+
+    assert_raise ArgumentError, fn ->
+      Imp.signature(%{
+        inputs: [:q],
+        outputs: [%{name: :tags, type: "array[string]", constraints: %{items: %{enum: [:a]}}}]
+      })
+    end
+
+    assert %Field{} =
+             Field.new(%{name: :team, constraints: %{enum: ["atlas", "harbor"]}}, :output)
+  end
 end
