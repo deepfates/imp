@@ -146,12 +146,11 @@ defmodule DocumentationContractTest do
     assert body =~ "Intentional Deviations"
     assert body =~ "the semantic contract (field names, delimiter structure"
 
-    # Lock the honest byte-parity claim (dee-8zev): the doc must state the
-    # measured byte-parity AND that it is enforced — so it can neither drift back
-    # to the stale "not byte-identical" underclaim nor inflate to an unqualified
-    # overclaim without a deliberate, test-visible edit.
-    assert body =~ "byte-identical to DSPy 3.2.1"
-    assert body =~ "enforced per-PR in CI"
+    # Lock the parity claim: prompts name types in neutral words, and DSPy
+    # parity is behaviour and information, measured by the golden differential.
+    assert body =~ "DSPy parity means the same behaviour and the same"
+    assert body =~ "39 of 42 cases match DSPy 3.2.1"
+    assert body =~ "not part of `mix check`"
   end
 
   test "shipped reader surfaces do not expose internal process coordinates" do

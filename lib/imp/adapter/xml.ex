@@ -102,9 +102,9 @@ defmodule Imp.Adapter.XML do
   defp append_text(content, suffix) when is_binary(content), do: content <> suffix
   defp append_text(content, suffix) when is_list(content), do: content ++ [suffix]
 
-  # XMLAdapter.user_message_output_requirements: tags only, no Python-type
-  # notes (those are Chat/JSON dialect; XML carries types in the structure
-  # notes instead).
+  # XMLAdapter.user_message_output_requirements: tags only, no type
+  # requirements (those are Chat/JSON dialect; XML carries types in the
+  # structure notes instead).
   defp user_message_output_requirements(signature) do
     base =
       "Respond with the corresponding output fields wrapped in XML tags " <>
@@ -139,7 +139,7 @@ defmodule Imp.Adapter.XML do
     fields
     |> Enum.with_index(1)
     |> Enum.map_join("\n", fn {field, index} ->
-      "#{index}. `#{field.name}` (#{field_annotation_name(field)}): #{field_desc(field)}" <>
+      "#{index}. `#{field.name}` (#{Imp.Adapter.FieldType.label(field)}): #{field_desc(field)}" <>
         Imp.Adapter.FieldConstraints.suffix(field)
     end)
     |> String.trim()
@@ -150,10 +150,10 @@ defmodule Imp.Adapter.XML do
   defp field_desc(field) do
     base = if field.desc == "${#{field.name}}", do: "", else: to_string(field.desc || "")
 
-    if code_field?(field) do
+    if Imp.Adapter.FieldType.code?(field) do
       type_description =
-        "Type description of #{code_annotation(field)}: " <>
-          Imp.Adapter.Types.Code.description(code_language(field))
+        "Type description: " <>
+          Imp.Adapter.Types.Code.description(Imp.Adapter.FieldType.code_language(field))
 
       case base do
         "" -> "\n    " <> type_description
@@ -188,63 +188,13 @@ defmodule Imp.Adapter.XML do
     end)
   end
 
-  # utils.translate_field_type: input fields (and str outputs) carry no note;
-  # typed output fields carry an 8-space-indented note inside the value.
-  defp translate_field_type(field, :input), do: "{#{field.name}}"
-
-  defp translate_field_type(field, :output) do
-    case output_note_desc(field) do
-      nil ->
-        "{#{field.name}}"
-
-      note ->
-        "{#{field.name}}" <> String.duplicate(" ", 8) <> "# note: the value you produce " <> note
-    end
-  end
-
-  # Composite output fields (enum->Literal, array->list, object->dict) note
-  # first via the shared CompositeType module; scalars keep their type notes.
-  defp output_note_desc(field),
-    do: Imp.Adapter.CompositeType.note_desc(field) || type_note(field.type)
-
-  defp type_note(:string), do: nil
-  defp type_note(:integer), do: "must be a single int value"
-  defp type_note(:float), do: "must be a single float value"
-  defp type_note(:boolean), do: "must be True or False"
-  # `:number` has no native DSPy counterpart; treat like float for the note.
-  defp type_note(:number), do: "must be a single float value"
-  defp type_note(_type), do: nil
+  defp translate_field_type(field, kind), do: Imp.Adapter.FieldType.placeholder(field, kind)
 
   # ChatAdapter.format_task_description (inherited by XMLAdapter).
   defp task_description(signature) do
     "In adhering to this structure, your objective is: " <>
       Imp.Adapter.Instructions.objective_text(signature.instructions)
   end
-
-  # DSPy annotation name for a field: composite types (Literal/list/dict)
-  # resolve through the shared CompositeType module; scalars map directly.
-  defp field_annotation_name(field) do
-    if code_field?(field),
-      do: code_annotation(field),
-      else: Imp.Adapter.CompositeType.annotation_name(field) || annotation_name(field.type)
-  end
-
-  # utils.get_annotation_name for the scalar types Imp models.
-  defp annotation_name(:string), do: "str"
-  defp annotation_name(:integer), do: "int"
-  defp annotation_name(:float), do: "float"
-  defp annotation_name(:boolean), do: "bool"
-  defp annotation_name(:number), do: "float"
-  defp annotation_name(type), do: to_string(type)
-
-  defp code_field?(%{type: type}), do: type in [:code, "code"]
-
-  defp code_language(field) do
-    Map.get(field.metadata, :language, Map.get(field.metadata, "language", "python"))
-    |> to_string()
-  end
-
-  defp code_annotation(field), do: "Code_#{code_language(field)}"
 
   # ------------------------------------------------------------------
   # DSPy 3.3.1 recursive XML values.

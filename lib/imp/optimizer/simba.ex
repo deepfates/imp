@@ -821,7 +821,7 @@ defmodule Imp.Optimizer.SIMBA do
     fields
     |> Enum.map(fn field ->
       description = if field.desc in [nil, ""], do: "", else: " - #{field.desc}"
-      "\t\t#{field.name}: #{field.type}#{description}"
+      "\t\t#{field.name}: #{Imp.Adapter.FieldType.label(field)}#{description}"
     end)
     |> Enum.join("\n")
   end

@@ -103,7 +103,9 @@ defmodule Imp.Predict.KNN do
     example
     |> Imp.Example.items()
     |> Enum.filter(fn {key, _value} -> key in input_keys end)
-    |> Enum.map_join(" | ", fn {key, value} -> "#{key}: #{py_str(value)}" end)
+    |> Enum.map_join(" | ", fn {key, value} ->
+      "#{key}: #{Imp.Adapter.Chat.format_value(value)}"
+    end)
   end
 
   # DSPy: " | ".join(f"{key}: {val}" for key, val in kwargs.items()) — every
@@ -118,7 +120,9 @@ defmodule Imp.Predict.KNN do
         raise ArgumentError,
               "Imp.Predict.KNN.call/2 expects inputs as {key, value} pairs; got entry: #{inspect(other)}"
     end)
-    |> Enum.map_join(" | ", fn {key, value} -> "#{key}: #{py_str(value)}" end)
+    |> Enum.map_join(" | ", fn {key, value} ->
+      "#{key}: #{Imp.Adapter.Chat.format_value(value)}"
+    end)
   end
 
   defp query_text(inputs) do
@@ -135,9 +139,6 @@ defmodule Imp.Predict.KNN do
 
     Enum.zip_reduce(left, right, 0.0, fn a, b, acc -> acc + a * b end)
   end
-
-  defp py_str(value) when is_float(value), do: Imp.PyFloat.repr(value)
-  defp py_str(value), do: Imp.Adapter.Chat.format_value(value)
 
   @doc false
   def validate_vectorizer(module) when is_atom(module) and not is_nil(module) do

@@ -714,7 +714,7 @@ defmodule CompletionSurfaceTest do
     messages = Imp.Adapter.TwoStep.format(signature, %{question: "capital of France?"}, [])
     assert [%{role: :system, content: system}, %{role: :user, content: user}] = messages
     assert String.starts_with?(system, "You are a helpful assistant")
-    assert system =~ "As input, you will be provided with:\n1. `question` (str):"
+    assert system =~ "As input, you will be provided with:\n1. `question` (string):"
     assert system =~ "Specific instructions: Answer the question."
     assert user == "question: capital of France?"
     refute Enum.any?(messages, &String.contains?(&1.content, "[[ ##"))
@@ -747,7 +747,7 @@ defmodule CompletionSurfaceTest do
            ] =
              Agent.get(calls, & &1)
 
-    assert extractor_system =~ "Your input fields are:\n1. `text` (str):"
+    assert extractor_system =~ "Your input fields are:\n1. `text` (string):"
 
     assert extractor_system =~
              "The input is a text that should contain all the necessary information to produce the fields `answer`."

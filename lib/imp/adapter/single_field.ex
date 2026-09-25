@@ -123,7 +123,7 @@ defmodule Imp.Adapter.SingleField do
     input_lines =
       signature.inputs
       |> Enum.map_join("\n", fn field ->
-        "- #{field.name} (#{Imp.Adapter.CompositeType.annotation_name(field)})#{description(field)}"
+        "- #{field.name} (#{Imp.Adapter.FieldType.label(field)})#{description(field)}"
       end)
 
     """
@@ -131,7 +131,7 @@ defmodule Imp.Adapter.SingleField do
     Objective: #{String.trim(to_string(signature.instructions || ""))}
     Input fields:
     #{input_lines}
-    Output value: #{output.name} (#{Imp.Adapter.CompositeType.annotation_name(output)})#{description(output)}
+    Output value: #{output.name} (#{Imp.Adapter.FieldType.label(output)})#{description(output)}
     Return only the value for #{output.name}. Do not include a field label, quotes, brackets, a code fence, or an explanation.
     """
     |> String.trim()

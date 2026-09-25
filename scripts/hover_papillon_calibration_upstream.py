@@ -503,6 +503,7 @@ class Recorder:
             raise CalibrationOperationalAbort("DSPy execution exceeded active repetition schedule")
         item = self.active.pop(0)
         encoded = canonical_bytes(messages)
+        record_messages(self.mode, item, messages)
         if len(encoded) > item["max_input_bytes"]:
             raise CalibrationOperationalAbort(f"message byte cap exceeded for {item['id']}")
         reservation = item["max_input_bytes"] / 1_000_000 * INPUT_PRICE + MAX_OUTPUT_TOKENS / 1_000_000 * OUTPUT_PRICE
@@ -643,6 +644,19 @@ class Recorder:
                       "provider_cost_usd": generation["total_cost"]},
             "router_metadata": router,
         }
+
+
+def record_messages(mode, item, messages):
+    # Provider-disabled runs only: the rendered messages, so the Imp test can
+    # compare them with Imp's after putting DSPy's Python spellings into Imp's
+    # words (Imp.DSPyWording). The events keep only a hash.
+    path = os.environ.get("IMP_CALIBRATION_MESSAGES_OUT")
+    if not path or mode != "provider_disabled":
+        return
+    line = json.dumps({**event_identity(item), "messages": messages}, ensure_ascii=False)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    with os.fdopen(fd, "a", encoding="utf-8") as handle:
+        handle.write(line + "\n")
 
 
 def event_identity(item):

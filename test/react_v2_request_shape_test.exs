@@ -101,6 +101,46 @@ defmodule ReActV2RequestShapeTest do
     end
   end
 
+  # Without this list an output's description reached the model only inside
+  # `submit`'s parameter schema, which a model reads when it calls `submit`,
+  # not while it decides which tools to call.
+  test "every step says what each output means, with its type and description" do
+    owner = self()
+
+    lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          send(owner, {:system, hd(messages)})
+          %{tool_calls: [%{name: "submit", arguments: %{team: "atlas", confidence: 1.0}}]}
+        end
+      )
+
+    signature =
+      Imp.Signature.new(%{
+        instructions: "Route the ticket.",
+        inputs: [%{name: :ticket, desc: "A customer's support ticket"}],
+        outputs: [
+          %{
+            name: :team,
+            type: :string,
+            constraints: %{enum: ["atlas", "harbor"]},
+            desc: "atlas owns money; harbor owns outages"
+          },
+          %{name: :confidence, type: :float, desc: "From 0 to 1"}
+        ]
+      })
+
+    program = Imp.react_v2(signature, [look()], lm: lm)
+    assert {:ok, _} = Imp.call(program, %{ticket: "We were charged twice."})
+    assert_received {:system, system}
+
+    assert system.content =~
+             "The outputs to produce are:\n" <>
+               "        1. `team` (one of: atlas, harbor): atlas owns money; harbor owns outages\n" <>
+               "        2. `confidence` (number): From 0 to 1\n" <>
+               "        Call tools when more information is needed."
+  end
+
   test "a host can replace the system message and keep parsing" do
     owner = self()
 

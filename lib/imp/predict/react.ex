@@ -29,15 +29,16 @@ defmodule Imp.Predict.ReAct do
   - final outputs that are missing or do not fit the signature return
     `{:error, %Imp.AdapterParseError{kind: :missing_fields | :invalid_fields}}`.
 
-  ## `:dspy_3_2_1` — byte-faithful port of DSPy 3.2.1 `dspy.ReAct`
+  ## `:dspy_3_2_1` — a port of DSPy 3.2.1 `dspy.ReAct`
 
-  This mode is a faithful reproduction of upstream `dspy/predict/react.py`, not
-  a provider-tool-calling loop. It builds the SAME reasoning signature DSPy
-  builds:
+  This mode reproduces upstream `dspy/predict/react.py`, not a
+  provider-tool-calling loop. It builds the same reasoning signature DSPy
+  builds, with types and tool arguments named in Imp's neutral words rather
+  than Python's:
 
-  - inputs: the original inputs plus a `trajectory` (str) input;
-  - outputs: `next_thought` (str), `next_tool_name`
-    (`Literal[tool_names + 'finish']`), and `next_tool_args` (`dict[str, Any]`);
+  - inputs: the original inputs plus a `trajectory` string input;
+  - outputs: `next_thought` (a string), `next_tool_name` (one of the tool
+    names or `finish`), and `next_tool_args` (an object);
   - instructions: DSPy's "You are an Agent..." block, listing each tool
     textually (name, `<desc>`, and `It takes arguments {...}`), the reserved
     `finish` tool, and the JSON-format reminder.
@@ -169,8 +170,8 @@ defmodule Imp.Predict.ReAct do
   end
 
   # ------------------------------------------------------------------
-  # :dspy_3_2_1 construction — byte-faithful reproduction of the reasoning
-  # signature and instructions built by dspy/predict/react.py ReAct.__init__.
+  # :dspy_3_2_1 construction — the reasoning signature and instructions built
+  # by dspy/predict/react.py ReAct.__init__.
   # ------------------------------------------------------------------
 
   defp build_agent(:dspy_3_2_1 = mode, signature, tools_list, opts) do
@@ -256,7 +257,7 @@ defmodule Imp.Predict.ReAct do
     Imp.Tool.new(:finish, desc, fn _args -> "Completed." end, schema: %{})
   end
 
-  # Byte-faithful reproduction of the instruction block built by
+  # The instruction block built by
   # dspy/predict/react.py ReAct.__init__ (`instr` list joined by "\n").
   defp dspy_react_instructions(signature, ordered_tools) do
     inputs = backtick_names(signature.inputs)
@@ -290,10 +291,10 @@ defmodule Imp.Predict.ReAct do
   defp backtick_names(fields),
     do: fields |> Enum.map_join(", ", fn field -> "`#{field.name}`" end)
 
-  # Byte-faithful reproduction of dspy.adapters.types.tool.Tool.__str__:
+  # dspy.adapters.types.tool.Tool.__str__:
   #   "{name}, whose description is <desc>{desc}</desc>. It takes arguments {args}."
   # where the description segment collapses newlines to two spaces, and `args`
-  # is the tool's argument schema rendered as a Python dict repr.
+  # is the tool's argument schema as JSON.
   defp tool_instruction(%Imp.Tool{} = tool) do
     desc_segment =
       case to_string(tool.description || "") do
@@ -304,7 +305,7 @@ defmodule Imp.Predict.ReAct do
           String.replace(", whose description is <desc>#{desc}</desc>.", "\n", "  ")
       end
 
-    "#{tool.name}#{desc_segment} It takes arguments #{python_repr(tool_args_schema(tool))}."
+    "#{tool.name}#{desc_segment} It takes arguments #{Imp.Adapter.Chat.format_value(tool_args_schema(tool))}."
   end
 
   # DSPy's Tool.args for these tools is `schema["properties"]` (see the golden
@@ -862,19 +863,10 @@ defmodule Imp.Predict.ReAct do
   end
 
   # Mirrors dspy.adapters.utils.format_field_value under a str-annotated field:
-  # a list becomes a numbered blob list; a dict/list JSON value is dumped with
-  # Python's json.dumps spacing; everything else is stringified.
+  # a list becomes a numbered blob list; any other value renders as the
+  # adapters render values (`Imp.Adapter.Chat.format_value/1`).
   defp format_trajectory_value(value) when is_list(value), do: format_input_list(value)
-  defp format_trajectory_value(value) when is_map(value), do: python_json(value)
-  defp format_trajectory_value(value) when is_binary(value), do: value
-  # DSPy renders a bare scalar observation through str(serialize_for_json(v)):
-  # `True`/`False`/`None`, and Python float repr (fixed vs exponent form) rather
-  # than Elixir's `true`/`false`, empty line, and `1.0e6` exponent form (dee-h7nw).
-  defp format_trajectory_value(true), do: "True"
-  defp format_trajectory_value(false), do: "False"
-  defp format_trajectory_value(nil), do: "None"
-  defp format_trajectory_value(value) when is_float(value), do: Imp.PyFloat.repr(value)
-  defp format_trajectory_value(value), do: to_string(value)
+  defp format_trajectory_value(value), do: Imp.Adapter.Chat.format_value(value)
 
   defp format_input_list([]), do: "N/A"
   defp format_input_list([single]), do: format_blob(single)
@@ -894,50 +886,6 @@ defmodule Imp.Predict.ReAct do
   end
 
   defp format_blob(blob), do: format_blob(to_string(blob))
-
-  # Python json.dumps(..., ensure_ascii=False) with default separators (", " and
-  # ": "). Only maps/lists get the spacing; scalars defer to Jason.
-  defp python_json(value) when is_map(value) do
-    "{" <>
-      Enum.map_join(value, ", ", fn {key, value} ->
-        "#{Jason.encode!(to_string(key))}: #{python_json(value)}"
-      end) <> "}"
-  end
-
-  defp python_json(value) when is_list(value),
-    do: "[" <> Enum.map_join(value, ", ", &python_json/1) <> "]"
-
-  # Python json.dumps renders floats with the same repr algorithm str() uses
-  # (`{"p": 1000000.0}`, not Jason's `1.0e6`); scalars otherwise defer to Jason,
-  # whose bool/null/int/string output already matches json.dumps (dee-h7nw).
-  defp python_json(value) when is_float(value), do: Imp.PyFloat.repr(value)
-  defp python_json(value), do: Jason.encode!(value)
-
-  # Python repr() for a tool's argument schema, as embedded in DSPy's tool
-  # instruction line: dicts/strings use single quotes; True/False/None literals.
-  defp python_repr(value) when is_map(value) do
-    "{" <>
-      Enum.map_join(value, ", ", fn {key, value} ->
-        "#{python_repr(to_string(key))}: #{python_repr(value)}"
-      end) <> "}"
-  end
-
-  defp python_repr(value) when is_list(value),
-    do: "[" <> Enum.map_join(value, ", ", &python_repr/1) <> "]"
-
-  defp python_repr(value) when is_binary(value), do: python_str_repr(value)
-  defp python_repr(true), do: "True"
-  defp python_repr(false), do: "False"
-  defp python_repr(nil), do: "None"
-  defp python_repr(value), do: to_string(value)
-
-  defp python_str_repr(string) do
-    if String.contains?(string, "'") and not String.contains?(string, "\"") do
-      "\"" <> string <> "\""
-    else
-      "'" <> String.replace(string, "'", "\\'") <> "'"
-    end
-  end
 
   defp extract_final(agent, inputs, history, reason) do
     extractor = extraction_program(agent)

@@ -95,7 +95,7 @@ defmodule Imp.Adapter.JSON do
     fields
     |> Enum.with_index(1)
     |> Enum.map_join("\n", fn {field, index} ->
-      "#{index}. `#{field.name}` (#{field_annotation_name(field)}): #{field_desc(field)}" <>
+      "#{index}. `#{field.name}` (#{Imp.Adapter.FieldType.label(field)}): #{field_desc(field)}" <>
         Imp.Adapter.FieldConstraints.suffix(field)
     end)
     |> String.trim()
@@ -107,10 +107,10 @@ defmodule Imp.Adapter.JSON do
   defp field_desc(field) do
     base = if field.desc == "${#{field.name}}", do: "", else: to_string(field.desc || "")
 
-    if code_field?(field) do
+    if Imp.Adapter.FieldType.code?(field) do
       type_description =
-        "Type description of #{code_annotation(field)}: " <>
-          Imp.Adapter.Types.Code.description(code_language(field))
+        "Type description: " <>
+          Imp.Adapter.Types.Code.description(Imp.Adapter.FieldType.code_language(field))
 
       case base do
         "" -> "\n    " <> type_description
@@ -151,32 +151,7 @@ defmodule Imp.Adapter.JSON do
     |> pretty_json_object()
   end
 
-  # utils.translate_field_type: input fields (and str/reasoning) carry no note;
-  # typed output fields carry an 8-space-indented note inside the value.
-  defp translate_field_type(field, :input), do: "{#{field.name}}"
-
-  defp translate_field_type(field, :output) do
-    case output_note_desc(field) do
-      nil ->
-        "{#{field.name}}"
-
-      note ->
-        "{#{field.name}}" <> String.duplicate(" ", 8) <> "# note: the value you produce " <> note
-    end
-  end
-
-  # Composite output fields (enum->Literal, array->list, object->dict) note first
-  # via CompositeType (dee-9ttv); scalars keep their existing type_note clauses.
-  defp output_note_desc(field),
-    do: Imp.Adapter.CompositeType.note_desc(field) || type_note(field.type)
-
-  defp type_note(:string), do: nil
-  defp type_note(:integer), do: "must be a single int value"
-  defp type_note(:float), do: "must be a single float value"
-  defp type_note(:boolean), do: "must be True or False"
-  # `:number` has no native DSPy counterpart; treat like float for the note.
-  defp type_note(:number), do: "must be a single float value"
-  defp type_note(_type), do: nil
+  defp translate_field_type(field, kind), do: Imp.Adapter.FieldType.placeholder(field, kind)
 
   # ChatAdapter.format_task_description.
   defp task_description(signature) do
@@ -194,28 +169,7 @@ defmodule Imp.Adapter.JSON do
     "Respond with a JSON object in the following order of fields: " <> fields <> "."
   end
 
-  defp type_info(field) do
-    case field_annotation_name(field) do
-      "str" -> ""
-      name -> " (must be formatted as a valid Python #{name})"
-    end
-  end
-
-  # DSPy annotation name for a field: composite types (Literal/list/dict) resolve
-  # through CompositeType; scalars fall back to the plain type-name mapping.
-  defp field_annotation_name(field) do
-    if code_field?(field),
-      do: code_annotation(field),
-      else: Imp.Adapter.CompositeType.annotation_name(field) || annotation_name(field.type)
-  end
-
-  # utils.get_annotation_name for the scalar types Imp models.
-  defp annotation_name(:string), do: "str"
-  defp annotation_name(:integer), do: "int"
-  defp annotation_name(:float), do: "float"
-  defp annotation_name(:boolean), do: "bool"
-  defp annotation_name(:number), do: "float"
-  defp annotation_name(type), do: to_string(type)
+  defp type_info(field), do: Imp.Adapter.Chat.output_type_info(field)
 
   # Demo / history ASSISTANT-turn renderer injected into Chat.format.
   # Mirrors DSPy JSONAdapter.format_assistant_message_content:
@@ -315,7 +269,7 @@ defmodule Imp.Adapter.JSON do
 
   defp capability_response_format(signature, %Imp.LM.Capability{response_schema: true}) do
     # DSPy tries a structured schema and, if it cannot build one (open-ended
-    # mapping, or a shape Imp cannot render byte-faithfully), falls back to
+    # mapping, or an enum nested in a list), falls back to
     # json_object — its `except Exception` clause. Nothing silent: the only
     # fallback is DSPy's own.
     case structured_response_format(signature) do
@@ -327,11 +281,12 @@ defmodule Imp.Adapter.JSON do
   defp capability_response_format(_signature, %Imp.LM.Capability{}),
     do: [response_format: %{type: "json_object"}]
 
-  # DSPy `_get_structured_outputs_response_format` (a pydantic `DSPyProgramOutputs`
-  # model) in the wire form litellm sends: `{"type": "json_schema", "json_schema":
-  # {"name": "DSPyProgramOutputs", "schema": <model_json_schema>, "strict": true}}`.
+  # DSPy `_get_structured_outputs_response_format` in the wire form litellm
+  # sends: `{"type": "json_schema", "json_schema": {"name": ..., "schema":
+  # <model_json_schema>, "strict": true}}`. DSPy names the schema after its
+  # pydantic class; Imp names it `outputs`, which is what the provider shows.
   # Returns `:fallback` when any output is an open-ended mapping or a shape whose
-  # pydantic schema Imp cannot reproduce byte-faithfully (DSPy's json_object path).
+  # structured schema Imp cannot express (DSPy's json_object path).
   defp structured_response_format(signature) do
     with {:ok, properties} <- output_properties(signature.outputs) do
       schema = %{
@@ -339,18 +294,18 @@ defmodule Imp.Adapter.JSON do
         "additionalProperties" => false,
         "properties" => Map.new(properties),
         "required" => Enum.map(signature.outputs, &to_string(&1.name)),
-        "title" => "DSPyProgramOutputs"
+        "title" => "Outputs"
       }
 
       {:ok,
        %{
          type: "json_schema",
-         json_schema: %{name: "DSPyProgramOutputs", schema: schema, strict: true}
+         json_schema: %{name: "outputs", schema: schema, strict: true}
        }}
     end
   rescue
-    # CompositeType raises for shapes with no faithful pydantic schema (e.g. a
-    # Literal nested in an array). DSPy's `except Exception` -> json_object.
+    # FieldType raises for a shape it cannot express as a structured-output
+    # schema (an enum nested in a list). DSPy's `except Exception` -> json_object.
     ArgumentError -> :fallback
   end
 
@@ -369,7 +324,7 @@ defmodule Imp.Adapter.JSON do
 
   # The pydantic property body for one output field, with pydantic's default
   # `title` (field name titlecased). Scalars carry only `type`; composites route
-  # through CompositeType.
+  # through `Imp.Adapter.FieldType`.
   defp field_property_schema(field) do
     if field.type in [:union, "union"] do
       property =
@@ -385,9 +340,9 @@ defmodule Imp.Adapter.JSON do
   end
 
   defp composite_field_property_schema(field) do
-    case Imp.Adapter.CompositeType.pydantic_schema_body(field) do
+    case Imp.Adapter.FieldType.json_schema_body(field) do
       :scalar ->
-        {:ok, %{"type" => scalar_json_type(field.type)} |> put_title(field.name)}
+        {:ok, %{"type" => Imp.Adapter.FieldType.json_type(field.type)} |> put_title(field.name)}
 
       :open_ended ->
         :open_ended
@@ -406,29 +361,6 @@ defmodule Imp.Adapter.JSON do
     |> String.split("_")
     |> Enum.map_join(" ", &String.capitalize/1)
   end
-
-  # pydantic JSON-schema `type` for the scalar output types Imp models.
-  defp scalar_json_type(:string), do: "string"
-  defp scalar_json_type(:integer), do: "integer"
-  defp scalar_json_type(:float), do: "number"
-  defp scalar_json_type(:number), do: "number"
-  defp scalar_json_type(:boolean), do: "boolean"
-  defp scalar_json_type(:code), do: "string"
-  defp scalar_json_type("string"), do: "string"
-  defp scalar_json_type("integer"), do: "integer"
-  defp scalar_json_type("float"), do: "number"
-  defp scalar_json_type("number"), do: "number"
-  defp scalar_json_type("boolean"), do: "boolean"
-  defp scalar_json_type("code"), do: "string"
-
-  defp code_field?(%{type: type}), do: type in [:code, "code"]
-
-  defp code_language(field) do
-    Map.get(field.metadata, :language, Map.get(field.metadata, "language", "python"))
-    |> to_string()
-  end
-
-  defp code_annotation(field), do: "Code_#{code_language(field)}"
 
   @impl true
   def parse(signature, raw, opts) when is_map(raw),

@@ -199,6 +199,33 @@ User-visible changes to Imp are recorded here.
 
 ### ReActV2, adapters and models
 
+- Prompts name types in plain words instead of Python annotations, in every
+  adapter and in ReAct: `` `team` (one of: atlas, harbor, beacon, quill) ``
+  where 0.4.0 wrote `` `team` (Literal['atlas', 'harbor', 'beacon', 'quill']) ``,
+  and "string", "integer", "number", "true or false", "list of strings",
+  "object", "code in python" for `str`, `int`, `float`, `bool`, `list[str]`,
+  `dict[str, Any]` and `Code_python`. "(must be formatted as a valid Python
+  int)" is "(must be formatted as an integer)", and ReAct's `:dspy_3_2_1`
+  mode lists tool arguments as JSON. Fields, order, constraints and parsing
+  are unchanged. A saved program's prompt text changes with this, so an
+  optimized program may be worth re-evaluating.
+- Values in prompts take their JSON spelling: `null`, `true` and `false`
+  where 0.4.0 wrote `None`, `True` and `False`, in inputs, demos, ReAct
+  observations and field constraints. The structured-output schema sent to a
+  provider is named `outputs` (title `Outputs`) instead of
+  `DSPyProgramOutputs`. The MIPROv2 proposer's dataset summary shows each
+  example as `{"inputs": {...}, "outputs": {...}}` instead of
+  `Example({...}) (input_keys={...})`. GEPA's reflective dataset and SIMBA's
+  program listing use the same words, so an enum shows its allowed values.
+- A non-string answer for a string field is kept as its JSON text (`"true"`,
+  `"[\"x\", \"y\"]"`) where 0.4.0 gave Python's `"True"` and `"['x', 'y']"`;
+  a `null` is no value, so a required field reports it missing and an
+  optional one is `nil`, where 0.4.0 gave the string `"None"`.
+- Each ReActV2 step lists the task's output fields with their types and
+  descriptions ("The outputs to produce are: ..."). Before, a model saw an
+  output's description only inside `submit`'s parameter schema.
+- `Imp.Adapter.SingleField` names an untyped input's type (`- ticket
+  (string)`), where it wrote empty parentheses.
 - The names follow the glossary: a step answered in text ends as `:answered`,
   the last request of an interrupted turn as `:last_text` with
   `last_request_note`, the step signature declares `metadata[:text_step]`, and

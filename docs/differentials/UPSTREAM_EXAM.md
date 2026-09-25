@@ -44,14 +44,16 @@ and passes.
    (strict JSON, then Python-dict spellings: single quotes, True/False/None,
    trailing commas) and the balanced-`{...}`-block extraction
    `JSONAdapter.parse` performs; used by chat field coercion and JSON parse.
-3. **parse_value scalar/str semantics** (2, fixed by dee-jbav): str-annotated
-   fields render through Python `str()` (`True`→"True", `None`→"None",
-   `[1, 2, 3]`→"[1, 2, 3]"); Literal parsing strips `Literal[...]`/`str[...]`
-   wrappers and wrapping quotes before enum matching.
+3. **parse_value scalar/str semantics** (2, fixed by dee-jbav): a string
+   field accepts a non-string value, as upstream does, as its JSON text
+   (`true`→"true", `[1, 2, 3]`→"[1, 2, 3]") rather than Python's `str()`
+   spelling, and a null is no value, so required/optional validation decides;
+   Literal parsing strips `Literal[...]`/`str[...]` wrappers and wrapping
+   quotes before enum matching.
 4. **Literal rendering of non-string members** (1, fixed by dee-xyhv):
-   non-string Literal members render bare via Python `str()`
-   (`Literal[1, 'bar']`, `Literal[True, 3, 'foo']`); only string members are
-   quoted.
+   every member reaches the prompt. Imp now names an enum in words
+   (`one of: 1, bar`, `one of: true, 3, foo`) rather than as a Python
+   `Literal[...]`; see "Type wording" below.
 5. **ToolCalls.format wire shape** (2, fixed by dee-4fuy): `ToolCalls.format`
    emits the OpenAI shape `{"type": "function", "function": {"name",
    "arguments"}}` (Imp's stable id rides at the top level when present).
@@ -62,11 +64,21 @@ and passes.
    splitting and Title Case with acronym preservation; the string-spec parser
    accepts the Python spellings `str` and `dict`.
 
-Notable byte-level passes throughout: chat, JSON, and XML
+Notable full-string passes throughout: chat, JSON, and XML
 `format_system_message` (full-string equality including type notes and
 JSON-schema escapes), conversation-history message shapes for chat and JSON,
 the two-step main+extraction round trip, XML parse/cast/missing-field errors,
-and Literal quoting across all five scenarios.
+and enum members reaching the prompt exactly across all five scenarios.
+
+### Type wording
+
+Where DSPy prints a Python type annotation (`str`, `int`, `list[str]`,
+`Literal['a', 'b']`, `dict[str, Any]`, `Code_python`, "must be formatted as a
+valid Python ..."), Imp names the type in neutral words (`string`, `integer`,
+`list of strings`, `one of: a, b`, `object`, `code in python`, "must be
+formatted as ..."). The ported assertions check Imp's words in those places
+and exact text everywhere else; DSPy parity means the same fields, order,
+constraints and parse results, not the same text (`decisions.md`).
 
 ## Legend
 
@@ -86,7 +98,7 @@ and Literal quoting across all five scenarios.
 
 | Upstream test | Status | Note |
 |---|---|---|
-| test_parse_value_str_annotation | pass (was FAIL) | Fixed by dee-jbav: str-annotated fields render through Python `str()` (`True`→"True", `None`→"None", `[1, 2, 3]`→"[1, 2, 3]"). |
+| test_parse_value_str_annotation | pass (adapted) | A string field accepts non-string values as upstream does, as JSON text (`true`→"true", `[1, 2, 3]`→"[1, 2, 3]") rather than Python's `str()` spelling; a null is no value, so a required field reports it missing and an optional one is nil. |
 | test_parse_value_pydantic_types | n/a | Pydantic BaseModel validation; Imp has no user-defined model field types. |
 | test_parse_value_basic_types | pass | int/float/bool/list[int] conversions match, incl. JSON-decoding `"[1, 2, 3]"` for an array field. |
 | test_parse_value_literal | pass (was FAIL) | Fixed by dee-jbav: `Literal[...]`/`str[...]` wrappers and wrapping quotes stripped before enum matching, exactly as parse_value does. |
@@ -139,7 +151,7 @@ prior-art). Most also require pydantic model schemas. One row each:
 
 | Upstream test | Status | Note |
 |---|---|---|
-| test_chat_adapter_quotes_literals_as_expected | pass (was FAIL, partial) | Scenarios 1–4 always passed byte-for-byte; scenario 5 fixed by dee-xyhv — non-string Literal members render bare (`Literal[1, 'bar']`). |
+| test_chat_adapter_quotes_literals_as_expected | pass (adapted) | Every member, quotes included, reaches the prompt in declared order, named in words (`one of: ...`) rather than as a quoted Python `Literal[...]`; non-string members take their JSON spelling (`one of: true, 3, foo`). |
 | test_chat_adapter_sync_call | pass | Predict + chat adapter + fixture LM returning the marker completion → answer "Paris". |
 | test_chat_adapter_async_call | n/a | asyncio variant of the previous test; BEAM concurrency model. |
 | test_chat_adapter_with_pydantic_models | n/a | Nested pydantic input/output classes; assertions are on Python class names as annotations. |

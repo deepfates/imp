@@ -109,7 +109,7 @@ defmodule Imp.Adapter.TwoStep do
       [prefix] ++
         Enum.flat_map(signature.inputs, fn field ->
           case fetch_present(inputs, field.name) do
-            {:ok, value} -> ["#{field.name}: #{py_str(value)}"]
+            {:ok, value} -> ["#{field.name}: #{Imp.Adapter.Chat.format_value(value)}"]
             :error -> []
           end
         end) ++ [""]
@@ -124,7 +124,7 @@ defmodule Imp.Adapter.TwoStep do
     signature.outputs
     |> Enum.flat_map(fn field ->
       case fetch_present(outputs, field.name) do
-        {:ok, value} -> ["#{field.name}: #{py_str(value)}"]
+        {:ok, value} -> ["#{field.name}: #{Imp.Adapter.Chat.format_value(value)}"]
         :error -> []
       end
     end)
@@ -286,11 +286,6 @@ defmodule Imp.Adapter.TwoStep do
       true -> :error
     end
   end
-
-  # Python `str(...)` as DSPy's f-strings apply it: None/True/False keep their
-  # Python spelling and floats render in repr form (1000000.0, not 1.0e6).
-  defp py_str(value) when is_float(value), do: Imp.PyFloat.repr(value)
-  defp py_str(value), do: Imp.Adapter.Chat.format_value(value)
 
   defp validate_opts!(opts, schema, context) when is_list(opts) do
     if Keyword.keyword?(opts) do
