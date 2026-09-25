@@ -21,7 +21,7 @@ untrusted application inputs before calling the program.
 A hand-built ticket router usually mixes the task, output format, parser, and
 validation in one call:
 
-```elixir no_run
+~~~elixir
 text =
   ReqLLM.Generation.generate_text!("openai:gpt-5.4-mini", """
   Route this ticket. Return only JSON with team and urgency.
@@ -32,10 +32,13 @@ text =
   """)
 
 %{"team" => team, "urgency" => urgency} = Jason.decode!(text)
-```
+~~~
 
 That works, but every caller must keep the prompt, parser, accepted values, and
-error policy in sync. In Imp the same contract is one typed program:
+error policy in sync. In Imp the same contract is one typed program. It calls
+OpenAI, so it needs an API key in `OPENAI_API_KEY`; the
+[provider-free ticket router](https://github.com/deepfates/imp/blob/main/examples/provider_free_ticket_router/README.md)
+runs the same kind of program with no key.
 
 ```elixir
 lm = Imp.req_llm("openai:gpt-5.4-mini", api_key: System.fetch_env!("OPENAI_API_KEY"))
@@ -134,9 +137,8 @@ Add Imp to your dependencies in `mix.exs`:
 Imp requires Elixir `~> 1.19` on macOS or Linux. Every dependency comes from
 Hex. One of them, erlexec, builds a small C++ program, so the machine that
 compiles Imp needs a C++ compiler (the Xcode command line tools, or `g++`).
-Version `0.5.0` changes how Imp is installed and one `Imp.MCP.OAuth` option;
-see the
-[release notes](RELEASE_NOTES.md) when upgrading from `0.4.0`.
+Upgrading from `0.4.0`, which was installed from a Git tag, has breaking
+changes; the [release notes](RELEASE_NOTES.md) list them with an upgrade path.
 
 ExMCP and erlexec are declared `runtime: false`: ordinary Imp startup does not
 start them. An OTP release that uses `Imp.ACP` or `Imp.MCP` lists them in
@@ -163,8 +165,8 @@ Without `erlexec: :load`, the first stdio MCP connection in the release fails
 with `{:spawn_failed, {:erlexec, ...}}`. See
 [protocol runtime in releases](docs/PRODUCTION_OPERATIONS.md#protocol-runtime-in-releases).
 
-`mix hex.audit` in a project that depends on Imp reports two advisories against
-cowlib, which arrives through ExMCP's HTTP server. Neither has a fixed cowlib
+`mix deps.get` and `mix hex.audit` in a project that depends on Imp report two
+advisories against cowlib, which arrives through ExMCP's HTTP server. Neither has a fixed cowlib
 release. EEF-CVE-2026-43966 (response splitting) is fixed one layer up, in
 cowboy 2.16.0 and later (a fresh `mix deps.get` resolves 2.19.0), which
 refuses header values containing CR or LF.
@@ -184,7 +186,9 @@ provider-free parts of the learning path and deployment example do too.
 
 ## Connect tools or expose a program
 
-`Imp.MCP.connect/2` imports authorized MCP servers through ExMCP, returning
+`Imp.MCP.connect/2` imports tools from authorized
+[MCP](https://modelcontextprotocol.io) (Model Context Protocol) servers through
+ExMCP, returning
 ordinary tools plus explicit connection cleanup. Source server/tool identities,
 schemas, and annotations remain in each tool's `metadata.mcp` even when names
 are qualified to avoid collisions. One unreachable server fails the whole
@@ -193,9 +197,9 @@ and the import leaves the unreachable one out, names it in `unavailable` with
 the position of its descriptor, and keeps the tools of the rest.
 
 `Imp.ACP.start_link/1` and `Imp.ACP.run/1` expose an ordinary Imp program to
-an ACP host. These are optional entry points, now included in Imp; consumers
-no longer need the separate imp_acp package. Ordinary Imp startup starts no
-protocol endpoint. See [protocol integration and migration](docs/PRODUCTION_OPERATIONS.md#protocol-integration-and-migration).
+an [ACP](https://agentclientprotocol.com) (Agent Client Protocol) host, such as
+an editor that runs coding agents. These are optional entry points. Ordinary
+Imp startup starts no protocol endpoint. See [protocol integration and migration](docs/PRODUCTION_OPERATIONS.md#protocol-integration-and-migration).
 
 ## Read next
 
@@ -226,7 +230,7 @@ Run `mix docs` for the exhaustive module and function reference.
 
 For an ordinary ACP workspace agent with bounded tools, see
 [examples/workspace_agent](https://github.com/deepfates/imp/blob/main/examples/workspace_agent/README.md). It depends
-directly on this Imp checkout by path and includes a provider-free mode for
+on the Imp source it sits in by path, and includes a provider-free mode for
 checking its launcher and workspace boundary.
 
 ## Where this fits

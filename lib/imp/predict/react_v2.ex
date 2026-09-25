@@ -16,7 +16,7 @@ defmodule Imp.Predict.ReActV2 do
 
   ## How a turn ends
 
-    * Prose (one text output). A step that says something and calls no tool is
+    * Text (one text output). A step that says something and calls no tool is
       the answer, in that one request: `termination_reason: :answered`.
     * `submit` (every other signature). The model calls `submit` with the
       signature's outputs: `termination_reason: :submit`.
@@ -424,7 +424,7 @@ defmodule Imp.Predict.ReActV2 do
       {:ok, prediction, history} ->
         calls = prediction |> Imp.get(:tool_calls, []) |> normalize_calls(turn)
 
-        # Prose that is the answer is not a thought: the `:final` event carries
+        # Text that is the answer is not a thought: the `:final` event carries
         # it, and a `:reasoning` event would say it a second time.
         if calls.tool_calls == [] do
           # The step called nothing. What it said is part of the run, so it is

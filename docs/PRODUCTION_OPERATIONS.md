@@ -146,13 +146,11 @@ store, then exercise the application's own bounded live smoke before rollout.
 
 ## Protocol integration and migration
 
-Imp includes the `Imp.ACP` adapter formerly distributed as imp_acp. Remove the
-`imp_acp` dependency and depend directly on this Imp version; the `Imp.ACP`
-namespace and its program factory, permission, session-store, and cleanup
-contracts remain available. Existing scripts call `Imp.ACP.run/1` as before.
-Ordinary Imp boot starts its supervision without starting ExMCP. Protocol use
+`Imp.ACP` serves an Imp program to an ACP (Agent Client Protocol) client, and
+`Imp.MCP` imports tools from MCP (Model Context Protocol) servers. Ordinary Imp
+boot starts its supervision without starting ExMCP. Protocol use
 starts ExMCP explicitly; listeners, subprocess servers, and remote connections
-require an explicit caller. `run/1` reserves stdout
+require an explicit caller. `Imp.ACP.run/1` reserves stdout
 before application boot; release launchers must likewise keep logs on stderr.
 
 For remote capabilities, prefer an explicitly owned import:
@@ -167,6 +165,14 @@ imported.cleanup.()
 
 The exact server descriptor must be authorized. Host-supplied command, URL,
 headers, environment and working-directory claims remain untrusted input.
+
+A descriptor is a local `"stdio"` server (a `"command"` Imp starts) or a remote
+`"http"` (Streamable HTTP) or `"sse"` server (a `"url"`). `"sse"` is MCP's
+deprecated HTTP+SSE transport and has limits: it takes no credentials (below),
+no query string in its URL, and works only with servers that name the session
+`sessionId`, as the TypeScript SDK's do; the Python SDK's SSE servers fail to
+dial. Reach a server as `"http"` when it offers Streamable HTTP.
+`Imp.MCP.Connections` documents every descriptor key and option.
 
 A stdio server runs as the leader of its own process group. Closing its
 connection, or the death of the process that owns the connection, sends the
@@ -229,21 +235,19 @@ Closed-client calls return errors rather than exiting their callers.
 
 `Imp.MCP.HTTPClient.new/2`, `StreamableHTTPClient.new/2`, and
 `StdioClient.new/2` are convenience constructors backed by the same ExMCP
-importer. They now connect during construction and return `Imp.MCP.Client`;
+importer. They connect during construction and return `Imp.MCP.Client`;
 close them with `Imp.MCP.Client.close/1`. Connection failures raise at
-construction; use `connect/2` for tagged error handling. A stdio server now
-stays alive across discovery and calls until cleanup or owner death. Code that
-relied on a fresh process per call must explicitly open and close a catalog per
-operation. Cancelling a call requests cancellation; a noncooperative server can
+construction; use `connect/2` for tagged error handling. A stdio server stays
+alive across discovery and calls until cleanup or owner death; code that needs
+a fresh process per operation opens and closes a catalog per operation. Cancelling a call requests cancellation; a noncooperative server can
 continue remote work until its connection owner closes it. Cancellation is not
 rollback.
 
-Retired constructor options `:transport`, `:transport_opts`, `:protocol_version`,
+The constructor options `:transport`, `:transport_opts`, `:protocol_version`,
 `:session_id`, `:max_attempts`, `:retry_delay`, `:max_retry_after`, and
-`:idempotency_key` are rejected, not ignored. ExMCP owns framing, negotiation,
-sessions and retries. Test the boundary with an actual local MCP server rather
-than injecting Imp's removed HTTP implementation. `:headers`, `:timeout`,
-`:result_mode`, ownership and catalog-filter options remain supported; stdio
+`:idempotency_key` are rejected, not ignored: ExMCP owns framing, negotiation,
+sessions and retries. Test the boundary against an actual local MCP server. `:headers`, `:timeout`,
+`:result_mode`, ownership and catalog-filter options are supported; stdio
 also accepts `:args`, `:env`, and `:cwd`.
 
 Known interoperability limit of ExMCP 1.5: when an HTTP server selects legacy
@@ -258,15 +262,13 @@ Imported tool calls explicitly disable generic transport retries and use
 ExMCP's `:safe_only` broken-stream policy. An ambiguous write is not repeated.
 Applications needing replay must establish a real server idempotency contract
 and deliberately use the protocol client's API; a stable request ID alone is
-not such a contract. Retired Imp-specific backoff/Retry-After knobs are not
-reimplemented above ExMCP. Discovery errors are returned to the caller, which
+not such a contract. Imp has no backoff or Retry-After options of its own. Discovery errors are returned to the caller, which
 can decide whether to retry a new import.
 
 Tool errors return `{:error, {:mcp_tool_error, original_envelope}}`, retaining
 `content`, `structuredContent`, error codes and operation identifiers, so
 refusal, authorization refusal and indeterminate effect outcomes the tool
-reports remain distinguishable. Successful `:text` and `:structured` result
-conversion remains unchanged. The model reads only the text of an error
+reports remain distinguishable. The model reads only the text of an error
 result's content (`Imp.MCP.failure_text/1`); the recorded term keeps the whole
 envelope.
 
@@ -291,14 +293,14 @@ name. This metadata contains no server credentials or connection descriptor.
 
 ### Authenticating a remote MCP server
 
-A descriptor may carry static `"headers"`, as before. It may instead name an
+A descriptor may carry static `"headers"`. It may instead name an
 auth kind, which Imp resolves to a header when the connection is built. The
 resolved header is never written back into the descriptor, so the
 authorization callback, `:call_meta`, and imported tool provenance never see a
 credential.
 
 OAuth, for a server a person authorizes in a browser — the official Readwise
-server, Scry, any MCP server with OAuth discovery:
+server, or any MCP server with OAuth discovery:
 
 ```elixir
 store = Imp.MCP.OAuth.store(directory: "~/.imp/mcp", secret: host_secret)
@@ -377,7 +379,7 @@ found a key. Add `"required" => true` when the server is useless without the
 key; the connection is then refused with a message naming the variable.
 
 Both forms apply to `"http"` descriptors and may be combined with static
-`"headers"`. Static headers alone keep working exactly as before. An `"sse"`
+`"headers"`. An `"sse"`
 descriptor (MCP's deprecated HTTP+SSE transport) takes neither: its server
 names the URL requests are posted to, and ExMCP would send the credentials
 there whatever origin it named, so such a descriptor is refused

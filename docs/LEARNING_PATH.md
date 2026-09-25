@@ -42,7 +42,7 @@ Unknown types and duplicate names fail when the signature is built.
 Use the structured form when a field needs a default, nullability, a union, or
 other constraints:
 
-```elixir no_run
+~~~elixir
 signature =
   Imp.signature(%{
     inputs: [%{name: :ticket, type: :string}],
@@ -56,7 +56,7 @@ signature =
       %{name: :citation, type: :string, optional: true}
     ]
   })
-```
+~~~
 
 Fields are required unless declared otherwise. A default fills an absent input
 or output; an optional field is nullable and becomes `nil` when omitted.
