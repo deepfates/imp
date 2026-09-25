@@ -22,7 +22,7 @@ defmodule Imp.Predict.ReAct do
   This mode preserves the original Imp contract:
 
   - unknown model-selected tools return `{:error, {:unknown_tool, name}}`;
-  - denied tools return `{:error, {:tool_authorization_denied, name, :tool_policy}}`;
+  - denied tools return `{:error, {:tool_denied, name, :tool_policy}}`;
   - tool crashes return `{:error, {:tool_error, name, reason}}`, where `reason`
     is the exception raised or `{kind, value}` for a throw or an exit;
   - tool-policy crashes return `{:error, {:tool_policy_error, name, reason}}`;

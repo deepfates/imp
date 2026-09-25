@@ -244,7 +244,7 @@ defmodule ReActV2Test do
 
   test "denied and failed tool results reach the model as prose, not Elixir tuples" do
     assert Imp.Adapter.Chat.format_tool_result(
-             {:error, {:tool_authorization_denied, :update_seen, :client_denied}}
+             {:error, {:tool_denied, :update_seen, :client_denied}}
            ) == "Error: update_seen was not allowed; the person declined it."
 
     assert Imp.Adapter.Chat.format_tool_result({:error, {:tool_error, :post, "boom"}}) ==

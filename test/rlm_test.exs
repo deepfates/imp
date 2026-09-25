@@ -912,7 +912,7 @@ submit(%{answer: child[:answer]})|
         ~S|lookup(%{})|,
         [Imp.Tool.new(:lookup, "lookup", fn _ -> :ok end)],
         [],
-        {:rlm_tool_error, {:tool_authorization_denied, :lookup, :tool_policy}}
+        {:rlm_tool_error, {:tool_denied, :lookup, :tool_policy}}
       },
       {~S|missing_tool(%{})|, [], :allow, {:function_not_allowed, :missing_tool}},
       {

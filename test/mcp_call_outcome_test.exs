@@ -212,9 +212,9 @@ defmodule Imp.MCPCallOutcomeTest do
             {:malformed_tool_call, %{}},
             {:missing_required, ["uri"]},
             {:schema_validation, [%{field: "limit", message: "must be <= 100"}]},
-            {:tool_authorization_denied, :post, :client_denied},
-            {:tool_authorization_denied, :post, :tool_policy},
-            {:rlm_tool_error, {:tool_authorization_denied, :post, :tool_policy}}
+            {:tool_denied, :post, :client_denied},
+            {:tool_denied, :post, :tool_policy},
+            {:rlm_tool_error, {:tool_denied, :post, :tool_policy}}
           ] do
         assert Imp.Tool.outcome({:error, reason}) == :result, inspect(reason)
       end

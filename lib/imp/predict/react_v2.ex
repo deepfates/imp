@@ -1072,8 +1072,7 @@ defmodule Imp.Predict.ReActV2 do
         safe_tool_call(tool, arguments)
 
       {:deny, reason} ->
-        {{:error, {:tool_authorization_denied, tool.name, Imp.Redaction.redact(reason)}}, true,
-         :refused}
+        {{:error, {:tool_denied, tool.name, Imp.Redaction.redact(reason)}}, true, :refused}
 
       {:cancel, reason} ->
         {:cancel, reason}

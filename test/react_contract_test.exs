@@ -195,7 +195,7 @@ defmodule ReActContractTest do
     lookup = Imp.Tool.new(:lookup, "lookup", fn _args -> raise "should not run" end)
     agent = Imp.Predict.ReAct.new("question -> answer", [lookup], lm: lm, tool_policy: [])
 
-    assert {:error, {:tool_authorization_denied, :lookup, :tool_policy}} =
+    assert {:error, {:tool_denied, :lookup, :tool_policy}} =
              Imp.Predict.ReAct.call(agent, %{question: "q"})
   end
 
@@ -847,7 +847,7 @@ defmodule ReActContractTest do
 
     # DSPy has no tool policy; this is an Imp safety layer. A denied tool is NOT
     # fed back to the model as a recoverable observation — it fails fast.
-    assert {:error, {:tool_authorization_denied, :lookup, :tool_policy}} =
+    assert {:error, {:tool_denied, :lookup, :tool_policy}} =
              Imp.Predict.ReAct.call(agent, %{question: "q"})
 
     assert_received :react_lm_called

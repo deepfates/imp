@@ -862,7 +862,7 @@ defmodule Imp.Adapter.Chat do
   protocol boundary should use this so the same words reach the person that
   reached the model.
 
-      iex> Imp.Adapter.Chat.format_tool_result({:error, {:tool_authorization_denied, :post, :client_denied}})
+      iex> Imp.Adapter.Chat.format_tool_result({:error, {:tool_denied, :post, :client_denied}})
       "Error: post was not allowed; the person declined it."
   """
   @spec format_tool_result(term()) :: String.t()
@@ -904,13 +904,13 @@ defmodule Imp.Adapter.Chat do
       end)
   end
 
-  defp error_text({:tool_authorization_denied, name, :tool_policy}),
+  defp error_text({:tool_denied, name, :tool_policy}),
     do: "#{name} is not allowed."
 
-  defp error_text({:tool_authorization_denied, name, :client_denied}),
+  defp error_text({:tool_denied, name, :client_denied}),
     do: "#{name} was not allowed; the person declined it."
 
-  defp error_text({:tool_authorization_denied, name, reason}),
+  defp error_text({:tool_denied, name, reason}),
     do: "#{name} was not allowed: #{error_text(reason)}"
 
   # An exit stops the tool wherever it was, which may be after its effect.

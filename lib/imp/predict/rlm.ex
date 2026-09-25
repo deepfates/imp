@@ -1829,7 +1829,7 @@ defmodule Imp.Predict.RLM do
           {:ran, call_known_tool(tool, args)}
 
         {:deny, reason} ->
-          {:refused, {:tool_authorization_denied, name, Imp.Redaction.redact(reason)}}
+          {:refused, {:tool_denied, name, Imp.Redaction.redact(reason)}}
 
         {:cancel, reason} ->
           {:cancel, reason}

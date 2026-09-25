@@ -432,10 +432,11 @@ Every change here is breaking for code that matches on the old shape.
   `max_attempts: 0`, `{:refine_fail_count_exceeded, reason}`, or the last
   attempt's reason. In 0.4.0 they returned `{:error, reason, history}`, which
   `Imp.call/2` reported as `{:invalid_module_result, module, text}`.
-- A tool a tool policy does not allow is
-  `{:tool_authorization_denied, tool, :tool_policy}`, the tag a run's
-  `:authorize` callback already denies with. In 0.4.0 it was
-  `{:tool_denied, tool}`.
+- A denied tool call is `{:tool_denied, tool, reason}`, whoever denied it:
+  `reason` is `:tool_policy` for a tool the static tool policy does not
+  allow, and the callback's own reason for a call the run's `:authorize`
+  callback denies. In 0.4.0 a policy denial was `{:tool_denied, tool}` and a
+  callback denial `{:tool_authorization_denied, tool, reason}`.
 - MCP import refusals: a tool named after one in `:reserved_tool_names` is
   `{:mcp_tool_name_reserved, tool, servers}` (it shared
   `:mcp_tool_name_collision` with two servers offering one name); an
