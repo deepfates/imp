@@ -310,7 +310,7 @@ User-visible changes to Imp are recorded here.
   natively, and `Imp.Predict.ReActV2` now executes such a call instead of
   recording a malformed-call observation and spending another iteration on it.
 - `Imp.Clients.ReqLLM` returns a response whose body carries a provider error
-  as `{:error, %ReqLLM.Error.API.Request{}}`. OpenRouter relays an upstream
+  as a failed request (`Imp.LMError`, below). OpenRouter relays an upstream
   provider's refusal as a successful HTTP response with an error object and no
   choices, which ReqLLM decodes to an empty message; read as a completion, a
   refused request was a model that said nothing.
@@ -324,6 +324,120 @@ User-visible changes to Imp are recorded here.
   id, go through `Imp.context/2`, which still carries any key; both check
   Imp's own settings the same way, so `:track_usage` and
   `:warn_on_type_mismatch` must now be booleans.
+
+### Errors and shapes
+
+Every change here is breaking for code that matches on the old shape.
+
+- A failed request from `Imp.Clients.ReqLLM` is
+  `{:error, %Imp.LMError{}}`, whatever failed: an HTTP error status, an error
+  relayed inside a successful response, a connection that failed, or an
+  exception raised inside ReqLLM, or a response or stream of a shape ReqLLM
+  never returns. It carries `status`, `retryable` and
+  `context_window_exceeded`, with ReqLLM's own error unchanged under
+  `reason`. `retryable` is `true` for a 408, 425, 429 or 5xx status, for a
+  request that never reached the provider (connection refused, no free
+  pooled connection, closed or timed out before sending), for any other
+  status whose ReqLLM error says `retryable: true`, and for a timeout while
+  waiting for the answer or a stream that failed after it started; those
+  last two may have run and been billed, and a retried stream repeats chunks
+  the caller already has. A 409 is never retryable. In 0.4.0 these reached
+  the caller as ReqLLM's structs, as `{:req_llm_generate_failed, text}`,
+  `{:req_llm_stream_failed, text}`, `{:invalid_req_llm_response, text}` or
+  `{:invalid_req_llm_stream, text}`, or, for a context-length refusal, as
+  `Imp.ContextWindowExceededError`, which is gone. An option the client refuses raises `ArgumentError` before the
+  request, as every other option error does.
+- `Imp.Errors.retryable?/1` reads `Imp.LMError`'s `retryable`, and the new
+  `Imp.Errors.context_window_exceeded?/1` its `context_window_exceeded`, each
+  through `{:error, _}` and `{:lm_failed, _, _}`. In 0.4.0 `retryable?/1` was
+  true only for an `Imp.LMError` that nothing built.
+- An LM client that raises is `{:lm_failed, client, exception}` with the
+  exception struct, and one that throws or exits is
+  `{:lm_failed, client, {kind, value}}`. In 0.4.0 both were the message text.
+  The same holds for `{:module_call_failed, module, reason}` from
+  `Imp.call/2`, `{:retriever_failed, _, reason}`, `{:tool_error, tool,
+  reason}`, `{:tool_policy_error, tool, reason}`, `{:parallel_program_failed,
+  reason}`, `{:ensemble_program_failed, reason}`, `{:optimizer_failed,
+  optimizer, reason}` and `{:optimizer_capabilities_failed, optimizer,
+  reason}`, the MCP import's `:mcp_connection_failed` and
+  `:mcp_tool_import_failed`, and `Imp.ACP`'s `:program_factory_failed`,
+  `:input_mapper_failed`, `:output_renderer_failed`, `:before_turn_failed`,
+  `:permission_policy_failed` and `:host_request_failed`, and for
+  `{:http_transport_failed, transport, reason}` from `Imp.HTTP` (and so the
+  training clients' `:training_transport_failed`, `:training_refresh_failed`
+  and `:training_cancel_failed`, and `Imp.Retrievers.HTTP`'s
+  `{:transport, reason}`),
+  `{:embedding_provider_failed, provider, reason}` from `Imp.Embeddings`, and
+  `Imp.Predict.Predict`'s `{:adapter_format_failed, adapter, reason}` and
+  `{:adapter_lm_opts_failed, adapter, reason}`, and
+  `{:program_runtime_error, reason}` from `Imp.Predict.ProgramOfThought` and
+  `Imp.Predict.CodeAct`, whose model still reads the exception's message.
+  Several of these carried text on one path and a term on another.
+- A completion that cannot be read as the outputs is always
+  `%Imp.AdapterParseError{}`, with a `kind`: `:malformed`, `:missing_fields`
+  (`reason` is the missing names), `:invalid_fields`, `:unsupported_output`
+  or `:other`; `kind` is required. In 0.4.0 an adapter could return the struct,
+  `{:missing_output_fields, names}` or `{:unsupported_lm_output, raw}`, and
+  `Imp.Adapter.TwoStep` `{:two_step_extraction_failed, reason, completion}`.
+  `Imp.Predict.ReAct`'s final outputs follow the same rule: in 0.4.0 a missing
+  output was `{:missing_output_fields, names}` and one of the wrong type an
+  `%Imp.AdapterParseError{}` with no `kind`.
+- `Imp.Predict.Predict` returns that struct, with `trace` (the redacted
+  messages, the raw completion, and which output fields were read) and, for
+  `n > 1`, `completion_index`. In 0.4.0 it returned
+  `%{reason: {:error, reason}, trace: trace}`, and an `n > 1` failure
+  `{:completion_parse_failed, index, reason}` inside it. Because of that map,
+  a `ReActV2` step that could not be parsed was recorded as
+  `termination_cause: :prediction_error`; it is now `:parse_error`.
+- When the chat or XML adapter's JSON fallback makes its request and that
+  request fails, `Imp.Predict.Predict` returns the LM's error. In 0.4.0 it
+  returned the original parse failure with the LM error inside it.
+  `Imp.Adapter.TwoStep`'s extraction request does the same: when it fails,
+  the call returns that `Imp.LMError` (or `{:lm_failed, _, _}`), so a 429
+  from the extraction model reads as retryable. In 0.4.0 it was
+  `{:two_step_extraction_failed, reason, completion}`.
+- A failure reason that holds a pid, port or reference, such as a
+  `GenServer.call` timeout, is written to JSON (optimizer checkpoints and
+  reports, `Imp.History.dump/1`) as its inspected text. Before, the write
+  raised `Protocol.UndefinedError`.
+- `Imp.Predict.Refine` and `Imp.Predict.Assertions` return
+  `{:error, reason}` like every `Imp.Module`: `:no_attempts` with
+  `max_attempts: 0`, `{:refine_fail_count_exceeded, reason}`, or the last
+  attempt's reason. In 0.4.0 they returned `{:error, reason, history}`, which
+  `Imp.call/2` reported as `{:invalid_module_result, module, text}`.
+- A tool a tool policy does not allow is
+  `{:tool_authorization_denied, tool, :tool_policy}`, the tag a run's
+  `:authorize` callback already denies with. In 0.4.0 it was
+  `{:tool_denied, tool}`.
+- MCP import refusals: a tool named after one in `:reserved_tool_names` is
+  `{:mcp_tool_name_reserved, tool, servers}` (it shared
+  `:mcp_tool_name_collision` with two servers offering one name); an
+  unauthorized descriptor is `{:mcp_server_not_authorized, server, answer}`,
+  where `answer` is what `:authorize` returned or `:not_trusted`; a descriptor
+  that cannot be addressed is `{:invalid_mcp_server, index, %ArgumentError{}}`
+  (it was `:mcp_connection_failed` with the message and no name); and a
+  server left out under `on_failure: :drop` carries the same reason term the
+  import would have refused with, where 0.4.0 shortened its detail to text.
+- `Imp.HTTP.request/6` and `Imp.Retrievers.HTTP` refuse a method they cannot
+  send as `{:http_method_not_supported, refuser, method}`; one of them said
+  `{:unsupported_http_method, method}`.
+- `Imp.stream/3` without `provider_stream: true` ends a failed call with
+  `%Imp.Streaming.Messages.StreamResponse{chunk: {:error, reason}, done: true}`,
+  as a provider stream does; it yielded a bare `{:error, reason}`.
+- An `Imp.Telemetry` span's `[:exception]` event carries `:kind`, `:reason`
+  and `:stacktrace`, as `:telemetry.span/3` does; it carried `:error` as text.
+  `Imp.Redaction` keeps an exception's type while redacting its fields.
+- `Imp.optimize!` raises `Imp.Error` with the reason `Imp.optimize` would
+  have returned when optimization fails, and `ArgumentError` only for a call
+  that could never run (including options the optimizer refused). In 0.4.0
+  every failure was an `ArgumentError` carrying text. `Imp.Error` is now that
+  exception; nothing raised it before.
+- `Imp.Example` and `Imp.Prediction` keep each key as the atom or string it
+  was given, and look keys up by their text. In 0.4.0 a string key became an
+  atom whenever that atom already existed in the VM, so the same data could
+  come back keyed either way. Data read from JSON now keeps its string keys:
+  a history turn loaded with `Imp.History.load/1`, or a demo field a
+  signature does not declare in a saved optimizer artifact.
 
 ## 0.4.0 — 2026-09-17
 

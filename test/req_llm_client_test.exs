@@ -538,7 +538,8 @@ defmodule ReqLLMClientTest do
     lm = Imp.req_llm("openrouter:thinkingmachines/inkling", req_module: RelayedErrorStub)
     message = "Upstream error from DeepInfra: Failed to compile structural_tag grammar"
 
-    assert {:error, %ReqLLM.Error.API.Request{status: 400, reason: ^message}} =
+    assert {:error,
+            %Imp.LMError{status: 400, reason: %ReqLLM.Error.API.Request{reason: ^message}}} =
              Imp.Clients.ReqLLM.generate(lm, [%{role: :user, content: "hello"}],
                relayed_error: %{"code" => 400, "message" => message}
              )
@@ -1642,12 +1643,12 @@ defmodule ReqLLMClientTest do
   test "ReqLLM client reports provider module failures without crashing callers" do
     lm = Imp.req_llm("openai:gpt-test", req_module: FailingStub)
 
-    assert {:error, {:req_llm_generate_failed, "transport exploded"}} =
+    assert {:error, %Imp.LMError{reason: %RuntimeError{message: "transport exploded"}}} =
              Imp.Clients.ReqLLM.generate(lm, [%{role: :user, content: "hello"}], [])
 
     assert [
              %Imp.Streaming.Messages.StreamResponse{
-               chunk: {:error, {:req_llm_stream_failed, "{:throw, :stream_exploded}"}},
+               chunk: {:error, %Imp.LMError{reason: {:throw, :stream_exploded}}},
                done: true
              }
            ] =
@@ -1711,9 +1712,9 @@ defmodule ReqLLMClientTest do
 
     expected = [
       error: :provider_open_failed,
-      raise: {:req_llm_stream_failed, "provider open exploded"},
-      throw: {:req_llm_stream_failed, "{:throw, :provider_open_threw}"},
-      exit: {:req_llm_stream_failed, "{:exit, :provider_open_exited}"}
+      raise: %RuntimeError{message: "provider open exploded"},
+      throw: {:throw, :provider_open_threw},
+      exit: {:exit, :provider_open_exited}
     ]
 
     Enum.each(expected, fn {failure, reason} ->
@@ -1726,7 +1727,7 @@ defmodule ReqLLMClientTest do
 
       assert [
                %Imp.Streaming.Messages.StreamResponse{
-                 chunk: {:error, ^reason},
+                 chunk: {:error, %Imp.LMError{reason: ^reason}},
                  done: true
                }
              ] =
@@ -1754,12 +1755,12 @@ defmodule ReqLLMClientTest do
       ])
 
     expected = [
-      raise: "provider enumeration exploded",
-      throw: "{:throw, :provider_enumeration_threw}",
-      exit: "{:exit, :provider_enumeration_exited}"
+      raise: %RuntimeError{message: "provider enumeration exploded"},
+      throw: {:throw, :provider_enumeration_threw},
+      exit: {:exit, :provider_enumeration_exited}
     ]
 
-    Enum.each(expected, fn {failure, message} ->
+    Enum.each(expected, fn {failure, reason} ->
       lm =
         Imp.req_llm("openai:gpt-test",
           test_pid: self(),
@@ -1770,7 +1771,9 @@ defmodule ReqLLMClientTest do
       assert [
                %Imp.Streaming.Messages.StreamResponse{chunk: "partial", done: false},
                %Imp.Streaming.Messages.StreamResponse{
-                 chunk: {:error, {:req_llm_stream_failed, ^message}},
+                 # A stream that died after it started may be sent again; the
+                 # retry repeats chunks the caller already has.
+                 chunk: {:error, %Imp.LMError{reason: ^reason, retryable: true}},
                  done: true
                }
              ] =
@@ -1797,7 +1800,7 @@ defmodule ReqLLMClientTest do
     lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: AdversarialStreamStub)
     program = Imp.predict("question -> answer", lm: lm)
 
-    assert {:error, {:req_llm_stream_failed, "provider enumeration exploded"}} =
+    assert {:error, %Imp.LMError{reason: %RuntimeError{message: "provider enumeration exploded"}}} =
              Imp.Streaming.collect(program, %{question: "hello"}, provider_stream: true)
 
     assert_received :provider_cleanup
@@ -1809,7 +1812,11 @@ defmodule ReqLLMClientTest do
   test "ReqLLM client reports invalid provider module return shapes" do
     lm = Imp.req_llm("openai:gpt-test", req_module: InvalidStub)
 
-    assert {:error, {:invalid_req_llm_response, ":not_a_req_llm_response"}} =
+    assert {:error,
+            %Imp.LMError{
+              retryable: false,
+              reason: {:invalid_req_llm_response, :not_a_req_llm_response}
+            }} =
              Imp.Clients.ReqLLM.generate(lm, [%{role: :user, content: "hello"}], [])
   end
 
@@ -2318,18 +2325,17 @@ defmodule ReqLLMClientTest do
     end
 
     # The nested wire is an OpenRouter fact; another provider refuses it.
-    assert {:error, {:req_llm_generate_failed, message}} =
-             Imp.Clients.ReqLLM.generate(
-               Imp.req_llm(%{provider: :openai, id: "model", model: "model"},
-                 reasoning_effort: :low,
-                 openrouter_reasoning_wire: :nested,
-                 cache: false
-               ),
-               [%{role: :user, content: "no transport"}],
-               []
-             )
-
-    assert message =~ "supported only for an OpenRouter model"
+    assert_raise ArgumentError, ~r/supported only for an OpenRouter model/, fn ->
+      Imp.Clients.ReqLLM.generate(
+        Imp.req_llm(%{provider: :openai, id: "model", model: "model"},
+          reasoning_effort: :low,
+          openrouter_reasoning_wire: :nested,
+          cache: false
+        ),
+        [%{role: :user, content: "no transport"}],
+        []
+      )
+    end
 
     configured = Imp.req_llm("openai:provider/model", reasoning_effort: :high)
 

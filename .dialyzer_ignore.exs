@@ -57,9 +57,9 @@
   # defensive clause/guard: ReqLLM.Response types `usage` as map() on the
   # struct, but its schema defaults the field to nil and Response.usage/1 is
   # `map() | nil`, so the nil clause is reachable at runtime.
-  {"lib/imp/clients/req_llm.ex", :guard_fail, 1526},
-  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {1554, 8}},
-  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {150, 7}},
+  {"lib/imp/clients/req_llm.ex", :guard_fail, 1586},
+  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {1614, 8}},
+  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {153, 7}},
   # defensive error clause on an always-ok internal call
   {"lib/imp/clients/training.ex", :pattern_match, {1215, 13}},
   # defensive error clause on an always-ok internal call
@@ -94,10 +94,10 @@
   # defensive clause for non-covered trace entries
   {"lib/imp/optimizer/trajectory.ex", :pattern_match_cov, {270, 8}},
   # MapSet opacity on the redaction key set
-  {"lib/imp/redaction.ex", :call_without_opaque, {502, 51}},
+  {"lib/imp/redaction.ex", :call_without_opaque, {508, 51}},
   # behaviour callback specs term(); impl narrows to %__MODULE__{} on
   # purpose so bad input crashes loudly
-  {"lib/imp/retrieve.ex", :callback_arg_type_mismatch, {161, 9}},
+  {"lib/imp/retrieve.ex", :callback_arg_type_mismatch, {158, 9}},
   # defensive error clause on an always-ok retriever call
   {"lib/imp/retrieve.ex", :pattern_match, {113, 8}},
   # defensive fallback paired with the 106 clause
@@ -219,13 +219,13 @@
   # Defensive fallbacks and MapSet opacity retained at the 0.3 cut. These are
   # individually pinned so a changed success type makes the gate ask again.
   {"bench/imp/benchmark_truth/multimodal_runner.ex", :pattern_match_cov, {340, 16}},
-  {"lib/imp/adapter/chat.ex", :pattern_match_cov, {787, 8}},
-  {"lib/imp/adapter/xml.ex", :pattern_match_cov, {675, 8}},
+  {"lib/imp/adapter/chat.ex", :pattern_match_cov, {788, 8}},
+  {"lib/imp/adapter/xml.ex", :pattern_match_cov, {673, 8}},
   {"lib/imp/mcp.ex", :pattern_match_cov, {518, 8}},
   {"lib/imp/optimizer/artifact.ex", :call_without_opaque, {745, 52}},
   {"lib/imp/optimizer/artifact.ex", :call_without_opaque, {909, 53}},
   {"lib/imp/optimizer/playbook.ex", :pattern_match_cov, {1014, 8}},
-  {"lib/imp/optimizer/report.ex", :call_without_opaque, {755, 55}},
+  {"lib/imp/optimizer/report.ex", :call_without_opaque, {766, 55}},
   {"lib/imp/schema.ex", :pattern_match_cov, {475, 8}},
   {"bench/imp/benchmark_truth/failure_campaign.ex", :pattern_match_cov, {168, 13}}
 ]

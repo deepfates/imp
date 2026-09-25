@@ -13,7 +13,7 @@ defmodule ReActContractTest do
 
     agent = Imp.Predict.ReAct.new("question -> answer", [], lm: lm, max_iters: 1)
 
-    assert {:error, {:missing_output_fields, [:answer]}} =
+    assert {:error, %Imp.AdapterParseError{kind: :missing_fields, reason: [:answer]}} =
              Imp.Predict.ReAct.call(agent, %{question: "q"})
   end
 
@@ -29,7 +29,7 @@ defmodule ReActContractTest do
 
     agent = Imp.Predict.ReAct.new("question -> answer", [], lm: lm, max_iters: 1)
 
-    assert {:error, {:missing_output_fields, [:answer]}} =
+    assert {:error, %Imp.AdapterParseError{kind: :missing_fields, reason: [:answer]}} =
              Imp.Predict.ReAct.call(agent, %{question: "q"})
   end
 
@@ -195,7 +195,7 @@ defmodule ReActContractTest do
     lookup = Imp.Tool.new(:lookup, "lookup", fn _args -> raise "should not run" end)
     agent = Imp.Predict.ReAct.new("question -> answer", [lookup], lm: lm, tool_policy: [])
 
-    assert {:error, {:tool_denied, :lookup}} =
+    assert {:error, {:tool_authorization_denied, :lookup, :tool_policy}} =
              Imp.Predict.ReAct.call(agent, %{question: "q"})
   end
 
@@ -337,7 +337,7 @@ defmodule ReActContractTest do
     lookup = Imp.Tool.new(:lookup, "lookup", fn _args -> raise "provider exploded" end)
     agent = Imp.Predict.ReAct.new("question -> answer", [lookup], lm: lm, max_iters: 3)
 
-    assert {:error, {:tool_error, :lookup, "provider exploded"}} =
+    assert {:error, {:tool_error, :lookup, %RuntimeError{message: "provider exploded"}}} =
              Imp.Predict.ReAct.call(agent, %{question: "q"})
   end
 
@@ -361,7 +361,7 @@ defmodule ReActContractTest do
         max_iters: 3
       )
 
-    assert {:error, {:tool_policy_error, :lookup, "policy broke"}} =
+    assert {:error, {:tool_policy_error, :lookup, %RuntimeError{message: "policy broke"}}} =
              Imp.Predict.ReAct.call(agent, %{question: "q"})
   end
 
@@ -572,8 +572,8 @@ defmodule ReActContractTest do
        %{next_thought: "t", next_tool_name: "lookup", next_tool_args: %{"query" => "first"}}},
       {:ok,
        %{next_thought: "t", next_tool_name: "lookup", next_tool_args: %{"query" => "second"}}},
-      {:error, %Imp.ContextWindowExceededError{message: "too long"}},
-      {:error, %Imp.ContextWindowExceededError{message: "still too long"}},
+      {:error, %Imp.LMError{context_window_exceeded: true, message: "too long"}},
+      {:error, %Imp.LMError{context_window_exceeded: true, message: "still too long"}},
       {:ok, %{next_thought: "t", next_tool_name: "finish", next_tool_args: %{}}},
       {:ok, %{reasoning: "The retained trajectory is enough", answer: "done"}}
     ])
@@ -614,7 +614,7 @@ defmodule ReActContractTest do
   end
 
   test "dspy_3_2_1: reports an overflow when no trajectory can be truncated" do
-    error = %Imp.ContextWindowExceededError{message: "input alone is too long"}
+    error = %Imp.LMError{context_window_exceeded: true, message: "input alone is too long"}
     lm = fn _messages, _opts -> {:error, error} end
 
     agent =
@@ -636,7 +636,7 @@ defmodule ReActContractTest do
          next_tool_name: "lookup",
          next_tool_args: %{"query" => "fact"}
        }},
-      {:error, %Imp.ContextWindowExceededError{message: "too long"}},
+      {:error, %Imp.LMError{context_window_exceeded: true, message: "too long"}},
       {:ok, %{reasoning: "Use the retained observation", answer: "fact"}}
     ])
 
@@ -682,8 +682,8 @@ defmodule ReActContractTest do
       {:ok,
        %{next_thought: "t", next_tool_name: "lookup", next_tool_args: %{"query" => "second"}}},
       {:ok, %{next_thought: "t", next_tool_name: "finish", next_tool_args: %{}}},
-      {:error, %Imp.ContextWindowExceededError{message: "too long"}},
-      {:error, %Imp.ContextWindowExceededError{message: "still too long"}},
+      {:error, %Imp.LMError{context_window_exceeded: true, message: "too long"}},
+      {:error, %Imp.LMError{context_window_exceeded: true, message: "still too long"}},
       {:ok, %{reasoning: "The retained trajectory is enough", answer: "done"}}
     ])
 
@@ -847,7 +847,7 @@ defmodule ReActContractTest do
 
     # DSPy has no tool policy; this is an Imp safety layer. A denied tool is NOT
     # fed back to the model as a recoverable observation — it fails fast.
-    assert {:error, {:tool_denied, :lookup}} =
+    assert {:error, {:tool_authorization_denied, :lookup, :tool_policy}} =
              Imp.Predict.ReAct.call(agent, %{question: "q"})
 
     assert_received :react_lm_called

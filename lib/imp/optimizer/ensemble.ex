@@ -79,11 +79,11 @@ defmodule Imp.Optimizer.Ensemble.Program do
   rescue
     error ->
       Imp.OperationalSafetyError.raise_if_present!(error)
-      {:error, {:ensemble_program_failed, error_message(error)}}
+      {:error, {:ensemble_program_failed, error}}
   catch
     kind, reason ->
       Imp.OperationalSafetyError.raise_if_present!(reason)
-      {:error, {:ensemble_program_failed, error_message({kind, reason})}}
+      {:error, {:ensemble_program_failed, {kind, reason}}}
   end
 
   defp reduce(reduce_fn, predictions, outputs) do
@@ -103,15 +103,12 @@ defmodule Imp.Optimizer.Ensemble.Program do
   rescue
     error ->
       Imp.OperationalSafetyError.raise_if_present!(error)
-      {:error, {:ensemble_reduce_failed, error_message(error), outputs}}
+      {:error, {:ensemble_reduce_failed, error, outputs}}
   catch
     kind, reason ->
       Imp.OperationalSafetyError.raise_if_present!(reason)
-      {:error, {:ensemble_reduce_failed, error_message({kind, reason}), outputs}}
+      {:error, {:ensemble_reduce_failed, {kind, reason}, outputs}}
   end
-
-  defp error_message(%_{} = exception), do: Exception.message(exception)
-  defp error_message(error), do: inspect(error)
 end
 
 defmodule Imp.Optimizer.Ensemble do

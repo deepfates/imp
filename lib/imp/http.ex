@@ -1,5 +1,11 @@
 defmodule Imp.HTTP do
-  @moduledoc "Small injectable HTTP boundary used by provider clients."
+  @moduledoc """
+  Small injectable HTTP boundary used by provider clients.
+
+  A method that cannot be sent is `{:error, {:http_method_not_supported, refuser,
+  method}}`, where `refuser` is `Imp.HTTP` for a method outside `t:method/0`,
+  or the transport that cannot send it.
+  """
 
   @type method :: :get | :post | :put | :patch | :delete
 
@@ -25,7 +31,7 @@ defmodule Imp.HTTP do
   end
 
   def request(_transport, method, _url, _headers, _body, _opts),
-    do: {:error, {:unsupported_http_method, method}}
+    do: {:error, {:http_method_not_supported, __MODULE__, method}}
 
   def post(transport, url, headers, body, opts \\ [])
 
@@ -129,7 +135,7 @@ defmodule Imp.HTTP do
     fun.()
   rescue
     safety in Imp.OperationalSafetyError -> {:error, safety}
-    error -> {:error, {:http_transport_failed, transport, Exception.message(error)}}
+    error -> {:error, {:http_transport_failed, transport, error}}
   catch
     kind, reason ->
       case Imp.OperationalSafetyError.find({kind, reason}) do

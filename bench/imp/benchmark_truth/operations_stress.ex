@@ -263,8 +263,8 @@ defmodule Imp.BenchmarkTruth.OperationsStress do
       match?(
         [
           {:ok, %Imp.Prediction{}},
-          {:error, {:parallel_program_failed, "ops branch failed"}},
-          {:error, {:parallel_program_failed, "{:throw, :ops_branch_thrown}"}},
+          {:error, {:parallel_program_failed, %RuntimeError{message: "ops branch failed"}}},
+          {:error, {:parallel_program_failed, {:throw, :ops_branch_thrown}}},
           {:error,
            {:invalid_module_result, Imp.BenchmarkTruth.OperationsStress.IsolatedProgram,
             ":not_a_module_result"}}
@@ -346,6 +346,8 @@ defmodule Imp.BenchmarkTruth.OperationsStress do
 
   defp json_safe(%Imp.Prediction{} = prediction),
     do: prediction |> Imp.Prediction.to_map() |> json_safe()
+
+  defp json_safe(exception) when is_exception(exception), do: Exception.message(exception)
 
   defp json_safe(%{} = map),
     do: Map.new(map, fn {key, value} -> {to_string(key), json_safe(value)} end)

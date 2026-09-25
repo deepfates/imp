@@ -723,14 +723,11 @@ defmodule Imp.Optimizer.InferRules do
 
   defp normalize_rules(rules), do: {:error, {:invalid_natural_language_rules, rules}}
 
-  defp context_window_exceeded?(%Imp.ContextWindowExceededError{}), do: true
   defp context_window_exceeded?({:error, reason}), do: context_window_exceeded?(reason)
   defp context_window_exceeded?({:lm_failed, _lm, reason}), do: context_window_exceeded?(reason)
 
-  defp context_window_exceeded?(%Imp.LMError{reason: reason}),
-    do: context_window_exceeded?(reason)
-
-  defp context_window_exceeded?(%{reason: reason}), do: context_window_exceeded?(reason)
+  defp context_window_exceeded?(%Imp.LMError{} = error),
+    do: Imp.Errors.context_window_exceeded?(error)
 
   # Pinned DSPy 3.2.1 also recognizes provider exceptions whose rendered
   # class name contains `ContextWindowExceededError`. Provider adapters do not

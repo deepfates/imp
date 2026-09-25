@@ -45,6 +45,11 @@
     },
     {
       "category": "internal",
+      "module": "Imp.FieldMap",
+      "source": "lib/imp/field_map.ex"
+    },
+    {
+      "category": "internal",
       "module": "Imp.FieldSelector",
       "source": "lib/imp/field_selector.ex"
     },
@@ -1367,14 +1372,31 @@
       "kind": "struct",
       "macros": [],
       "module": "Imp.AdapterParseError",
-      "signatures": {},
+      "signatures": {
+        "types": {
+          "kind/0": [],
+          "t/0": []
+        }
+      },
       "source": "lib/imp/exceptions.ex",
       "struct_fields": [
         "__exception__",
+        "completion_index",
+        "kind",
         "message",
-        "reason"
+        "reason",
+        "trace"
       ],
-      "types": []
+      "types": [
+        {
+          "kind": "type",
+          "name": "kind/0"
+        },
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
     },
     {
       "callbacks": [],
@@ -2497,22 +2519,6 @@
       "callbacks": [],
       "category": "stable",
       "functions": [],
-      "kind": "struct",
-      "macros": [],
-      "module": "Imp.ContextWindowExceededError",
-      "signatures": {},
-      "source": "lib/imp/exceptions.ex",
-      "struct_fields": [
-        "__exception__",
-        "message",
-        "reason"
-      ],
-      "types": []
-    },
-    {
-      "callbacks": [],
-      "category": "stable",
-      "functions": [],
       "kind": "module",
       "macros": [],
       "module": "Imp.Core",
@@ -3000,19 +3006,29 @@
       "kind": "struct",
       "macros": [],
       "module": "Imp.Error",
-      "signatures": {},
+      "signatures": {
+        "types": {
+          "t/0": []
+        }
+      },
       "source": "lib/imp/exceptions.ex",
       "struct_fields": [
         "__exception__",
         "message",
         "reason"
       ],
-      "types": []
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
     },
     {
       "callbacks": [],
       "category": "stable",
       "functions": [
+        "context_window_exceeded?/1",
         "retryable?/1"
       ],
       "kind": "module",
@@ -3020,8 +3036,11 @@
       "module": "Imp.Errors",
       "signatures": {
         "functions": {
+          "context_window_exceeded?/1": [
+            "context_window_exceeded?(error)"
+          ],
           "retryable?/1": [
-            "retryable?(arg1)"
+            "retryable?(error)"
           ]
         }
       },
@@ -3920,15 +3939,26 @@
       "kind": "struct",
       "macros": [],
       "module": "Imp.LMError",
-      "signatures": {},
+      "signatures": {
+        "types": {
+          "t/0": []
+        }
+      },
       "source": "lib/imp/exceptions.ex",
       "struct_fields": [
         "__exception__",
+        "context_window_exceeded",
         "message",
         "reason",
-        "retryable"
+        "retryable",
+        "status"
       ],
-      "types": []
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
     },
     {
       "callbacks": [],

@@ -74,12 +74,12 @@ defmodule Imp.Adapter.SingleField do
 
       text when is_binary(text) ->
         case String.trim(text) do
-          "" -> {:error, {:missing_output_fields, [output.name]}}
+          "" -> {:error, Imp.AdapterParseError.missing_fields([output.name])}
           value -> parse_text_or_schema_object(signature, output, value, opts)
         end
 
       other ->
-        {:error, {:unsupported_lm_output, other}}
+        {:error, Imp.AdapterParseError.unsupported_output(other)}
     end
   end
 
@@ -181,6 +181,7 @@ defmodule Imp.Adapter.SingleField do
         else
           {:error,
            %Imp.AdapterParseError{
+             kind: :malformed,
              message: "expected an exact one-field JSON object",
              reason: %{expected: [to_string(output.name)], present: Map.keys(decoded)}
            }}
@@ -207,7 +208,13 @@ defmodule Imp.Adapter.SingleField do
   end
 
   defp reject_coerced_enum({:ok, _prediction}, value),
-    do: {:error, %Imp.AdapterParseError{message: "expected an exact enum value", reason: value}}
+    do:
+      {:error,
+       %Imp.AdapterParseError{
+         kind: :malformed,
+         message: "expected an exact enum value",
+         reason: value
+       }}
 
   defp reject_coerced_enum(error, _value), do: error
 

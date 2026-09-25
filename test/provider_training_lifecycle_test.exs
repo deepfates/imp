@@ -884,7 +884,7 @@ defmodule ProviderTrainingLifecycleTest do
         transport: RaisingTrainingTransport
       )
 
-    assert {:error, {:training_transport_failed, "transport exploded"}} =
+    assert {:error, {:training_transport_failed, %RuntimeError{message: "transport exploded"}}} =
              Imp.Clients.Trainer.finetune(transport_trainer, lm, examples(), [])
 
     invalid_json_trainer =
@@ -948,7 +948,7 @@ defmodule ProviderTrainingLifecycleTest do
 
     raising = %{base | transport: RaisingTrainingTransport}
 
-    assert {:error, {:training_refresh_failed, "transport exploded"}} =
+    assert {:error, {:training_refresh_failed, %RuntimeError{message: "transport exploded"}}} =
              Imp.Clients.TrainingJob.refresh(raising)
 
     invalid_json = %{base | transport: InvalidJSONTrainingTransport}

@@ -60,6 +60,7 @@
       "modules": [
         "Imp.Adapter.OutputFields",
         "Imp.Deadline",
+        "Imp.FieldMap",
         "Imp.FieldSelector",
         "Imp.FunctionContract",
         "Imp.Observability.Inspection",
@@ -88,7 +89,6 @@
       "category": "stable",
       "modules": [
         "Imp.AdapterParseError",
-        "Imp.ContextWindowExceededError",
         "Imp.EvaluationCancelledError",
         "Imp.LMError",
         "Imp.OperationalSafetyError",

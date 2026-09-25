@@ -693,7 +693,7 @@ defmodule UpstreamExam.AdaptersTest do
     test "a missing required output remains a loud error" do
       signature = optional_output_signature()
 
-      assert {:error, {:missing_output_fields, [:answer]}} =
+      assert {:error, %Imp.AdapterParseError{kind: :missing_fields, reason: [:answer]}} =
                Imp.Adapter.JSON.parse(signature, ~s({"note":"present"}), [])
     end
 
@@ -764,7 +764,7 @@ defmodule UpstreamExam.AdaptersTest do
     test "xml adapter parse errors on missing field" do
       signature = Imp.signature("question -> answer, explanation")
 
-      assert {:error, {:missing_output_fields, [:explanation]}} =
+      assert {:error, %Imp.AdapterParseError{kind: :missing_fields, reason: [:explanation]}} =
                Imp.Adapter.XML.parse(signature, "<answer>Paris</answer>", [])
     end
 
@@ -1148,12 +1148,17 @@ defmodule UpstreamExam.AdaptersTest do
     # Upstream: tests/adapters/test_two_step_adapter.py::test_two_step_adapter_parse_errors
     # (was a finding; fixed by dee-coia — strict chat parse rejects the
     # unusable extraction text, the JSON retry also fails, and the loud
-    # two_step_extraction_failed error surfaces, matching DSPy's ValueError.)
+    # extraction failure surfaces, matching DSPy's ValueError.)
     test "two step adapter parse errors" do
       extraction_lm = fn _messages, _opts -> {:ok, "invalid response"} end
       signature = Imp.signature("question -> answer")
 
-      assert {:error, {:two_step_extraction_failed, _reason, _completion}} =
+      assert {:error,
+              %Imp.AdapterParseError{
+                kind: :missing_fields,
+                message: "Failed to parse response from the original completion: " <> _,
+                trace: %{raw: "main LM response"}
+              }} =
                Imp.Adapter.TwoStep.parse(signature, "main LM response",
                  extraction_lm: extraction_lm
                )

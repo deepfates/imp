@@ -161,14 +161,17 @@ defmodule ProgramOfThoughtFidelityTest do
              Enum.at(prediction.metadata.code_act_trace, 0).output
            )
 
+    # The record keeps the exception; the model reads its message.
     assert match?(
-             {:error, {:program_runtime_error, "bad argument in arithmetic expression"}},
+             {:error, {:program_runtime_error, %ArithmeticError{}}},
              Enum.at(prediction.metadata.code_act_trace, 1).output
            )
 
     [_first, second, third] = collect_messages(3)
     assert rendered(second) =~ "missing_program"
     assert rendered(third) =~ "program_runtime_error"
+    assert rendered(third) =~ "bad argument in arithmetic expression"
+    refute rendered(third) =~ "ArithmeticError"
   end
 
   test "CodeAct honors finished and extracts signature outputs from the trajectory" do

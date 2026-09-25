@@ -133,7 +133,7 @@ defmodule ProductionAdapterPersistenceTest do
     assert Imp.Prediction.get(prediction, :answer) == "Paris"
     assert Imp.Prediction.get(prediction, :confidence) == 0.95
 
-    assert {:error, {:missing_output_fields, [:confidence]}} =
+    assert {:error, %Imp.AdapterParseError{kind: :missing_fields, reason: [:confidence]}} =
              Imp.Adapter.JSON.parse(signature, ~s({"answer": "Paris"}), [])
   end
 
@@ -159,7 +159,7 @@ defmodule ProductionAdapterPersistenceTest do
     # completion (verified against dspy 3.2.1: "Expected to find output fields
     # in the LM response"); the JSON fallback is a SECOND LM call at the
     # Predict level, never an in-parse decode (dee-coia).
-    assert {:error, {:missing_output_fields, [:answer, :score]}} =
+    assert {:error, %Imp.AdapterParseError{kind: :missing_fields, reason: [:answer, :score]}} =
              Imp.Adapter.Chat.parse(signature, ~s({"answer":"Paris","score":1.0}), [])
   end
 
@@ -190,7 +190,7 @@ defmodule ProductionAdapterPersistenceTest do
     assert Imp.Prediction.get(prediction, :answer) == "Paris"
     assert Imp.Prediction.get(prediction, :score) == 42
 
-    assert {:error, {:missing_output_fields, [:score]}} =
+    assert {:error, %Imp.AdapterParseError{kind: :missing_fields, reason: [:score]}} =
              Imp.Adapter.XML.parse(signature, "<answer>Paris</answer>", [])
   end
 
@@ -391,7 +391,7 @@ defmodule ProductionAdapterPersistenceTest do
         config: [json_fallback: false]
       )
 
-    assert {:error, %{reason: {:error, {:missing_output_fields, [:confidence]}}}} =
+    assert {:error, %Imp.AdapterParseError{kind: :missing_fields, reason: [:confidence]}} =
              Imp.call(program, %{question: "Capital of France?"})
 
     assert_received {:lm_call, [_system, _user], opts}
@@ -425,7 +425,7 @@ defmodule ProductionAdapterPersistenceTest do
     # malformed marker — a lenient divergence removed by dee-coia.
     signature = Imp.signature("question -> reasoning, answer")
 
-    assert {:error, {:missing_output_fields, [:answer]}} =
+    assert {:error, %Imp.AdapterParseError{kind: :missing_fields, reason: [:answer]}} =
              Imp.Adapter.Chat.parse(
                signature,
                """
