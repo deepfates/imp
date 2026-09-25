@@ -279,6 +279,7 @@ defmodule Imp.MixProject do
     [
       "docs/diving-deeper/signatures.md",
       "docs/diving-deeper/modules-and-composition.md",
+      "docs/diving-deeper/rlm.md",
       "docs/diving-deeper/adapters.md",
       "docs/diving-deeper/react.md",
       "docs/diving-deeper/tools-and-mcp.md",
