@@ -200,6 +200,14 @@ User-visible changes to Imp are recorded here.
   mode lists tool arguments as JSON. Fields, order, constraints and parsing
   are unchanged. A saved program's prompt text changes with this, so an
   optimized program may be worth re-evaluating.
+- Values in prompts take their JSON spelling: `null`, `true` and `false`
+  where 0.4.0 wrote `None`, `True` and `False`, in inputs, demos, ReAct
+  observations and field constraints. The structured-output schema sent to a
+  provider is named `outputs` (title `Outputs`) instead of
+  `DSPyProgramOutputs`. The MIPROv2 proposer's dataset summary shows each
+  example as `{"inputs": {...}, "outputs": {...}}` instead of
+  `Example({...}) (input_keys={...})`. How a model's answer is parsed is
+  unchanged.
 - Each ReActV2 step lists the task's output fields with their types and
   descriptions ("The outputs to produce are: ..."). Before, a model saw an
   output's description only inside `submit`'s parameter schema.
