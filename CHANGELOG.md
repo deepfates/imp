@@ -22,6 +22,12 @@ User-visible changes to Imp are recorded here.
   its value. The ExMCP client's state, which a crash report prints, is redacted
   the same way. Before, a header was hidden only when its name looked like a
   credential, and `Imp.save!` wrote other headers' values to disk.
+- RLM controller code cannot make a struct. A map literal that named
+  `__struct__` was dispatched by every protocol as that struct: a map shaped
+  like a `File.Stream` sent `Enum.join` into `Enumerable.File.Stream` and read
+  the named file. A map literal, `submit/1` and the result of a library call
+  may no longer carry the key, and a library call takes no struct but a range
+  or MapSet and no Elixir module named as a value.
 
 ### Installing
 

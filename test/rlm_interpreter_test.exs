@@ -285,4 +285,66 @@ missing()|
 
     assert bytes > 1_000
   end
+
+  describe "forged structs" do
+    # A map carrying `__struct__` is dispatched by every protocol as that
+    # struct. Controller code must not be able to make one: a map shaped like
+    # a File.Stream sent Enum.take into Enumerable.File.Stream and read a file.
+    setup do
+      path =
+        Path.join(System.tmp_dir!(), "imp-rlm-forged-#{System.unique_integer([:positive])}")
+
+      File.write!(path, "host secret\n")
+      on_exit(fn -> File.rm(path) end)
+      {:ok, path: path}
+    end
+
+    defp file_stream_literal(path) do
+      ~s|%{__struct__: :"Elixir.File.Stream", path: #{inspect(path)}, modes: [:raw, :read_ahead, :binary], line_or_bytes: :line, raw: true, node: :nonode@nohost}|
+    end
+
+    test "a map literal cannot carry __struct__ into Enumerable, String.Chars or Inspect",
+         %{path: path} do
+      interpreter = Interpreter.new(%{}, %{}, nil)
+      forged = file_stream_literal(path)
+
+      for source <- [
+            "Enum.join(#{forged})",
+            "Enum.chunk_every(#{forged}, 1)",
+            "Enum.count(#{forged})",
+            "Enum.join([#{forged}])",
+            "print(#{forged})",
+            "forged = #{forged}",
+            "key = :__struct__\nEnum.join(%{key => :\"Elixir.File.Stream\", path: #{inspect(path)}})",
+            "%File.Stream{path: #{inspect(path)}}",
+            "submit(__struct__: :\"Elixir.File.Stream\", path: #{inspect(path)})"
+          ] do
+        result = Interpreter.execute(interpreter, source)
+        refute inspect(result) =~ "host secret", source
+        assert {:error, _reason, next} = result, source
+        refute Map.has_key?(next.vars, :forged)
+      end
+    end
+
+    test "a string __struct__ key is ordinary data" do
+      interpreter = Interpreter.new(%{}, %{}, nil)
+
+      assert {:ok, 1, _next} =
+               Interpreter.execute(interpreter, ~S|Enum.count(%{"__struct__" => "File.Stream"})|)
+    end
+
+    test "a module named as a value cannot reach a library call" do
+      interpreter = Interpreter.new(%{}, %{}, nil)
+
+      assert {:error, {:module_value_not_allowed, File.Stream}, _next} =
+               Interpreter.execute(interpreter, ~S|Enum.join([:"Elixir.File.Stream"])|)
+    end
+
+    test "structs handed in by the host still reach library calls" do
+      interpreter = Interpreter.new(%{ids: MapSet.new([1, 2]), span: 1..3}, %{}, nil)
+
+      assert {:ok, [2, 3], _next} =
+               Interpreter.execute(interpreter, "[Enum.count(ids), Enum.count(span)]")
+    end
+  end
 end

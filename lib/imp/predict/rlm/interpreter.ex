@@ -469,7 +469,8 @@ defmodule Imp.Predict.RLM.Interpreter do
 
   defp eval_node({:submit, _, args}, state) when is_list(args) do
     with {:ok, values, state} <- eval_arguments(args, state),
-         {:ok, output} <- submission(values) do
+         {:ok, output} <- submission(values),
+         :ok <- check_constructed(output, state) do
       {:final, output, state}
     else
       {:error, reason} -> {:error, reason, state}
@@ -521,14 +522,20 @@ defmodule Imp.Predict.RLM.Interpreter do
 
   defp eval_pairs([], state, pairs), do: {:ok, Map.new(Enum.reverse(pairs)), state}
 
+  # A map with a `__struct__` key is dispatched by every protocol as that
+  # struct, so controller code may not write one (see `check_constructed/2`).
   defp eval_pairs([{key, value} | rest], state, pairs) do
     with {:ok, key, state} <- eval(key, state),
+         :ok <- refuse_struct_key(key, state),
          {:ok, value, state} <- eval(value, state) do
       eval_pairs(rest, state, [{key, value} | pairs])
     end
   end
 
   defp eval_pairs(_pairs, state, _result), do: {:error, :invalid_map, state}
+
+  defp refuse_struct_key(:__struct__, state), do: {:error, :struct_key_not_allowed, state}
+  defp refuse_struct_key(_key, _state), do: :ok
 
   defp eval_binary(operator, left_ast, right_ast, state) when operator in [:and, :&&, :or, :||] do
     with {:ok, left, state} <- eval(left_ast, state) do
@@ -692,10 +699,12 @@ defmodule Imp.Predict.RLM.Interpreter do
     arities = List.wrap(Map.get(allowed, function))
 
     if length(args) in arities do
-      with {:ok, values, state} <- eval_arguments(args, state) do
+      with {:ok, values, state} <- eval_arguments(args, state),
+           :ok <- check_library_arguments(values, state) do
         try do
           with :ok <- check_transformation_budget(module, function, values, state) do
-            {:ok, apply(target, function, values), state}
+            value = apply(target, function, values)
+            with :ok <- check_constructed(value, state), do: {:ok, value, state}
           end
         rescue
           error -> {:error, {:transformation_error, Exception.message(error)}, state}
@@ -705,6 +714,79 @@ defmodule Imp.Predict.RLM.Interpreter do
       {:error, {:function_not_allowed, module, function, length(args)}, state}
     end
   end
+
+  # Protocols dispatch on a map's `__struct__` key, so a map that merely
+  # carries one is treated as that struct: a map shaped like a File.Stream
+  # sends `Enum.join` into `Enumerable.File.Stream` and reads the named file,
+  # and the same holds for Collectable, String.Chars, Inspect and any other
+  # protocol with an implementation loaded in the VM. Controller code
+  # therefore never holds a struct it did not receive from the host: a map
+  # literal may not name the key (`eval_pairs/3`), and the result of every
+  # library call is checked here, since library functions build maps from
+  # data. Genuine ranges and MapSets are the only structs a library call may
+  # take or return; no other struct, and no Elixir module named as a value
+  # (a forged struct's module, or a sorter whose `compare/2` would run), is
+  # passed to one.
+  @data_structs [Range, MapSet]
+
+  defp check_library_arguments(values, state) do
+    case Enum.find_value(values, &library_argument_error/1) do
+      nil -> :ok
+      reason -> {:error, reason, state}
+    end
+  end
+
+  defp check_constructed(value, state) do
+    case forged_struct(value) do
+      nil -> :ok
+      _forged -> {:error, :struct_key_not_allowed, state}
+    end
+  end
+
+  defp library_argument_error(%{__struct__: module} = value) do
+    if genuine_data_struct?(value),
+      do: value |> Map.from_struct() |> library_argument_error(),
+      else: {:module_value_not_allowed, module}
+  end
+
+  defp library_argument_error(value) when is_map(value) do
+    Enum.find_value(value, fn {key, item} ->
+      library_argument_error(key) || library_argument_error(item)
+    end)
+  end
+
+  defp library_argument_error([head | tail]),
+    do: library_argument_error(head) || library_argument_error(tail)
+
+  defp library_argument_error(value) when is_tuple(value),
+    do: value |> Tuple.to_list() |> library_argument_error()
+
+  defp library_argument_error(value) when is_atom(value) and value not in @data_structs do
+    if String.starts_with?(Atom.to_string(value), "Elixir."),
+      do: {:module_value_not_allowed, value},
+      else: nil
+  end
+
+  defp library_argument_error(_value), do: nil
+
+  defp forged_struct(%{__struct__: _module} = value) do
+    if genuine_data_struct?(value),
+      do: value |> Map.from_struct() |> forged_struct(),
+      else: value
+  end
+
+  defp forged_struct(value) when is_map(value),
+    do: Enum.find_value(value, fn {key, item} -> forged_struct(key) || forged_struct(item) end)
+
+  defp forged_struct([head | tail]), do: forged_struct(head) || forged_struct(tail)
+  defp forged_struct(value) when is_tuple(value), do: value |> Tuple.to_list() |> forged_struct()
+  defp forged_struct(_value), do: nil
+
+  defp genuine_data_struct?(%Range{first: first, last: last, step: step} = range),
+    do: is_integer(first) and is_integer(last) and is_integer(step) and map_size(range) == 4
+
+  defp genuine_data_struct?(%MapSet{map: map} = set), do: is_map(map) and map_size(set) == 2
+  defp genuine_data_struct?(_value), do: false
 
   defp format_allowlist(module, functions) do
     functions
