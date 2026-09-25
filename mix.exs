@@ -282,6 +282,7 @@ defmodule Imp.MixProject do
       "docs/diving-deeper/adapters.md",
       "docs/diving-deeper/react.md",
       "docs/diving-deeper/tools-and-mcp.md",
+      "docs/diving-deeper/retrieval.md",
       "docs/diving-deeper/metrics-and-evaluation.md",
       "docs/diving-deeper/choosing-an-optimizer.md",
       "docs/diving-deeper/saving-and-artifacts.md",
