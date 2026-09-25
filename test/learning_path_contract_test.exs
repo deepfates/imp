@@ -4,7 +4,7 @@ defmodule LearningPathContractTest do
   @reader_docs [
     "README.md",
     "docs/LEARNING_PATH.md",
-    "docs/IMP_FOR_DSPY_USERS.md",
+    "docs/coming-from-dspy.md",
     "docs/production.md",
     "examples/deployment/README.md"
   ]

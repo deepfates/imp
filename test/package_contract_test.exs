@@ -28,7 +28,7 @@ defmodule PackageContractTest do
                    "NOTICE",
                    "RELEASE_NOTES.md",
                    "README.md",
-                   "docs/IMP_FOR_DSPY_USERS.md",
+                   "docs/coming-from-dspy.md",
                    "docs/LEARNING_PATH.md",
                    "docs/production.md",
                    "examples/provider_free_ticket_router/README.md",

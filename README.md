@@ -90,7 +90,7 @@ Imp needs Elixir 1.19 and a C++ compiler for one dependency (erlexec).
 
 - **[Getting started](docs/getting-started/index.md)** builds this router step
   by step, from the first call to running it in an application.
-- **[Coming from DSPy](docs/IMP_FOR_DSPY_USERS.md)** maps what you already know.
+- **[Coming from DSPy](docs/coming-from-dspy.md)** maps what you already know.
 - **[Cheatsheet](docs/cheatsheet.cheatmd)** has the common calls on one page.
 
 Imp is MIT licensed.
