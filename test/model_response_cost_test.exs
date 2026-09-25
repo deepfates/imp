@@ -38,12 +38,12 @@ defmodule Imp.ModelResponseCostTest do
 
   defmodule CallsLM do
     @behaviour Imp.Module
-    defstruct [:lm, :usage, :signature]
+    defstruct [:lm, :usage, :signature, cache: false]
 
     @impl true
-    def call(%__MODULE__{lm: lm, usage: usage}, _inputs) do
+    def call(%__MODULE__{lm: lm, usage: usage, cache: cache}, _inputs) do
       case Imp.LM.generate(lm, [%{role: :user, content: "ping"}],
-             cache: false,
+             cache: cache,
              stub_usage: usage
            ) do
         {:ok, _output} -> {:ok, Imp.Prediction.new(%{answer: "ok"})}
@@ -65,9 +65,12 @@ defmodule Imp.ModelResponseCostTest do
     end
   end
 
-  defp run_events(usage) do
-    lm = Imp.Clients.ReqLLM.new("openai:gpt-test", req_module: BilledStub)
-    {:ok, run} = Imp.Run.start(%CallsLM{lm: lm, usage: usage}, %{question: "runtime?"})
+  defp run_events(usage, model \\ "openai:gpt-test", cache \\ false) do
+    lm = Imp.Clients.ReqLLM.new(model, req_module: BilledStub)
+
+    {:ok, run} =
+      Imp.Run.start(%CallsLM{lm: lm, usage: usage, cache: cache}, %{question: "runtime?"})
+
     assert {:ok, _prediction} = Task.await(run.task)
     events = Imp.Run.events(run)
     Imp.Run.stop(run)
@@ -108,6 +111,24 @@ defmodule Imp.ModelResponseCostTest do
     assert response.metadata.cost == nil
     refute Map.has_key?(response.metadata, :billing)
     assert response.metadata.usage == usage
+  end
+
+  # A cached answer made no request: it is free, which a host counting spend
+  # must be able to tell from a call whose price is unknown.
+  test "an answer from Imp's cache says so, with a cost of zero" do
+    model = "openai:gpt-cached-#{System.unique_integer([:positive])}"
+    usage = %{input_tokens: 3, output_tokens: 2, total_tokens: 5, cost: @breakdown}
+
+    [first, second] =
+      for _call <- 1..2 do
+        usage |> run_events(model, true) |> Enum.find(&(&1.kind == :model_response))
+      end
+
+    assert first.metadata.cached == false
+    assert first.metadata.cost == 0.001858
+    assert second.metadata.cached == true
+    assert second.metadata.cost == 0.0
+    assert second.metadata.usage == %{}
   end
 
   test "the ATIF export carries the number, not the breakdown map" do

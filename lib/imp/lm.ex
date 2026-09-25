@@ -18,6 +18,9 @@ defmodule Imp.LM do
   money for that call in `:cost`: the provider's reported total in USD as a
   non-negative float, or `nil` when the provider reported nothing Imp can read
   as a number. A host summing spend reads that number and nothing else.
+  `:cached` is true when the answer came from Imp's response cache (on by
+  default for `Imp.req_llm/2`): no request was made, the cost is `0.0` and the
+  usage is empty, which is how a free answer differs from an unpriced one.
 
   Providers report the total as a bare number, a string, a `Decimal` or a cost
   breakdown map, and Imp reads the number out of all four. When the provider
@@ -157,6 +160,7 @@ defmodule Imp.LM do
                   model: request.config.model,
                   usage: response.usage,
                   cost: response.cost,
+                  cached: response.cached,
                   response: response.metadata
                 },
                 response.billing

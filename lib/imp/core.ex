@@ -111,15 +111,25 @@ defmodule Imp.Core do
     provider reported one, and `nil` otherwise. It is the detail behind `cost`
     (line items, input and output splits); its shape belongs to the provider,
     so it is evidence to inspect rather than a contract to depend on.
+
+    `cached` is true when the answer came from Imp's response cache: no
+    request was made, so `usage` is empty and `cost` is `0.0`.
     """
 
-    defstruct outputs: [], usage: %{}, cost: nil, billing: nil, metadata: %{}, raw: nil
+    defstruct outputs: [],
+              usage: %{},
+              cost: nil,
+              billing: nil,
+              cached: false,
+              metadata: %{},
+              raw: nil
 
     @type t :: %__MODULE__{
             outputs: list(),
             usage: map(),
             cost: number() | nil,
             billing: map() | nil,
+            cached: boolean(),
             metadata: map(),
             raw: term()
           }
@@ -143,20 +153,26 @@ defmodule Imp.Core do
   def response(raw) do
     with {:ok, outputs, metadata} <- split_outputs(raw) do
       usage = response_usage(metadata)
-
-      reported = reported_cost(metadata, usage)
+      cached = cache_hit?(metadata)
+      reported = if cached, do: nil, else: reported_cost(metadata, usage)
 
       {:ok,
        %LMResponse{
          outputs: outputs,
          usage: usage,
-         cost: cost_number(reported),
+         cost: if(cached, do: 0.0, else: cost_number(reported)),
          billing: billing_breakdown(reported),
+         cached: cached,
          metadata: metadata,
          raw: raw
        }}
     end
   end
+
+  # `Imp.Clients.ReqLLM` marks an answer it served from the cache.
+  defp cache_hit?(%{req_llm: %{cache_hit: true}}), do: true
+  defp cache_hit?(%{"req_llm" => %{"cache_hit" => true}}), do: true
+  defp cache_hit?(_metadata), do: false
 
   @doc false
   def legacy_response(%LMResponse{raw: raw}) when not is_nil(raw), do: raw
