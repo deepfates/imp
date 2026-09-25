@@ -592,9 +592,17 @@ defmodule Imp.Clients.ReqLLM do
     kind, reason -> {:error, lm_error({kind, reason})}
   end
 
+  # A saved client holds no credential: none by key name, no header at all,
+  # and no URL whose query or user info could carry a key.
   def dump(%__MODULE__{} = lm) do
-    model = lm.model |> encode_model() |> Imp.Redaction.drop_credentials()
-    opts = Imp.Redaction.drop_credentials(lm.opts)
+    model =
+      lm.model
+      |> encode_model()
+      |> Imp.Redaction.drop_credentials()
+      |> Imp.Redaction.drop_headers()
+
+    opts = lm.opts |> Imp.Redaction.drop_credentials() |> Imp.Redaction.drop_headers()
+    refuse_secret_urls!(model, opts)
 
     %{
       provider: :req_llm,
@@ -603,10 +611,25 @@ defmodule Imp.Clients.ReqLLM do
     }
   end
 
+  defp refuse_secret_urls!(model, opts) do
+    urls = [
+      Keyword.get(opts, :base_url),
+      is_map(model) && (model[:base_url] || model["base_url"])
+    ]
+
+    if Enum.any?(urls, &Imp.Redaction.url_with_secret_parts?/1) do
+      raise ArgumentError,
+            "#{inspect(__MODULE__)}: base_url has a query string or user info, which may " <>
+              "carry a key, so the client is not saved; pass the key as :api_key, or give " <>
+              "the saved program an LM when it is loaded"
+    end
+  end
+
   defp validate_new_opts!(opts) when is_list(opts) do
     unless Keyword.keyword?(opts) do
       raise ArgumentError,
-            "#{inspect(__MODULE__)}.new/2 expects keyword options, got: #{inspect(opts)}"
+            "#{inspect(__MODULE__)}.new/2 expects a keyword list of options, got a list " <>
+              "that is not one"
     end
 
     owned_opts =
@@ -617,9 +640,10 @@ defmodule Imp.Clients.ReqLLM do
     {Keyword.fetch!(owned_opts, :req_module), Keyword.fetch!(owned_opts, :opts)}
   end
 
+  # Options can hold a key, so an error names their shape, never their value.
   defp validate_new_opts!(opts) do
     raise ArgumentError,
-          "#{inspect(__MODULE__)}.new/2 expects keyword options, got: #{inspect(opts)}"
+          "#{inspect(__MODULE__)}.new/2 expects a keyword list of options, got #{Imp.Options.shape(opts)}"
   end
 
   defp validate_call_opts!(opts, context) when is_list(opts) do

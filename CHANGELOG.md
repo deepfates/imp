@@ -12,6 +12,14 @@ User-visible changes to Imp are recorded here.
   IEx, in log lines and in crash reports, and a RAG program printed its
   retriever's bearer token. Refusing to save a retriever that is not portable
   names its module instead of printing it.
+- A client, retriever or tracker prints every header value as `[REDACTED]`,
+  whatever the header is called (`X-Subscription-Token`, `Cookie`), and the
+  query and user info of every URL. A saved program holds no header at all,
+  and `Imp.save!` refuses an LM whose `base_url` has a query string or user
+  info. Option errors name a credential-bearing option without printing its
+  value. The ExMCP client's state, which a crash report prints, is redacted
+  the same way. Before, a header was hidden only when its name looked like a
+  credential, and `Imp.save!` wrote other headers' values to disk.
 
 ### Installing
 
