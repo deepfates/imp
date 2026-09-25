@@ -97,7 +97,7 @@
   {"lib/imp/redaction.ex", :call_without_opaque, {508, 51}},
   # behaviour callback specs term(); impl narrows to %__MODULE__{} on
   # purpose so bad input crashes loudly
-  {"lib/imp/retrieve.ex", :callback_arg_type_mismatch, {158, 9}},
+  {"lib/imp/retrieve.ex", :callback_arg_type_mismatch, {160, 9}},
   # defensive error clause on an always-ok retriever call
   {"lib/imp/retrieve.ex", :pattern_match, {113, 8}},
   # defensive fallback paired with the 106 clause
