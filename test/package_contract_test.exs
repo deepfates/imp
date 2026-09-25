@@ -28,14 +28,9 @@ defmodule PackageContractTest do
                    "NOTICE",
                    "RELEASE_NOTES.md",
                    "README.md",
-                   "docs/coming-from-dspy.md",
-                   "docs/LEARNING_PATH.md",
-                   "docs/PRODUCTION_OPERATIONS.md",
                    "examples/provider_free_ticket_router/README.md",
                    "examples/provider_free_ticket_router/mix.exs",
-                   "examples/provider_free_ticket_router/run.exs",
-                   "livebooks/01_real_lm_front_door.livemd",
-                   "livebooks/02_programming_not_prompting.livemd"
+                   "examples/provider_free_ticket_router/run.exs"
                  ] ++ @deployment_files
 
   @repository_files [
@@ -52,8 +47,7 @@ defmodule PackageContractTest do
   @excluded_prefixes [
     "benchmarks/config/",
     "benchmarks/",
-    "examples/local_",
-    "examples/matched_",
+    "research/",
     "lib/imp/benchmark_env.ex",
     "lib/mix/tasks/imp.benchmark",
     "bench/",
@@ -64,11 +58,6 @@ defmodule PackageContractTest do
   ]
 
   @excluded_files [
-    "docs/EVIDENCE.md",
-    "docs/BENCHMARKS.md",
-    "docs/differentials/README.md",
-    "docs/differentials/ADAPTER_FIDELITY.md",
-    "docs/differentials/UPSTREAM_EXAM.md",
     "lib/imp/benchmarks.ex",
     "lib/mix/tasks/imp.public_api.ex",
     "lib/mix/tasks/imp.package.clean_room.ex",
@@ -268,7 +257,9 @@ defmodule PackageContractTest do
 
     missing =
       files
-      |> Enum.filter(&String.match?(&1, ~r/^(README\.md|docs\/.*\.md|livebooks\/.*\.livemd)$/))
+      |> Enum.filter(
+        &String.match?(&1, ~r/^(README\.md|docs\/.*\.(?:md|cheatmd)|livebooks\/.*\.livemd)$/)
+      )
       |> documented_module_references()
       |> Enum.reject(&MapSet.member?(@documented_module_allowlist, &1))
       |> Enum.reject(fn module_name ->
@@ -304,7 +295,9 @@ defmodule PackageContractTest do
       Mix.Project.config()
       |> Keyword.fetch!(:package)
       |> Keyword.fetch!(:files)
-      |> Enum.filter(&String.match?(&1, ~r/^(README\.md|docs\/.*\.md|livebooks\/.*\.livemd)$/))
+      |> Enum.filter(
+        &String.match?(&1, ~r/^(README\.md|docs\/.*\.(?:md|cheatmd)|livebooks\/.*\.livemd)$/)
+      )
 
     unavailable =
       files
@@ -324,8 +317,8 @@ defmodule PackageContractTest do
   end
 
   defp assert_release_files(files) do
-    for file <- @product_files do
-      assert file in files
+    for file <- @product_files ++ rendered_pages() do
+      assert file in files, "#{file} is not in the package"
     end
 
     for prefix <- @excluded_prefixes do
@@ -348,6 +341,18 @@ defmodule PackageContractTest do
     end
 
     refute Enum.any?(files, &String.starts_with?(&1, "lib/mix/tasks/"))
+  end
+
+  # Every page hexdocs renders ships with the package, so the docs a consumer
+  # has offline are the ones online.
+  defp rendered_pages do
+    Mix.Project.config()
+    |> Keyword.fetch!(:docs)
+    |> Keyword.fetch!(:extras)
+    |> Enum.map(fn
+      {path, _opts} -> to_string(path)
+      path -> path
+    end)
   end
 
   defp package_tmp_dir do
@@ -1243,7 +1248,7 @@ defmodule PackageContractTest do
     end
   end
 
-  defp shipped_markdown?(path), do: String.ends_with?(path, [".md", ".livemd"])
+  defp shipped_markdown?(path), do: String.ends_with?(path, [".md", ".livemd", ".cheatmd"])
 
   defp reference_base(_source, "docs/" <> _rest), do: File.cwd!()
   defp reference_base(_source, "livebooks/" <> _rest), do: File.cwd!()

@@ -3,7 +3,7 @@ defmodule Imp.LocalSIMBABanking77ResultTest do
 
   test "retained rule-only stop is negative operational evidence, not a mutation claim" do
     result =
-      "examples/local_simba_banking77/exercised-rule-only-stopped-result.json"
+      "research/local_simba_banking77/exercised-rule-only-stopped-result.json"
       |> File.read!()
       |> Jason.decode!()
 
@@ -17,7 +17,7 @@ defmodule Imp.LocalSIMBABanking77ResultTest do
 
   test "retained full-strategy run preserves mutation, validation rejection, and fresh reuse" do
     result =
-      "examples/local_simba_banking77/exercised-result.json"
+      "research/local_simba_banking77/exercised-result.json"
       |> File.read!()
       |> Jason.decode!()
 

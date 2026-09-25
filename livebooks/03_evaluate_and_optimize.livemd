@@ -37,9 +37,8 @@ live_provider_enabled? = System.get_env("LIVE_PROVIDER") == "1"
 
 ## Build Train And Dev Sets
 
-Livebook 02 made the program inspectable. This chapter gives that program a
-scorecard. Optimizers are only useful after examples and metrics say what
-better means.
+This notebook gives a program a scorecard. Optimizers are only useful after
+examples and metrics say what better means.
 
 Optimizers need two kinds of examples. The train set is material they can use
 to build candidates. The dev set is the held-out scorecard used to choose

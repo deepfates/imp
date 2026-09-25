@@ -5,10 +5,10 @@ defmodule LocalGRPOTRECSourceGuidedPreregistrationTest do
   alias Imp.Optimizer.Report
 
   @treatment_id "imp-grpo-trec-coarse-lora-source-guided-v1"
-  @data_path "examples/local_grpo_opaque_banking77/trec-source-guided-v1-data.json"
-  @config_path "examples/local_grpo_opaque_banking77/trec-source-guided-v1-treatment.json"
+  @data_path "research/local_grpo_opaque_banking77/trec-source-guided-v1-data.json"
+  @config_path "research/local_grpo_opaque_banking77/trec-source-guided-v1-treatment.json"
   @contract_path "priv/trl_worker/qwen-trec-source-guided-33-step-contract.json"
-  @runner_path "examples/local_grpo_opaque_banking77/run.exs"
+  @runner_path "research/local_grpo_opaque_banking77/run.exs"
   @source_path "benchmarks/data/confidence-calibration-trec-fine.jsonl"
   @simba_path "benchmarks/data/simba-trec-coarse-v1.json"
   @legend [{"DESC", "R17"}, {"HUM", "R42"}, {"LOC", "R68"}, {"NUM", "R93"}]

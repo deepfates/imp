@@ -1,73 +1,867 @@
 defmodule DocumentationContractTest do
-  use ExUnit.Case, async: true
+  @moduledoc """
+  Properties every rendered page holds. The pages are the `extras` in
+  `mix.exs`, so a page is checked by being added to the docs.
 
-  @documented_module_allowlist MapSet.new([
-                                 "Imp.Optimize",
-                                 "Imp.Optimizer",
-                                 "Imp.TaskSupervisor",
-                                 "Imp.UnlinkedTaskSupervisor"
-                               ])
+  Code on a guide runs in order, one top-level expression at a time, sharing
+  one binding, in a scratch directory. The Getting started pages are one
+  walk-through and share one binding across pages.
 
-  test "the benchmark docs name runnable commands instead of closed planning tickets" do
-    benchmarks = File.read!("docs/BENCHMARKS.md")
-    contributing = File.read!("CONTRIBUTING.md")
+    * Every Elixir block must parse.
+    * A block fenced with `~~~` is only parsed. Use it for a fragment that
+      needs something the page does not set up, or for a config file.
+    * Code runs with the network refused: provider keys are replaced by a
+      placeholder, and every HTTP request gets a 401 and is counted. Building
+      a provider client works. An expression that sends a request is live: its
+      value is not checked, and what it binds is live from then on. A block
+      naming one of `@live_markers` starts processes or installs packages, and
+      is live without running.
+    * An expression that needs a live variable is live the same way. The
+      expressions around it still run, so a scripted-model example on a page
+      that otherwise calls a provider is checked.
+    * An expression that needs a variable no earlier code defined is a
+      fragment and is only parsed, unless it shows a result.
+    * `#=> value` after an expression is a claim about that expression's
+      value, and is checked unless the expression was live. The value is read
+      as a pattern (so a map may show some of its keys), then as an
+      expression, then compared with `inspect/1`. Lines beginning `#` and
+      three spaces continue it.
 
-    refute_closed_ticket_refs(benchmarks)
-    refute_closed_ticket_refs(contributing)
-    refute benchmarks =~ "before closing"
-    refute benchmarks =~ "waiting on live release evidence"
+  Only guides run here. Livebooks run as notebooks under
+  `mix livebook.execute.check`; a cheatsheet is a set of separate snippets,
+  not a sequence; the release notes and changelog are history.
+  """
+  use ExUnit.Case, async: false
 
-    assert contributing =~ "mix integration.check"
-    assert contributing =~ "mix protocol.check"
-    assert contributing =~ "mix livebook.execute.check"
-    assert benchmarks =~ "mix differential.check"
+  # Words that belong to the project's research and process, not to a reader
+  # building with Imp. Checked in prose only; code may use them (an `owner:`
+  # option is fine).
+  @banned_vocabulary [
+    ~r/\breceipts?\b/i,
+    ~r/\blanes?\b/i,
+    ~r/\bgat(?:e|es|ed|ing)\b/i,
+    ~r/\btreatments?\b/i,
+    ~r/\bpre-?registered\b/i,
+    ~r/\bfalsif(?:y|ies|ied|ying|iable|ication)\b/i,
+    ~r/\bC[0-5]\b/,
+    ~r/\bparity claims?\b/i,
+    ~r/\bowners?\b/i,
+    ~r/\brulings?\b/i,
+    ~r/\bconstellation\b/i,
+    ~r/\bworkshop\b/i,
+    ~r/\b(?:Dwell|Kite|Haven)\b/,
+    ~r/\bevidence\b/i,
+    ~r/\bfidelity\b/i,
+    ~r/\b(?:imp|de|dee|eid)-[a-z0-9]{4}\b/
+  ]
 
-    assert Code.ensure_loaded?(Imp.Embeddings.BagOfWords)
-    assert Code.ensure_loaded?(Imp.MCP.Catalog)
-    assert Code.ensure_loaded?(Imp.MCP.HTTPClient)
-    assert Code.ensure_loaded?(Imp.MCP.StdioClient)
-    assert Code.ensure_loaded?(Imp.MCP.StreamableHTTPClient)
-  end
+  # A block naming one of these starts servers, other OS processes or a
+  # package install, so the doc tests parse it and do not run it.
+  @live_markers [
+    "Imp.MCP.connect",
+    "Mix.install"
+  ]
 
-  # A benchmark command a reader cannot run is worse than no command. The file
-  # name of a Mix task module is not the task name: both
-  # lib/mix/tasks/imp.benchmark.classical_optimizer_differential.ex and
-  # lib/mix/tasks/imp.benchmark.weight_composition_differential.ex define a
-  # module with no run/1 plus several sibling task modules that do have one,
-  # so `mix imp.benchmark.classical_optimizer_differential` does not exist
-  # while `mix imp.benchmark.bootstrap_few_shot_differential` does. Resolving
-  # the module is therefore not enough; it has to be invocable.
-  test "every mix command the benchmark docs publish is invocable" do
-    published = published_mix_commands("docs/BENCHMARKS.md")
+  # Replaced for the run, so no real key is ever sent anywhere.
+  @provider_keys ["OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY"]
 
-    assert length(published) > 20
+  # Process names the module check would otherwise read as modules.
+  @module_reference_allowlist MapSet.new(["Imp.TaskSupervisor", "Imp.UnlinkedTaskSupervisor"])
 
-    for task <- published do
-      assert invocable_mix_command?(task),
-             "docs/BENCHMARKS.md publishes `mix #{task}`, which is neither an " <>
-               "alias in mix.exs nor a Mix task module exporting run/1"
+  @history ["CHANGELOG.md", "RELEASE_NOTES.md"]
+
+  describe "every rendered page" do
+    test "has Elixir blocks that parse" do
+      failures =
+        for page <- pages(),
+            %{lang: "elixir"} = block <- blocks(page),
+            {:error, reason} <- [parse(block.code)],
+            do: "#{page}:#{block.line}: #{reason}"
+
+      assert failures == [], Enum.join(failures, "\n")
+    end
+
+    @tag timeout: 600_000
+    test "runs its provider-free blocks and matches the results it shows" do
+      failures =
+        for session <- sessions(),
+            blocks = Enum.map(session, &{&1, blocks(&1)}),
+            failure <- in_scratch_dir(fn -> run_session(blocks) end).failures,
+            do: failure
+
+      assert failures == [], Enum.join(failures, "\n\n")
+    end
+
+    test "links only to files that exist and render" do
+      extras = MapSet.new(pages())
+      by_name = pages() |> Enum.group_by(&Path.basename/1)
+
+      failures =
+        for page <- pages(),
+            {target, line} <- relative_links(page),
+            failure = link_failure(page, target, extras, by_name),
+            failure != nil,
+            do: "#{page}:#{line}: #{target} #{failure}"
+
+      assert failures == [], Enum.join(failures, "\n")
+    end
+
+    # ExDoc's Markdown parser reads a fence whose info string has a second
+    # word (```elixir no_run) as inline code, which unbalances every fence
+    # after it: the rest of the page renders its headings as literal text.
+    test "fences code with a one-word info string" do
+      failures =
+        for page <- pages(),
+            {line, number} <- page |> File.read!() |> String.split("\n") |> Enum.with_index(1),
+            Regex.match?(~r/^\s*(```|~~~)\S+\s+\S/, line),
+            do: "#{page}:#{number}"
+
+      assert failures == [], "fences with a multi-word info string: #{inspect(failures)}"
+    end
+
+    test "names only documented modules" do
+      documented = documented_modules()
+
+      failures =
+        for page <- pages(),
+            page not in @history,
+            name <- page |> File.read!() |> without_output() |> module_references(),
+            not MapSet.member?(@module_reference_allowlist, name),
+            not documented?(documented, name),
+            uniq: true,
+            do: "#{page}: #{name}"
+
+      assert failures == [], Enum.join(failures, "\n")
+    end
+
+    test "keeps research and process vocabulary out of its prose" do
+      failures =
+        for page <- pages(),
+            page not in @history,
+            {line, number} <- page |> File.read!() |> prose() |> Enum.with_index(1),
+            pattern <- @banned_vocabulary,
+            [word | _] <- [Regex.run(pattern, line)],
+            do: "#{page}:#{number}: #{word}"
+
+      assert failures == [], Enum.join(failures, "\n")
     end
   end
 
-  test "the invocable-command check rejects a module that is not a runnable task" do
-    # Guard on the guard: these two resolve to real modules under
-    # lib/mix/tasks, and neither can be run.
-    refute invocable_mix_command?("imp.benchmark.classical_optimizer_differential")
-    refute invocable_mix_command?("imp.benchmark.weight_composition_differential")
-    refute invocable_mix_command?("imp.benchmark.no_such_task_at_all")
+  describe "the research material" do
+    test "links only to files that exist" do
+      failures =
+        for page <- research_pages(),
+            {target, line} <- relative_links(page),
+            not File.exists?(resolve(page, target)),
+            do: "#{page}:#{line}: #{target}"
 
-    assert invocable_mix_command?("imp.benchmark.bootstrap_few_shot_differential")
-    assert invocable_mix_command?("differential.check")
+      assert failures == [], Enum.join(failures, "\n")
+    end
+
+    # The file name of a Mix task module is not the task name: both
+    # lib/mix/tasks/imp.benchmark.classical_optimizer_differential.ex and
+    # lib/mix/tasks/imp.benchmark.weight_composition_differential.ex define a
+    # module with no run/1 plus several sibling task modules that do have one.
+    # Resolving the module is therefore not enough; it has to be invocable.
+    test "publishes only mix commands that can be invoked" do
+      published =
+        for page <- research_pages(),
+            [_, task] <- Regex.scan(~r/mix ([a-z][a-z_0-9.]*[a-z0-9])/, File.read!(page)),
+            task not in ["deps.get", "run", "test", "help", "compile", "format"],
+            uniq: true,
+            do: {page, task}
+
+      assert length(published) > 20
+
+      failures =
+        for {page, task} <- published,
+            not invocable_mix_command?(task),
+            do: "#{page}: mix #{task}"
+
+      assert failures == [], Enum.join(failures, "\n")
+    end
   end
 
-  defp published_mix_commands(path) do
-    path
+  describe "the checks themselves" do
+    test "a shown result that does not match fails" do
+      assert [_] = run_markdown("```elixir\n1 + 1\n#=> 3\n```\n").failures
+      assert [] == run_markdown("```elixir\n1 + 1\n#=> 2\n```\n").failures
+    end
+
+    test "each shown result in a block is checked against its own expression" do
+      page = """
+      ```elixir
+      x = 2
+      x * 3
+      #=> 6
+      x + 1
+      #=> 4
+      ```
+      """
+
+      assert %{failures: [_], checked: 1} = run_markdown(page)
+    end
+
+    test "a shown map is a pattern, and a multi-line result continues with #   " do
+      page = """
+      ```elixir
+      %{team: "atlas", score: 1.0, extra: [1, 2]}
+      #=> %{team: "atlas",
+      #     score: 1.0}
+      ```
+      """
+
+      assert %{failures: [], checked: 1} = run_markdown(page)
+    end
+
+    test "a block that sends a request is live, and so is what depends on it" do
+      page = """
+      ```elixir
+      lm = Imp.req_llm("openai:gpt-5.4-mini", api_key: System.fetch_env!("OPENAI_API_KEY"))
+      router = Imp.predict("ticket -> team", lm: lm)
+      ```
+
+      ```elixir
+      {:ok, prediction} = Imp.call(router, %{ticket: "charged twice"})
+      Imp.get(prediction, :team)
+      #=> :never_checked
+      ```
+
+      ```elixir
+      prediction.metadata
+      #=> :never_checked
+      ```
+      """
+
+      assert %{failures: [], checked: 0, requests: 1, live_vars: live} = run_markdown(page)
+      assert :prediction in live
+      refute :router in live
+    end
+
+    test "a provider-free expression after a request still runs and is checked" do
+      page = """
+      ```elixir
+      lm = Imp.req_llm("openai:gpt-5.4-mini", api_key: System.fetch_env!("OPENAI_API_KEY"))
+      router = Imp.predict("ticket -> team", lm: lm)
+      {:ok, prediction} = Imp.call(router, %{ticket: "charged twice"})
+      ```
+
+      ```elixir
+      always_atlas = Imp.with_lm(router, Imp.LM.Static.new(handler: fn _, _ -> %{team: "atlas"} end))
+      {:ok, scripted} = Imp.call(always_atlas, %{ticket: "charged twice"})
+      Imp.get(scripted, :team)
+      #=> "atlas"
+      ```
+      """
+
+      assert %{failures: [], checked: 1, requests: 1} = run_markdown(page)
+    end
+
+    test "a real provider key is never visible to a page" do
+      page = """
+      ```elixir
+      System.fetch_env!("OPENAI_API_KEY")
+      #=> "sk-the-doc-tests-send-no-requests"
+      ```
+      """
+
+      assert %{failures: [], checked: 1} = run_markdown(page)
+    end
+
+    test "blocks share one binding, in order" do
+      page = """
+      ```elixir
+      router = Imp.predict("ticket -> team", lm: Imp.LM.Static.new(handler: fn _, _ -> %{team: "atlas"} end))
+      ```
+
+      ```elixir
+      {:ok, prediction} = Imp.call(router, %{ticket: "charged twice"})
+      Imp.get(prediction, :team)
+      #=> "atlas"
+      ```
+      """
+
+      assert %{failures: [], checked: 1, ran: 2} = run_markdown(page)
+    end
+
+    test "a fragment is parsed only, unless it shows a result" do
+      assert %{failures: [], ran: 0} = run_markdown("```elixir\nImp.call(program, inputs)\n```\n")
+
+      assert %{failures: [_]} =
+               run_markdown("```elixir\nImp.call(program, inputs)\n#=> {:ok, _}\n```\n")
+    end
+
+    test "a provider-free block that raises fails, unless it is fenced with ~~~" do
+      assert %{failures: [_]} = run_markdown("```elixir\nraise \"boom\"\n```\n")
+      assert %{failures: []} = run_markdown("~~~elixir\nraise \"boom\"\n~~~\n")
+    end
+
+    test "module names are read from prose and Elixir, not from shown output" do
+      text = "Imp.Prose\n```text\n** (Imp.Printed) boom\n```\n```elixir\nImp.Code.call()\n```\n"
+
+      assert text |> without_output() |> module_references() == ["Imp.Prose", "Imp.Code"]
+    end
+
+    test "prose excludes code, links and comments" do
+      text = """
+      A gate in prose.
+      `gate` in code, [a link](https://example.com/gate), <!-- a gate -->
+      ```elixir
+      gate = 1
+      ```
+      """
+
+      assert ["A gate in prose." | rest] = prose(text)
+      refute Enum.any?(rest, &(&1 =~ "gate"))
+    end
+
+    test "the invocable-command check rejects a module that is not a runnable task" do
+      refute invocable_mix_command?("imp.benchmark.classical_optimizer_differential")
+      refute invocable_mix_command?("imp.benchmark.weight_composition_differential")
+      refute invocable_mix_command?("imp.benchmark.no_such_task_at_all")
+
+      assert invocable_mix_command?("imp.benchmark.bootstrap_few_shot_differential")
+      assert invocable_mix_command?("differential.check")
+    end
+  end
+
+  describe "Getting started" do
+    test "chains its pages in reading order with Next links" do
+      [_ | rest] = pages = getting_started()
+
+      for {page, next} <- Enum.zip(pages, rest) do
+        assert File.read!(page) =~
+                 ~r/\*\*Next:\*\* \[[^\]]*\]\(#{Regex.escape(Path.basename(next))}\)/,
+               "#{page} does not end with a Next link to #{next}"
+      end
+    end
+  end
+
+  # Runs every block, live ones included, against a provider: README on its
+  # own, Getting started as one session, and each other guide on its own.
+  # The pages show OpenAI; with only OPENROUTER_API_KEY set, the same models
+  # run through OpenRouter's OpenAI route.
+  @tag :live
+  @tag timeout: 1_200_000
+  test "every guide runs end to end against a provider" do
+    for session <- sessions() do
+      blocks =
+        for page <- session,
+            block <- blocks(page),
+            block.lang == "elixir" and block.fence == "```",
+            do: {page, block}
+
+      in_scratch_dir(fn ->
+        Enum.reduce(blocks, [], fn {page, block}, binding ->
+          {_result, binding} =
+            Code.eval_string(provider(block.code), binding, file: page, line: block.line)
+
+          binding
+        end)
+      end)
+    end
+  end
+
+  defp provider(code) do
+    if System.get_env("OPENAI_API_KEY") || is_nil(System.get_env("OPENROUTER_API_KEY")) do
+      code
+    else
+      code
+      |> String.replace(~s|Imp.req_llm("openai:|, ~s|Imp.req_llm("openrouter:openai/|)
+      |> String.replace(
+        ~s|System.fetch_env!("OPENAI_API_KEY")|,
+        ~s|System.fetch_env!("OPENROUTER_API_KEY")|
+      )
+    end
+  end
+
+  ## Pages
+
+  defp pages do
+    Mix.Project.config()
+    |> Keyword.fetch!(:docs)
+    |> Keyword.fetch!(:extras)
+    |> Enum.map(fn
+      {path, _opts} -> to_string(path)
+      path -> path
+    end)
+  end
+
+  # Getting started is one walk-through, read as one session; every other
+  # guide stands alone.
+  defp sessions do
+    gs = getting_started()
+    [gs | for(page <- pages(), guide?(page), page not in gs, do: [page])]
+  end
+
+  defp getting_started do
+    Mix.Project.config()
+    |> Keyword.fetch!(:docs)
+    |> Keyword.fetch!(:groups_for_extras)
+    |> Keyword.fetch!(:"Getting started")
+  end
+
+  defp guide?(page), do: String.ends_with?(page, ".md") and page not in @history
+
+  defp research_pages, do: Path.wildcard("research/**/*.md")
+
+  defp documented_modules do
+    "priv/public_api.json"
     |> File.read!()
-    |> then(&Regex.scan(~r/mix ([a-z][a-z_0-9.]*[a-z0-9])/, &1))
-    |> Enum.map(fn [_, task] -> task end)
-    |> Enum.uniq()
-    |> Enum.reject(&(&1 in ["deps.get", "run", "test", "help"]))
+    |> Jason.decode!()
+    |> Map.fetch!("modules")
+    |> MapSet.new(& &1["module"])
   end
+
+  # Shown output (```text, ```sh) records what the runtime printed, which may
+  # name an internal module; only the page's own words and code are checked.
+  defp without_output(text) do
+    Regex.replace(~r/^\s*(```|~~~)(?!elixir\s*$)[^\n]*\n.*?^\s*\1\s*$/ms, text, "")
+  end
+
+  # A documented module, or a namespace of documented modules (`Imp.Retrievers`).
+  defp documented?(documented, name) do
+    MapSet.member?(documented, name) or
+      Enum.any?(documented, &String.starts_with?(&1, name <> "."))
+  end
+
+  defp module_references(text) do
+    ~r/(?<![\w.])Imp(?:\.[A-Z][A-Za-z0-9_]*)+/
+    |> Regex.scan(text)
+    |> List.flatten()
+  end
+
+  ## Blocks
+
+  # Splits Markdown into fenced blocks: %{fence, lang, code, line}.
+  defp blocks(page), do: page |> File.read!() |> parse_blocks()
+
+  defp parse_blocks(text) do
+    text
+    |> String.split("\n")
+    |> Enum.with_index(1)
+    |> Enum.reduce({[], nil}, fn
+      {line, number}, {acc, nil} ->
+        case Regex.run(~r/^\s*(```|~~~)\s*([\w+-]*)\s*$/, line) do
+          [_, fence, lang] -> {acc, %{fence: fence, lang: lang, lines: [], line: number + 1}}
+          nil -> {acc, nil}
+        end
+
+      {line, _number}, {acc, open} ->
+        if String.trim(line) == open.fence do
+          block = %{
+            fence: open.fence,
+            lang: open.lang,
+            line: open.line,
+            code: open.lines |> Enum.reverse() |> Enum.join("\n")
+          }
+
+          {[block | acc], nil}
+        else
+          {acc, %{open | lines: [line | open.lines]}}
+        end
+    end)
+    |> elem(0)
+    |> Enum.reverse()
+  end
+
+  defp parse(code) do
+    case Code.string_to_quoted(code) do
+      {:ok, _} -> :ok
+      {:error, {meta, message, token}} -> {:error, "line #{meta[:line]}: #{message}#{token}"}
+    end
+  end
+
+  ## Running a page
+
+  defp run_markdown(text), do: run_session([{"page.md", parse_blocks(text)}])
+
+  # Pages in a session share one binding, in order.
+  defp run_session(pages) do
+    without_network(fn requests ->
+      state = %{
+        binding: [],
+        env: Code.env_for_eval([]),
+        live_vars: MapSet.new(),
+        live_modules: [],
+        failures: [],
+        ran: 0,
+        checked: 0,
+        requests: requests
+      }
+
+      pages
+      |> Enum.reduce(state, fn {page, blocks}, state ->
+        blocks
+        |> Enum.filter(&(&1.lang == "elixir" and &1.fence == "```"))
+        |> Enum.reduce(state, &run_block(page, &1, &2))
+      end)
+      |> Map.update!(:failures, &Enum.reverse/1)
+      |> Map.put(:requests, :counters.get(requests, 1))
+    end)
+  end
+
+  # Every request Req makes (ReqLLM builds its requests with Req) gets a 401,
+  # which is not retried, and is counted.
+  defp without_network(fun) do
+    requests = :counters.new(1, [:atomics])
+    defaults = Req.default_options()
+    keys = Map.new(@provider_keys, &{&1, System.get_env(&1)})
+
+    refuse = fn request ->
+      :counters.add(requests, 1, 1)
+      body = %{"error" => %{"message" => "the doc tests send no requests"}}
+      {request, Req.Response.new(status: 401, body: body)}
+    end
+
+    try do
+      Enum.each(@provider_keys, &System.put_env(&1, "sk-the-doc-tests-send-no-requests"))
+      Req.default_options(Keyword.put(defaults, :adapter, refuse))
+      fun.(requests)
+    after
+      Req.default_options(defaults)
+
+      Enum.each(keys, fn
+        {key, nil} -> System.delete_env(key)
+        {key, value} -> System.put_env(key, value)
+      end)
+    end
+  end
+
+  defp run_block(page, block, state) do
+    where = "#{page}:#{block.line}"
+    segments = segments(block.code)
+
+    cond do
+      parse(block.code) != :ok ->
+        state
+
+      Enum.any?(@live_markers, &String.contains?(block.code, &1)) ->
+        taint(state, block.code)
+
+      true ->
+        Enum.reduce_while(segments, %{state | ran: state.ran + 1}, fn segment, state ->
+          case run_segment(segment, state) do
+            {:ok, state} ->
+              {:cont, state}
+
+            {:skip, :live} ->
+              {:halt, taint(%{state | ran: state.ran - 1}, block.code)}
+
+            {:skip, :fragment} ->
+              if Enum.any?(segments, & &1.expected) do
+                {:halt, fail(state, where, "needs a variable no earlier block defines")}
+              else
+                {:halt, taint(%{state | ran: state.ran - 1}, block.code)}
+              end
+
+            # What a failed block would have bound is missing; its dependents
+            # are skipped rather than reported again.
+            {:error, message} ->
+              {:halt, state |> fail(where, message) |> taint(block.code)}
+          end
+        end)
+    end
+  end
+
+  defp fail(state, where, message),
+    do: %{state | failures: ["#{where}: #{message}" | state.failures]}
+
+  defp taint(state, code) do
+    {:ok, ast} = Code.string_to_quoted(code)
+    taint_ast(state, ast)
+  end
+
+  defp taint_ast(state, ast) do
+    {_, {vars, modules}} =
+      Macro.prewalk(ast, {[], []}, fn
+        {:defmodule, _, [{:__aliases__, _, parts} | _]} = node, {vars, modules} ->
+          {node, {vars, [Module.concat(parts) | modules]}}
+
+        {op, _, [pattern, _]} = node, {vars, modules} when op in [:=, :<-] ->
+          {node, {pattern_vars(pattern) ++ vars, modules}}
+
+        node, acc ->
+          {node, acc}
+      end)
+
+    # What the block bound is unknown now; a later block that reads it is live.
+    %{
+      state
+      | binding: Keyword.drop(state.binding, vars),
+        live_vars: MapSet.union(state.live_vars, MapSet.new(vars)),
+        live_modules: modules ++ state.live_modules
+    }
+  end
+
+  defp pattern_vars(pattern) do
+    {_, vars} =
+      Macro.prewalk(pattern, [], fn
+        {:^, _, _}, acc ->
+          {:pinned, acc}
+
+        {name, _, context} = node, acc when is_atom(name) and is_atom(context) ->
+          {node, [name | acc]}
+
+        node, acc ->
+          {node, acc}
+      end)
+
+    vars
+  end
+
+  # A block is a sequence of expressions, each optionally followed by the
+  # result it shows.
+  defp segments(code) do
+    {segments, current} =
+      code
+      |> String.split("\n")
+      |> Enum.reduce({[], %{code: [], expected: nil}}, fn line, {done, current} ->
+        cond do
+          match = Regex.run(~r/^\s*#=>\s?(.*)$/, line) ->
+            {done, %{current | expected: [Enum.at(match, 1)]}}
+
+          current.expected != nil and Regex.match?(~r/^\s*#\s{3,}/, line) ->
+            continued = Regex.replace(~r/^\s*#\s{3,}/, line, "")
+            {done, %{current | expected: [continued | current.expected]}}
+
+          current.expected != nil ->
+            {[finish(current) | done], %{code: [line], expected: nil}}
+
+          true ->
+            {done, %{current | code: [line | current.code]}}
+        end
+      end)
+
+    [finish(current) | segments]
+    |> Enum.reverse()
+    |> Enum.reject(&(String.trim(&1.code) == "" and &1.expected == nil))
+  end
+
+  defp finish(%{code: code, expected: expected}) do
+    %{
+      code: code |> Enum.reverse() |> Enum.join("\n"),
+      expected: expected && expected |> Enum.reverse() |> Enum.join("\n")
+    }
+  end
+
+  # A segment runs one top-level expression at a time, so an expression that
+  # sends a request makes only what it binds live; the expressions before it
+  # keep their values, and later ones run unless they need what it bound.
+  defp run_segment(%{code: code, expected: expected}, state) do
+    {:ok, quoted} = Code.string_to_quoted(code)
+
+    statements =
+      case quoted do
+        {:__block__, _, statements} -> statements
+        statement -> [statement]
+      end
+
+    result =
+      Enum.reduce_while(statements, {:ok, nil, state, false}, fn statement, {:ok, _, state, _} ->
+        case run_statement(statement, state) do
+          {:ok, value, state} -> {:cont, {:ok, value, state, false}}
+          {:skip, :live} -> {:cont, {:ok, nil, taint_ast(state, statement), true}}
+          other -> {:halt, other}
+        end
+      end)
+
+    case result do
+      {:ok, _value, state, true} ->
+        {:ok, state}
+
+      {:ok, value, state, false} ->
+        case expected && check(value, expected, state.binding) do
+          nil -> {:ok, state}
+          :ok -> {:ok, %{state | checked: state.checked + 1}}
+          {:error, message} -> {:error, message}
+        end
+
+      other ->
+        other
+    end
+  end
+
+  defp run_statement(statement, state) do
+    before = :counters.get(state.requests, 1)
+
+    {outcome, diagnostics} =
+      Code.with_diagnostics(fn ->
+        try do
+          {:ok, Code.eval_quoted_with_env(statement, state.binding, state.env)}
+        rescue
+          error in [CompileError] -> {:compile_error, error}
+          error in [UndefinedFunctionError] -> {:undefined, error, __STACKTRACE__}
+          error -> {:raised, error, __STACKTRACE__}
+        end
+      end)
+
+    undefined =
+      for %{message: message} <- diagnostics,
+          [_, name] <- [Regex.run(~r/undefined variable "(\w+)"/, message)],
+          do: String.to_atom(name)
+
+    sent_request? = :counters.get(state.requests, 1) > before
+
+    case outcome do
+      _ when sent_request? ->
+        {:skip, :live}
+
+      {:ok, {value, binding, env}} ->
+        {:ok, value, %{state | binding: binding, env: env}}
+
+      {:compile_error, error} ->
+        cond do
+          Enum.any?(undefined, &MapSet.member?(state.live_vars, &1)) ->
+            {:skip, :live}
+
+          undefined != [] ->
+            {:skip, :fragment}
+
+          true ->
+            {:error,
+             Enum.map_join(diagnostics, "\n", & &1.message) <> "\n" <> Exception.message(error)}
+        end
+
+      {:undefined, %{module: module} = error, stacktrace} ->
+        if module in state.live_modules,
+          do: {:skip, :live},
+          else: {:error, Exception.format(:error, error, stacktrace)}
+
+      {:raised, error, stacktrace} ->
+        {:error, Exception.format(:error, error, stacktrace)}
+    end
+  end
+
+  defp check(value, expected, binding) do
+    shown = fn -> "shows #{expected}, got #{inspect(value, pretty: true)}" end
+
+    case Code.string_to_quoted(expected) do
+      {:ok, quoted} ->
+        case as_pattern(quoted, value) do
+          true ->
+            :ok
+
+          false ->
+            {:error, shown.()}
+
+          :not_a_pattern ->
+            case Code.eval_quoted(quoted, binding) do
+              {^value, _} -> :ok
+              _ -> {:error, shown.()}
+            end
+        end
+
+      {:error, _} ->
+        if squash(inspect(value, pretty: true)) == squash(expected),
+          do: :ok,
+          else: {:error, shown.()}
+    end
+  rescue
+    error ->
+      {:error, "shows #{expected}, which could not be checked: #{Exception.message(error)}"}
+  end
+
+  defp as_pattern(quoted, value) do
+    {matched?, _diagnostics} =
+      Code.with_diagnostics(fn ->
+        try do
+          {result, _} =
+            Code.eval_quoted(quote(do: match?(unquote(quoted), var!(value))), value: value)
+
+          result
+        rescue
+          CompileError -> :not_a_pattern
+        end
+      end)
+
+    matched?
+  end
+
+  defp squash(text), do: text |> String.split() |> Enum.join(" ")
+
+  defp in_scratch_dir(fun) do
+    dir = Path.join(System.tmp_dir!(), "imp-docs-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(dir)
+    original = File.cwd!()
+
+    try do
+      File.cd!(dir)
+      fun.()
+    after
+      File.cd!(original)
+      File.rm_rf!(dir)
+    end
+  end
+
+  ## Links and prose
+
+  defp relative_links(page) do
+    for {line, number} <- page |> File.read!() |> without_code() |> Enum.with_index(1),
+        [_, target] <-
+          Regex.scan(~r/\]\(([^)\s]+)(?:\s+"[^"]*")?\)/, line) ++
+            Regex.scan(~r/\b(?:src|href)="([^"]+)"/, line),
+        not String.match?(target, ~r/^(?:[a-z]+:|#)/),
+        do: {target |> String.split("#") |> hd(), number}
+  end
+
+  defp resolve(page, target) do
+    page |> Path.dirname() |> Path.join(target) |> Path.expand() |> Path.relative_to_cwd()
+  end
+
+  # ExDoc renders a link to another extra as a link to its page, and resolves
+  # it by base name alone; it copies assets/. Anything else would be a broken
+  # link on hexdocs, so it needs a full URL.
+  defp link_failure(page, target, extras, by_name) do
+    path = resolve(page, target)
+    doc? = String.ends_with?(path, [".md", ".livemd", ".cheatmd"])
+
+    cond do
+      not File.exists?(path) ->
+        "does not exist"
+
+      doc? and not MapSet.member?(extras, path) ->
+        "is not rendered; link to it by URL"
+
+      doc? and by_name[Path.basename(path)] != [path] ->
+        "shares its base name with another page"
+
+      not doc? and not String.starts_with?(path, "assets/") ->
+        "is not published; link to it by URL"
+
+      true ->
+        nil
+    end
+  end
+
+  # Text lines with fenced code blanked, so line numbers still match the page.
+  defp without_code(text) do
+    text
+    |> String.split("\n")
+    |> Enum.map_reduce(nil, fn line, fence ->
+      case {Regex.run(~r/^\s*(```|~~~)/, line), fence} do
+        {[_, open], nil} -> {"", open}
+        {[_, same], same} -> {"", nil}
+        {_, nil} -> {line, nil}
+        {_, fence} -> {"", fence}
+      end
+    end)
+    |> elem(0)
+  end
+
+  defp prose(text) do
+    text
+    |> String.replace(~r/<!--.*?-->|<[^>]+>/s, &String.replace(&1, ~r/[^\n]/, ""))
+    |> without_code()
+    |> Enum.map(fn line ->
+      line
+      |> String.replace(~r/`[^`]*`/, "")
+      |> String.replace(~r/\]\([^)]*\)/, "]")
+      |> String.replace(~r/https?:\/\/\S+/, "")
+    end)
+  end
+
+  ## Mix commands
 
   defp invocable_mix_command?(task) do
     aliases =
@@ -86,627 +880,5 @@ defmodule DocumentationContractTest do
       true ->
         false
     end
-  end
-
-  test "documented Imp module references resolve to loadable modules" do
-    missing =
-      documented_module_references()
-      |> Enum.reject(&MapSet.member?(@documented_module_allowlist, &1))
-      |> Enum.reject(fn name ->
-        name
-        |> module_from_string()
-        |> Code.ensure_loaded?()
-      end)
-
-    assert missing == []
-  end
-
-  test "the learning path owns the signature type DSL" do
-    body = File.read!("docs/LEARNING_PATH.md")
-
-    for spelling <-
-          ~w(string str integer int float number boolean bool datetime object map dict array enum class yes_no short_span numeric_span) do
-      assert body =~ "`#{spelling}", "missing signature type spelling #{spelling}"
-    end
-
-    assert body =~ "Unknown types and duplicate names fail"
-    assert body =~ "Imp.Signature.Field"
-  end
-
-  test "user-facing docs keep the internal HTTP transport out of the public vocabulary" do
-    docs =
-      ["README.md" | Path.wildcard("docs/*.md") ++ Path.wildcard("livebooks/*.livemd")]
-      |> Enum.map_join("\n", &File.read!/1)
-
-    refute docs =~ "Imp.HTTP.Hackneyless"
-  end
-
-  test "the benchmark docs separate what can be re-measured from what cannot" do
-    body = File.read!("docs/BENCHMARKS.md")
-
-    refute body =~ "Ticket:"
-    refute body =~ "regressions have tickets"
-
-    assert body =~ "## Cannot be re-measured"
-    assert body =~ "The split files are\nabsent"
-
-    results = File.read!("benchmarks/RESULTS.md")
-
-    assert results =~ "## Re-measurable"
-    assert results =~ "## Recomputable only"
-    assert results =~ "## Findings that are not results"
-  end
-
-  test "adapter fidelity audit names upstream semantics and Imp evidence" do
-    body = File.read!("docs/differentials/ADAPTER_FIDELITY.md")
-    contributing = File.read!("CONTRIBUTING.md")
-
-    assert contributing =~ "Public behavior belongs to code, tests, and user documentation"
-    assert body =~ "DSPy `ChatAdapter` uses `[[ ## field_name ## ]]` delimiters"
-    assert body =~ "JSON fallback"
-    assert body =~ "Imp.Adapter.JSON.lm_opts/2"
-    assert body =~ "Imp.Clients.ReqLLM"
-    assert body =~ "Intentional Deviations"
-    assert body =~ "the semantic contract (field names, delimiter structure"
-
-    # Lock the honest byte-parity claim (dee-8zev): the doc must state the
-    # measured byte-parity AND that it is enforced — so it can neither drift back
-    # to the stale "not byte-identical" underclaim nor inflate to an unqualified
-    # overclaim without a deliberate, test-visible edit.
-    assert body =~ "byte-identical to DSPy 3.2.1"
-    assert body =~ "enforced per-PR in CI"
-  end
-
-  test "shipped reader surfaces do not expose internal process coordinates" do
-    user_surfaces =
-      [
-        "README.md",
-        "RELEASE_NOTES.md",
-        "CHANGELOG.md",
-        "docs/coming-from-dspy.md",
-        "docs/LEARNING_PATH.md",
-        "docs/PRODUCTION_OPERATIONS.md",
-        "examples/deployment/README.md",
-        "examples/provider_free_ticket_router/README.md"
-      ] ++ Path.wildcard("livebooks/*.livemd")
-
-    # benchmarks/RESULTS.md is a published surface: user docs are expected to
-    # cite it. Everything else under benchmarks/ is still internal.
-    banned =
-      ~r/\bimp-[a-z]*\d[a-z0-9]*\b|docs\/(?:internal|maintainers)|benchmarks\/(?!RESULTS\.md)|evidence\//i
-
-    offenders =
-      for path <- user_surfaces,
-          match = Regex.run(banned, File.read!(path)),
-          do: {path, hd(match)}
-
-    assert offenders == [],
-           "internal coordinates leaked onto user surfaces: #{inspect(offenders)}"
-  end
-
-  test "learner-facing docs do not foreground maintainer evidence commands" do
-    learner_text =
-      ["README.md", "docs/LEARNING_PATH.md" | Path.wildcard("livebooks/*.livemd")]
-      |> Enum.map_join("\n", &File.read!/1)
-
-    refute learner_text =~ "mix evidence.check"
-  end
-
-  test "README opens with a real provider call and routes into the learning path" do
-    readme = File.read!("README.md")
-    learning = File.read!("docs/LEARNING_PATH.md")
-
-    assert readme =~ "typed Elixir program"
-    assert readme =~ "Imp.req_llm"
-    assert readme =~ "OPENAI_API_KEY"
-    assert readme =~ "docs/LEARNING_PATH.md"
-    # The front door shows a real model call, never the deterministic test double.
-    refute readme =~ "Imp.LM.Static"
-    # No quality-gate plumbing on the front door.
-    refute readme =~ "test/learning_path_contract_test.exs"
-    assert learning =~ "Imp.context/2"
-    assert learning =~ "Imp.LM.Static"
-    assert readme =~ "livebooks/01_real_lm_front_door.livemd"
-    refute readme =~ "05_real_lm_wow_path"
-  end
-
-  test "the packaged reader surface stays small and starts with the real workflow" do
-    readme = File.read!("README.md")
-    learning = File.read!("docs/LEARNING_PATH.md")
-
-    product_docs =
-      Mix.Project.config()
-      |> Keyword.fetch!(:package)
-      |> Keyword.fetch!(:files)
-      |> Enum.filter(&String.starts_with?(&1, "docs/"))
-      |> Enum.sort()
-
-    assert readme =~ "Learning Path"
-    assert readme =~ "docs/LEARNING_PATH.md"
-    assert learning =~ "## 1. Make A Real Call"
-    assert learning =~ ~r/## 10\. .*Artifact/
-
-    assert product_docs == [
-             "docs/LEARNING_PATH.md",
-             "docs/PRODUCTION_OPERATIONS.md",
-             "docs/TRAJECTORIES.md",
-             "docs/TUTORIAL_TICKET_ROUTING.md",
-             "docs/coming-from-dspy.md",
-             "docs/diving-deeper/adapters.md",
-             "docs/diving-deeper/modules-and-composition.md",
-             "docs/diving-deeper/react.md",
-             "docs/diving-deeper/signatures.md",
-             "docs/diving-deeper/tools-and-mcp.md"
-           ]
-
-    extras =
-      Mix.Project.config()
-      |> Keyword.fetch!(:docs)
-      |> Keyword.fetch!(:extras)
-
-    for doc <- ["docs/CASE_STUDY_TREC.md", "docs/EVIDENCE.md"] do
-      assert doc in extras, "#{doc} is not rendered into the docs"
-      refute doc in product_docs, "#{doc} names source-checkout commands and must not ship"
-    end
-
-    refute "docs/BENCHMARKS.md" in extras
-    refute "docs/BENCHMARKS.md" in product_docs
-
-    for doc <- ["README.md", "docs/EVIDENCE.md", "docs/TUTORIAL_TICKET_ROUTING.md"] do
-      assert File.read!(doc) =~ "blob/main/docs/BENCHMARKS.md",
-             "#{doc} does not link to the benchmark index"
-    end
-
-    refute readme =~ "01_programming_not_prompting"
-  end
-
-  # ExDoc resolves a relative link to a Markdown file by its base name alone,
-  # so `examples/deployment/README.md` opens whichever rendered extra is called
-  # README.md. Every relative link in a rendered page must name the page it
-  # opens there.
-  test "relative links in the rendered docs open the page they name" do
-    extras =
-      Mix.Project.config()
-      |> Keyword.fetch!(:docs)
-      |> Keyword.fetch!(:extras)
-      |> Enum.map(fn
-        {path, _opts} -> to_string(path)
-        path -> path
-      end)
-
-    by_name = Map.new(extras, &{Path.basename(&1), &1})
-
-    wrong =
-      for page <- extras,
-          [_, target] <-
-            Regex.scan(~r/\]\(([^)#\s]+\.(?:md|livemd))(?:#[^)]*)?\)/, File.read!(page)),
-          not String.contains?(target, "://"),
-          named =
-            page |> Path.dirname() |> Path.join(target) |> Path.expand() |> Path.relative_to_cwd(),
-          opened = Map.get(by_name, Path.basename(target)),
-          opened != nil and opened != named,
-          do: {page, target, opened}
-
-    assert wrong == [], "relative links that open another page: #{inspect(wrong)}"
-  end
-
-  # ExDoc's Markdown parser reads a fence whose info string has a second word
-  # (```elixir no_run) as inline code, which unbalances every fence after it:
-  # the rest of the page renders its headings as literal `##` text. A block
-  # the docs evaluator must skip is fenced with ~~~ instead.
-  test "rendered pages fence code with a one-word info string" do
-    extras =
-      Mix.Project.config()
-      |> Keyword.fetch!(:docs)
-      |> Keyword.fetch!(:extras)
-      |> Enum.map(fn
-        {path, _opts} -> to_string(path)
-        path -> path
-      end)
-
-    wrong =
-      for page <- extras,
-          {line, number} <- page |> File.read!() |> String.split("\n") |> Enum.with_index(1),
-          Regex.match?(~r/^\s*(```|~~~)\S+\s+\S/, line),
-          do: "#{page}:#{number}"
-
-    assert wrong == [], "fences with a multi-word info string: #{inspect(wrong)}"
-  end
-
-  test "README common workflow snippets compose as one coherent path" do
-    typed_lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{sentiment: "positive", confidence: 0.9} end]
-    }
-
-    signature =
-      Imp.signature(
-        "text -> sentiment: enum[positive,negative], confidence: number",
-        "Classify the sentiment of the text."
-      )
-
-    typed_program = Imp.predict(signature, lm: typed_lm, adapter: Imp.Adapter.JSON)
-
-    assert {:ok, typed_prediction} = Imp.call(typed_program, %{text: "Imp is useful."})
-    assert Imp.get(typed_prediction, :sentiment) == "positive"
-    assert Imp.get(typed_prediction, :confidence) == 0.9
-
-    qa_lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-    }
-
-    qa_program = Imp.predict("question -> answer", lm: qa_lm)
-
-    trainset = [
-      Imp.example(question: "Eiffel Tower city?", answer: "Paris")
-      |> Imp.with_inputs(:question)
-    ]
-
-    devset = [
-      Imp.example(question: "Capital of France?", answer: "Paris")
-      |> Imp.with_inputs(:question)
-    ]
-
-    metric = Imp.Metrics.exact_match(:answer)
-
-    assert %Imp.Evaluate.Result{score: 1.0} = Imp.evaluate(qa_program, devset, metric)
-
-    optimizer = Imp.Optimizer.RandomSearch.new(metric, candidates: 2, demos_per_candidate: 1)
-    compiled = Imp.optimize!(qa_program, optimizer, trainset, devset)
-
-    assert %Imp.Optimizer.Report{optimizer: :random_search} =
-             Imp.Optimizer.Report.fetch(compiled)
-
-    tool_lm = %{
-      module: Imp.LM.Static,
-      opts: [
-        handler: fn _messages, _opts ->
-          %{tool_calls: [%{name: :submit, arguments: %{answer: "Paris"}}]}
-        end
-      ]
-    }
-
-    lookup =
-      Imp.tool(:lookup, "lookup facts", fn %{query: "capital-france"} ->
-        "Paris"
-      end)
-
-    agent =
-      Imp.react("question -> answer: short_span", [lookup],
-        lm: tool_lm,
-        tool_policy: [:lookup, :submit]
-      )
-
-    assert {:ok, agent_prediction} = Imp.call(agent, %{question: "Capital of France?"})
-    assert Imp.get(agent_prediction, :answer) == "Paris"
-  end
-
-  test "GEPA records distinguish the differential that runs from the campaign that cannot" do
-    benchmarks = File.read!("docs/BENCHMARKS.md")
-
-    assert benchmarks =~ "mix benchmark.gepa.contract.check"
-    assert benchmarks =~ "**The GEPA six-family campaign.**"
-
-    attribution = File.read!("benchmarks/data/GEPA_SPLITS_ATTRIBUTION.md")
-
-    assert attribution =~ "not in this repository"
-  end
-
-  test "cold learning path distinguishes portable programs from selected parameter artifacts" do
-    learning = File.read!("docs/LEARNING_PATH.md")
-
-    assert learning =~ "## 8. Persist Programs Or Selected Parameters, Not Secrets"
-    assert learning =~ "There are two restart paths."
-    assert learning =~ "Imp.Optimizer.Artifact.from_optimized_program(selected"
-    assert learning =~ "Imp.Optimizer.Artifact.write!(artifact"
-    assert learning =~ "Imp.Optimizer.Artifact.read!()"
-    assert learning =~ "Imp.Optimizer.Artifact.apply(fresh_router)"
-    assert learning =~ "%Imp.Optimizer.Report{} = Imp.Optimizer.Report.fetch(deployed)"
-    assert learning =~ "Imp.Optimizer.GEPA.compile_with_artifact/5"
-    assert learning =~ "It does not carry\nyour module, LMs, adapters, callbacks"
-    assert learning =~ "tool runners, policies, credentials"
-
-    assert learning =~
-             "Measure\nthe selected program on data unavailable to optimization before promotion."
-  end
-
-  test "instruction optimizer fidelity defines durable run-level resume boundaries" do
-    fidelity = File.read!("docs/differentials/INSTRUCTION_OPTIMIZER_FIDELITY.md")
-
-    assert fidelity =~ "## Durable Run-Level Resume"
-    assert fidelity =~ "A trial is the atomic boundary"
-    assert fidelity =~ "every completed finalist evaluation"
-    assert fidelity =~ "### Rebinding And Trust Boundary"
-  end
-
-  test "the deterministic embedder says in its own docs that it is not a semantic model" do
-    {:docs_v1, _, _, _, %{"en" => doc}, _, _} = Code.fetch_docs(Imp.Embeddings.BagOfWords)
-
-    assert doc =~ "local baseline"
-    assert doc =~ "not a semantic embedding model"
-    assert doc =~ "inject a real embedding provider"
-  end
-
-  test "streaming response structs are deliberate public vocabulary" do
-    assert match?(
-             {:docs_v1, _, _, _, %{"en" => _}, _, _},
-             Code.fetch_docs(Imp.Streaming.Messages)
-           )
-
-    assert match?(
-             {:docs_v1, _, _, _, %{"en" => _}, _, _},
-             Code.fetch_docs(Imp.Streaming.Messages.StreamResponse)
-           )
-
-    assert match?(
-             {:docs_v1, _, _, _, %{"en" => _}, _, _},
-             Code.fetch_docs(Imp.Streaming.Messages.StreamListener)
-           )
-  end
-
-  test "core LM structs are deliberate public vocabulary" do
-    for module <- [
-          Imp.Core.Message,
-          Imp.Core.System,
-          Imp.Core.User,
-          Imp.Core.Assistant,
-          Imp.Core.Developer,
-          Imp.Core.ToolCall,
-          Imp.Core.ToolResult,
-          Imp.Core.LMConfig,
-          Imp.Core.LMRequest,
-          Imp.Core.LMResponse
-        ] do
-      assert match?({:docs_v1, _, _, _, %{"en" => _}, _, _}, Code.fetch_docs(module))
-    end
-  end
-
-  test "the documented ReAct path executes with a deterministic tool-calling LM" do
-    {:ok, actions} =
-      Agent.start_link(fn ->
-        [
-          %{tool_calls: [%{name: :lookup, arguments: %{query: "capital-france"}}]},
-          %{tool_calls: [%{name: :submit, arguments: %{answer: "Paris"}}]}
-        ]
-      end)
-
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
-        handler: fn _messages, _opts ->
-          Agent.get_and_update(actions, fn
-            [action | rest] -> {action, rest}
-            [] -> {%{tool_calls: []}, []}
-          end)
-        end
-      ]
-    }
-
-    lookup =
-      Imp.tool(
-        :lookup,
-        "lookup facts",
-        fn %{query: "capital-france"} -> "Paris" end,
-        schema: %{
-          "type" => "object",
-          "properties" => %{"query" => %{"type" => "string"}},
-          "required" => ["query"]
-        }
-      )
-
-    program = Imp.react("question -> answer", [lookup], lm: lm, tool_policy: [:lookup, :submit])
-
-    assert {:ok, prediction} =
-             Imp.call(program, %{question: "What is the capital of France?"})
-
-    assert Imp.get(prediction, :answer) == "Paris"
-  end
-
-  test "the documented Predict and ChainOfThought paths execute" do
-    predict_lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-    }
-
-    program =
-      "question -> answer: short_span"
-      |> Imp.signature("Answer with the shortest correct span. Do not explain.")
-      |> Imp.predict(lm: predict_lm)
-
-    assert {:ok, pred} = Imp.call(program, %{question: "Capital of France?"})
-    assert Imp.get(pred, :answer) == "Paris"
-
-    cot_lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{reasoning: "add two and two", answer: "4"} end]
-    }
-
-    cot = Imp.chain_of_thought("question -> answer", lm: cot_lm)
-
-    assert {:ok, cot_pred} = Imp.call(cot, %{question: "2+2?"})
-    assert Imp.get(cot_pred, :reasoning) == "add two and two"
-    assert Imp.get(cot_pred, :answer) == "4"
-  end
-
-  test "the documented evaluate and optimize path executes through the facade" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-    }
-
-    program = Imp.predict("question -> answer", lm: lm)
-
-    trainset = [
-      Imp.example(question: "Capital of France?", answer: "Paris") |> Imp.with_inputs(:question)
-    ]
-
-    devset = [
-      Imp.example(question: "Eiffel Tower city?", answer: "Paris") |> Imp.with_inputs(:question)
-    ]
-
-    metric = Imp.Metrics.exact_match(:answer)
-
-    assert %Imp.Evaluate.Result{score: 1.0} = Imp.evaluate(program, devset, metric)
-
-    optimizer = Imp.Optimizer.RandomSearch.new(metric, candidates: 4, demos_per_candidate: 1)
-    compiled = Imp.optimize!(program, optimizer, trainset, devset)
-
-    assert %Imp.Optimizer.Report{optimizer: :random_search} =
-             Imp.Optimizer.Report.fetch(compiled)
-  end
-
-  test "the documented save and load path uses a portable program" do
-    path =
-      Path.join(
-        System.tmp_dir!(),
-        "imp-doc-save-#{System.unique_integer([:positive])}.json"
-      )
-
-    on_exit(fn -> File.rm(path) end)
-
-    program = Imp.predict("question -> answer")
-
-    assert :ok = Imp.Saving.save!(program, path)
-    assert %Imp.Predict.Predict{} = Imp.Saving.load!(path)
-  end
-
-  test "the documented RAG path retrieves context, records metadata, and stays portable" do
-    docs = [
-      %{text: "France has capital Paris."},
-      %{text: "Germany has capital Berlin."}
-    ]
-
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
-        handler: fn messages, _opts ->
-          prompt = Enum.map_join(messages, "\n", & &1.content)
-
-          if prompt =~ "France has capital Paris.",
-            do: %{answer: "Paris"},
-            else: %{answer: "unknown"}
-        end
-      ]
-    }
-
-    retriever = Imp.Retrieve.Memory.new(docs, k: 1)
-
-    # Mirrors the API guide: the RAG program stays dynamic (context-scoped LM)
-    # because saving refuses a Static-pinned program.
-    program =
-      "question, context -> answer"
-      |> Imp.predict()
-      |> Imp.rag(retriever, k: 1)
-
-    assert {:ok, prediction} =
-             Imp.context([lm: lm], fn ->
-               Imp.call(program, %{question: "capital France"})
-             end)
-
-    assert Imp.get(prediction, :answer) == "Paris"
-    assert prediction.metadata.retrieval.count == 1
-
-    path =
-      Path.join(
-        System.tmp_dir!(),
-        "imp-doc-rag-#{System.unique_integer([:positive])}.json"
-      )
-
-    on_exit(fn -> File.rm(path) end)
-
-    assert :ok = Imp.Saving.save!(program, path)
-    assert %Imp.Predict.RAG{retriever: %Imp.Retrieve.Memory{}} = Imp.Saving.load!(path)
-  end
-
-  test "the documented Optimize Anything path produces an improving result" do
-    result =
-      Imp.Optimize.Anything.run(
-        "mode=slow",
-        fn candidate -> if(candidate =~ "mode=fast", do: 1.0, else: 0.0) end,
-        config: [
-          engine: [max_candidate_proposals: 1, parallel: false],
-          reflection: [
-            custom_candidate_proposer: fn _candidate, _component, _records, _iteration ->
-              "mode=fast"
-            end
-          ]
-        ]
-      )
-
-    assert hd(result.validation_scores) == 0.0
-    assert Enum.max(result.validation_scores) == 1.0
-  end
-
-  test "the documented MCP import path returns ordinary Imp tools" do
-    # MCP spec dialect: camelCase
-    # "inputSchema", optional description per the MCP spec Tool definition).
-    catalog =
-      Imp.MCP.Catalog.new([
-        %{
-          "name" => "lookup",
-          "inputSchema" => %{"required" => ["key"]},
-          "run" => & &1
-        }
-      ])
-
-    [tool] = Imp.MCP.import_tools(catalog)
-
-    assert tool.name == "lookup"
-    assert {:ok, [^tool]} = Imp.Tool.validate_tools([tool])
-    assert {:error, message} = Imp.Tool.validate_tools([:not_a_tool])
-    assert message =~ "expected a list of Imp.Tool structs"
-    assert Imp.Tool.call(tool, %{key: "value"}) == %{key: "value"}
-  end
-
-  test "the documented streaming path collects predictions and parses incremental fields" do
-    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "Paris"} end)
-
-    program = Imp.predict("question -> answer", lm: lm)
-
-    assert Imp.stream(program, %{question: "q"}) |> Enum.to_list() == [
-             "P",
-             "a",
-             "r",
-             "i",
-             "s"
-           ]
-
-    assert Imp.Streaming.incremental_fields(
-             ["[[ ## answer ## ]]Paris", "[[ ## rationale ## ]]lookup"],
-             "question -> answer, rationale"
-           ) == [
-             %{field: :answer, value: "Paris"},
-             %{field: :rationale, value: "lookup"}
-           ]
-  end
-
-  defp refute_closed_ticket_refs(body) do
-    refute body =~ "de-wrnz"
-    refute body =~ "de-i8cc"
-    refute body =~ "de-qvwf"
-    refute body =~ "de-i4o5"
-    refute body =~ "de-ztx7"
-    refute body =~ "de-vge9"
-    refute body =~ "de-t0c8"
-    refute body =~ "de-dd3k"
-  end
-
-  defp documented_module_references do
-    (["README.md"] ++ Path.wildcard("docs/*.md") ++ Path.wildcard("livebooks/*.livemd"))
-    |> Enum.flat_map(fn path ->
-      path
-      |> File.read!()
-      |> then(&Regex.scan(~r/Imp(?:\.[A-Z][A-Za-z0-9_]*)+/, &1))
-      |> List.flatten()
-    end)
-    |> Enum.uniq()
-    |> Enum.sort()
-  end
-
-  defp module_from_string(name) do
-    name
-    |> String.split(".")
-    |> Module.concat()
   end
 end

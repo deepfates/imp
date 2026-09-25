@@ -1,7 +1,7 @@
 defmodule Imp.LocalOptimizeAnythingRetryPolicyExampleTest do
   use ExUnit.Case, async: false
 
-  @source "examples/local_optimize_anything_retry_policy/run.exs"
+  @source "research/local_optimize_anything_retry_policy/run.exs"
 
   setup_all do
     previous = System.get_env("IMP_OA_DEFINE_ONLY")
@@ -44,7 +44,7 @@ defmodule Imp.LocalOptimizeAnythingRetryPolicyExampleTest do
   end
 
   test "future untouched rows are frozen canonically without evaluating them" do
-    path = "examples/local_optimize_anything_retry_policy/data/untouched-v2.jsonl"
+    path = "research/local_optimize_anything_retry_policy/data/untouched-v2.jsonl"
     bytes = File.read!(path)
 
     assert :crypto.hash(:sha256, bytes) |> Base.encode16(case: :lower) ==
@@ -60,7 +60,7 @@ defmodule Imp.LocalOptimizeAnythingRetryPolicyExampleTest do
   end
 
   test "portfolio fresh process enters through the ordinary example" do
-    source = File.read!("examples/local_optimize_anything_retry_policy/usefulness.exs")
+    source = File.read!("research/local_optimize_anything_retry_policy/usefulness.exs")
 
     assert source =~ ~S|Path.join(__DIR__, "run.exs")|
     refute source =~ ~S|["run", "--no-compile", "--no-deps-check", __ENV__.file]|

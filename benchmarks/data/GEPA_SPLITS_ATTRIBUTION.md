@@ -9,7 +9,7 @@ row counts and a SHA-256 for each of the train, dev and test splits.
 manifest of data that is absent: nothing under `benchmarks/data/` matches those
 checksums, for any of the six families. Any claim that rests on running these
 splits therefore cannot be re-measured here. See the "Cannot be re-measured"
-section of [docs/BENCHMARKS.md](../../docs/BENCHMARKS.md).
+section of [research/BENCHMARKS.md](../../research/BENCHMARKS.md).
 
 Upstream source, as recorded in the manifest:
 

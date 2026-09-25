@@ -1,10 +1,10 @@
 defmodule Imp.LocalSIMBATRECExampleTest do
   use ExUnit.Case, async: false
 
-  @source "examples/local_simba_trec/run.exs"
+  @source "research/local_simba_trec/run.exs"
   @data "benchmarks/data/simba-trec-coarse-v1.json"
-  @result "examples/local_simba_trec/exercised-result.json"
-  @json_result "examples/local_simba_trec/exercised-json-result.json"
+  @result "research/local_simba_trec/exercised-result.json"
+  @json_result "research/local_simba_trec/exercised-json-result.json"
 
   setup_all do
     previous = System.get_env("IMP_SIMBA_TREC_DEFINE_ONLY")

@@ -4,7 +4,7 @@ defmodule Imp.LocalGEPABanking77ExampleTest do
   setup_all do
     previous = System.get_env("IMP_GEPA_DEFINE_ONLY")
     System.put_env("IMP_GEPA_DEFINE_ONLY", "1")
-    Code.require_file("examples/local_gepa_banking77/run.exs", File.cwd!())
+    Code.require_file("research/local_gepa_banking77/run.exs", File.cwd!())
 
     on_exit(fn ->
       if previous,
