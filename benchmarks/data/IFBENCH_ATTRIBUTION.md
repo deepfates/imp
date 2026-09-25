@@ -20,10 +20,10 @@ changes.
 
 ## The matched IFBench experiments — real IFBench, license unknown
 
-`examples/matched_gepa_mipro_ifbench*/` and
-`examples/matched_ifbench_rehearsal16k/` use the real IFBench task graph,
-metric and splits (`IFBench_train[0:300]`, `IFBench_test`), taken from the GEPA
-artifact repository:
+`research/local_gepa_ifbench_cross_task/` and
+`research/matched_instruction_family_ifbench/` use the real IFBench program,
+metric and rows, keeping upstream split ownership, taken from the GEPA artifact
+repository:
 
 - https://github.com/gepa-ai/gepa-artifact
 - GEPA paper: https://arxiv.org/abs/2507.19457

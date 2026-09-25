@@ -4,7 +4,7 @@ defmodule UpstreamExam.SignaturesTest do
 
   Tranche 1 of the upstream exam: every test cites the upstream file and test
   function it translates. The per-test disposition map (including everything
-  that was NOT portable and why) is docs/differentials/UPSTREAM_EXAM.md.
+  that was NOT portable and why) is research/differentials/UPSTREAM_EXAM.md.
 
   DSPy signatures are Python classes (pydantic models built by a metaclass);
   Imp signatures are plain structs built from string specs or maps. Ports use

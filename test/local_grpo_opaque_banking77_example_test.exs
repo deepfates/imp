@@ -1,20 +1,20 @@
 defmodule Imp.LocalGRPOOpaqueBanking77ExampleTest do
   use ExUnit.Case, async: false
 
-  @source "examples/local_grpo_opaque_banking77/run.exs"
+  @source "research/local_grpo_opaque_banking77/run.exs"
   @contract "priv/trl_worker/qwen-opaque-38-step-contract.json"
-  @result "examples/local_grpo_opaque_banking77/exercised-result.json"
+  @result "research/local_grpo_opaque_banking77/exercised-result.json"
   @usefulness_data "benchmarks/data/grpo-usefulness-banking77-v1.json"
-  @usefulness_config "examples/local_grpo_opaque_banking77/usefulness-v1-treatment.json"
-  @usefulness_result "examples/local_grpo_opaque_banking77/exercised-usefulness-v1-result.json"
-  @semantic_config "examples/local_grpo_opaque_banking77/semantic-v1-treatment.json"
-  @semantic_stopped_result "examples/local_grpo_opaque_banking77/exercised-semantic-v1-stopped-result.json"
-  @trec_config "examples/local_grpo_opaque_banking77/trec-semantic-v1-treatment.json"
-  @trec_correct_config "examples/local_grpo_opaque_banking77/trec-correct-semantics-v1-treatment.json"
-  @trec_correct_result "examples/local_grpo_opaque_banking77/exercised-trec-correct-semantics-v1-result.json"
+  @usefulness_config "research/local_grpo_opaque_banking77/usefulness-v1-treatment.json"
+  @usefulness_result "research/local_grpo_opaque_banking77/exercised-usefulness-v1-result.json"
+  @semantic_config "research/local_grpo_opaque_banking77/semantic-v1-treatment.json"
+  @semantic_stopped_result "research/local_grpo_opaque_banking77/exercised-semantic-v1-stopped-result.json"
+  @trec_config "research/local_grpo_opaque_banking77/trec-semantic-v1-treatment.json"
+  @trec_correct_config "research/local_grpo_opaque_banking77/trec-correct-semantics-v1-treatment.json"
+  @trec_correct_result "research/local_grpo_opaque_banking77/exercised-trec-correct-semantics-v1-result.json"
   @trec_contract "priv/trl_worker/qwen-trec-14-step-contract.json"
-  @trec_stopped_result "examples/local_grpo_opaque_banking77/exercised-trec-semantic-v1-stopped-result.json"
-  @trec_source_guided_result "examples/local_grpo_opaque_banking77/exercised-trec-source-guided-v1-result.json"
+  @trec_stopped_result "research/local_grpo_opaque_banking77/exercised-trec-semantic-v1-stopped-result.json"
+  @trec_source_guided_result "research/local_grpo_opaque_banking77/exercised-trec-source-guided-v1-result.json"
 
   setup_all do
     output =

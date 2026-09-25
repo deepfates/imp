@@ -20,10 +20,14 @@ mix quality.check
 mix dialyzer.check
 ```
 
-Documentation examples are executable and gated: the learning-path snippets
-run under `mix test test/learning_path_contract_test.exs`, and
-`mix livebook.execute.check` executes every shipped notebook end to end. Keep
-both green when changing public examples or notebooks.
+Documentation examples are executable. `test/documentation_contract_test.exs`
+checks every page `mix docs` renders: Elixir blocks parse, blocks that need no
+provider run and match the results they show (`#=>`), links resolve, and
+modules named are documented; its moduledoc gives the rules a page's code
+follows. `mix livebook.execute.check` executes every shipped notebook end to
+end. Research material (results, comparisons with DSPy, and the experiments
+behind them) lives in `research/`, outside the package and hexdocs; its
+README says how to check it.
 
 Provider-backed and research-scale tests are separate because they require
 credentials, external services, canonical datasets, or significant spend.
@@ -62,9 +66,9 @@ ticket file in this repository.
 - Preserve upstream algorithmic semantics when using an upstream name.
 - Give deliberate Elixir-native alternatives a distinct contract and rationale.
 - Never turn fixtures, smoke tests, or symbol presence into broad parity claims.
-- Every published number needs a row in `benchmarks/RESULTS.md` carrying its
+- Every published number needs a row in `research/RESULTS.md` carrying its
   dataset, license, model, provider, date, commit, and the command that
-  produces it; `docs/BENCHMARKS.md` says what running that command needs.
+  produces it; `research/BENCHMARKS.md` says what running that command needs.
 - Keep changes focused and update ExDoc or Livebooks with public API changes.
 
 ## Pull Requests

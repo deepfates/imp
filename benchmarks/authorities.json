@@ -2,8 +2,8 @@
   "schema_version": 1,
   "purpose": "Audit ledger of upstream authorities for algorithm and benchmark families named by Imp claim surfaces. This inventory is not proof of conformance, parity, benchmark validity, or effectiveness.",
   "generated_from": [
-    "docs/differentials/INSTRUCTION_OPTIMIZER_FIDELITY.md",
-    "docs/differentials/RESEARCH_LANDSCAPE.md"
+    "research/differentials/INSTRUCTION_OPTIMIZER_FIDELITY.md",
+    "research/differentials/RESEARCH_LANDSCAPE.md"
   ],
   "status_vocabulary": {
     "upstream_repository": ["release_and_commit_pinned", "commit_pinned", "gap", "not_applicable"],

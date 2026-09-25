@@ -273,5 +273,5 @@ case live_lm.([]) do
 end
 ```
 
-Next: open `livebooks/02_programming_not_prompting.livemd` to run the same
-programming model without provider calls and inspect the generated messages.
+Next: open `livebooks/03_evaluate_and_optimize.livemd` to turn examples into a
+metric, evaluate the baseline, and compile a better program.

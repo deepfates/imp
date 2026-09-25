@@ -23,6 +23,12 @@ program = Imp.predict(sig, lm: lm)
 Imp.get(prediction, :team)
 ```
 
+### See what was sent
+
+```elixir
+prediction.metadata.trace.messages
+```
+
 ### Reason first
 
 ```elixir
@@ -137,6 +143,9 @@ weather =
 ```elixir
 agent = Imp.react_v2("question -> answer", [weather], lm: lm, max_iters: 5)
 {:ok, prediction} = Imp.call(agent, %{question: "Is it raining in Lisbon?"})
+
+# Each step's tool calls and their results.
+prediction.metadata.history.messages
 ```
 
 ### Tools from MCP servers
@@ -156,12 +165,6 @@ imported.cleanup.()
 ```elixir
 :ok = Imp.save!(program, "router.json")
 program = "router.json" |> Imp.load!() |> Imp.with_lm(lm)
-```
-
-### See what was sent
-
-```elixir
-prediction.metadata.trace.messages
 ```
 
 ### Capture telemetry around a call

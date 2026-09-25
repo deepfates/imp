@@ -8,7 +8,7 @@ overlap rules, and the selection seed;
 `benchmarks/data/build_confidence_calibration_trec.py` rebuilds it.
 
 The matched GEPA/MIPROv2 experiment in
-`examples/matched_instruction_optimizers_trec/` draws its 20 train, 40
+`research/matched_instruction_optimizers_trec/` draws its 20 train, 40
 selection and 80 held-out rows from this file. Those splits are listed by
 source id in that example's `contract.json`.
 

@@ -416,8 +416,8 @@ User-visible changes to Imp are recorded here.
 - Removed the evidence-certification bookkeeping from the source checkout. It
   never shipped in the package, so a consumer sees no change; the benchmark
   harness it wrapped is unchanged.
-- Added [Benchmarks](https://github.com/deepfates/imp/blob/main/docs/BENCHMARKS.md)
-  and its [results table](https://github.com/deepfates/imp/blob/main/benchmarks/RESULTS.md).
+- Added [Benchmarks](https://github.com/deepfates/imp/blob/main/research/BENCHMARKS.md)
+  and its [results table](https://github.com/deepfates/imp/blob/main/research/RESULTS.md).
   Every number this repository publishes is one row in that table, carrying
   the dataset and its license, the model, the provider, the date, the commit,
   and the command that produced it; prose elsewhere cites a row rather than
