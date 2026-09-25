@@ -97,6 +97,13 @@ defmodule Imp.Predict.RLM.InterpreterTest do
              Interpreter.execute(interpreter, novel_atom)
   end
 
+  test "a pinned pattern matches the variable's value" do
+    interpreter = Interpreter.new(%{t: 3, xs: [3, 4, 3]}, %{}, nil)
+
+    assert {:ok, [:hit, :miss, :hit], _next} =
+             Interpreter.execute(interpreter, "Enum.map(xs, fn ^t -> :hit; _ -> :miss end)")
+  end
+
   test "Enum.sum, Enum.product and Enum.reduce aggregate" do
     interpreter = Interpreter.new(%{numbers: [1, 2, 3, 4, 5]}, %{}, nil)
 

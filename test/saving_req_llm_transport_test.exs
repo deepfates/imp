@@ -204,7 +204,10 @@ defmodule Imp.SavingReqLLMTransportTest do
     end
   end
 
-  test "fresh-program metadata vocabulary does not admit arbitrary atom tags" do
+  # An atom tag the VM does not know loads as its text: loading creates no
+  # atom, and a saved program still loads in a VM that never created the names
+  # its metadata carries (an optimizer report repeats its demos' field names).
+  test "fresh-program metadata creates no atom from an unknown atom tag" do
     dumped = stopped_program_shape() |> Imp.dump() |> json_round_trip()
     unknown = "imp_unknown_training_metadata_#{System.unique_integer([:positive])}"
     assert_raise ArgumentError, fn -> String.to_existing_atom(unknown) end
@@ -214,7 +217,8 @@ defmodule Imp.SavingReqLLMTransportTest do
         entries ++ [[%{"__imp_type__" => "atom", "value" => unknown}, "unsafe"]]
       end)
 
-    assert_raise ArgumentError, fn -> Imp.load(poisoned) end
+    loaded = Imp.load(poisoned)
+    assert loaded.metadata[unknown] == "unsafe"
     assert_raise ArgumentError, fn -> String.to_existing_atom(unknown) end
   end
 

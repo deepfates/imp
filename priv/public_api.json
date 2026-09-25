@@ -2645,6 +2645,7 @@
       "source": "lib/imp/core.ex",
       "struct_fields": [
         "billing",
+        "cached",
         "cost",
         "metadata",
         "outputs",
@@ -8117,6 +8118,7 @@
         "context/2",
         "fetch!/1",
         "get/0",
+        "http_pool_size/0",
         "reset/0",
         "start_link/1"
       ],
@@ -8139,6 +8141,9 @@
           ],
           "get/0": [
             "get()"
+          ],
+          "http_pool_size/0": [
+            "http_pool_size()"
           ],
           "reset/0": [
             "reset()"

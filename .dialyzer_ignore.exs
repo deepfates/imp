@@ -57,8 +57,8 @@
   # defensive clause/guard: ReqLLM.Response types `usage` as map() on the
   # struct, but its schema defaults the field to nil and Response.usage/1 is
   # `map() | nil`, so the nil clause is reachable at runtime.
-  {"lib/imp/clients/req_llm.ex", :guard_fail, 1586},
-  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {1614, 8}},
+  {"lib/imp/clients/req_llm.ex", :guard_fail, 1607},
+  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {1635, 8}},
   {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {153, 7}},
   # defensive error clause on an always-ok internal call
   {"lib/imp/clients/training.ex", :pattern_match, {1215, 13}},

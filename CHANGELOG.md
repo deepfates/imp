@@ -6,10 +6,6 @@ User-visible changes to Imp are recorded here.
 
 ### Security
 
-- An LM client, an HTTP retriever and the MLflow and W&B trackers print with
-  their credentials redacted, and so does a program holding such an LM.
-  `Imp.req_llm(model, api_key: key)` printed the key in IEx, in log lines and
-  in crash reports.
 - RLM controller code cannot build a map that poses as a struct. A map
   literal with a `__struct__` key is refused, and a library call refuses any
   struct other than ranges, `MapSet` and the calendar types, and any other
