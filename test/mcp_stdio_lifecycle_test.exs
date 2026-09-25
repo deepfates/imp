@@ -129,7 +129,14 @@ defmodule Imp.MCPStdioLifecycleTest do
 
     Process.exit(client, :kill)
 
-    assert os_process_dead?(os_pid), "stdio server #{os_pid} outlived its killed client"
+    # Nothing waits for the group here, as `close/1` does: erlexec sends it
+    # SIGTERM, which this server ignores, and SIGKILL only after the kill
+    # timeout. The poll starts at the kill, so it has to outlast that grace
+    # before the time it allows for scheduling and reaping counts.
+    within = Imp.MCP.OwnedStdio.kill_timeout_ms() + 4_000
+
+    assert os_process_dead?(os_pid, within),
+           "stdio server #{os_pid} outlived its killed client"
 
     assert os_process_dead?(child_pid),
            "stdio server child #{child_pid} outlived its killed client"
