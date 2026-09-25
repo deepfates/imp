@@ -35,7 +35,7 @@ it happens.
 ### 3. What was retrieved travels with the answer
 
 Each prediction from a RAG program carries `metadata.retrieval`: the query,
-the documents and how many there were. When the answer is wrong, you can see
+the documents, how many there were, and what each hop found. When the answer is wrong, you can see
 whether retrieval found the wrong document or the model misread the right
 one. Those are different fixes.
 
@@ -68,10 +68,11 @@ search tool that calls a retriever. See [ReAct](react.md).
 
 ### 8. Embeddings are yours to choose
 
-The built-in retrievers match words, which is deterministic and free and
-misses paraphrase. For retrieval by meaning, compute embeddings with any
-provider and rank by similarity in your retriever, or pass an embedding
-function to `Imp.knn/3`. On the example below, that was the difference
+`Imp.memory/2` matches words, which is deterministic and free and misses
+paraphrase. The Weaviate and Databricks retrievers ask a vector search
+service, which ranks by meaning on its side. For retrieval by meaning over
+your own documents, compute embeddings with any provider and rank by
+similarity in your retriever. On the example below, that was the difference
 between 60% and 85–90%.
 
 ## API walkthrough
@@ -182,10 +183,12 @@ routed = Imp.rag(router, retriever, query_field: :ticket, k: 1)
 ```
 
 Options: `query_field:` (default `:question`; a list joins several fields),
-`context_field:` (default `:context`), `k:` (default 3), and `hops:`. With
-`hops: 2` or more, each hop searches again with the query plus the text
-found so far, for questions whose answer takes two lookups; documents found
-twice appear once.
+`context_field:` (default `:context`), `k:` (default 3, and it overrides the
+retriever's own `k`), and `hops:`. With `hops: 2` or more, each hop searches
+again with the query plus the text found so far, for questions whose answer
+takes two lookups. Earlier finds are not excluded from later searches, so
+with a small `k` a hop can return a document it already has; the context
+lists each document once.
 
 A retriever error stops the call before the model is asked:
 
@@ -263,16 +266,19 @@ Imp.evaluate(
 #=> 0.9
 ~~~
 
-Over three runs on the 20 test tickets, the same router without context
-scored 0.2–0.4, with the charter chosen by shared words 0.6, and with the
-charter chosen by meaning 0.85–0.9, for a few cents in all. Word matching often
-picks the wrong charter: "We were charged twice this month" shares no word
-with "atlas owns money: charges, refunds, …", and atlas came back only
-because it was first in the list. The prompt the model saw:
+Over three runs on the 20 test tickets, the router scored 0.2–0.4 without
+context (the same router with the signature `ticket -> team`), 0.6 with the
+charter chosen by shared words, and 0.85–0.9 with the charter chosen by
+meaning, for a few cents in all. By shared words, only 5 of the 20 tickets
+get the right charter, and 5 share no word with any charter at all. "Refund
+attempts fail with a gateway timeout error" is one of those: "Refund" is not
+"refunds", and atlas's charter came back only because it is first in the
+list. The prompt the model saw, which it answered with atlas (the ticket is
+harbor's):
 
 ~~~text
 [[ ## ticket ## ]]
-We were charged twice this month.
+Refund attempts fail with a gateway timeout error.
 
 [[ ## context ## ]]
 atlas owns money: charges, refunds, invoices, plans, taxes, receipts.
@@ -302,9 +308,9 @@ end
 #=> true
 ```
 
-Rebuild it in code at startup, as
-[Saving and artifacts](saving-and-artifacts.md) describes for other
-functions.
+A saving registry does not cover retrievers. Save the wrapped program
+instead, and call `Imp.rag/3` on it again after loading, with a retriever
+your application builds (see [Saving and artifacts](saving-and-artifacts.md)).
 
 ### Retrieval as a tool
 
@@ -363,8 +369,8 @@ call; see [Choosing an optimizer](choosing-an-optimizer.md).
 it returns to documents, with timeouts and retries on 429 and 5xx responses;
 `body_builder:` and `response_mapper:` adapt it to any API.
 `Imp.Retrievers.Weaviate` and `Imp.Retrievers.Databricks` are built on it.
-Pass their credentials in `headers:` or `token:` when you build them, from
-runtime configuration.
+Pass credentials in `headers:` (or, for Databricks, `token:`) when you build
+them, from runtime configuration.
 
 ### Coming from DSPy
 
