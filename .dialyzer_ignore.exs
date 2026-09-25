@@ -57,8 +57,8 @@
   # defensive clause/guard: ReqLLM.Response types `usage` as map() on the
   # struct, but its schema defaults the field to nil and Response.usage/1 is
   # `map() | nil`, so the nil clause is reachable at runtime.
-  {"lib/imp/clients/req_llm.ex", :guard_fail, 1587},
-  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {1615, 8}},
+  {"lib/imp/clients/req_llm.ex", :guard_fail, 1611},
+  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {1639, 8}},
   {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {154, 7}},
   # defensive error clause on an always-ok internal call
   {"lib/imp/clients/training.ex", :pattern_match, {1215, 13}},
@@ -94,7 +94,7 @@
   # defensive clause for non-covered trace entries
   {"lib/imp/optimizer/trajectory.ex", :pattern_match_cov, {270, 8}},
   # MapSet opacity on the redaction key set
-  {"lib/imp/redaction.ex", :call_without_opaque, {495, 51}},
+  {"lib/imp/redaction.ex", :call_without_opaque, {613, 51}},
   # behaviour callback specs term(); impl narrows to %__MODULE__{} on
   # purpose so bad input crashes loudly
   {"lib/imp/retrieve.ex", :callback_arg_type_mismatch, {158, 9}},
