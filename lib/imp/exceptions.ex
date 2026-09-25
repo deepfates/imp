@@ -73,6 +73,10 @@ defmodule Imp.AdapterParseError do
     * `:other` — a custom adapter returned an error that is not this struct;
       `:reason` is that error.
 
+  An adapter that sends a request of its own, such as `Imp.Adapter.TwoStep`,
+  does not report that request's failure as a parse error: the call returns
+  the `Imp.LMError` (or `{:lm_failed, client, reason}`) itself.
+
   `:message` is the feedback a retry shows the model. `Imp.Predict.Predict`
   also fills `:trace` (the redacted messages, the raw completion, and which
   output fields were read) and, for an `n > 1` call, `:completion_index`, the
@@ -160,6 +164,12 @@ defmodule Imp.Errors do
   @spec context_window_exceeded?(term()) :: boolean()
   def context_window_exceeded?(error),
     do: match?(%Imp.LMError{context_window_exceeded: true}, lm_error(error))
+
+  @doc false
+  # Whether `reason` is a language-model request's failure rather than
+  # anything else a caller could be handed.
+  @spec lm_failure?(term()) :: boolean()
+  def lm_failure?(reason), do: lm_error(reason) != nil
 
   defp lm_error({:error, reason}), do: lm_error(reason)
   defp lm_error({:lm_failed, _client, reason}), do: lm_error(reason)

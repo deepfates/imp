@@ -26,7 +26,8 @@ defmodule Imp.Predict.ReAct do
   - tool crashes return `{:error, {:tool_error, name, reason}}`, where `reason`
     is the exception raised or `{kind, value}` for a throw or an exit;
   - tool-policy crashes return `{:error, {:tool_policy_error, name, reason}}`;
-  - missing final fields return `{:error, {:missing_output_fields, fields}}`.
+  - final outputs that are missing or do not fit the signature return
+    `{:error, %Imp.AdapterParseError{kind: :missing_fields | :invalid_fields}}`.
 
   ## `:dspy_3_2_1` — byte-faithful port of DSPy 3.2.1 `dspy.ReAct`
 
@@ -1068,9 +1069,13 @@ defmodule Imp.Predict.ReAct do
 
         if missing == [] do
           {:error,
-           %Imp.AdapterParseError{message: Imp.Schema.retry_feedback(errors), reason: fields}}
+           %Imp.AdapterParseError{
+             kind: :invalid_fields,
+             message: Imp.Schema.retry_feedback(errors),
+             reason: fields
+           }}
         else
-          {:error, {:missing_output_fields, missing}}
+          {:error, Imp.AdapterParseError.missing_fields(missing)}
         end
     end
   end

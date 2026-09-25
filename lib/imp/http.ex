@@ -135,7 +135,7 @@ defmodule Imp.HTTP do
     fun.()
   rescue
     safety in Imp.OperationalSafetyError -> {:error, safety}
-    error -> {:error, {:http_transport_failed, transport, Exception.message(error)}}
+    error -> {:error, {:http_transport_failed, transport, error}}
   catch
     kind, reason ->
       case Imp.OperationalSafetyError.find({kind, reason}) do

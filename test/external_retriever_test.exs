@@ -369,7 +369,9 @@ defmodule ExternalRetrieverTest do
     bad_transport =
       Imp.Retrievers.HTTP.new("https://retriever.example/search", transport: RaisingTransport)
 
-    assert {:error, {:retriever_http_failed, {:transport, "retriever transport exploded"}, 1}} =
+    assert {:error,
+            {:retriever_http_failed,
+             {:transport, %RuntimeError{message: "retriever transport exploded"}}, 1}} =
              Imp.Retrieve.retrieve(bad_transport, "capital France")
 
     invalid_json =

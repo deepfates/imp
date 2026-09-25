@@ -346,14 +346,24 @@ Every change here is breaking for code that matches on the old shape.
   reason}`, the MCP import's `:mcp_connection_failed` and
   `:mcp_tool_import_failed`, and `Imp.ACP`'s `:program_factory_failed`,
   `:input_mapper_failed`, `:output_renderer_failed`, `:before_turn_failed`,
-  `:permission_policy_failed` and `:host_request_failed`. Several of these
-  carried text on one path and a term on another.
+  `:permission_policy_failed` and `:host_request_failed`, and for
+  `{:http_transport_failed, transport, reason}` from `Imp.HTTP` (and so the
+  training clients' `:training_transport_failed`, `:training_refresh_failed`
+  and `:training_cancel_failed`, and `Imp.Retrievers.HTTP`'s
+  `{:transport, reason}`),
+  `{:embedding_provider_failed, provider, reason}` from `Imp.Embeddings`, and
+  `Imp.Predict.Predict`'s `{:adapter_format_failed, adapter, reason}` and
+  `{:adapter_lm_opts_failed, adapter, reason}`. Several of these carried text
+  on one path and a term on another.
 - A completion that cannot be read as the outputs is always
   `%Imp.AdapterParseError{}`, with a `kind`: `:malformed`, `:missing_fields`
   (`reason` is the missing names), `:invalid_fields`, `:unsupported_output`
   or `:other`. In 0.4.0 an adapter could return the struct,
   `{:missing_output_fields, names}` or `{:unsupported_lm_output, raw}`, and
   `Imp.Adapter.TwoStep` `{:two_step_extraction_failed, reason, completion}`.
+  `Imp.Predict.ReAct`'s final outputs follow the same rule: in 0.4.0 a missing
+  output was `{:missing_output_fields, names}` and one of the wrong type an
+  `%Imp.AdapterParseError{}` with no `kind`.
 - `Imp.Predict.Predict` returns that struct, with `trace` (the redacted
   messages, the raw completion, and which output fields were read) and, for
   `n > 1`, `completion_index`. In 0.4.0 it returned
@@ -364,6 +374,14 @@ Every change here is breaking for code that matches on the old shape.
 - When the chat or XML adapter's JSON fallback makes its request and that
   request fails, `Imp.Predict.Predict` returns the LM's error. In 0.4.0 it
   returned the original parse failure with the LM error inside it.
+  `Imp.Adapter.TwoStep`'s extraction request does the same: when it fails,
+  the call returns that `Imp.LMError` (or `{:lm_failed, _, _}`), so a 429
+  from the extraction model reads as retryable. In 0.4.0 it was
+  `{:two_step_extraction_failed, reason, completion}`.
+- A failure reason that holds a pid, port or reference, such as a
+  `GenServer.call` timeout, is written to JSON (optimizer checkpoints and
+  reports, `Imp.History.dump/1`) as its inspected text. Before, the write
+  raised `Protocol.UndefinedError`.
 - `Imp.Predict.Refine` and `Imp.Predict.Assertions` return
   `{:error, reason}` like every `Imp.Module`: `:no_attempts` with
   `max_attempts: 0`, `{:refine_fail_count_exceeded, reason}`, or the last

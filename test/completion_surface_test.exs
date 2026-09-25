@@ -470,7 +470,8 @@ defmodule CompletionSurfaceTest do
              %Imp.Streaming.Messages.StreamResponse{
                chunk:
                  {:error,
-                  {:adapter_format_failed, StreamingRaisingAdapter, "streaming format exploded"}},
+                  {:adapter_format_failed, StreamingRaisingAdapter,
+                   %RuntimeError{message: "streaming format exploded"}}},
                done: true
              }
            ] =
@@ -768,7 +769,10 @@ defmodule CompletionSurfaceTest do
 
     assert {:error,
             {:embedding_provider_failed, Imp.Embeddings.BagOfWords,
-             "Imp.Embeddings.BagOfWords.embed/2: invalid value for :dims option: expected positive integer, got: 0"}} =
+             %ArgumentError{
+               message:
+                 "Imp.Embeddings.BagOfWords.embed/2: invalid value for :dims option: expected positive integer, got: 0"
+             }}} =
              Imp.Embeddings.embed(Imp.Embeddings.BagOfWords, ["beam"], dims: 0)
 
     assert {:error, {:not_embedding_provider, :not_an_embedder}} =
@@ -794,10 +798,14 @@ defmodule CompletionSurfaceTest do
                []
              )
 
-    assert {:error, {:embedding_provider_failed, :anonymous_embedder, "embed exploded"}} =
+    assert {:error,
+            {:embedding_provider_failed, :anonymous_embedder,
+             %RuntimeError{message: "embed exploded"}}} =
              Imp.Embeddings.embed(fn _texts, _opts -> raise "embed exploded" end, ["beam"], [])
 
-    assert {:error, {:embedding_provider_failed, RaisingEmbedder, "embed exploded"}} =
+    assert {:error,
+            {:embedding_provider_failed, RaisingEmbedder,
+             %RuntimeError{message: "embed exploded"}}} =
              Imp.Embeddings.embed(RaisingEmbedder, ["beam"], [])
   end
 end

@@ -309,10 +309,14 @@ defmodule ProductionHardeningTest do
     assert {:error, {:not_http_transport, :not_a_transport}} =
              Imp.HTTP.post(:not_a_transport, "https://example.test", [], "{}", [])
 
-    assert {:error, {:http_transport_failed, RaisingHTTPTransport, "post exploded"}} =
+    assert {:error,
+            {:http_transport_failed, RaisingHTTPTransport,
+             %RuntimeError{message: "post exploded"}}} =
              Imp.HTTP.post(RaisingHTTPTransport, "https://example.test", [], "{}", [])
 
-    assert {:error, {:http_transport_failed, :anonymous_http_transport, "post exploded"}} =
+    assert {:error,
+            {:http_transport_failed, :anonymous_http_transport,
+             %RuntimeError{message: "post exploded"}}} =
              Imp.HTTP.post(
                fn _url, _headers, _body, _opts -> raise "post exploded" end,
                "https://example.test",
@@ -335,11 +339,19 @@ defmodule ProductionHardeningTest do
              Imp.HTTP.stream(:not_a_transport, "https://example.test", [], "{}", [])
              |> Enum.to_list()
 
-    assert [{:error, {:http_transport_failed, RaisingStreamTransport, "stream exploded"}}] =
+    assert [
+             {:error,
+              {:http_transport_failed, RaisingStreamTransport,
+               %RuntimeError{message: "stream exploded"}}}
+           ] =
              Imp.HTTP.stream(RaisingStreamTransport, "https://example.test", [], "{}", [])
              |> Enum.to_list()
 
-    assert [{:error, {:http_transport_failed, :anonymous_http_transport, "post exploded"}}] =
+    assert [
+             {:error,
+              {:http_transport_failed, :anonymous_http_transport,
+               %RuntimeError{message: "post exploded"}}}
+           ] =
              Imp.HTTP.stream(
                fn _url, _headers, _body, _opts -> raise "post exploded" end,
                "https://example.test",
@@ -429,12 +441,16 @@ defmodule ProductionHardeningTest do
 
     format_program = Imp.predict("question -> answer", lm: lm, adapter: RaisingFormatAdapter)
 
-    assert {:error, {:adapter_format_failed, RaisingFormatAdapter, "format exploded"}} =
+    assert {:error,
+            {:adapter_format_failed, RaisingFormatAdapter,
+             %RuntimeError{message: "format exploded"}}} =
              Imp.Predict.Predict.call(format_program, %{question: "q"})
 
     lm_opts_program = Imp.predict("question -> answer", lm: lm, adapter: RaisingLMOptsAdapter)
 
-    assert {:error, {:adapter_lm_opts_failed, RaisingLMOptsAdapter, "lm opts exploded"}} =
+    assert {:error,
+            {:adapter_lm_opts_failed, RaisingLMOptsAdapter,
+             %RuntimeError{message: "lm opts exploded"}}} =
              Imp.Predict.Predict.call(lm_opts_program, %{question: "q"})
 
     invalid_opts_program =

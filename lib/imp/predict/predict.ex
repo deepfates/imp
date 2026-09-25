@@ -596,7 +596,7 @@ defmodule Imp.Predict.Predict do
     end
   rescue
     error ->
-      {:error, {:adapter_format_failed, adapter, Exception.message(error)}}
+      {:error, {:adapter_format_failed, adapter, error}}
   catch
     kind, reason ->
       {:error, {:adapter_format_failed, adapter, {kind, reason}}}
@@ -634,7 +634,7 @@ defmodule Imp.Predict.Predict do
     end
   rescue
     error ->
-      {:error, {:adapter_lm_opts_failed, adapter, Exception.message(error)}}
+      {:error, {:adapter_lm_opts_failed, adapter, error}}
   catch
     kind, reason ->
       {:error, {:adapter_lm_opts_failed, adapter, {kind, reason}}}
@@ -698,20 +698,25 @@ defmodule Imp.Predict.Predict do
         {:ok, prediction, messages, raw, %{completion_metadata: completion_metadata}}
 
       {:error, _reason} = error ->
-        if chat_json_fallback?(adapter, opts) do
-          retry_completions_with_json_adapter(
-            error,
-            signature,
-            lm,
-            opts,
-            inputs,
-            demos,
-            messages,
-            raw
-          )
-        else
-          emit_parse_error(adapter, signature, error)
-          parse_error(error, messages, raw, signature)
+        cond do
+          lm_failure?(error) ->
+            error
+
+          chat_json_fallback?(adapter, opts) ->
+            retry_completions_with_json_adapter(
+              error,
+              signature,
+              lm,
+              opts,
+              inputs,
+              demos,
+              messages,
+              raw
+            )
+
+          true ->
+            emit_parse_error(adapter, signature, error)
+            parse_error(error, messages, raw, signature)
         end
     end
   end
@@ -740,6 +745,9 @@ defmodule Imp.Predict.Predict do
 
   defp recover_parse_failure(error, adapter, signature, messages, lm, opts, inputs, demos, raw) do
     cond do
+      lm_failure?(error) ->
+        error
+
       chat_json_fallback?(adapter, opts) ->
         retry_with_json_adapter(error, signature, lm, opts, inputs, demos, messages, raw)
 
@@ -777,7 +785,10 @@ defmodule Imp.Predict.Predict do
            {:ok, prediction} <- adapter.parse(signature, output, []) do
         {:cont, {:ok, [{prediction, lm_metadata} | acc]}}
       else
-        {:error, reason} -> {:halt, {:error, %{parse_failure(reason) | completion_index: index}}}
+        {:error, reason} = error ->
+          if lm_failure?(error),
+            do: {:halt, error},
+            else: {:halt, {:error, %{parse_failure(reason) | completion_index: index}}}
       end
     end)
     |> case do
@@ -904,6 +915,11 @@ defmodule Imp.Predict.Predict do
       end
     end
   end
+
+  # An adapter that sends its own request, such as `Imp.Adapter.TwoStep`,
+  # returns that request's failure as it is. It is not a parse failure: no
+  # fallback is tried, and the caller reads it as the LM error it is.
+  defp lm_failure?({:error, reason}), do: Imp.Errors.lm_failure?(reason)
 
   defp adapter_parse_error?({:error, %Imp.AdapterParseError{}}), do: true
   defp adapter_parse_error?(_error), do: false

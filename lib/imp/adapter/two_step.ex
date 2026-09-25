@@ -178,15 +178,20 @@ defmodule Imp.Adapter.TwoStep do
     extractor_signature = extractor_signature(signature)
     messages = Imp.Adapter.Chat.format(extractor_signature, %{text: completion}, demos: [])
 
-    with {:ok, raw} <- Imp.LM.generate(extraction_lm, messages, []),
-         {:ok, output, _lm_metadata} <- Imp.LM.Result.split(raw),
-         {:ok, prediction} <- Imp.Adapter.Chat.parse(extractor_signature, output, []) do
-      {:ok, prediction}
-    else
-      {:error, reason} ->
-        # DSPy's extraction call goes through ChatAdapter.__call__, which
-        # retries a failure through JSONAdapter before giving up.
-        json_fallback(extractor_signature, completion, extraction_lm, reason)
+    # The extraction LM's own failure is returned as it is, as `Imp.Predict.Predict`
+    # returns its LM's: it is not a parse failure, and whether it may be retried
+    # is the caller's to read. DSPy wraps it in the same ValueError as a parse
+    # failure, which would hide a 429 behind a parse error.
+    with {:ok, raw} <- Imp.LM.generate(extraction_lm, messages, []) do
+      with {:ok, output, _lm_metadata} <- Imp.LM.Result.split(raw),
+           {:ok, prediction} <- Imp.Adapter.Chat.parse(extractor_signature, output, []) do
+        {:ok, prediction}
+      else
+        {:error, reason} ->
+          # DSPy's extraction call goes through ChatAdapter.__call__, which
+          # retries a failure through JSONAdapter before giving up.
+          json_fallback(extractor_signature, completion, extraction_lm, reason)
+      end
     end
   end
 
@@ -200,15 +205,16 @@ defmodule Imp.Adapter.TwoStep do
         Imp.LM.response_format_capability(extraction_lm)
       )
 
-    with {:ok, raw} <- Imp.LM.generate(extraction_lm, retry_messages, retry_opts),
-         {:ok, output, _lm_metadata} <- Imp.LM.Result.split(raw),
-         {:ok, prediction} <- Imp.Adapter.JSON.parse(extractor_signature, output, []) do
-      {:ok, prediction}
-    else
-      {:error, _retry_reason} ->
-        # Mirrors DSPy's ValueError("Failed to parse response from the
-        # original completion: ...") — loud, and the completion is retained.
-        {:error, extraction_failed(original_reason, completion)}
+    with {:ok, raw} <- Imp.LM.generate(extraction_lm, retry_messages, retry_opts) do
+      with {:ok, output, _lm_metadata} <- Imp.LM.Result.split(raw),
+           {:ok, prediction} <- Imp.Adapter.JSON.parse(extractor_signature, output, []) do
+        {:ok, prediction}
+      else
+        {:error, _retry_reason} ->
+          # Mirrors DSPy's ValueError("Failed to parse response from the
+          # original completion: ...") — loud, and the completion is retained.
+          {:error, extraction_failed(original_reason, completion)}
+      end
     end
   end
 
@@ -251,7 +257,7 @@ defmodule Imp.Adapter.TwoStep do
   defp require_text(raw), do: {:error, Imp.AdapterParseError.unsupported_output(raw)}
 
   # The extraction's own failure keeps its kind when it was a parse failure;
-  # an extraction LM that failed is `:other`, with its error as the reason.
+  # anything else the extraction could not read is `:other`, with that as the reason.
   defp extraction_failed(reason, completion) do
     kind =
       case reason do

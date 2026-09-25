@@ -13,7 +13,7 @@ defmodule ReActContractTest do
 
     agent = Imp.Predict.ReAct.new("question -> answer", [], lm: lm, max_iters: 1)
 
-    assert {:error, {:missing_output_fields, [:answer]}} =
+    assert {:error, %Imp.AdapterParseError{kind: :missing_fields, reason: [:answer]}} =
              Imp.Predict.ReAct.call(agent, %{question: "q"})
   end
 
@@ -29,7 +29,7 @@ defmodule ReActContractTest do
 
     agent = Imp.Predict.ReAct.new("question -> answer", [], lm: lm, max_iters: 1)
 
-    assert {:error, {:missing_output_fields, [:answer]}} =
+    assert {:error, %Imp.AdapterParseError{kind: :missing_fields, reason: [:answer]}} =
              Imp.Predict.ReAct.call(agent, %{question: "q"})
   end
 

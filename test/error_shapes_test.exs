@@ -145,6 +145,34 @@ defmodule Imp.ErrorShapesTest do
                Imp.call(program, %{question: "q"})
     end
 
+    test "a TwoStep extraction LM that fails returns the LM's error" do
+      main = Imp.LM.Static.new(handler: fn _messages, _opts -> "free text answer" end)
+      extraction = Imp.req_llm("openai:gpt-test", req_module: StatusReqLLM, status: 429)
+      program = Imp.predict("question -> answer", lm: main, adapter: Imp.Adapter.TwoStep)
+
+      result =
+        Imp.Settings.context([two_step_extraction_lm: extraction], fn ->
+          Imp.call(program, %{question: "q"})
+        end)
+
+      assert {:error, %Imp.LMError{status: 429, retryable: true}} = result
+      assert Imp.Errors.retryable?(result)
+    end
+
+    test "a ReAct submit whose outputs do not fit is an AdapterParseError with a kind" do
+      lm =
+        Imp.LM.Static.new(
+          handler: fn _messages, _opts ->
+            %{tool_calls: [%{name: :submit, arguments: %{count: "many"}}]}
+          end
+        )
+
+      agent = Imp.Predict.ReAct.new("question -> count: int", [], lm: lm, max_iters: 1)
+
+      assert {:error, %Imp.AdapterParseError{kind: :invalid_fields}} =
+               Imp.call(agent, %{question: "q"})
+    end
+
     test "a ReActV2 step that cannot be parsed ends with cause :parse_error" do
       counter = :counters.new(1, [])
 
@@ -253,6 +281,57 @@ defmodule Imp.ErrorShapesTest do
       after
         :telemetry.detach(handler)
       end
+    end
+
+    test "a reason holding a pid or a reference still writes as JSON" do
+      reason =
+        {:lm_failed, Imp.LM.Static,
+         {:exit, {:timeout, {GenServer, :call, [self(), make_ref(), 10]}}}}
+
+      assert {:ok, _json} = reason |> Imp.Optimizer.Report.encode_term() |> Jason.encode()
+      assert {:ok, _json} = reason |> Imp.Optimizer.Report.json_safe() |> Jason.encode()
+    end
+
+    test "an optimizer checkpoint survives an LM that exits with a pid in its reason" do
+      lm =
+        Imp.LM.Static.new(
+          handler: fn _messages, _opts ->
+            exit({:timeout, {GenServer, :call, [self(), :probe, 10]}})
+          end
+        )
+
+      prompt_lm =
+        Imp.LM.Static.new(
+          handler: fn _messages, _opts ->
+            %{discussion: "d", module_advice: %{main: "Answer yes."}}
+          end
+        )
+
+      trainset =
+        for i <- 1..4 do
+          Imp.example(question: "t#{i}", answer: "yes") |> Imp.with_inputs(:question)
+        end
+
+      optimizer =
+        Imp.Optimizer.SIMBA.new(Imp.Metrics.exact_match(:answer),
+          bsize: 2,
+          num_candidates: 2,
+          max_steps: 1,
+          max_demos: 0,
+          prompt_lm: prompt_lm,
+          max_concurrency: 1,
+          seed: 1,
+          metric_identity: %{"id" => "exact-answer", "version" => 1, "config" => %{}}
+        )
+
+      program = Imp.predict("question -> answer", lm: lm)
+      owner = self()
+
+      Imp.Optimizer.SIMBA.compile(optimizer, program, trainset, trainset,
+        checkpoint_fn: fn checkpoint -> send(owner, {:checkpoint, checkpoint}) end
+      )
+
+      assert_received {:checkpoint, _checkpoint}
     end
 
     test "optimize! raises Imp.Error carrying the reason optimize returns" do
