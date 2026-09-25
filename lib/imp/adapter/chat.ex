@@ -203,8 +203,8 @@ defmodule Imp.Adapter.Chat do
       field.type in [:union, "union"] ->
         coerce_union(field, value)
 
-      code_field?(field) ->
-        coerce_code(value, code_language(field))
+      Imp.Adapter.FieldType.code?(field) ->
+        coerce_code(value, Imp.Adapter.FieldType.code_language(field))
 
       field.type in [:reasoning, "reasoning"] ->
         coerce_reasoning(value)
@@ -308,9 +308,12 @@ defmodule Imp.Adapter.Chat do
     end
   end
 
-  # A string field takes Python's `str(value)` spelling: "None"/"True"/"False",
-  # repr-style lists and dicts ("[1, 2, 3]"), floats in repr form.
-  defp coerce_value(value, :string), do: py_str(value)
+  # A string field given a non-string value takes the value's JSON text
+  # ("true", "[\"x\", \"y\"]", "1000000.0"). A null is not a value: it stays
+  # nil, so the field's required or optional declaration decides.
+  defp coerce_value(nil, :string), do: nil
+  defp coerce_value(value, :string) when is_float(value), do: Imp.PyFloat.repr(value)
+  defp coerce_value(value, :string), do: format_value(value)
 
   defp coerce_value(value, :integer) when is_binary(value) do
     case Integer.parse(String.trim(value)) do
@@ -372,39 +375,6 @@ defmodule Imp.Adapter.Chat do
       :error -> value
     end
   end
-
-  # Python `str(...)` as applied to a string field's value.
-  defp py_str(value) when is_binary(value), do: value
-  defp py_str(nil), do: "None"
-  defp py_str(true), do: "True"
-  defp py_str(false), do: "False"
-  defp py_str(value) when is_integer(value), do: Integer.to_string(value)
-  defp py_str(value) when is_float(value), do: Imp.PyFloat.repr(value)
-
-  defp py_str(value) when is_list(value),
-    do: "[" <> Enum.map_join(value, ", ", &py_repr/1) <> "]"
-
-  defp py_str(value) when is_map(value) and not is_struct(value),
-    do:
-      "{" <> Enum.map_join(value, ", ", fn {k, v} -> py_repr(k) <> ": " <> py_repr(v) end) <> "}"
-
-  defp py_str(%DateTime{} = value), do: DateTime.to_iso8601(value)
-  defp py_str(%NaiveDateTime{} = value), do: NaiveDateTime.to_iso8601(value)
-  defp py_str(value) when is_atom(value), do: to_string(value)
-  defp py_str(value), do: inspect(value)
-
-  # Python `repr(...)` for elements nested in a `str()`-rendered list or dict:
-  # a string is quoted (single quotes, unless it contains one and no double
-  # quote); other scalars render as `py_str`.
-  defp py_repr(value) when is_binary(value) do
-    if String.contains?(value, "'") and not String.contains?(value, "\"") do
-      "\"" <> value <> "\""
-    else
-      "'" <> String.replace(value, "'", "\\'") <> "'"
-    end
-  end
-
-  defp py_repr(value), do: py_str(value)
 
   defp fetch_field(fields, name) do
     string_name = to_string(name)
@@ -474,8 +444,10 @@ defmodule Imp.Adapter.Chat do
   # renderer is: the multimodal split happens on provider content parts, not in
   # the field dialect. Text values go through the section renderer.
   defp render_input_section(field, value, section_renderer) do
-    if code_field?(field) do
-      code = Imp.Adapter.Types.Code.new(value, language: code_language(field))
+    if Imp.Adapter.FieldType.code?(field) do
+      code =
+        Imp.Adapter.Types.Code.new(value, language: Imp.Adapter.FieldType.code_language(field))
+
       section_renderer.(field, Imp.Adapter.Types.Code.format(code))
     else
       render_non_code_input_section(field, value, section_renderer)
@@ -686,10 +658,10 @@ defmodule Imp.Adapter.Chat do
       |> Enum.reject(&(is_nil(&1) or &1 == ""))
       |> Enum.join(" ")
 
-    if code_field?(field) do
+    if Imp.Adapter.FieldType.code?(field) do
       type_description =
         "Type description: " <>
-          Imp.Adapter.Types.Code.description(code_language(field))
+          Imp.Adapter.Types.Code.description(Imp.Adapter.FieldType.code_language(field))
 
       case base do
         "" -> "\n    " <> type_description
@@ -1018,14 +990,6 @@ defmodule Imp.Adapter.Chat do
   defp dumps_key(key) when is_atom(key), do: {:ok, Jason.encode!(Atom.to_string(key))}
   defp dumps_key(key) when is_integer(key), do: {:ok, Jason.encode!(Integer.to_string(key))}
   defp dumps_key(_key), do: :error
-
-  defp code_field?(%{type: type}), do: type in [:code, "code"]
-
-  defp code_language(field) do
-    field.metadata
-    |> fetch_meta(:language, "python")
-    |> to_string()
-  end
 
   defp render_demos(_signature, [], _renderer, _input_renderer), do: []
   defp render_demos(_signature, nil, _renderer, _input_renderer), do: []

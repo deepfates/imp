@@ -45,12 +45,7 @@ defmodule Imp.DSPyWording do
     |> regex_replace(~r/Example\((\{.*?\})\) \(input_keys=\{(.*?)\}\)/, fn all, fields, inputs ->
       with {:ok, %Jason.OrderedObject{values: fields}} <- python_literal(fields) do
         input_names = Regex.scan(~r/'([^']*)'|"([^"]*)"/, inputs) |> Enum.map(&Enum.at(&1, -1))
-
-        fields
-        |> Map.new()
-        |> Imp.Example.new()
-        |> Imp.Example.with_inputs(input_names)
-        |> Imp.Optimizer.MIPROv2.UpstreamProposer.example_json()
+        example_text(fields, input_names)
       else
         _other -> all
       end
@@ -68,6 +63,35 @@ defmodule Imp.DSPyWording do
   end
 
   def in_imp_words(value), do: value
+
+  # One DSPy example as Imp's dataset summary shows it: `{"inputs": {...},
+  # "outputs": {...}}`, each group's fields in lexical order, nested dicts in
+  # DSPy's order. Encoded here rather than through Imp's renderer, so the
+  # proposer differential compares two independent renderings.
+  defp example_text(fields, input_names) do
+    {inputs, outputs} =
+      fields
+      |> Enum.sort_by(&elem(&1, 0))
+      |> Enum.split_with(fn {name, _value} -> name in input_names end)
+
+    json(%Jason.OrderedObject{
+      values: [
+        {"inputs", %Jason.OrderedObject{values: inputs}},
+        {"outputs", %Jason.OrderedObject{values: outputs}}
+      ]
+    })
+  end
+
+  # JSON with `", "` and `": "` separators; numbers keep Python's spelling,
+  # which is valid JSON for the finite numbers a repr carries.
+  defp json(%Jason.OrderedObject{values: values}),
+    do:
+      "{" <>
+        Enum.map_join(values, ", ", fn {k, v} -> Jason.encode!(k) <> ": " <> json(v) end) <> "}"
+
+  defp json(values) when is_list(values), do: "[" <> Enum.map_join(values, ", ", &json/1) <> "]"
+  defp json({:number, text}), do: text
+  defp json(value), do: Jason.encode!(value)
 
   defp regex_replace(value, regex, fun), do: Regex.replace(regex, value, fun)
 
@@ -94,10 +118,7 @@ defmodule Imp.DSPyWording do
       [number] ->
         rest = binary_part(text, byte_size(number), byte_size(text) - byte_size(number))
 
-        case Integer.parse(number) do
-          {integer, ""} -> {:ok, integer, rest}
-          _other -> with {float, ""} <- Float.parse(number), do: {:ok, float, rest}
-        end
+        {:ok, {:number, number}, rest}
 
       nil ->
         :error
@@ -159,6 +180,14 @@ defmodule Imp.DSPyWording do
     do: Map.new(values, fn {k, v} -> {k, plain(v)} end)
 
   defp plain(values) when is_list(values), do: Enum.map(values, &plain/1)
+
+  defp plain({:number, text}) do
+    case Integer.parse(text) do
+      {integer, ""} -> integer
+      _other -> text |> Float.parse() |> elem(0)
+    end
+  end
+
   defp plain(value), do: value
 
   defp json_scalar("True"), do: "true"

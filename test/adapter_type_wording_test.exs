@@ -126,6 +126,31 @@ defmodule Imp.AdapterTypeWordingTest do
     refute text =~ @python
   end
 
+  test "the MIPROv2 dataset summary shows an example as JSON inputs and outputs" do
+    example =
+      Imp.example(%{
+        "text" => "request-0",
+        "route" => "K11",
+        "ok" => true,
+        "missing" => nil,
+        "meta" => %Jason.OrderedObject{values: [{"z", [1, 2.5e-5]}, {"a", "can't \"say\""}]}
+      })
+      |> Imp.with_inputs("text")
+
+    assert Imp.Optimizer.MIPROv2.UpstreamProposer.example_json(example) ==
+             ~s({"inputs": {"text": "request-0"}, "outputs": {"meta": {"z": [1, 2.5e-05], "a": "can't \\"say\\""}, "missing": null, "ok": true, "route": "K11"}})
+  end
+
+  test "a non-string answer for a string field is kept as its JSON text" do
+    signature = Imp.signature("question -> a, b")
+
+    assert {:ok, prediction} =
+             Imp.Adapter.JSON.parse(signature, ~s({"a": true, "b": ["x","y"]}), [])
+
+    assert Imp.get(prediction, :a) == "true"
+    assert Imp.get(prediction, :b) == ~s(["x", "y"])
+  end
+
   defp text(messages) do
     Enum.map_join(messages, "\n", fn %{content: content} ->
       if is_binary(content), do: content, else: inspect(content)

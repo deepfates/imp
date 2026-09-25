@@ -288,9 +288,11 @@ defmodule Imp.Adapter.FieldType do
 
   defp union_nodes(_constraints), do: []
 
-  defp code?(%{type: type}), do: type in [:code, "code"]
+  @doc "Whether the field holds code (`Imp.Adapter.Types.Code`)."
+  def code?(%{type: type}), do: type in [:code, "code"]
 
-  defp code_language(field) do
+  @doc "The programming language a code field declares, `python` when it declares none."
+  def code_language(field) do
     field.metadata
     |> fetch(:language)
     |> Kernel.||("python")

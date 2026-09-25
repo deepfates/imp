@@ -150,10 +150,10 @@ defmodule Imp.Adapter.XML do
   defp field_desc(field) do
     base = if field.desc == "${#{field.name}}", do: "", else: to_string(field.desc || "")
 
-    if code_field?(field) do
+    if Imp.Adapter.FieldType.code?(field) do
       type_description =
         "Type description: " <>
-          Imp.Adapter.Types.Code.description(code_language(field))
+          Imp.Adapter.Types.Code.description(Imp.Adapter.FieldType.code_language(field))
 
       case base do
         "" -> "\n    " <> type_description
@@ -194,13 +194,6 @@ defmodule Imp.Adapter.XML do
   defp task_description(signature) do
     "In adhering to this structure, your objective is: " <>
       Imp.Adapter.Instructions.objective_text(signature.instructions)
-  end
-
-  defp code_field?(%{type: type}), do: type in [:code, "code"]
-
-  defp code_language(field) do
-    Map.get(field.metadata, :language, Map.get(field.metadata, "language", "python"))
-    |> to_string()
   end
 
   # ------------------------------------------------------------------

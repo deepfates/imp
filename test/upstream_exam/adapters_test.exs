@@ -59,14 +59,20 @@ defmodule UpstreamExam.AdaptersTest do
 
   describe "test_adapter_utils.py" do
     # Upstream: tests/adapters/test_adapter_utils.py::test_parse_value_str_annotation
-    # (was a finding; fixed by dee-jbav — str-annotated fields render through
-    # Python str(): True -> "True", None -> "None", [1, 2, 3] -> "[1, 2, 3]".)
+    # A string field accepts a non-string value, as upstream does, as the
+    # value's JSON text rather than Python's str() spelling; a null is no
+    # value, so a required field reports it missing and an optional one is nil.
     test "parse_value str annotation" do
       assert parse_one(%{name: :value, type: :string}, 123) == {:ok, "123"}
-      assert parse_one(%{name: :value, type: :string}, true) == {:ok, "True"}
+      assert parse_one(%{name: :value, type: :string}, true) == {:ok, "true"}
       assert parse_one(%{name: :value, type: :string}, "hello") == {:ok, "hello"}
-      assert parse_one(%{name: :value, type: :string}, nil) == {:ok, "None"}
       assert parse_one(%{name: :value, type: :string}, [1, 2, 3]) == {:ok, "[1, 2, 3]"}
+
+      assert parse_one(%{name: :value, type: :string}, %{"a" => true, "b" => ["x", "y"]}) ==
+               {:ok, ~s({"a": true, "b": ["x", "y"]})}
+
+      assert parse_one(%{name: :value, type: :string, optional: true}, nil) == {:ok, nil}
+      assert {:error, _missing} = parse_one(%{name: :value, type: :string}, nil)
     end
 
     # Upstream: tests/adapters/test_adapter_utils.py::test_parse_value_basic_types

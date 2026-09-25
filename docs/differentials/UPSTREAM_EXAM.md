@@ -44,10 +44,12 @@ and passes.
    (strict JSON, then Python-dict spellings: single quotes, True/False/None,
    trailing commas) and the balanced-`{...}`-block extraction
    `JSONAdapter.parse` performs; used by chat field coercion and JSON parse.
-3. **parse_value scalar/str semantics** (2, fixed by dee-jbav): str-annotated
-   fields render through Python `str()` (`True`→"True", `None`→"None",
-   `[1, 2, 3]`→"[1, 2, 3]"); Literal parsing strips `Literal[...]`/`str[...]`
-   wrappers and wrapping quotes before enum matching.
+3. **parse_value scalar/str semantics** (2, fixed by dee-jbav): a string
+   field accepts a non-string value, as upstream does, as its JSON text
+   (`true`→"true", `[1, 2, 3]`→"[1, 2, 3]") rather than Python's `str()`
+   spelling, and a null is no value, so required/optional validation decides;
+   Literal parsing strips `Literal[...]`/`str[...]` wrappers and wrapping
+   quotes before enum matching.
 4. **Literal rendering of non-string members** (1, fixed by dee-xyhv):
    every member reaches the prompt. Imp now names an enum in words
    (`one of: 1, bar`, `one of: true, 3, foo`) rather than as a Python
@@ -96,7 +98,7 @@ constraints and parse results, not the same text (`decisions.md`).
 
 | Upstream test | Status | Note |
 |---|---|---|
-| test_parse_value_str_annotation | pass (was FAIL) | Fixed by dee-jbav: str-annotated fields render through Python `str()` (`True`→"True", `None`→"None", `[1, 2, 3]`→"[1, 2, 3]"). |
+| test_parse_value_str_annotation | pass (adapted) | A string field accepts non-string values as upstream does, as JSON text (`true`→"true", `[1, 2, 3]`→"[1, 2, 3]") rather than Python's `str()` spelling; a null is no value, so a required field reports it missing and an optional one is nil. |
 | test_parse_value_pydantic_types | n/a | Pydantic BaseModel validation; Imp has no user-defined model field types. |
 | test_parse_value_basic_types | pass | int/float/bool/list[int] conversions match, incl. JSON-decoding `"[1, 2, 3]"` for an array field. |
 | test_parse_value_literal | pass (was FAIL) | Fixed by dee-jbav: `Literal[...]`/`str[...]` wrappers and wrapping quotes stripped before enum matching, exactly as parse_value does. |
