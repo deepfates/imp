@@ -55,7 +55,10 @@ that always says atlas should score exactly the share of tickets that belong
 to atlas:
 
 ```elixir
-always_atlas = Imp.with_lm(router, Imp.LM.Static.new(handler: fn _messages, _opts -> %{team: "atlas"} end))
+always_atlas =
+  "ticket -> team: enum[atlas,harbor,beacon,quill]"
+  |> Imp.signature("Route the support ticket to the squad that owns it.")
+  |> Imp.predict(lm: Imp.LM.Static.new(handler: fn _messages, _opts -> %{team: "atlas"} end))
 
 Imp.evaluate(always_atlas, testset, metric).score
 #=> 0.25

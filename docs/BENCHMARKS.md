@@ -53,7 +53,7 @@ Also accepts `OPENROUTER_API_KEY` with `openai/gpt-5.4-mini`. Set
   the search optimizers. Twenty rows move in 5-point steps.
 
 This is the one end-to-end effectiveness number an outsider can reproduce from
-scratch. [Getting started](getting-started/measuring.md) walks through the same
+scratch. [The tutorial](TUTORIAL_TICKET_ROUTING.md) walks through the same
 experiment as ordinary library code.
 
 ### Agent optimization (row R6)

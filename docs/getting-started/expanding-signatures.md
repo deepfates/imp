@@ -55,8 +55,9 @@ type is a string. The types are:
 
 Outputs are parsed and checked strictly: a reply that doesn't fit the type is
 an error, never a guess. Inputs are checked for presence before any request is
-made, so a missing field costs nothing. An unknown type or a repeated name
-fails when the signature is built, not when it runs.
+made, so a missing field costs nothing. An unknown type, or a name used twice
+(on either side or on both), fails when the signature is built, not when it
+runs.
 
 ## The structured form
 
@@ -65,7 +66,7 @@ value, or a constraint the string can't say, we can write the signature as
 data. This is the same signature, with an optional note added:
 
 ```elixir
-signature =
+structured =
   Imp.signature(
     %{
       inputs: [%{name: :ticket, type: :string}],
@@ -83,7 +84,7 @@ signature =
     "Route the support ticket to the squad that owns it."
   )
 
-Imp.Signature.output_names(signature)
+Imp.Signature.output_names(structured)
 #=> [:team, :urgency, :note]
 ```
 

@@ -26,9 +26,8 @@ Imp.get(prediction, :reasoning)
 
 The reasoning is right, and the answer is still harbor. The model knows this
 is a billing problem; it doesn't know that billing is atlas. Thinking longer
-can't supply a fact the model was never given. That is one run of one ticket,
-and the answer can change between runs; whether chain of thought helps this
-router on the whole is a question for measurement, which is coming.
+can't supply a fact the model was never given. One run can differ; measuring
+comes later.
 
 Changing the module never touches the signature. Other modules run it as a
 tool-using agent, compare several attempts, or retry until a check passes; the

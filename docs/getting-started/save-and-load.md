@@ -39,8 +39,7 @@ switch.
 
 The saved file is plain JSON. When an optimizer run produces a better program,
 the change arrives as a diff, and review sees exactly which instructions and
-examples moved. Keep the metric and data that justified it
-alongside.
+examples moved. Keep the metric and data that justified it alongside.
 
 `Imp.save!/2` stores Imp's own program types, like the router. A program we
 defined ourselves, such as `TicketTriage`, is our code: it lives in our

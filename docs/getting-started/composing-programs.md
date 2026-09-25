@@ -47,7 +47,8 @@ end
 
 `new/1` builds the stages. `call/2` runs them: plain Elixir, with `with` to
 stop at the first error. A stage that fails returns its error, and the caller
-gets it unchanged.
+gets it unchanged. `Imp.prediction/1` builds a prediction from fields, so
+callers read `problem` and `team` with `Imp.get/2`, as from any other program.
 
 ```elixir
 triage = TicketTriage.new(lm)

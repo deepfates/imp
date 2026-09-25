@@ -19,7 +19,7 @@ Imp.evaluate(improved, testset, metric, num_threads: 8).score
 ```
 
 The router went from 0.25 to 0.75 on tickets it never saw. Across three runs
-it scored 0.75 to 0.85. Compiling made no model calls; the only cost is a
+it scored 0.75 to 0.85. Optimizing made no model calls; the only cost is a
 longer prompt.
 
 `improved` is a new value. `router` is unchanged, so we can compare the two, or

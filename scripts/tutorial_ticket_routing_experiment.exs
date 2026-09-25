@@ -1,5 +1,4 @@
-# Reproduces the support-ticket routing experiment (docs/getting-started/
-# measuring.md and improving.md use the same data) end to end against the live
+# Reproduces docs/TUTORIAL_TICKET_ROUTING.md end to end against the live
 # provider and writes a provenance-stamped, content-addressed run artifact to
 # benchmarks/runs/tutorial-ticket-routing/<sha256>.json.
 #

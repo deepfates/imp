@@ -28,7 +28,9 @@ want; modules like `Imp.Predict` say *how* to get it. `Predict` is the simplest
 module: one request to the model per call. We give it the model and an
 adapter, which decides how the signature becomes messages. `Imp.Adapter.JSON`
 asks for a JSON object; the default, `Imp.Adapter.Chat`, uses the same
-`[[ ## field ## ]]` markers DSPy does.
+`[[ ## field ## ]]` markers DSPy does. The examples use JSON because our
+outputs are typed values our code reads, and a JSON object is a format
+providers can be asked to return directly.
 
 The router is a value. Nothing has run yet. `Imp.call/2` runs it:
 
@@ -41,8 +43,8 @@ The router is a value. Nothing has run yet. `Imp.call/2` runs it:
    of a prediction.
 5. We get `{:ok, %Imp.Prediction{}}`, and read fields with `Imp.get/2`.
 
-Identical calls in the same VM are answered from a cache, as in DSPy, so
-running a block twice costs nothing the second time.
+Imp keeps a cache in memory for the life of the VM, so an identical call is
+answered from it and running a block twice costs nothing the second time.
 
 The router answered `"harbor"`. That is a valid squad and the wrong one: a
 double charge is money, so it belongs to atlas. The model is guessing, because

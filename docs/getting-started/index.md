@@ -26,7 +26,7 @@ support tickets. Our company sends tickets to four squads with internal names:
 - **quill** owns the product: feature requests, how-to questions, docs.
 
 No model knows these names. That makes the task small enough to follow and
-real enough to need everything Imp offers. Imp ships sixty labeled tickets for
+real enough to need measuring and improving. Imp ships sixty labeled tickets for
 it, which we'll use to measure and improve the router.
 
 ## What we'll learn

@@ -99,16 +99,26 @@ trajectory is the first thing to read.
 
 ## Keeping tools in bounds
 
-A tool runs with whatever authority its function has. `tool_policy:` names
-the tools a program may call (`tool_policy: [:charter, :submit]`), and
-anything else is refused before it runs. Keep authorization, timeouts, and
-idempotency in the functions themselves, as you would for any code a request
-can reach. When your code already knows which function to call, call it
-directly; an agent is for when the model has to choose.
+A tool runs with whatever authority its function has. Keep authorization,
+timeouts, and idempotency in the functions themselves, as you would for any
+code a request can reach. When your code already knows which function to
+call, call it directly; an agent is for when the model has to choose.
 
 Tools can also come from an MCP server, a standard way for services to
 publish tools to models: `Imp.MCP.connect/2` turns a server's tools into
-`Imp.Tool` values that work here unchanged.
+`Imp.Tool` values that work here unchanged. A server may publish twenty tools
+when a program should use two. `tool_policy:` names the tools a program may
+call, and anything else is refused before it runs. `submit` is a tool like
+the others, so the list must name it too:
+
+~~~elixir
+Imp.react(
+  "question -> answer: string, source: string",
+  imported.tools,
+  lm: lm,
+  tool_policy: ["search_docs", "read_page", :submit]
+)
+~~~
 
 [Tools and MCP](../diving-deeper/tools-and-mcp.md) and
 [ReAct](../diving-deeper/react.md) go further: tool schemas, policies, MCP
