@@ -56,7 +56,7 @@ defmodule Imp.Predict.CodeAct do
   @spec new(term(), [struct()], keyword()) :: t()
   def new(signature, tools \\ [], opts \\ []) do
     opts =
-      Imp.Predict.Predict.validate_options!(opts, @option_schema, "Imp.Predict.CodeAct.new/3")
+      Imp.Predict.Options.validate!(opts, @option_schema, "Imp.Predict.CodeAct.new/3")
 
     tools = Imp.Tool.index_tools!(tools, "Imp.Predict.CodeAct.new/3")
     pot_opts = Keyword.take(opts, [:lm, :adapter, :demos, :config, :metadata, :output_field])

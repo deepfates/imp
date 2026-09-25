@@ -232,7 +232,7 @@ defmodule Imp.Predict.ReActV2 do
     signature = Imp.Signature.ensure(signature)
 
     opts =
-      Imp.Predict.Predict.validate_options!(opts, @option_schema, "Imp.Predict.ReActV2.new/3")
+      Imp.Predict.Options.validate!(opts, @option_schema, "Imp.Predict.ReActV2.new/3")
 
     tools = Imp.Tool.index_tools!(tools, "Imp.Predict.ReActV2.new/3")
 

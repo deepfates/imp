@@ -41,7 +41,7 @@ defmodule Imp.Optimizer.Avatar do
     Imp.FunctionContract.validate!(metric, [2, 3], "Imp.Optimizer.Avatar.new/2", "metric")
 
     opts =
-      Imp.Predict.Predict.validate_options!(opts, @option_schema, "Imp.Optimizer.Avatar.new/2")
+      Imp.Predict.Options.validate!(opts, @option_schema, "Imp.Optimizer.Avatar.new/2")
 
     unless opts[:optimize_for] in [:max, :min] do
       raise ArgumentError, "Imp.Optimizer.Avatar.new/2: :optimize_for must be :max or :min"

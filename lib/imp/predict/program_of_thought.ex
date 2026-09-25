@@ -51,7 +51,7 @@ defmodule Imp.Predict.ProgramOfThought do
   @spec new(term(), keyword()) :: t()
   def new(signature, opts \\ []) do
     opts =
-      Imp.Predict.Predict.validate_options!(
+      Imp.Predict.Options.validate!(
         opts,
         @option_schema,
         "Imp.Predict.ProgramOfThought.new/2"

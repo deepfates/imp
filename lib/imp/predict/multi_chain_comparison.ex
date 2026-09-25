@@ -52,7 +52,7 @@ defmodule Imp.Predict.MultiChainComparison do
   """
   def new(signature, opts \\ []) do
     opts =
-      Imp.Predict.Predict.validate_options!(
+      Imp.Predict.Options.validate!(
         opts,
         @option_schema,
         "Imp.Predict.MultiChainComparison.new/2"
