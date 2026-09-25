@@ -163,7 +163,7 @@ defmodule DocumentationContractTest do
         "README.md",
         "RELEASE_NOTES.md",
         "CHANGELOG.md",
-        "docs/IMP_FOR_DSPY_USERS.md",
+        "docs/coming-from-dspy.md",
         "docs/LEARNING_PATH.md",
         "docs/PRODUCTION_OPERATIONS.md",
         "examples/deployment/README.md",
@@ -227,11 +227,16 @@ defmodule DocumentationContractTest do
     assert learning =~ ~r/## 10\. .*Artifact/
 
     assert product_docs == [
-             "docs/IMP_FOR_DSPY_USERS.md",
              "docs/LEARNING_PATH.md",
              "docs/PRODUCTION_OPERATIONS.md",
              "docs/TRAJECTORIES.md",
-             "docs/TUTORIAL_TICKET_ROUTING.md"
+             "docs/TUTORIAL_TICKET_ROUTING.md",
+             "docs/coming-from-dspy.md",
+             "docs/diving-deeper/adapters.md",
+             "docs/diving-deeper/modules-and-composition.md",
+             "docs/diving-deeper/react.md",
+             "docs/diving-deeper/signatures.md",
+             "docs/diving-deeper/tools-and-mcp.md"
            ]
 
     extras =

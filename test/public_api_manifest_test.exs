@@ -366,7 +366,7 @@ defmodule PublicAPIManifestTest do
         "README.md",
         "docs/PRODUCTION_OPERATIONS.md",
         "docs/LEARNING_PATH.md",
-        "docs/IMP_FOR_DSPY_USERS.md",
+        "docs/coming-from-dspy.md",
         "livebooks/03_evaluate_and_optimize.livemd"
       ]
       |> Enum.flat_map(fn path ->

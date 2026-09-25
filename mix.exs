@@ -17,9 +17,11 @@ defmodule Imp.MixProject do
         warnings_as_errors: true,
         extras:
           ["README.md"] ++
-            product_docs() ++ livebooks() ++ ["RELEASE_NOTES.md", "CHANGELOG.md"],
+            product_docs() ++
+            diving_deeper() ++ livebooks() ++ ["RELEASE_NOTES.md", "CHANGELOG.md"],
         groups_for_extras: [
           Guides: product_docs(),
+          "Diving deeper": diving_deeper(),
           Livebooks: livebooks(),
           Releases: ["RELEASE_NOTES.md", "CHANGELOG.md"]
         ],
@@ -192,6 +194,7 @@ defmodule Imp.MixProject do
        Path.wildcard("examples/provider_free_ticket_router/**/*") ++
        Path.wildcard("examples/workspace_agent/**/*") ++
        product_docs() ++
+       diving_deeper() ++
        livebooks() ++
        [
          ".formatter.exs",
@@ -234,9 +237,19 @@ defmodule Imp.MixProject do
     [
       "docs/LEARNING_PATH.md",
       "docs/TUTORIAL_TICKET_ROUTING.md",
-      "docs/IMP_FOR_DSPY_USERS.md",
+      "docs/coming-from-dspy.md",
       "docs/PRODUCTION_OPERATIONS.md",
       "docs/TRAJECTORIES.md"
+    ]
+  end
+
+  defp diving_deeper do
+    [
+      "docs/diving-deeper/signatures.md",
+      "docs/diving-deeper/modules-and-composition.md",
+      "docs/diving-deeper/adapters.md",
+      "docs/diving-deeper/tools-and-mcp.md",
+      "docs/diving-deeper/react.md"
     ]
   end
 
