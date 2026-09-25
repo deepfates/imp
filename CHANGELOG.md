@@ -394,6 +394,10 @@ User-visible changes to Imp are recorded here.
   bootstraps demos, as DSPy's `trace=None` has it. Before, evaluation passed
   the trace too, so a ported metric that scores continuously when evaluated
   and passes or fails when compiling gave its compile-time answer.
+- `Imp.load!/2` loads a saved program in a VM that never created its demos'
+  field names as atoms: such a name loads as a string, which `Imp.Example`
+  looks up by text. It raised `ArgumentError` ("not an already existing
+  atom"), so a router saved by one process failed to load in a fresh one.
 
 ### Errors and shapes
 

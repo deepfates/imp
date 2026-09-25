@@ -1344,10 +1344,12 @@ defmodule Imp.Saving do
   defp decode_predict_metadata(metadata) do
     # These tags are part of the supported TrainingJob.rebind/3 program
     # artifact. Decode only this explicit Saving-owned vocabulary before the
-    # existing-atom-only generic decoder sees the remaining metadata.
+    # generic decoder sees the remaining metadata. That decoder creates no
+    # atoms: the optimizer report here repeats the demos, whose field names
+    # load as strings when this VM never created them.
     metadata
     |> decode_portable_predict_metadata_atoms()
-    |> Imp.Optimizer.Report.decode_term()
+    |> Imp.Optimizer.Report.decode_term_compatible()
   end
 
   defp decode_portable_predict_metadata_atoms(%{"__imp_type__" => "atom", "value" => value} = tag)
@@ -1785,8 +1787,11 @@ defmodule Imp.Saving do
     end
   end
 
+  # A demo's field names are the task's, and the loading VM may never have
+  # created them as atoms. A name whose atom does not exist loads as a string,
+  # which `Imp.Example` looks up by text; no atom is created from the file.
   defp load_demo!(%{"__imp_type__" => "example"} = demo) do
-    case Imp.Optimizer.Report.decode_term(demo) do
+    case Imp.Optimizer.Report.decode_term_compatible(demo) do
       %Imp.Example{} = example ->
         example
 
