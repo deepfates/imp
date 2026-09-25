@@ -404,6 +404,12 @@ User-visible changes to Imp are recorded here.
   `map_size/1`, `tuple_size/1`, `byte_size/1`, `abs/1`, `round/1`, `trunc/1`,
   `div/2`, `rem/2`, `max/2` and `min/2` are available. Other calls return
   `{:function_not_allowed, ...}`.
+- RLM controller code that calls a value that is not a function (`g = 1;
+  g.(1)`) fails that turn with `{:not_a_function, "g", 1}`, which the
+  controller reads and repairs. It ended the whole call with
+  `{:module_call_failed, Imp.Predict.RLM, ...}` whenever the variable's name
+  was not already an atom. An unexpected error inside the interpreter now
+  fails the turn the same way, as `{:interpreter_error, message}`.
 
 ### Errors and shapes
 

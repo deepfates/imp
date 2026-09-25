@@ -30,6 +30,46 @@ defmodule RLMPublicSurfaceTest do
     Process.delete(:rlm_actions)
   end
 
+  # A model's variable names are usually not atoms in the VM; the interpreter
+  # keeps them as strings, which crashed printing the failed expression.
+  test "calling a value that is not a function is a failed turn the model reads" do
+    parent = self()
+    name = "zq_" <> "notfn"
+
+    actions = [
+      %{reasoning: "call it", code: "#{name} = 1\n#{name}.(1)"},
+      %{reasoning: "finish", code: ~S|submit(%{answer: "done"})|}
+    ]
+
+    lm = %{
+      module: Imp.LM.Static,
+      opts: [
+        handler: fn messages, _opts ->
+          send(parent, {:turn, Enum.map_join(messages, "\n", &to_string(&1.content))})
+          [action | rest] = Process.get(:rlm_actions)
+          Process.put(:rlm_actions, rest)
+          action
+        end
+      ]
+    }
+
+    Process.put(:rlm_actions, actions)
+
+    rlm = Imp.Predict.RLM.new("x: int -> answer", lm: lm, max_iterations: 3)
+    assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{x: 1})
+    assert Imp.Prediction.get(prediction, :answer) == "done"
+
+    assert [%{action: :run_error, output: {:error, reason}}, %{action: :submit}] =
+             prediction.metadata.rlm_trace
+
+    assert reason == {:not_a_function, name, 1}
+    assert_received {:turn, _first}
+    assert_received {:turn, second}
+    assert second =~ "not_a_function"
+  after
+    Process.delete(:rlm_actions)
+  end
+
   test "RLM gives the controller the interpreter-owned language guide" do
     parent = self()
 

@@ -395,6 +395,23 @@ missing()|
                Interpreter.execute(interpreter, source)
     end
 
+    test "calling a value that is not a function is an error the model can read" do
+      interpreter = Interpreter.new(%{}, %{}, nil)
+
+      # The name is not an atom in this VM, as a model's names usually are not.
+      source = "zq_" <> "notfn = 1\nzq_" <> "notfn.(1)"
+      assert {:error, reason, _next} = Interpreter.execute(interpreter, source)
+      assert reason == {:not_a_function, "zq_notfn", 1}
+
+      assert {:error, {:unsupported_expression, text}, _next} =
+               Interpreter.execute(interpreter, "f = fn x -> x end\nf.(1)")
+
+      assert text =~ "calling a function held in a variable"
+
+      assert {:error, {:function_not_allowed, "zq_" <> "other", :call, 0}, _next} =
+               Interpreter.execute(interpreter, "zq_" <> "other.call()")
+    end
+
     test "effectful and atom-making Kernel functions stay refused" do
       interpreter = Interpreter.new(%{}, %{}, nil)
 

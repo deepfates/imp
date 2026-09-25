@@ -240,7 +240,7 @@ defmodule Imp.Predict.RLM.Interpreter do
          {:ok, source} <- normalize_repl_helpers(source),
          {:ok, ast} <- parse(source),
          :ok <- check_ast_budget(ast, interpreter.max_steps) do
-      case eval(ast, interpreter) do
+      case safe_eval(ast, interpreter) do
         {:ok, value, next} ->
           {:ok, value, finish_transaction(next)}
 
@@ -267,6 +267,14 @@ defmodule Imp.Predict.RLM.Interpreter do
     else
       {:error, reason} -> {:error, reason, original}
     end
+  end
+
+  # A defect in the interpreter must reach the model as a failed cell, not
+  # end the whole RLM call.
+  defp safe_eval(ast, interpreter) do
+    eval(ast, interpreter)
+  rescue
+    error -> {:error, {:interpreter_error, Exception.message(error)}, interpreter}
   end
 
   defp check_source_budget(source, max_bytes) do
@@ -555,6 +563,24 @@ defmodule Imp.Predict.RLM.Interpreter do
     {:ok, "Available variables: #{inspect(variables)}", state}
   end
 
+  # `f.(x)`. An interpreter function runs only where a library function
+  # applies it, and a variable that holds anything else is not a function at
+  # all. Either way the model reads why.
+  defp eval_node({{:., _, [callee]}, _, args}, state) when is_list(args) do
+    with {:ok, value, state} <- eval(callee, state) do
+      case value do
+        %Fn{} ->
+          {:error,
+           {:unsupported_expression,
+            "calling a function held in a variable (#{render(callee)}.(...)); " <>
+              "pass it to an Enum function, or write its body inline"}, state}
+
+        _other ->
+          {:error, {:not_a_function, render(callee), value}, state}
+      end
+    end
+  end
+
   defp eval_node({name, _, args}, state)
        when (is_atom(name) or is_binary(name)) and is_list(args) do
     if {normalize_known_name(name), length(args)} in @kernel_functions and
@@ -566,7 +592,29 @@ defmodule Imp.Predict.RLM.Interpreter do
     end
   end
 
-  defp eval_node(ast, state), do: {:error, {:unsupported_expression, Macro.to_string(ast)}, state}
+  defp eval_node(ast, state), do: {:error, {:unsupported_expression, render(ast)}, state}
+
+  # The parser keeps a name whose atom does not exist as a string, which
+  # `Macro.to_string/1` cannot print. Each such name is printed through a
+  # placeholder variable and put back in order; no atom is created.
+  defp render(ast) do
+    {ast, names} =
+      Macro.prewalk(ast, [], fn
+        {name, meta, context}, names when is_binary(name) and is_atom(context) ->
+          {{:imp_rendered_name, meta, nil}, [name | names]}
+
+        other, names ->
+          {other, names}
+      end)
+
+    names
+    |> Enum.reverse()
+    |> Enum.reduce(Macro.to_string(ast), fn name, text ->
+      String.replace(text, "imp_rendered_name", name, global: false)
+    end)
+  rescue
+    _error -> "an expression"
+  end
 
   # `to_string/1` and `is_nil/1` are macros in Kernel, not functions.
   defp kernel_apply(:to_string, [value]), do: String.Chars.to_string(value)
@@ -587,7 +635,7 @@ defmodule Imp.Predict.RLM.Interpreter do
       case module do
         {:__aliases__, _, parts} -> Enum.map_join(parts, ".", &to_string/1)
         module when is_atom(module) or is_binary(module) -> to_string(module)
-        module -> Macro.to_string(module)
+        module -> render(module)
       end
 
     {:error,
