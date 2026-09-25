@@ -485,6 +485,11 @@ Every change here is breaking for code that matches on the old shape.
   word with the query, up to `k`. It returned `k` documents whatever they
   scored, so a document with no word in common came back with `score: 0`
   because it came first in the list.
+### Observability
+
+- `Imp.trace/2` collects `[:imp, :module, ...]` events by default, so tracing
+  a program call records it on any LM; with `Imp.LM.Static` it recorded
+  nothing unless `events:` was given.
 
 ## 0.4.0 — 2026-09-17
 

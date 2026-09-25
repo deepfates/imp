@@ -20,6 +20,9 @@ defmodule Imp.Observability do
   ]
 
   @default_trace_events [
+    [:imp, :module, :start],
+    [:imp, :module, :stop],
+    [:imp, :module, :exception],
     [:imp, :lm, :start],
     [:imp, :lm, :stop],
     [:imp, :lm, :exception],
@@ -155,6 +158,10 @@ defmodule Imp.Observability do
 
   @doc """
   Collects selected redacted telemetry emitted in this function's trace context.
+
+  By default it collects module calls (`[:imp, :module, ...]`), LM requests,
+  tool and retriever calls, optimizer progress and training jobs; `:events`
+  names others.
 
   Owned `Imp.Tasks` children inherit correlation; unrelated processes do not.
   Ordinary `Task`/`spawn` children require explicit `Imp.Telemetry.with_context(context, fun)`

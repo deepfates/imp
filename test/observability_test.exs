@@ -77,6 +77,18 @@ defmodule ObservabilityTest do
     refute inspect(events) =~ "sk-test-secret"
   end
 
+  test "trace with the default events captures a program call on any LM" do
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "pong"} end)
+    program = Imp.predict("question -> answer", lm: lm)
+
+    trace = Imp.trace(fn -> Imp.call(program, %{question: "ping"}) end)
+
+    assert {:ok, _prediction} = trace.result
+    names = Enum.map(trace.events, &elem(&1, 0))
+    assert [:imp, :module, :start] in names
+    assert [:imp, :module, :stop] in names
+  end
+
   test "logging controls suppress Imp logs and redact emitted metadata" do
     enabled =
       capture_log(fn ->
