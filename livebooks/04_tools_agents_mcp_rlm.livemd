@@ -32,7 +32,27 @@ else
   # Standalone notebook: install the released package from Hex.
   Mix.install([{:imp, "~> 0.5"}])
 end
-live_provider_enabled? = System.get_env("LIVE_PROVIDER") == "1"
+
+# Live cells run when LIVE_PROVIDER=1 and a key is set: OPENAI_API_KEY, or
+# OPENROUTER_API_KEY for the same model through OpenRouter. In your own code,
+# any ReqLLM model string works.
+live_lm = fn opts ->
+  model = System.get_env("OPENAI_MODEL", "gpt-5.4-mini")
+
+  cond do
+    System.get_env("LIVE_PROVIDER") != "1" ->
+      {:skip, "Set LIVE_PROVIDER=1 and OPENAI_API_KEY to run this cell."}
+
+    key = System.get_env("OPENAI_API_KEY") ->
+      {:ok, Imp.req_llm("openai:" <> model, Keyword.put(opts, :api_key, key))}
+
+    key = System.get_env("OPENROUTER_API_KEY") ->
+      {:ok, Imp.req_llm("openrouter:openai/" <> model, Keyword.put(opts, :api_key, key))}
+
+    true ->
+      {:skip, "Set OPENAI_API_KEY to run this cell."}
+  end
+end
 ```
 
 ## Tools
@@ -73,28 +93,83 @@ Policy lives where the model chooses actions: any react-family program takes
 instead of an execution. The ReAct section below shows the action loop; use a
 deny policy when you want to exercise this boundary directly.
 
-## MCP Catalog Import
+## Tools From An MCP Server
 
-Catalog import turns external tool descriptions into Imp tools so the rest of
-the system does not care whether a tool was handwritten or discovered.
+MCP (the Model Context Protocol) is a standard way for a program to offer
+tools to a model client. `Imp.MCP.connect/2` starts or dials the servers you
+list and imports their tools as ordinary `Imp.Tool` values.
 
-Schemas use the MCP spec dialect: camelCase `"inputSchema"` with an optional
-`"description"` (snake_case `:input_schema` remains an in-process fallback).
+A real server would be a package you install. To keep this notebook offline,
+the next cell writes a small one: an Elixir script that answers MCP over its
+standard input and output and offers one tool, `charter`.
 
 ```elixir
-catalog =
-  Imp.MCP.Catalog.new([
-    %{
-      "name" => "remote_lookup",
-      "description" => "lookup through an imported catalog",
-      "inputSchema" => %{"required" => ["key"]},
-      "run" => fn %{key: "capital"} -> %{value: "Paris"} end
-    }
-  ])
+server_source = ~S"""
+defmodule Charters do
+  @charters %{
+    "atlas" => "atlas owns money: charges, refunds, invoices, plans.",
+    "harbor" => "harbor owns the platform: outages, errors, latency.",
+    "beacon" => "beacon owns identity: accounts, credentials, sessions.",
+    "quill" => "quill owns the product: feature requests, how-to questions."
+  }
 
-[tool] = Imp.MCP.import_tools(catalog)
-Imp.Tool.call(tool, %{key: "capital"})
+  def loop do
+    case IO.read(:stdio, :line) do
+      :eof -> :ok
+      line -> line |> JSON.decode!() |> reply() |> write(); loop()
+    end
+  end
+
+  defp reply(%{"id" => id, "method" => "initialize", "params" => params}),
+    do: {id, %{"protocolVersion" => params["protocolVersion"], "capabilities" => %{"tools" => %{}},
+               "serverInfo" => %{"name" => "charters", "version" => "1.0.0"}}}
+
+  defp reply(%{"id" => id, "method" => "tools/list"}),
+    do: {id, %{"tools" => [%{"name" => "charter", "description" => "The charter of one squad.",
+               "inputSchema" => %{"type" => "object", "properties" => %{"team" => %{"type" => "string"}}, "required" => ["team"]}}]}}
+
+  defp reply(%{"id" => id, "method" => "tools/call", "params" => %{"arguments" => %{"team" => team}}}),
+    do: {id, %{"content" => [%{"type" => "text", "text" => Map.get(@charters, team, "No squad named #{team}.")}]}}
+
+  defp reply(%{"id" => id}), do: {:error, id}
+  defp reply(_notification), do: nil
+
+  defp write(nil), do: :ok
+  defp write({:error, id}),
+    do: IO.puts(JSON.encode!(%{"jsonrpc" => "2.0", "id" => id, "error" => %{"code" => -32601, "message" => "Method not found"}}))
+
+  defp write({id, result}), do: IO.puts(JSON.encode!(%{"jsonrpc" => "2.0", "id" => id, "result" => result}))
+end
+
+Charters.loop()
+"""
+
+script = Path.join(System.tmp_dir!(), "charters_mcp_server.exs")
+File.write!(script, server_source)
 ```
+
+A descriptor names the command to start. Imp starts only servers you
+authorize, here with `trusted_servers:`:
+
+```elixir
+server = %{"name" => "charters", "command" => System.find_executable("elixir"), "args" => [script]}
+
+{:ok, imported} = Imp.MCP.connect([server], trusted_servers: [server])
+[charter] = imported.tools
+
+{charter.name, charter.metadata.mcp.server_name,
+ Imp.Tool.call(charter, %{"team" => "harbor"})}
+```
+
+The server runs until its connection closes: `imported.cleanup.()` stops it,
+and so does the end of the process that connected.
+
+```elixir
+imported.cleanup.()
+```
+
+[Tools and MCP](../docs/diving-deeper/tools-and-mcp.md) covers remote
+servers, credentials, and what happens when a server does not answer.
 
 ## ReAct
 
@@ -125,27 +200,7 @@ This cell proves the provider tool-call path with a real LM only when
 `LIVE_PROVIDER=1` and provider credentials are present.
 
 ```elixir
-live_lm = fn opts ->
-  if live_provider_enabled? && System.get_env("OPENAI_API_KEY") && System.get_env("OPENAI_MODEL") do
-    {:ok,
-     Imp.req_llm("openai:#{System.fetch_env!("OPENAI_MODEL")}",
-       Keyword.merge(
-         [
-           api_key: System.fetch_env!("OPENAI_API_KEY"),
-           temperature: 0,
-           max_completion_tokens: 180
-         ],
-         opts
-       )
-     )}
-  else
-    {:skip, "Set LIVE_PROVIDER=1, OPENAI_API_KEY, and OPENAI_MODEL to run the live provider cells."}
-  end
-end
-```
-
-```elixir
-case live_lm.(max_completion_tokens: 180) do
+case live_lm.(max_tokens: 180) do
   {:ok, lm} ->
     live_react =
       Imp.react(
@@ -337,7 +392,7 @@ This example asks the controller to emit constrained Elixir and submit from
 the persistent environment.
 
 ```elixir
-case live_lm.(max_completion_tokens: 100, response_format: %{type: "json_object"}) do
+case live_lm.(max_tokens: 100, response_format: %{type: "json_object"}) do
   {:ok, lm} ->
     live_rlm =
       Imp.rlm(
@@ -366,5 +421,5 @@ case live_lm.(max_completion_tokens: 100, response_format: %{type: "json_object"
 end
 ```
 
-Next: the production guide (`docs/production.md`) covers live providers,
-redaction, persistence, and runtime limits.
+Next: open `livebooks/05_operating_imp.livemd` to bound calls under a
+supervisor, check what traces and saved files hold, and run a live check.

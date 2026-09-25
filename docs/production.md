@@ -243,3 +243,7 @@ from the environment, serves calls from bounded supervised tasks, answers
 overload and timeouts with errors instead of blocking, and reloads
 parameters without a restart. Its `run_workflow.exs` runs the whole path
 offline, from optimizing to serving.
+
+[Livebook 05](../livebooks/05_operating_imp.livemd) runs the pieces of this
+page in a notebook: bounded calls, redaction, saving without secrets,
+telemetry, and a live check.
