@@ -575,10 +575,8 @@ surface. Ranked by owner-steer relevance (API boundary first):
    payload — reaches the LM request. Signature inputs never do.
 10. **FIXED (de-hzcv)** — `Enum.sum/1` and `Enum.product/1` are allowlisted
     (noted while porting test_with_input_variables_e2e; the port now spells
-    `Enum.sum(numbers)` directly). `Enum.reduce` stays out: the constrained
-    interpreter has no anonymous functions, so a lambda-taking reduce is not
-    expressible; sum/product are the function-free aggregations upstream's
-    Python `sum()` maps to.
+    `Enum.sum(numbers)` directly). Controller code can also write anonymous
+    functions, so `Enum.reduce` and the rest of `Enum` are available too.
 11. **FIXED (de-hzcv)** — datetime field type
     (test_datetime_inputs_and_outputs): `datetime` is a first-class field
     type (`"when: datetime"` in string specs, `type: :datetime` in maps).

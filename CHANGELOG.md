@@ -393,6 +393,17 @@ User-visible changes to Imp are recorded here.
   `:settings` or `:teacher_settings`. `Imp.configure/1`, `Imp.context/2` and an
   optimizer's `:teacher_settings` refuse either key with a message naming where
   it belongs.
+- RLM controller code may call every function of `Enum`, `Keyword`, `List`,
+  `Map` and `String` except `String.to_atom`, `List.to_atom`,
+  `String.splitter`, `Enum.random`, `Enum.shuffle` and `Enum.take_random`, and
+  may pass them anonymous functions and captures, which the interpreter runs
+  under the cell's step and value budgets. Registered tools, `llm_query` and
+  `submit` stay outside such functions; a function's patterns may pin a
+  variable (`fn ^target -> ... end`). Without a module, the Kernel data
+  functions `elem/2`, `to_string/1`, the `is_*` type checks, `length/1`,
+  `map_size/1`, `tuple_size/1`, `byte_size/1`, `abs/1`, `round/1`, `trunc/1`,
+  `div/2`, `rem/2`, `max/2` and `min/2` are available. Other calls return
+  `{:function_not_allowed, ...}`.
 
 ### Errors and shapes
 
