@@ -63,6 +63,10 @@ defmodule Imp.Saving do
     end
   end
 
+  # Loading creates no atom. A tagged atom the VM already has loads as that
+  # atom; one it does not (a field name, a tool name, a document key that no
+  # loaded code has mentioned yet) loads as its text, which `Imp.Example`,
+  # `Imp.Prediction` and the tool index look up by text.
   @doc """
   Reads a program artifact written by `save!/3` and returns the program.
 
@@ -478,7 +482,7 @@ defmodule Imp.Saving do
 
   defp load_state!(%{"type" => "knn"} = state) do
     require_keys!(state, ["type", "examples", "k", "vectorizer"])
-    examples = Imp.Optimizer.Report.decode_term(Map.fetch!(state, "examples"))
+    examples = Imp.Optimizer.Report.decode_term_compatible(Map.fetch!(state, "examples"))
     vectorizer = load_vectorizer!(Map.fetch!(state, "vectorizer"))
     # Re-embeds the trainset at load: the stored artifact carries the corpus
     # (examples) and the derivation (vectorizer), never stale vectors.
@@ -514,7 +518,7 @@ defmodule Imp.Saving do
     metadata =
       state
       |> Map.get("metadata", %{})
-      |> Imp.Optimizer.Report.decode_term()
+      |> Imp.Optimizer.Report.decode_term_compatible()
       |> require_map_value!("Avatar metadata")
 
     validate_avatar_predicts!(signature, actor, finisher)
@@ -577,7 +581,7 @@ defmodule Imp.Saving do
         require_keys!(assertion, ["name", "predicate", "message"])
 
         Imp.Assertion.new(
-          Imp.Optimizer.Report.decode_term(assertion["name"]),
+          Imp.Optimizer.Report.decode_term_compatible(assertion["name"]),
           load_callback!(assertion["predicate"], [1, 2], "assertion predicate"),
           message: assertion["message"]
         )
@@ -1171,13 +1175,13 @@ defmodule Imp.Saving do
     states
     |> Enum.map(fn state ->
       require_keys!(state, ["name", "description", "schema", "runner"])
-      name = Imp.Optimizer.Report.decode_term(state["name"])
+      name = Imp.Optimizer.Report.decode_term_compatible(state["name"])
 
       Imp.Tool.new(
         name,
         state["description"],
         load_callback!(state["runner"], 1, "#{context} tool #{name}"),
-        schema: Imp.Optimizer.Report.decode_term(state["schema"])
+        schema: Imp.Optimizer.Report.decode_term_compatible(state["schema"])
       )
     end)
     |> Imp.Tool.index_tools!("saved #{context}")
@@ -1197,7 +1201,7 @@ defmodule Imp.Saving do
     do: load_callback!(name, 2, context)
 
   defp load_tool_policy!(policy, context) do
-    policy = Imp.Optimizer.Report.decode_term(policy)
+    policy = Imp.Optimizer.Report.decode_term_compatible(policy)
 
     case Imp.ToolPolicy.validate(policy) do
       {:ok, policy} -> policy
@@ -1687,7 +1691,7 @@ defmodule Imp.Saving do
 
   defp load_retriever!(%{"type" => "memory"} = state) do
     Imp.Retrieve.Memory.new(
-      state |> Map.fetch!("docs") |> Imp.Optimizer.Report.decode_term(),
+      state |> Map.fetch!("docs") |> Imp.Optimizer.Report.decode_term_compatible(),
       k: Map.fetch!(state, "k")
     )
   end

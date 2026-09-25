@@ -41,4 +41,31 @@ defmodule SavingFreshAtomsTest do
     assert Imp.get(demo, fresh) == "charged twice"
     assert Imp.get(demo, :team) == "atlas"
   end
+
+  test "a saved RAG program with a memory retriever loads with field names this VM never created" do
+    query = "never_q_" <> Integer.to_string(System.unique_integer([:positive]))
+    context = "never_c_" <> Integer.to_string(System.unique_integer([:positive]))
+    tag = "never_t_" <> Integer.to_string(System.unique_integer([:positive]))
+
+    program =
+      Imp.rag(
+        Imp.predict("context, question -> answer"),
+        Imp.memory([%{text: "Refunds take five days", tag: "billing"}], k: 1)
+      )
+
+    state =
+      program
+      |> Imp.Saving.dump()
+      |> Jason.encode!()
+      |> Jason.decode!()
+      |> rename_atom("question", query)
+      |> rename_atom("context", context)
+      |> rename_atom("tag", tag)
+
+    loaded = Imp.Saving.load(state)
+    assert to_string(loaded.query_field) == query
+    assert to_string(loaded.context_field) == context
+    assert [%{^tag => "billing"}] = loaded.retriever.docs
+    assert_raise ArgumentError, fn -> String.to_existing_atom(query) end
+  end
 end
