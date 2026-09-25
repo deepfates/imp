@@ -851,6 +851,14 @@ defmodule Imp.Predict.RLM.Interpreter do
 
   defp bind_all(_patterns, _values, _vars), do: :error
 
+  defp bind({:^, _, [{name, _, context}]}, value, vars)
+       when (is_atom(name) or is_binary(name)) and (is_atom(context) or is_nil(context)) do
+    case Map.fetch(vars, name) do
+      {:ok, pinned} when pinned === value -> {:ok, vars}
+      _other -> :error
+    end
+  end
+
   defp bind({name, _, context}, value, vars)
        when (is_atom(name) or is_binary(name)) and (is_atom(context) or is_nil(context)) do
     if String.starts_with?(to_string(name), "_"),
