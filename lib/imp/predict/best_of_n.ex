@@ -17,6 +17,8 @@ defmodule Imp.Predict.BestOfN do
   ]
 
   def new(program, metric, opts \\ []) do
+    # Not Predict's check: that refuses `:n` as a request option, and here
+    # `:n` is BestOfN's own count of attempts.
     opts = Imp.Options.validate!(opts, @option_schema, "Imp.Predict.BestOfN.new/3")
     Imp.FunctionContract.validate!(metric, 2, "Imp.Predict.BestOfN.new/3", "metric")
 

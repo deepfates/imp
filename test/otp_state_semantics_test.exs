@@ -140,7 +140,7 @@ defmodule OTPStateSemanticsTest do
     refute Map.has_key?(Imp.settings(), :max_errors)
     refute Map.has_key?(Imp.settings(), :retriever)
 
-    for {key, place} <- [max_errors: ~r/to the optimizer/, retriever: ~r/Imp\.rag/] do
+    for {key, place} <- [max_errors: ~r/COPRO\.compile\/5/, retriever: ~r/Imp\.rag/] do
       assert_raise ArgumentError, ~r/#{inspect(key)} is not a setting/, fn ->
         Imp.configure([{key, 1}])
       end

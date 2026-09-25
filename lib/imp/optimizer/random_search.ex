@@ -220,8 +220,7 @@ defmodule Imp.Optimizer.RandomSearch do
         teacher,
         restrict,
         labeled_sample,
-        metric_identity,
-        max_errors_source
+        metric_identity
       )
 
     {state, resumed?} =
@@ -403,8 +402,7 @@ defmodule Imp.Optimizer.RandomSearch do
          teacher,
          restrict,
          labeled_sample,
-         metric_identity,
-         max_errors_source
+         metric_identity
        ) do
     payload = %{
       datasets: %{trainset: trainset, valset: valset},
@@ -413,8 +411,9 @@ defmodule Imp.Optimizer.RandomSearch do
         optimizer
         |> Map.from_struct()
         |> Map.drop([:metric, :metric_identity])
-        |> runtime_identity()
-        |> Map.put(:max_errors_source, max_errors_source),
+        # The resolved `max_errors` is in the struct; where it came from is
+        # reported but not hashed, so a nil and an explicit 10 resume alike.
+        |> runtime_identity(),
       invocation: %{
         teacher: runtime_identity(teacher),
         restrict: restrict,
