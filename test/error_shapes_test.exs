@@ -257,7 +257,7 @@ defmodule Imp.ErrorShapesTest do
       program = Imp.react_v2("intent -> answer", [look], lm: lm)
 
       assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
-      assert Imp.get(prediction, :termination_cause) == :parse_error
+      assert prediction.metadata[:termination_cause] == :parse_error
     end
   end
 
@@ -301,7 +301,7 @@ defmodule Imp.ErrorShapesTest do
       assert {:ok, prediction} = Imp.call(program, %{intent: "go"})
 
       results =
-        Enum.flat_map(Imp.get(prediction, :history).messages, &(&1[:tool_call_results] || []))
+        Enum.flat_map(prediction.metadata[:history].messages, &(&1[:tool_call_results] || []))
 
       assert Enum.any?(
                results,
