@@ -825,7 +825,7 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibrationPilotTest do
     )
   end
 
-  defp run_dspy(root, commit, source, extra_env \\ []) do
+  defp run_dspy(root, commit, source, extra_env) do
     System.cmd(
       Path.expand("tmp/dspy-parity-venv/bin/python"),
       [
