@@ -359,7 +359,7 @@ defmodule DocumentationContractTest do
       )
 
     lookup =
-      Imp.tool(:lookup, "lookup facts", fn %{query: "capital-france"} ->
+      Imp.tool(:lookup, "lookup facts", fn %{"query" => "capital-france"} ->
         "Paris"
       end)
 
@@ -474,7 +474,7 @@ defmodule DocumentationContractTest do
       Imp.tool(
         :lookup,
         "lookup facts",
-        fn %{query: "capital-france"} -> "Paris" end,
+        fn %{"query" => "capital-france"} -> "Paris" end,
         schema: %{
           "type" => "object",
           "properties" => %{"query" => %{"type" => "string"}},

@@ -542,7 +542,7 @@ defmodule Imp.ACPTest do
              "external"
 
     refute Map.has_key?(permission_tool, "name")
-    assert_receive {:effect, %{value: "x"}}
+    assert_receive {:effect, %{"value" => "x"}}
 
     updates = receive_updates(session_id, [])
     [pending, in_progress, completed] = tool_updates(updates)
@@ -588,7 +588,7 @@ defmodule Imp.ACPTest do
              Client.prompt(client, session_id, "run it")
 
     assert_receive {:policy_checked, :external, "/tmp/project"}
-    assert_receive {:bounded_effect, %{value: "x"}}
+    assert_receive {:bounded_effect, %{"value" => "x"}}
     refute_receive {:permission_requested, _handler, ^session_id, _tool, _options}
 
     updates = receive_updates(session_id, [])
@@ -1657,7 +1657,7 @@ defmodule Imp.ACPTest do
   end
 
   test "ReActV2 source events become correlated live ACP thought and tool updates" do
-    lookup = Imp.tool(:lookup, "lookup", fn %{query: query} -> "found " <> query end)
+    lookup = Imp.tool(:lookup, "lookup", fn %{"query" => query} -> "found " <> query end)
 
     lm =
       Imp.LM.Static.new(
@@ -1713,7 +1713,7 @@ defmodule Imp.ACPTest do
   end
 
   test "ACP tool-call IDs remain unique when source IDs repeat across session turns" do
-    lookup = Imp.tool(:lookup, "lookup", fn %{query: query} -> "found " <> query end)
+    lookup = Imp.tool(:lookup, "lookup", fn %{"query" => query} -> "found " <> query end)
 
     lm =
       Imp.LM.Static.new(
@@ -1788,7 +1788,7 @@ submit(%{answer: observed <> ":" <> scratch})|
         end
       )
 
-    lookup = Imp.tool(:lookup, "lookup", fn %{query: query} -> "found-" <> query end)
+    lookup = Imp.tool(:lookup, "lookup", fn %{"query" => query} -> "found-" <> query end)
 
     {client, _agent} =
       start_pair(

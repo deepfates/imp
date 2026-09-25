@@ -1467,7 +1467,7 @@ defmodule ReqLLMClientTest do
     lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: ToolStub)
 
     tool =
-      Imp.Tool.new(:lookup, "Lookup a fact.", fn %{query: "beam"} -> "ok" end,
+      Imp.Tool.new(:lookup, "Lookup a fact.", fn %{"query" => "beam"} -> "ok" end,
         schema: %{
           "type" => "object",
           "properties" => %{"query" => %{"type" => "string"}},
@@ -1480,7 +1480,7 @@ defmodule ReqLLMClientTest do
     assert {:error, {:react_max_iters, history}} =
              Imp.Predict.ReAct.call(program, %{question: "lookup beam"})
 
-    assert [%{tool: :lookup, arguments: %{query: "beam"}, result: "ok"}] = history
+    assert [%{tool: :lookup, arguments: %{"query" => "beam"}, result: "ok"}] = history
 
     assert_received {:req_llm_generate, "openai:gpt-test", _messages, opts}
 

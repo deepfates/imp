@@ -98,7 +98,7 @@ defmodule Imp.TelemetryLineageContractTest do
 
   test "nested module and tool spans carry matching call and parent IDs" do
     tool =
-      Imp.Tool.new(:double, "Double an integer", fn %{value: value} -> {:ok, value * 2} end,
+      Imp.Tool.new(:double, "Double an integer", fn %{"value" => value} -> {:ok, value * 2} end,
         schema: %{
           "type" => "object",
           "required" => ["value"],
