@@ -389,15 +389,16 @@ defmodule Imp.LM do
   defp lm_name(%module{}), do: module
   defp lm_name(other), do: other
 
+  # Options can hold a key, so an error names their shape, never their value.
   defp validate_opts!(opts, context) when is_list(opts) do
     if Keyword.keyword?(opts) do
       opts
     else
-      raise ArgumentError, "#{context} expects keyword options, got: #{inspect(opts)}"
+      raise ArgumentError, "#{context} expects keyword options, got #{Imp.Options.shape(opts)}"
     end
   end
 
   defp validate_opts!(opts, context) do
-    raise ArgumentError, "#{context} expects keyword options, got: #{inspect(opts)}"
+    raise ArgumentError, "#{context} expects keyword options, got #{Imp.Options.shape(opts)}"
   end
 end

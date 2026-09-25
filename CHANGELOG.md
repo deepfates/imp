@@ -14,10 +14,12 @@ User-visible changes to Imp are recorded here.
   names its module instead of printing it.
 - A client, retriever or tracker prints every header value as `[REDACTED]`,
   whatever the header is called (`X-Subscription-Token`, `Cookie`), and the
-  query and user info of every URL. A saved program holds no header at all,
-  and `Imp.save!` refuses an LM whose `base_url` has a query string or user
-  info. Option errors name a credential-bearing option without printing its
-  value. The ExMCP client's state, which a crash report prints, is redacted
+  query, fragment and user info of every URL, given as a string or a `%URI{}`.
+  A saved program holds no header at all, so an LM with custom headers has to
+  be rebound after loading, and `Imp.save!` refuses an LM whose `base_url` has
+  a query, fragment or user info. Option errors, including those for the
+  options passed to a call, name a credential-bearing option without printing
+  its value. The ExMCP client's state, which a crash report prints, is redacted
   the same way. Before, a header was hidden only when its name looked like a
   credential, and `Imp.save!` wrote other headers' values to disk.
 

@@ -10,9 +10,9 @@ defmodule Imp.Redaction do
 
   Clients, retrievers and trackers that hold a credential print through a
   redacting `Inspect` implementation, which hides every header value and the
-  query of every URL as well; `inspect(term, structs: false)`, Erlang's `~p`,
-  and a credential kept outside those structs (a bare keyword list in a
-  process's state) bypass it.
+  query, fragment and user info of every URL as well;
+  `inspect(term, structs: false)`, Erlang's `~p`, and a credential kept
+  outside those structs (a bare keyword list in a process's state) bypass it.
   """
 
   @default_redact_keys [
@@ -116,8 +116,8 @@ defmodule Imp.Redaction do
 
   @doc false
   # What a client, retriever or tracker prints: `redact/1`, then every header
-  # value whatever the header is called, and the query and user info of every
-  # URL. A header's name says nothing reliable about its value
+  # value whatever the header is called, and the query, fragment and user info
+  # of every URL. A header's name says nothing reliable about its value
   # (`X-Subscription-Token`, `Cookie`), and a URL's query often carries a key.
   def redact_for_print(value), do: value |> redact() |> hide_headers_and_urls()
 
@@ -149,15 +149,20 @@ defmodule Imp.Redaction do
   def drop_headers(value), do: value
 
   @doc false
-  # True for a URL whose query or user info may carry a credential.
+  # True for a URL whose query, fragment or user info may carry a credential.
+  def url_with_secret_parts?(%URI{} = uri), do: secret_parts?(uri)
+
   def url_with_secret_parts?(value) when is_binary(value) do
     case url(value) do
-      %URI{query: query, userinfo: userinfo} -> query not in [nil, ""] or userinfo != nil
+      %URI{} = uri -> secret_parts?(uri)
       nil -> false
     end
   end
 
   def url_with_secret_parts?(_value), do: false
+
+  defp secret_parts?(%URI{} = uri),
+    do: uri.query not in [nil, ""] or uri.fragment not in [nil, ""] or uri.userinfo != nil
 
   defp hide_headers_and_urls(value) when is_struct(value), do: value
 
@@ -185,15 +190,14 @@ defmodule Imp.Redaction do
     do: value |> Tuple.to_list() |> hide_headers_and_urls() |> List.to_tuple()
 
   defp hide_headers_and_urls(value) when is_binary(value) do
-    case url(value) do
-      %URI{} = uri when uri.query not in [nil, ""] or uri.userinfo != nil ->
-        uri
-        |> Map.put(:query, if(uri.query in [nil, ""], do: uri.query, else: "[REDACTED]"))
-        |> Map.put(:userinfo, if(uri.userinfo, do: "[REDACTED]"))
-        |> URI.to_string()
-
-      _other ->
-        value
+    with %URI{} = uri <- url(value), true <- secret_parts?(uri) do
+      uri
+      |> Map.put(:query, if(uri.query in [nil, ""], do: uri.query, else: "[REDACTED]"))
+      |> Map.put(:fragment, if(uri.fragment in [nil, ""], do: uri.fragment, else: "[REDACTED]"))
+      |> Map.put(:userinfo, if(uri.userinfo, do: "[REDACTED]"))
+      |> URI.to_string()
+    else
+      _other -> value
     end
   end
 
@@ -298,6 +302,10 @@ defmodule Imp.Redaction do
   def redact(value, keys) when is_exception(value) do
     struct(value.__struct__, value |> Map.from_struct() |> redact(keys))
   end
+
+  # A URI is redacted as the URL it spells, so its query, fragment and user
+  # info are hidden the same way whether it was given as a string or a struct.
+  def redact(%URI{} = uri, keys), do: uri |> URI.to_string() |> redact(keys)
 
   def redact(value, keys) when is_struct(value) do
     value

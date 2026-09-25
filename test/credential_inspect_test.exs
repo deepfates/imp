@@ -54,6 +54,10 @@ defmodule CredentialInspectTest do
       Imp.req_llm("openai:gpt-4o-mini", req_http_options: [headers: headers]),
       Imp.req_llm("openai:gpt-4o-mini", headers: headers),
       Imp.req_llm("openai:gpt-4o-mini", base_url: "https://llm.test/v1?key=" <> @secret),
+      Imp.req_llm("openai:gpt-4o-mini", base_url: "https://llm.test/v1#" <> @secret),
+      Imp.req_llm("openai:gpt-4o-mini",
+        base_url: URI.parse("https://u:" <> @secret <> "@llm.test/v1?key=" <> @secret)
+      ),
       Imp.Retrievers.HTTP.new("https://retriever.test", headers: headers),
       Imp.Retrievers.HTTP.new("https://retriever.test/search?token=" <> @secret),
       struct(Imp.Tracking.MLflow, headers: headers)
@@ -115,15 +119,23 @@ defmodule CredentialInspectTest do
       end
     end
 
-    lm = Imp.req_llm("openai:gpt-4o-mini", base_url: "https://llm.test/v1?key=" <> @secret)
-    path = Path.join(System.tmp_dir!(), "credential-#{System.unique_integer([:positive])}.json")
-    error = assert_raise ArgumentError, fn -> Imp.save!(Imp.predict("q -> a", lm: lm), path) end
-    assert error.message =~ "base_url"
-    refute error.message =~ @secret
-    refute File.exists?(path)
+    for base_url <- [
+          "https://llm.test/v1?key=" <> @secret,
+          "https://llm.test/v1#" <> @secret,
+          URI.parse("https://llm.test/v1?key=" <> @secret)
+        ] do
+      lm = Imp.req_llm("openai:gpt-4o-mini", base_url: base_url)
+      path = Path.join(System.tmp_dir!(), "credential-#{System.unique_integer([:positive])}.json")
+      error = assert_raise ArgumentError, fn -> Imp.save!(Imp.predict("q -> a", lm: lm), path) end
+      assert error.message =~ "base_url"
+      refute error.message =~ @secret
+      refute File.exists?(path)
+    end
   end
 
   test "an option error names the key and does not print the value" do
+    messages = [%{role: "user", content: "x"}]
+
     for fun <- [
           fn -> Imp.req_llm("m", %{api_key: @secret}) end,
           fn ->
@@ -132,7 +144,15 @@ defmodule CredentialInspectTest do
           fn ->
             Imp.Retrievers.Databricks.new("https://r.test", token: String.to_charlist(@secret))
           end,
-          fn -> Imp.Optimize.Anything.run(:not_a_seed, nil, wandb_api_key: @secret) end
+          fn -> Imp.Optimize.Anything.run(:not_a_seed, nil, wandb_api_key: @secret) end,
+          fn -> Imp.LM.generate(lm(), messages, %{api_key: @secret}) end,
+          fn -> Imp.Clients.ReqLLM.generate(lm(), messages, %{api_key: @secret}) end,
+          fn -> Imp.Clients.ReqLLM.generate(lm(), messages, [{"authorization", @secret}]) end,
+          fn ->
+            Imp.predict("q -> a", lm: lm())
+            |> Imp.Streaming.stream(%{q: "x"}, %{api_key: @secret})
+            |> Enum.to_list()
+          end
         ] do
       error = assert_raise ArgumentError, fun
       refute error.message =~ @secret
