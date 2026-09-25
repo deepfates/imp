@@ -60,6 +60,34 @@ defmodule Imp.Predict.RLM.Interpreter do
   # effect. A map may not pose as a struct (see `check_library_argument/2`),
   # so protocol dispatch inside these modules reaches only plain data.
   @library_modules %{Enum: Enum, Keyword: Keyword, List: List, Map: Map, String: String}
+  # Kernel functions of plain data a model calls without a module: type
+  # checks, sizes, tuple access, arithmetic. Nothing that makes atoms, sends,
+  # spawns or reaches the process.
+  @kernel_functions MapSet.new([
+                      {:elem, 2},
+                      {:to_string, 1},
+                      {:is_map, 1},
+                      {:is_list, 1},
+                      {:is_binary, 1},
+                      {:is_integer, 1},
+                      {:is_float, 1},
+                      {:is_number, 1},
+                      {:is_boolean, 1},
+                      {:is_atom, 1},
+                      {:is_tuple, 1},
+                      {:is_nil, 1},
+                      {:length, 1},
+                      {:map_size, 1},
+                      {:tuple_size, 1},
+                      {:byte_size, 1},
+                      {:abs, 1},
+                      {:round, 1},
+                      {:trunc, 1},
+                      {:div, 2},
+                      {:rem, 2},
+                      {:max, 2},
+                      {:min, 2}
+                    ])
   @refused_functions %{
     # Atoms are never garbage-collected; generated code must not mint them.
     {:String, :to_atom} => "creates atoms",
@@ -127,7 +155,7 @@ defmodule Imp.Predict.RLM.Interpreter do
     """
     The controller executes a small Elixir-shaped language, not general Elixir.
     Supported values and data are strings, numbers, booleans, nil, existing atom literals, lists, maps, tuples, and integer ranges; unfamiliar atom literals are represented as strings rather than creating VM atoms. Supported control is variable assignment, `if condition, do: value, else: value`, and bounded `for item <- items, do: expression` comprehensions. Pipelines with `|>` are supported. Supported operators are #{format_operators(@binary_operators ++ @unary_operators)}. Use `Access.get(container, key)` or `container[key]` for map/list/string access.
-    Every function of `Enum`, `Keyword`, `List`, `Map` and `String` is available except #{format_refused()}. Other modules cannot be called.
+    Every function of `Enum`, `Keyword`, `List`, `Map` and `String` is available except #{format_refused()}. Other modules cannot be called. Without a module, #{format_kernel()} are available.
     Anonymous functions (`fn x -> ... end`, with several clauses, guards, and tuple, list or map patterns) and captures (`&String.downcase/1`, `&(&1 + 1)`) can be passed to those functions. Inside a function, `print` works but registered tools, the task built-ins and `submit` do not; call those from a `for` comprehension instead.
     Important traps: `case`, `hd`, and calling a function stored in a variable are not supported. Use `if` or a multi-clause `fn` instead of `case`, `List.first` instead of `hd`, and string concatenation with `<>` instead of interpolation or binary `<<>>` syntax. String literals themselves are supported.
     Registered tools and the built-ins named in the task prompt are the only effectful calls. A failed cell rolls back its assignments while retaining already-completed effects for deterministic repair.
@@ -529,12 +557,72 @@ defmodule Imp.Predict.RLM.Interpreter do
     {:ok, "Available variables: #{inspect(variables)}", state}
   end
 
-  defp eval_node({name, _, args}, state)
-       when (is_atom(name) or is_binary(name)) and is_list(args) do
-    invoke_callback(name, args, state)
+  # `f.(x)`. Calling a variable is not supported: an interpreter function runs
+  # only where a library function applies it, and a variable that holds
+  # something else is not a function at all. Either way the model reads why.
+  defp eval_node({{:., _, [callee]}, _, args}, state) when is_list(args) do
+    with {:ok, value, state} <- eval(callee, state) do
+      case value do
+        %Fn{} ->
+          {:error,
+           {:unsupported_expression,
+            "calling a function held in a variable (#{render(callee)}.(...)); " <>
+              "pass it to an Enum function, or write its body inline"}, state}
+
+        _other ->
+          {:error, {:not_a_function, render(callee), value}, state}
+      end
+    end
   end
 
-  defp eval_node(ast, state), do: {:error, {:unsupported_expression, Macro.to_string(ast)}, state}
+  defp eval_node({name, _, args}, state)
+       when (is_atom(name) or is_binary(name)) and is_list(args) do
+    if {normalize_known_name(name), length(args)} in @kernel_functions and
+         not Map.has_key?(state.callbacks, name) and
+         not Map.has_key?(state.callbacks, to_string(name)) do
+      eval_kernel(normalize_known_name(name), args, state)
+    else
+      invoke_callback(name, args, state)
+    end
+  end
+
+  defp eval_node(ast, state), do: {:error, {:unsupported_expression, render(ast)}, state}
+
+  # The parser keeps a name whose atom does not exist as a string, which
+  # `Macro.to_string/1` cannot print. Each such name is printed through a
+  # placeholder variable and put back in order; no atom is created.
+  defp render(ast) do
+    {ast, names} =
+      Macro.prewalk(ast, [], fn
+        {name, meta, context}, names when is_binary(name) and is_atom(context) ->
+          {{:imp_rendered_name, meta, nil}, [name | names]}
+
+        other, names ->
+          {other, names}
+      end)
+
+    names
+    |> Enum.reverse()
+    |> Enum.reduce(Macro.to_string(ast), fn name, text ->
+      String.replace(text, "imp_rendered_name", name, global: false)
+    end)
+  rescue
+    _error -> "an expression"
+  end
+
+  # `to_string/1` and `is_nil/1` are macros in Kernel, not functions.
+  defp kernel_apply(:to_string, [value]), do: String.Chars.to_string(value)
+  defp kernel_apply(:is_nil, [value]), do: value == nil
+  defp kernel_apply(name, values), do: apply(Kernel, name, values)
+
+  defp eval_kernel(name, args, state) do
+    with {:ok, values, state} <- eval_arguments(args, state),
+         :ok <- check_library_arguments(values, state) do
+      {:ok, kernel_apply(name, values), state}
+    end
+  rescue
+    error -> {:error, {:kernel_call_failed, name, Exception.message(error)}, state}
+  end
 
   defp eval_module_call(module, function, args, state) do
     module =
@@ -1020,6 +1108,12 @@ defmodule Imp.Predict.RLM.Interpreter do
   end
 
   defp check_library_argument(_value, _state), do: :ok
+
+  defp format_kernel do
+    @kernel_functions
+    |> Enum.sort()
+    |> Enum.map_join(", ", fn {name, arity} -> "`#{name}/#{arity}`" end)
+  end
 
   defp format_refused do
     @refused_functions

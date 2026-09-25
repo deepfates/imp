@@ -289,6 +289,43 @@ missing()|
     assert bytes > 1_000
   end
 
+  describe "local calls" do
+    test "the pure Kernel functions a model reaches for are allowed" do
+      interpreter = Interpreter.new(%{row: %{"team" => "atlas"}, pair: {1, "b"}}, %{}, nil)
+
+      source = ~S"""
+      [elem(pair, 1), to_string(elem(pair, 0)), is_map(row), is_list(row), length([1, 2]),
+       map_size(row), div(7, 2), rem(7, 2), max(3, 4), abs(-2), is_nil(nil)]
+      """
+
+      assert {:ok, ["b", "1", true, false, 2, 1, 3, 1, 4, 2, true], _next} =
+               Interpreter.execute(interpreter, source)
+    end
+
+    test "effectful and atom-making Kernel functions stay refused" do
+      interpreter = Interpreter.new(%{}, %{}, nil)
+
+      for source <- [~S|spawn(fn -> 1 end)|, ~S|send(1, 2)|, ~S|self()|, ~S|apply(1, 2, 3)|] do
+        assert {:error, {:function_not_allowed, _name}, _next} =
+                 Interpreter.execute(interpreter, source)
+      end
+    end
+
+    test "calling a value that is not a function is an error the model can read" do
+      interpreter = Interpreter.new(%{}, %{}, nil)
+
+      # The name is not an atom in this VM, as a model's names usually are not.
+      source = "zq_" <> "notfn = 1\nzq_" <> "notfn.(1)"
+      assert {:error, reason, _next} = Interpreter.execute(interpreter, source)
+      assert reason == {:not_a_function, "zq_notfn", 1}
+
+      assert {:error, {:unsupported_expression, text}, _next} =
+               Interpreter.execute(interpreter, "f = fn x -> x end\nf.(1)")
+
+      assert is_binary(text)
+    end
+  end
+
   describe "library calls" do
     @tickets [
       %{"id" => 1, "squad" => "Billing", "priority" => "high"},
