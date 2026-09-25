@@ -48,8 +48,7 @@ when the code calls `submit/1` with valid outputs, and runs for at most
 
 The code can call a model. `llm_query(prompt)` asks the sub-model one
 question and returns its answer as a string; `llm_query_batched(prompts)`
-asks several at once (up to `max_concurrent_subcalls`, 4 by default) and
-returns the answers in order. The usual shape is: find the relevant pieces
+asks several at once and returns the answers in order. The usual shape is: find the relevant pieces
 with code, have the sub-model read each piece, combine the answers with code.
 `rlm_query(prompt)` goes one level deeper and runs the question as a child RLM
 with its own interpreter, up to `max_recursion_depth` (1 by default); at the
@@ -62,16 +61,16 @@ split: planning the search is harder than reading one line.
 ### 5. The code is a small language Imp interprets itself
 
 The model writes a subset of Elixir: values, assignment, `if`, `for`
-comprehensions, pipelines, and an allowlist of pure functions. Imp parses the
-code and walks the syntax tree itself; nothing is passed to
-`Code.eval_string/3`, and nothing outside the allowlist can run. Reading a
-file, opening a socket or calling an arbitrary module is an error the model
-reads, not an action. The controller's prompt lists exactly what is allowed,
-and it is the same list the interpreter enforces.
+comprehensions, pipelines, and an allowlist of functions. The controller's
+prompt lists exactly what is allowed, and it is the same list the interpreter
+enforces.
 
-This is a language boundary, not an operating system sandbox. The interpreter
-runs in your VM, and the tools you register are ordinary Elixir functions with
-your process's authority. Keep them narrow, and give them a `tool_policy:`.
+Imp parses the code and walks the syntax tree itself; nothing is passed to
+`Code.eval_string/3`, and module calls are limited to an allowlist. This is a
+language boundary, not an operating system sandbox: it runs in your VM with
+your process's authority, a running cell has no time limit of its own, and the
+tools you register are ordinary Elixir functions. Don't run it on untrusted
+input where that matters. Keep tools narrow and give them a `tool_policy:`.
 
 ### 6. Every budget is separate, and each says how it ran out
 
@@ -87,8 +86,9 @@ the model reads and can work around; a budget spent on the loop itself
 
 When the model reaches `max_iterations` without submitting, an extract pass
 reads the variables and the whole history once more and fills the outputs
-directly. You get the best answer the exploration supports, marked `:extract`
-in the trace. Only when that fails too does the call return an error.
+directly. Usually that gives the best answer the exploration supports, marked
+`:extract` in the trace; when the extract pass fails too, the call returns an
+error.
 
 ## API walkthrough
 
@@ -176,8 +176,8 @@ Every request starts with a system message: what the environment is, the
 reply format (one JSON object with `reasoning` and `code`), the built-in
 functions, and the language's rules and allowlist. Next come the task:
 the signature, your instructions, the required outputs and your tools. Each
-turn then adds one message with every variable's description and preview and
-what is left of each budget. Earlier turns stay in the conversation as the
+turn then adds one message with every variable's description and preview, and
+the turns, sub-model calls and time that are left. Earlier turns stay in the conversation as the
 model's code and what it printed.
 
 The model can also submit by replying with a JSON object holding exactly the
@@ -268,7 +268,7 @@ data saves turns.
 | Option | Default | Bounds | When it runs out |
 | --- | --- | --- | --- |
 | `max_iterations` | 20 | controller turns | the extract pass fills the outputs; if it cannot, `{:error, {:rlm_extract_failed, reason, trace}}` |
-| `max_llm_calls` | 50 | sub-model calls in the whole call, children included | the code gets `{:error, {:rlm_max_llm_calls, n}}` |
+| `max_llm_calls` | 50 | sub-model calls in the whole call, children included | the code gets `{:error, {:rlm_max_llm_calls, n}}`; with `0`, a sub-model call ends the whole call with `{:error, {:rlm_max_llm_calls, 0, trace}}` |
 | `max_time_ms` | none | wall time of the whole call | `{:error, {:rlm_max_time_ms, ms, trace}}` |
 | `max_interpreter_steps` | 10,000 | evaluation steps per turn | the code gets `{:error, :step_limit_exceeded}` |
 | `max_interpreter_value_bytes` | 16 MB | the size of any one value | the code gets an error |
@@ -368,11 +368,15 @@ Imp.get(prediction, :lines)
 
 The idea is the same: inputs as variables with previews, a loop of code
 turns, `llm_query` and `llm_query_batched` for sub-model calls, one budget
-for those calls across the run, a separate `sub_lm`, an extract pass when
-turns run out, and lazy inputs (`dspy.SandboxSerializable`,
-`Imp.rlm_serializable/3` here).
+for those calls across the run, a separate `sub_lm`, and an extract pass when
+turns run out.
 
 What differs:
+
+- DSPy's `SandboxSerializable` loads an input into the sandbox eagerly, once
+  at the start of each call, and rebuilds rich values there (a DataFrame stays
+  a DataFrame). `Imp.rlm_serializable/3` is a lazy handle: the model sees its
+  name and metadata, and the loader runs only if the code calls `load/1`.
 
 - DSPy runs Python in a Deno and Pyodide WebAssembly sandbox, and can swap in
   another interpreter. Imp interprets a subset of Elixir itself, against an
