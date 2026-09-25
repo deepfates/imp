@@ -195,7 +195,8 @@ defmodule Imp.Evaluate do
       1.0
 
   Metrics may return booleans, numbers, maps with `:score` and `:feedback`, or
-  `%Imp.Metrics.Result{}`. Arity-3 metrics also receive the prediction trace.
+  `%Imp.Metrics.Result{}`. An arity-3 metric receives `nil` as its trace here,
+  as in DSPy (see `Imp.Metrics`).
   Program and metric failures are recorded as failed rows so optimizers can keep
   searching and report diagnostics.
 
@@ -505,10 +506,12 @@ defmodule Imp.Evaluate do
   defp metric_result(metric, example, prediction) when is_function(metric, 2),
     do: metric |> apply_metric([example, prediction]) |> Imp.Metrics.normalize_result()
 
+  # DSPy's Evaluate calls `metric(example, prediction)`, so a metric's `trace`
+  # is None at evaluation; only bootstrapping passes one.
   defp metric_result(metric, example, prediction) when is_function(metric, 3),
     do:
       metric
-      |> apply_metric([example, prediction, trace(prediction)])
+      |> apply_metric([example, prediction, nil])
       |> Imp.Metrics.normalize_result()
 
   defp apply_metric(metric, args) do
@@ -546,8 +549,6 @@ defmodule Imp.Evaluate do
       end
   end
 
-  defp trace(%Imp.Prediction{metadata: metadata}), do: Map.get(metadata, :trace)
-  defp trace(_prediction), do: nil
 
   defp metric_error(_index, %Imp.Metrics.Result{
          metadata: %{imp_operational_safety: safety}
