@@ -616,3 +616,21 @@ defmodule Imp.Redaction do
     )
   end
 end
+
+# Structs that can hold a credential print it redacted: an LM client's
+# `api_key` or headers, a retriever's or tracker's headers. A program prints
+# its LM, so a program in IEx, a log line or a crash report would otherwise
+# carry the key.
+defimpl Inspect,
+  for: [
+    Imp.Clients.ReqLLM,
+    Imp.Retrievers.HTTP,
+    Imp.Tracking.MLflow,
+    Imp.Tracking.WandB,
+    Imp.Optimize.Anything.Config.Tracking
+  ] do
+  # `redact/1` returns a struct's fields as a map; merging them back keeps the
+  # struct, so it prints as one.
+  def inspect(struct, opts),
+    do: Inspect.Any.inspect(Map.merge(struct, Imp.Redaction.redact(struct)), opts)
+end
