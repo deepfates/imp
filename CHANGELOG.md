@@ -221,6 +221,14 @@ User-visible changes to Imp are recorded here.
   `"[\"x\", \"y\"]"`) where 0.4.0 gave Python's `"True"` and `"['x', 'y']"`;
   a `null` is no value, so a required field reports it missing and an
   optional one is `nil`, where 0.4.0 gave the string `"None"`.
+- A `null` answer for any output field with a declared default takes the
+  default, as an omitted one does; 0.4.0 kept the null and failed "is
+  required". A present non-null value, `""` and `[]` included, still wins
+  over the default.
+- InferRules shows the rule model each example's values as JSON text
+  (`null`, `{"k": 1}`, `1500000.0`) instead of Elixir's `inspect` output, and
+  a `Jason.OrderedObject` (a ReAct observation, for one) renders as JSON in
+  its own order instead of as the struct.
 - Each ReActV2 step lists the task's output fields with their types and
   descriptions ("The outputs to produce are: ..."). Before, a model saw an
   output's description only inside `submit`'s parameter schema.
