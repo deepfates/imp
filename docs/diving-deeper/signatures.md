@@ -102,9 +102,12 @@ signature =
     "Route the support ticket to the squad that owns it."
   )
 
-Imp.Signature.to_spec(signature)
-#=> "ticket -> team"
+Imp.Signature.json_schema(signature)["properties"]["team"]
+#=> %{"description" => "atlas: money. harbor: the platform. beacon: identity. quill: the product.", "enum" => ["atlas", "harbor", "beacon", "quill"], "type" => "string"}
 ```
+
+That schema is what a provider with structured output receives, and what the
+answer is checked against.
 
 A field is `name`, `name: type`, or `name: type "description"`. Fields are
 separated by commas; a signature has exactly one `->`. An untyped field is a
