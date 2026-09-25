@@ -1332,6 +1332,46 @@ defmodule ReActV2Test do
            )
   end
 
+  test "a forced submit that fails after the deadline has passed is cut short by the deadline" do
+    counter = :counters.new(1, [])
+
+    # The deadline passes during the first step's tool call; the forced
+    # submit that follows fails.
+    slow_lookup =
+      Imp.tool(:lookup, "Look something up", fn _arguments ->
+        Process.sleep(20)
+        "found"
+      end)
+
+    lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          :counters.add(counter, 1, 1)
+
+          if :counters.get(counter, 1) == 1 do
+            %{
+              next_thought: "look first",
+              tool_calls: [%{id: "c1", name: "lookup", arguments: %{}}]
+            }
+          else
+            raise "provider timed out"
+          end
+        end
+      )
+
+    program = Imp.react_v2(@submit_signature, [slow_lookup], lm: lm, max_iters: 1)
+
+    assert {:ok, prediction} =
+             Imp.Deadline.with_deadline(10, fn ->
+               Imp.call(program, %{question: "Capital of France?"})
+             end)
+
+    # The same answer the one-text-output path gives: what left the turn
+    # without an answer is the deadline, not the step limit before it.
+    assert prediction.metadata[:termination_reason] == :incomplete
+    assert prediction.metadata[:termination_cause] == :deadline_exceeded
+  end
+
   defp action_lm(actions, notify \\ nil) do
     {:ok, state} = Agent.start_link(fn -> actions end)
 

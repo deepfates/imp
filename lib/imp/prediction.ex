@@ -86,10 +86,9 @@ defmodule Imp.Prediction do
   @doc """
   Whether the program that made this prediction ended with its outputs.
 
-  A tool loop that was interrupted and could not answer (`Imp.Predict.ReActV2`,
-  `Imp.Predict.ReAct`) says so with `termination_reason: :incomplete` in the
-  prediction's metadata, and its fields hold no outputs. Every other
-  prediction is complete.
+  An `Imp.Predict.ReActV2` turn that was interrupted and could not answer says
+  so with `termination_reason: :incomplete` in the prediction's metadata, and
+  its fields hold no outputs. Every other prediction is complete.
 
       iex> Imp.Prediction.complete?(Imp.Prediction.new(%{answer: "Paris"}))
       true

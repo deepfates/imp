@@ -211,8 +211,10 @@ User-visible changes to Imp are recorded here.
   `:incomplete` (no answer; it was the failure itself, such as `:max_iters`
   or `:context_window_exceeded`). `termination_cause` is set whenever the turn
   was interrupted, including a forced submit that answered, where 0.4.0 left
-  it out: the interruption that led to the last request, or for
-  `:incomplete` what left the turn without an answer. `Imp.Predict.ReAct`
+  it out: the interruption that led to the last request. An `:incomplete`
+  turn names the same interruption, unless its context window was full or
+  its `Imp.Deadline` had passed, which are named instead, so a turn that hit
+  `max_iters` and then ran out of time is `:deadline_exceeded`. `Imp.Predict.ReAct`
   follows the same rule: `:dspy_3_2_1` mode's extraction after `max_iters`, a
   parse failure or an empty step is `:extracted` with that cause, spelled
   `:parse_error` (it was `:parse_failure`), and `:provider_native` mode's

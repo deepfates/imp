@@ -25,8 +25,10 @@ defmodule Imp.Predict.ReActV2 do
     * `:termination_reason` — how the turn ended (below).
     * `:termination_cause` — present whenever the turn was interrupted: for
       `:last_text`, `:forced_submit` and `:extracted`, the interruption that led
-      to the last request; for `:incomplete`, what left the turn without an
-      answer. One of `:max_iters`, `:parse_error`, `:prediction_error`,
+      to the last request. For `:incomplete`, the same interruption, unless
+      the turn's context window was full or its `Imp.Deadline` had passed,
+      which would refuse any further request too and so are named instead;
+      `termination_error` holds the errors of the requests that failed. One of `:max_iters`, `:parse_error`, `:prediction_error`,
       `:invalid_answer`, `:empty_tool_calls`, `:context_window_exceeded` and
       `:deadline_exceeded`.
     * `:termination_error` — for `:incomplete`, the redacted errors of the
@@ -529,10 +531,7 @@ defmodule Imp.Predict.ReActV2 do
         })
 
       {:error, forced_error, history} ->
-        reason =
-          if context_window_exceeded?(forced_error), do: :context_window_exceeded, else: reason
-
-        incomplete_prediction(history, reason, %{
+        incomplete_prediction(history, failed_last_request_cause(reason, forced_error), %{
           initial: initial_error,
           forced_submit: forced_error
         })
@@ -568,14 +567,7 @@ defmodule Imp.Predict.ReActV2 do
           )
 
         {:error, reason, history} ->
-          termination =
-            cond do
-              deadline_passed?() -> :deadline_exceeded
-              context_window_exceeded?(reason) -> :context_window_exceeded
-              true -> cause
-            end
-
-          incomplete_prediction(history, termination, %{
+          incomplete_prediction(history, failed_last_request_cause(cause, reason), %{
             initial: initial_error,
             last_text: reason
           })
@@ -596,6 +588,18 @@ defmodule Imp.Predict.ReActV2 do
     do: {append_note(history, react.signature, react.last_request_note), pending}
 
   defp deadline_passed?, do: Imp.Deadline.expired?(Imp.Deadline.current())
+
+  # The cause of a turn whose last request failed: the interruption that led to
+  # that request, unless the request failed because the turn is out of time or
+  # its context window is full. Those two would refuse any further request the
+  # same way, so they are what the caller has to change.
+  defp failed_last_request_cause(interruption, error) do
+    cond do
+      deadline_passed?() -> :deadline_exceeded
+      context_window_exceeded?(error) -> :context_window_exceeded
+      true -> interruption
+    end
+  end
 
   defp put_unexecuted(metadata, %ToolCalls{tool_calls: []}), do: metadata
 
@@ -756,12 +760,7 @@ defmodule Imp.Predict.ReActV2 do
         end
 
       {:error, extraction_error, history} ->
-        reason =
-          if context_window_exceeded?(extraction_error),
-            do: :context_window_exceeded,
-            else: reason
-
-        incomplete_prediction(history, reason, %{
+        incomplete_prediction(history, failed_last_request_cause(reason, extraction_error), %{
           initial: initial_error,
           extraction: extraction_error
         })
