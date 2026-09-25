@@ -416,7 +416,7 @@ defmodule ReqLLMClientTest do
            } = lm
 
     assert_raise ArgumentError,
-                 ~r/Imp.Clients.ReqLLM\.new\/2 expects keyword options/,
+                 ~r/Imp.Clients.ReqLLM\.new\/2 expects a keyword list of options/,
                  fn ->
                    Imp.Clients.ReqLLM.new("openai:gpt-test", %{temperature: 0})
                  end
@@ -1907,7 +1907,8 @@ defmodule ReqLLMClientTest do
     assert loaded.lm.opts[:max_tokens] == 96
     assert loaded.lm.opts[:request_id] == model_id
     assert loaded.lm.opts[:provider_options]["request_id"] == model_id
-    assert loaded.lm.opts[:headers] == [{"x-tenant", "tenant-a"}]
+    # A save holds no header, credential or not.
+    assert loaded.lm.opts[:headers] == nil
 
     poisoned_lm = %{
       provider: :req_llm,
