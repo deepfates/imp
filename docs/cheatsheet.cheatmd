@@ -1,0 +1,172 @@
+# Cheatsheet
+
+## Programs
+{: .col-2}
+
+### Declare a task
+
+```elixir
+sig = Imp.signature("question -> answer")
+
+sig =
+  Imp.signature(
+    "ticket -> team: enum[billing,security], urgent: boolean",
+    "Route the support ticket."
+  )
+```
+
+### Run it
+
+```elixir
+program = Imp.predict(sig, lm: lm)
+{:ok, prediction} = Imp.call(program, %{ticket: "..."})
+Imp.get(prediction, :team)
+```
+
+### Reason first
+
+```elixir
+Imp.chain_of_thought(sig, lm: lm)
+```
+
+### Typed JSON output, with one retry
+
+```elixir
+Imp.predict(sig, lm: lm, adapter: Imp.Adapter.JSON, config: [json_retries: 1])
+```
+
+## Models
+{: .col-2}
+
+### A provider
+
+```elixir
+lm = Imp.req_llm("openai:gpt-5.4-mini", api_key: System.fetch_env!("OPENAI_API_KEY"))
+```
+
+### Swap the model
+
+```elixir
+Imp.with_lm(program, other_lm)
+
+Imp.context([lm: other_lm], fn -> Imp.call(program, inputs) end)
+```
+
+### A scripted model for tests
+
+```elixir
+lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{team: "security"} end)
+```
+
+## Measure
+{: .col-2}
+
+### Examples
+
+```elixir
+example =
+  Imp.example(ticket: "Charged twice.", team: "billing")
+  |> Imp.with_inputs(:ticket)
+```
+
+### Evaluate
+
+```elixir
+report = Imp.evaluate(program, devset, Imp.exact_match(:team))
+report.score
+report.rows
+```
+
+### Your own metric
+
+```elixir
+metric = fn example, prediction ->
+  Imp.get(prediction, :team) == Imp.get(example, :team)
+end
+```
+
+## Improve
+{: .col-2}
+
+### Add labeled examples (no model calls)
+
+```elixir
+Imp.optimize!(program, Imp.Optimizer.LabeledFewShot.new(k: 8), trainset)
+```
+
+### Bootstrap examples the program gets right
+
+```elixir
+Imp.optimize!(program, Imp.Optimizer.BootstrapFewShot.new(metric), trainset)
+```
+
+### Search over candidates
+
+```elixir
+optimizer = Imp.Optimizer.RandomSearch.new(metric)
+Imp.optimize!(program, optimizer, trainset, valset)
+```
+
+### Rewrite instructions from feedback
+
+```elixir
+optimizer = Imp.Optimizer.GEPA.new(metric, reflection_lm: strong_lm, max_metric_calls: 400)
+Imp.optimize!(program, optimizer, trainset, valset)
+```
+
+## Tools and agents
+{: .col-2}
+
+### A tool
+
+```elixir
+weather =
+  Imp.tool(:weather, "Current weather for a city.", fn %{"city" => city} ->
+    Weather.lookup(city)
+  end,
+    schema: %{
+      "type" => "object",
+      "properties" => %{"city" => %{"type" => "string"}},
+      "required" => ["city"]
+    }
+  )
+```
+
+### An agent loop
+
+```elixir
+agent = Imp.react_v2("question -> answer", [weather], lm: lm, max_iters: 5)
+{:ok, prediction} = Imp.call(agent, %{question: "Is it raining in Lisbon?"})
+```
+
+### Tools from MCP servers
+
+```elixir
+server = %{"name" => "docs", "type" => "http", "url" => "https://example.com/mcp"}
+{:ok, imported} = Imp.MCP.connect([server], trusted_servers: [server])
+agent = Imp.react_v2("question -> answer", imported.tools, lm: lm)
+imported.cleanup.()
+```
+
+## Keep and inspect
+{: .col-2}
+
+### Save and load (no credentials saved)
+
+```elixir
+:ok = Imp.save!(program, "router.json")
+program = "router.json" |> Imp.load!() |> Imp.with_lm(lm)
+```
+
+### See what was sent
+
+```elixir
+prediction.metadata.trace.messages
+```
+
+### Capture telemetry around a call
+
+```elixir
+trace = Imp.trace(fn -> Imp.call(program, inputs) end)
+trace.events
+```

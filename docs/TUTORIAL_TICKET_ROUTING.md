@@ -10,15 +10,10 @@ every repeat of both. Each full experiment — baseline, optimization, and
 held-out evaluation — used about 14,800 tokens and ran in **8–13 seconds** with
 `gpt-5.4-mini`, for an estimated **$0.013** at list prices.
 
-Those are rows R1 and R2 in
-[benchmarks/RESULTS.md](https://github.com/deepfates/imp/blob/main/benchmarks/RESULTS.md),
-which carries the dataset, model, provider, date and commit. You can measure
-them yourself: with an API key,
+You can measure them yourself: with an API key,
 `mix run scripts/tutorial_ticket_routing_experiment.exs` in a source checkout
 runs exactly this experiment three times, for about four cents in total. The
-packaged tutorial below uses the same public program, evaluation and optimizer
-APIs without that runner.
-The gain has a plain-English reason: our routing labels encode conventions
+gain has a plain-English reason: our routing labels encode conventions
 the model cannot guess, and the optimizer put examples of those conventions
 into the program.
 
@@ -146,10 +141,8 @@ gains of 55–65 points on held-out tickets. Each run used about 14,800 tokens a
 finished in 8–13 seconds, an estimated $0.013 at list prices; all 120 evaluation
 calls completed without a row error and the cache was cleared before each
 repeat, so every call was live. An earlier run of the same command reached
-95–100% optimized with gains of 45–65 points, so treat 90% as the low end you
-should expect, not a regression. Twenty rows move in 5-point steps, so trust the
-direction and the magnitude, not the endpoints. Rows R1 and R2 in
-[benchmarks/RESULTS.md](https://github.com/deepfates/imp/blob/main/benchmarks/RESULTS.md).
+95–100% optimized with gains of 45–65 points. Twenty rows move in 5-point steps,
+so trust the direction and the magnitude, not the endpoints.
 
 It is not a magic button. The remaining misses are genuinely marginal tickets
 ("Scheduled reports did not run last night" — a platform failure that reads
@@ -192,11 +185,11 @@ assistant: beacon
 user:      Refund attempts fail with a gateway timeout error.
 ```
 
-That last ticket is the trap from the baseline — the zero-shot router sent it
-to atlas (money). The compiled router answers **harbor**, because the second
-demo taught it that payment timeouts are platform failures. The demos are
-program data, not hidden prompt strings: they survive `Imp.save!/2`, travel
-with the artifact, and can be reviewed like any other data.
+That last ticket is exactly the kind the demos are for: the second demo shows
+that a payment timeout belongs to harbor, not atlas. Any single ticket can still
+go either way from one run to the next; the held-out score is what to trust. The
+demos are program data, not hidden prompt strings: they survive `Imp.save!/2`,
+travel with the artifact, and can be reviewed like any other data.
 
 ## Ship It
 
@@ -227,5 +220,3 @@ the provider credential or executable application code.
   same metric, bigger budget.
 - [Livebook 03](../livebooks/03_evaluate_and_optimize.livemd) runs this
   workflow interactively.
-- [Benchmarks](https://github.com/deepfates/imp/blob/main/docs/BENCHMARKS.md) lists every number this repository publishes,
-  what each costs to re-measure, and what cannot be re-measured at all.

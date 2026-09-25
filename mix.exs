@@ -17,11 +17,9 @@ defmodule Imp.MixProject do
         warnings_as_errors: true,
         extras:
           ["README.md"] ++
-            product_docs() ++
-            repository_docs() ++ livebooks() ++ ["RELEASE_NOTES.md", "CHANGELOG.md"],
+            product_docs() ++ livebooks() ++ ["RELEASE_NOTES.md", "CHANGELOG.md"],
         groups_for_extras: [
           Guides: product_docs(),
-          Evidence: repository_docs(),
           Livebooks: livebooks(),
           Releases: ["RELEASE_NOTES.md", "CHANGELOG.md"]
         ],
@@ -239,20 +237,6 @@ defmodule Imp.MixProject do
       "docs/IMP_FOR_DSPY_USERS.md",
       "docs/PRODUCTION_OPERATIONS.md",
       "docs/TRAJECTORIES.md"
-    ]
-  end
-
-  # Rendered into the docs but NOT shipped in the package: they describe
-  # source-checkout commands a Hex consumer cannot run.
-  # docs/BENCHMARKS.md is deliberately NOT here. It is almost entirely bare
-  # `mix …` command spans, which ExDoc resolves to their task modules and then
-  # warns about because those modules are filtered out of the public API docs.
-  # It is a source-checkout document like CONTRIBUTING.md; README, EVIDENCE and
-  # the case study link to it by URL.
-  defp repository_docs do
-    [
-      "docs/CASE_STUDY_TREC.md",
-      "docs/EVIDENCE.md"
     ]
   end
 
