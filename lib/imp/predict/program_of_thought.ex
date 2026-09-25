@@ -88,7 +88,7 @@ defmodule Imp.Predict.ProgramOfThought do
 
     predict_opts =
       opts
-      |> Predict.take_options()
+      |> Imp.Predict.Options.take()
       |> Keyword.update!(:metadata, &Map.put(&1, @max_iters_metadata_key, opts[:max_iters]))
 
     %__MODULE__{

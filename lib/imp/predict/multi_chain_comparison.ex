@@ -58,7 +58,7 @@ defmodule Imp.Predict.MultiChainComparison do
 
     predict_opts =
       opts
-      |> Imp.Predict.Predict.take_options()
+      |> Imp.Predict.Options.take()
       |> Keyword.put(:config, Keyword.put_new(opts[:config], :temperature, 0.7))
 
     comparison_signature =

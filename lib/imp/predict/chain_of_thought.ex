@@ -5,7 +5,7 @@ defmodule Imp.Predict.ChainOfThought do
 
   defstruct [:predict]
 
-  @option_schema Imp.Predict.Predict.option_schema() ++
+  @option_schema Imp.Predict.Options.schema() ++
                    [
                      rationale_field: [
                        type:
@@ -41,7 +41,7 @@ defmodule Imp.Predict.ChainOfThought do
   #{NimbleOptions.docs(@option_schema)}
   """
   def new(signature, opts \\ []) do
-    Imp.Predict.Predict.validate_options!(
+    Imp.Predict.Options.validate!(
       opts,
       @option_schema,
       "Imp.Predict.ChainOfThought.new/2"
