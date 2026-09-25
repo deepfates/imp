@@ -1176,6 +1176,7 @@ defmodule Imp.Predict.RLM do
   defp interpreter_load(args, runtime), do: {:error, {:invalid_load_arguments, args}, runtime}
 
   defp interpreter_tool(name, [args], %{rlm: rlm} = runtime) when is_map(args) do
+    args = Imp.Tool.normalize_arguments(args)
     tool_call_id = Imp.Run.new_event_id("rlm_tool")
 
     :ok =

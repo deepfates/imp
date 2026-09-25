@@ -175,8 +175,8 @@ also fetches the on-call engineer for the team it picks:
 lm = Imp.req_llm("openai:gpt-5.4-mini", api_key: System.fetch_env!("OPENAI_API_KEY"))
 
 on_call =
-  Imp.tool(:on_call, "Look up the current on-call engineer for a team.", fn args ->
-    team = to_string(args[:team] || args["team"]) |> String.downcase()
+  Imp.tool(:on_call, "Look up the current on-call engineer for a team.", fn %{"team" => team} ->
+    team = String.downcase(team)
 
     %{
       "billing" => "Maya",
@@ -368,11 +368,11 @@ Tool calls, retries, and model traffic all emit events you can forward to
 your metrics system:
 
 ```elixir
-on_call = Imp.tool(:on_call, "Look up the on-call engineer", fn %{team: "security"} -> "Ines" end)
+on_call = Imp.tool(:on_call, "Look up the on-call engineer", fn %{"team" => "security"} -> "Ines" end)
 
 trace =
   Imp.trace(fn ->
-    Imp.Tool.call(on_call, %{team: "security"})
+    Imp.Tool.call(on_call, %{"team" => "security"})
   end)
 
 {trace.result, Enum.map(trace.events, &elem(&1, 0))}

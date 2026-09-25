@@ -52,7 +52,8 @@ defmodule Imp.Predict.ReActV2 do
       signature's outputs.
     * `:finished_by_tool`. `finish_on` maps a tool name to
       `fn arguments, result, inputs -> {:finish, outputs} | :continue end`. It
-      runs after that tool's call executes; `{:finish, outputs}` validates
+      runs after that tool's call executes, with the string-keyed arguments
+      the tool received; `{:finish, outputs}` validates
       `outputs` against the signature exactly as a `submit` would and ends the
       turn, with `finished_by_tool` naming the tool. `:continue` leaves the
       loop running. When one step calls several terminal tools, the first in

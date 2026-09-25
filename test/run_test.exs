@@ -26,7 +26,7 @@ defmodule Imp.RunTest do
 
   test "ReActV2 emits ordered source IDs, reasoning, tool calls, results, and final output" do
     owner = self()
-    lookup = Imp.tool(:lookup, "lookup", fn %{query: query} -> "found " <> query end)
+    lookup = Imp.tool(:lookup, "lookup", fn %{"query" => query} -> "found " <> query end)
 
     lm =
       Imp.LM.Static.new(
@@ -327,7 +327,7 @@ defmodule Imp.RunTest do
                     %Imp.Execution.Authorization{
                       tool_call_id: "lookup-2",
                       tool_name: :lookup,
-                      arguments: %{query: "beam"}
+                      arguments: %{"query" => "beam"}
                     }}
 
     refute_received {:authorization_requested,
@@ -486,7 +486,7 @@ defmodule Imp.RunTest do
     assert_receive {:rlm_authorization,
                     %Imp.Execution.Authorization{
                       tool_name: :external,
-                      arguments: %{value: "x"}
+                      arguments: %{"value" => "x"}
                     }}
 
     refute_received {:rlm_effect, _args}

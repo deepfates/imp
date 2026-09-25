@@ -57,7 +57,7 @@ defmodule Imp.SavingSecretSafetyTest do
 
   test "file artifacts redact secrets in nested tool data and preserve registry rebinding" do
     secret = "sk-tool-secret-1234567890"
-    runner = fn %{query: query} -> query end
+    runner = fn %{"query" => query} -> query end
     registry = Imp.Saving.Registry.new(lookup: runner)
 
     tool =

@@ -2,12 +2,13 @@ defmodule Imp.ToolPolicy do
   @moduledoc """
   Internal. Validates and enforces the `:tool_policy` option accepted by
   ReAct-style programs: `:allow`, a tool name, a list of tool
-  names, or an arity-2 function of tool name and args. `authorize/3` returns
-  `:ok`, `{:tool_denied, name, :tool_policy}` for a tool the
-  policy does not allow (the same tag a run's `:authorize` callback denies
-  with), or `{:tool_policy_error, name, reason}` for a policy function that
-  raised (the exception) or threw or exited (`{kind, value}`), so a crashing
-  policy does not take down the tool loop.
+  names, or an arity-2 function of tool name and args, where args are the
+  string-keyed map the tool receives. `authorize/3` returns `:ok`,
+  `{:tool_denied, name, :tool_policy}` for a tool the policy does not allow
+  (the same tag a run's `:authorize` callback denies with), or
+  `{:tool_policy_error, name, reason}` for a policy function that raised (the
+  exception) or threw or exited (`{kind, value}`), so a crashing policy does
+  not take down the tool loop.
   """
 
   def validate(:allow), do: {:ok, :allow}

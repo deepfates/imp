@@ -190,6 +190,13 @@ User-visible changes to Imp are recorded here.
 
 ### ReActV2, adapters and models
 
+- A tool receives its arguments as a map with string keys, from every runtime
+  (ReActV2 and its `finish_on` callbacks, ReAct, Avatar, CodeAct, RLM) and
+  from `Imp.Tool.call/2`, which turns atom keys into strings at every depth.
+  In 0.4.0 a key became an atom when that atom already existed in the VM, so
+  the same tool could see either shape. Match on strings: `fn %{query: q}`
+  becomes `fn %{"query" => q}`. Tool policies and `unexecuted_tool_calls` see
+  the same string keys.
 - The names follow the glossary: a step answered in text ends as `:answered`,
   the last request of an interrupted turn as `:last_text` with
   `last_request_note`, the step signature declares `metadata[:text_step]`, and

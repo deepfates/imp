@@ -1297,7 +1297,7 @@ defmodule UpstreamExam.PredictTest do
     # final answer. (Design substitution: Imp CodeAct plans discrete tool or
     # Elixir-program steps; tools are not callable from inside generated code.)
     test "codeact code generation" do
-      add = Imp.tool(:add, "add two numbers", fn %{a: a, b: b} -> a + b end)
+      add = Imp.tool(:add, "add two numbers", fn %{"a" => a, "b" => b} -> a + b end)
 
       lm =
         dummy_lm([
@@ -1315,7 +1315,7 @@ defmodule UpstreamExam.PredictTest do
     # Upstream: test_codeact_support_multiple_fields
     test "codeact support multiple fields" do
       extract =
-        Imp.tool(:extract_maximum_minimum, "max and min", fn %{input_list: input_list} ->
+        Imp.tool(:extract_maximum_minimum, "max and min", fn %{"input_list" => input_list} ->
           numbers =
             input_list
             |> String.split(",")
@@ -1380,7 +1380,7 @@ defmodule UpstreamExam.PredictTest do
     # finish, then extraction. The trajectory (Imp: prediction metadata :history)
     # records thought/tool/args/observation, with "Completed." for finish.
     test "tool calling without typehint" do
-      foo = Imp.tool(:foo, "Add two numbers.", fn %{a: a, b: b} -> a + b end)
+      foo = Imp.tool(:foo, "Add two numbers.", fn %{"a" => a, "b" => b} -> a + b end)
 
       lm =
         dummy_lm([
@@ -1405,7 +1405,7 @@ defmodule UpstreamExam.PredictTest do
       assert [first, second] = outputs.metadata.history
       assert first.thought == "I need to add two numbers."
       assert to_string(first.tool) == "foo"
-      assert first.arguments == %{a: 1, b: 2}
+      assert first.arguments == %{"a" => 1, "b" => 2}
       assert first.result == 3
 
       assert second.thought == "I have the sum, now I can finish."
@@ -1445,7 +1445,7 @@ defmodule UpstreamExam.PredictTest do
       for entry <- [first, second] do
         assert entry.thought == "I need to add two numbers."
         assert to_string(entry.tool) == "foo"
-        assert entry.arguments == %{a: 1, b: 2}
+        assert entry.arguments == %{"a" => 1, "b" => 2}
         assert to_string(entry.result) =~ "tool error"
       end
     end
@@ -1558,7 +1558,7 @@ defmodule UpstreamExam.PredictTest do
 
     # Upstream: TestRLMInitialization::test_custom_tools
     test "rlm custom tools" do
-      custom_tool = Imp.tool(:custom_tool, "upcase", fn %{x: x} -> String.upcase(x) end)
+      custom_tool = Imp.tool(:custom_tool, "upcase", fn %{"x" => x} -> String.upcase(x) end)
       rlm = Imp.rlm("context -> answer", max_iterations: 5, tools: [custom_tool])
 
       assert Map.has_key?(rlm.tools, :custom_tool)
@@ -1662,7 +1662,7 @@ defmodule UpstreamExam.PredictTest do
     # host-side tool is callable from generated code.
     test "rlm with tool e2e" do
       lookup =
-        Imp.tool(:lookup, "fruit colors", fn %{key: key} ->
+        Imp.tool(:lookup, "fruit colors", fn %{"key" => key} ->
           Map.get(%{"apple" => "red", "banana" => "yellow"}, key, "unknown")
         end)
 

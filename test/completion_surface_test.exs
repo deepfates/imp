@@ -144,7 +144,7 @@ defmodule CompletionSurfaceTest do
       ]
     }
 
-    lookup = Imp.Tool.new(:lookup, "lookup a number", fn %{key: "n"} -> 41 end)
+    lookup = Imp.Tool.new(:lookup, "lookup a number", fn %{"key" => "n"} -> 41 end)
     Process.put(:code_act_actions, actions)
 
     code_act = Imp.Predict.CodeAct.new("question -> answer", [lookup], lm: lm, max_iters: 3)
@@ -173,7 +173,7 @@ defmodule CompletionSurfaceTest do
       ]
     }
 
-    lookup = Imp.Tool.new(:lookup, "lookup a number", fn %{key: "n"} -> 41 end)
+    lookup = Imp.Tool.new(:lookup, "lookup a number", fn %{"key" => "n"} -> 41 end)
     Process.put(:code_act_actions, actions)
 
     code_act = Imp.Predict.CodeAct.new("question -> answer", [lookup], lm: lm, max_iters: 3)
@@ -182,7 +182,7 @@ defmodule CompletionSurfaceTest do
     assert Imp.Prediction.get(prediction, :answer) == 42
 
     assert [
-             %{action: :tool, input: %{arguments: %{key: "n"}}},
+             %{action: :tool, input: %{arguments: %{"key" => "n"}}},
              %{action: :program}
            ] = prediction.metadata.code_act_trace
   after

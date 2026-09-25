@@ -607,7 +607,7 @@ defmodule ProductionAdapterPersistenceTest do
   end
 
   test "named registry round-trips ReAct CodeAct and RLM tool graphs" do
-    lookup = fn %{query: query} -> "found #{query}" end
+    lookup = fn %{"query" => query} -> "found #{query}" end
     policy = fn name, _args -> name in [:lookup, "lookup"] end
     registry = Imp.Saving.Registry.new(lookup_runner: lookup, tool_policy: policy)
     tool = Imp.tool(:lookup, "lookup facts", lookup, schema: %{query: :string})

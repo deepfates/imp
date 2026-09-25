@@ -977,7 +977,7 @@ defmodule PackageContractTest do
       }
 
     lookup =
-      Imp.tool(:lookup, "lookup facts", fn %{query: "capital-france"} -> "Paris" end)
+      Imp.tool(:lookup, "lookup facts", fn %{"query" => "capital-france"} -> "Paris" end)
 
     react = Imp.react("question -> answer: short_span", [lookup], lm: react_lm, max_iters: 3)
 

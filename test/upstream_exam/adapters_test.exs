@@ -1187,7 +1187,7 @@ defmodule UpstreamExam.AdaptersTest do
     test "tool callable" do
       tool =
         Imp.Tool.new(:dummy_function, "A dummy function for testing", fn args ->
-          "#{Map.get(args, :y, "hello")} #{args.x}"
+          "#{Map.get(args, "y", "hello")} #{args["x"]}"
         end)
 
       assert Imp.Tool.call(tool, %{x: 42, y: "hello"}) == "hello 42"

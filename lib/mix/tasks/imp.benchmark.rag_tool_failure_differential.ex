@@ -247,7 +247,7 @@ defmodule Mix.Tasks.Imp.Benchmark.RagToolFailureDifferential do
   defp fixture_tools(state) do
     [
       Imp.tool(:unstable_lookup, "fixture unstable lookup", fn args ->
-        key = fetch_arg!(args, "request_id")
+        key = Map.fetch!(args, "request_id")
 
         attempt =
           Agent.get_and_update(state, fn data ->
@@ -258,11 +258,11 @@ defmodule Mix.Tasks.Imp.Benchmark.RagToolFailureDifferential do
         if attempt == 1, do: raise("transient_failure"), else: "Paris"
       end),
       Imp.tool(:timed_retriever, "fixture retriever timeout", fn args ->
-        "capital-france" = fetch_arg!(args, "query")
+        "capital-france" = Map.fetch!(args, "query")
         raise "deadline_exceeded"
       end),
       Imp.tool(:idempotent_lookup, "fixture idempotent lookup", fn args ->
-        key = fetch_arg!(args, "idempotency_key")
+        key = Map.fetch!(args, "idempotency_key")
 
         status =
           Agent.get_and_update(state, fn data ->
@@ -276,11 +276,11 @@ defmodule Mix.Tasks.Imp.Benchmark.RagToolFailureDifferential do
         args
       end),
       Imp.tool(:broken_lookup, "fixture permanent failure", fn args ->
-        "capital-france" = fetch_arg!(args, "query")
+        "capital-france" = Map.fetch!(args, "query")
         raise "permanent_failure"
       end),
       Imp.tool(:stable_lookup, "fixture stable lookup", fn args ->
-        "capital-france" = fetch_arg!(args, "query")
+        "capital-france" = Map.fetch!(args, "query")
         "Paris"
       end)
     ]
@@ -546,13 +546,6 @@ defmodule Mix.Tasks.Imp.Benchmark.RagToolFailureDifferential do
   defp side_report(artifact, side) do
     artifact[side]
     |> Map.put("rows", Enum.map(artifact["rows"], & &1[side]))
-  end
-
-  defp fetch_arg!(args, key) do
-    case Map.fetch(args, key) do
-      {:ok, value} -> value
-      :error -> Map.fetch!(args, String.to_atom(key))
-    end
   end
 
   defp normalize(%_{} = struct), do: struct |> Map.from_struct() |> normalize()

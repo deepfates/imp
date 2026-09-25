@@ -363,7 +363,7 @@ defmodule DocumentationContractTest do
     }
 
     lookup =
-      Imp.tool(:lookup, "lookup facts", fn %{query: "capital-france"} ->
+      Imp.tool(:lookup, "lookup facts", fn %{"query" => "capital-france"} ->
         "Paris"
       end)
 
@@ -482,7 +482,7 @@ defmodule DocumentationContractTest do
       Imp.tool(
         :lookup,
         "lookup facts",
-        fn %{query: "capital-france"} -> "Paris" end,
+        fn %{"query" => "capital-france"} -> "Paris" end,
         schema: %{
           "type" => "object",
           "properties" => %{"query" => %{"type" => "string"}},
@@ -651,7 +651,7 @@ defmodule DocumentationContractTest do
     assert {:ok, [^tool]} = Imp.Tool.validate_tools([tool])
     assert {:error, message} = Imp.Tool.validate_tools([:not_a_tool])
     assert message =~ "expected a list of Imp.Tool structs"
-    assert Imp.Tool.call(tool, %{key: "value"}) == %{key: "value"}
+    assert Imp.Tool.call(tool, %{key: "value"}) == %{"key" => "value"}
   end
 
   test "the documented streaming path collects predictions and parses incremental fields" do

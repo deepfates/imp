@@ -587,7 +587,7 @@ submit(%{answer: child[:answer]})|
       ]
     }
 
-    lookup = Imp.Tool.new(:lookup, "lookup a key", fn %{key: "capital"} -> "Paris" end)
+    lookup = Imp.Tool.new(:lookup, "lookup a key", fn %{"key" => "capital"} -> "Paris" end)
     Process.put(:rlm_actions, actions)
 
     rlm =
@@ -829,7 +829,7 @@ submit(%{answer: child[:answer]})|
       ]
     }
 
-    lookup = Imp.Tool.new(:lookup, "lookup a key", fn %{key: "capital"} -> "Paris" end)
+    lookup = Imp.Tool.new(:lookup, "lookup a key", fn %{"key" => "capital"} -> "Paris" end)
     Process.put(:rlm_actions, actions)
 
     rlm = Imp.Predict.RLM.new("question -> answer", lm: lm, tools: [lookup], max_iterations: 3)

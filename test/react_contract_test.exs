@@ -241,12 +241,12 @@ defmodule ReActContractTest do
       ]
     }
 
-    lookup = Imp.Tool.new(:lookup, "lookup", fn %{query: "capital"} -> %{answer: "Paris"} end)
+    lookup = Imp.Tool.new(:lookup, "lookup", fn %{"query" => "capital"} -> %{answer: "Paris"} end)
     agent = Imp.Predict.ReAct.new("question -> answer", [lookup], lm: lm, max_iters: 1)
 
     assert {:error,
             {:react_max_iters,
-             [%{tool: :lookup, arguments: %{query: "capital"}, result: %{answer: "Paris"}}]}} =
+             [%{tool: :lookup, arguments: %{"query" => "capital"}, result: %{answer: "Paris"}}]}} =
              Imp.Predict.ReAct.call(agent, %{question: "q"})
   end
 
@@ -279,15 +279,15 @@ defmodule ReActContractTest do
       ]
     }
 
-    lookup = Imp.Tool.new(:lookup, "lookup", fn %{query: "capital"} -> "Paris" end)
+    lookup = Imp.Tool.new(:lookup, "lookup", fn %{"query" => "capital"} -> "Paris" end)
     agent = Imp.Predict.ReAct.new("question -> answer", [lookup], lm: lm, max_iters: 1)
 
     assert {:ok, prediction} = Imp.Predict.ReAct.call(agent, %{question: "q"})
     assert Imp.Prediction.get(prediction, :answer) == "Paris"
 
     assert [
-             %{tool: :lookup, arguments: %{query: "capital"}, result: "Paris"},
-             %{tool: :submit, arguments: %{answer: "Paris"}, result: %{answer: "Paris"}}
+             %{tool: :lookup, arguments: %{"query" => "capital"}, result: "Paris"},
+             %{tool: :submit, arguments: %{"answer" => "Paris"}, result: %{"answer" => "Paris"}}
            ] = prediction.metadata[:history]
   end
 
@@ -295,7 +295,7 @@ defmodule ReActContractTest do
     unknown_key = "model_generated_key_#{System.unique_integer([:positive])}"
     assert_raise ArgumentError, fn -> String.to_existing_atom(unknown_key) end
 
-    assert %{^unknown_key => "kept", query: "capital"} =
+    assert %{^unknown_key => "kept", "query" => "capital"} =
              Imp.Tool.normalize_arguments(%{"query" => "capital", unknown_key => "kept"})
 
     assert_raise ArgumentError, fn -> String.to_existing_atom(unknown_key) end
@@ -311,7 +311,7 @@ defmodule ReActContractTest do
       ]
     }
 
-    lookup = Imp.Tool.new(:lookup, "lookup", fn %{query: "capital"} -> "Paris" end)
+    lookup = Imp.Tool.new(:lookup, "lookup", fn %{"query" => "capital"} -> "Paris" end)
 
     agent =
       Imp.Predict.ReAct.new("question -> answer", [lookup],
@@ -412,7 +412,7 @@ defmodule ReActContractTest do
 
   test "dspy_3_2_1: reasoning signature and instructions match dspy.ReAct" do
     lookup =
-      Imp.Tool.new(:lookup, "Lookup a fact by query.", fn %{query: q} -> q end,
+      Imp.Tool.new(:lookup, "Lookup a fact by query.", fn %{"query" => q} -> q end,
         schema: %{
           "type" => "object",
           "properties" => %{"query" => %{"type" => "string"}},
@@ -494,7 +494,7 @@ defmodule ReActContractTest do
     end
 
     lookup =
-      Imp.Tool.new(:lookup, "Lookup a fact by query.", fn %{query: "capital-france"} ->
+      Imp.Tool.new(:lookup, "Lookup a fact by query.", fn %{"query" => "capital-france"} ->
         "Paris"
       end)
 
@@ -518,7 +518,7 @@ defmodule ReActContractTest do
 
     # History is derived from the trajectory: the real tool call, then finish.
     assert [
-             %{tool: :lookup, arguments: %{query: "capital-france"}, result: "Paris"},
+             %{tool: :lookup, arguments: %{"query" => "capital-france"}, result: "Paris"},
              %{tool: :finish, result: "Completed."}
            ] = prediction.metadata[:history]
 
@@ -585,7 +585,7 @@ defmodule ReActContractTest do
       next
     end
 
-    lookup = Imp.Tool.new(:lookup, "lookup", fn %{query: query} -> query end)
+    lookup = Imp.Tool.new(:lookup, "lookup", fn %{"query" => query} -> query end)
 
     agent =
       Imp.Predict.ReAct.new("question -> answer", [lookup],
@@ -599,7 +599,7 @@ defmodule ReActContractTest do
     # The first overflow drops the oldest call. DSPy then refuses to truncate
     # the one complete call that remains, so extraction and returned history
     # retain that useful observation.
-    assert [%{tool: :lookup, arguments: %{query: "second"}, result: "second"}] =
+    assert [%{tool: :lookup, arguments: %{"query" => "second"}, result: "second"}] =
              prediction.metadata[:history]
 
     assert Process.get(:react_context_responses) == []
@@ -647,7 +647,7 @@ defmodule ReActContractTest do
       next
     end
 
-    lookup = Imp.Tool.new(:lookup, "lookup", fn %{query: query} -> query end)
+    lookup = Imp.Tool.new(:lookup, "lookup", fn %{"query" => query} -> query end)
 
     agent =
       Imp.Predict.ReAct.new("question -> answer", [lookup],
@@ -661,7 +661,7 @@ defmodule ReActContractTest do
     assert prediction.metadata[:termination_reason] == :extracted
     assert prediction.metadata[:termination_cause] == :parse_error
 
-    assert [%{tool: :lookup, arguments: %{query: "fact"}, result: "fact"}] =
+    assert [%{tool: :lookup, arguments: %{"query" => "fact"}, result: "fact"}] =
              prediction.metadata[:history]
 
     assert Process.get(:react_single_call_context_responses) == []
@@ -694,7 +694,7 @@ defmodule ReActContractTest do
       next
     end
 
-    lookup = Imp.Tool.new(:lookup, "lookup", fn %{query: query} -> query end)
+    lookup = Imp.Tool.new(:lookup, "lookup", fn %{"query" => query} -> query end)
 
     agent =
       Imp.Predict.ReAct.new("question -> answer", [lookup],

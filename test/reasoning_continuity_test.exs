@@ -290,7 +290,7 @@ defmodule ReasoningContinuityTest do
   end
 
   defp lookup_tool,
-    do: Imp.tool(:lookup, "Read an immutable fixture", fn %{query: "fixture"} -> "found" end)
+    do: Imp.tool(:lookup, "Read an immutable fixture", fn %{"query" => "fixture"} -> "found" end)
 
   defp reload(history),
     do: history |> Imp.History.dump() |> Jason.encode!() |> Jason.decode!() |> Imp.History.load()

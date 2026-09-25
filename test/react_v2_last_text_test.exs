@@ -330,7 +330,7 @@ defmodule ReActV2LastTextTest do
     assert Imp.get(prediction, :answer) == "One more look, then: it is there."
     assert prediction.metadata[:termination_reason] == :last_text
 
-    assert [%{id: "late", name: "look", arguments: %{where: "shelf"}}] =
+    assert [%{id: "late", name: "look", arguments: %{"where" => "shelf"}}] =
              prediction.metadata[:unexecuted_tool_calls]
 
     [_first, last] = Imp.History.messages(prediction.metadata[:history])

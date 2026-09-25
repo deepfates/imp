@@ -175,7 +175,7 @@ defmodule Imp.Optimizer.ParameterContractTest do
   end
 
   test "ReAct tool parameters preserve executable authority and refresh provider config" do
-    runner = fn %{query: query} -> query end
+    runner = fn %{"query" => query} -> query end
 
     tool =
       Imp.Tool.new(:lookup, "Old description", runner,
