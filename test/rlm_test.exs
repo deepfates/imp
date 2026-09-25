@@ -568,6 +568,82 @@ submit(%{answer: child[:answer]})|
     assert Enum.map(trace, & &1.action) == [:run]
   end
 
+  # `max_preview_chars` bounds what the controller sees of every variable in
+  # characters. A list was previewed as its first `max_preview_chars` items:
+  # after `lines = String.split(log, "\n")` on a 20,000-line log the turn
+  # message grew from 2,351 to 89,312 bytes.
+  test "a list's preview is bounded in characters, not items" do
+    parent = self()
+    log = Enum.map_join(1..20_000, "\n", &"#{&1} INFO path=/v1/items/#{&1} status=200")
+
+    handler = fn messages, _opts ->
+      send(parent, {:turn, byte_size(List.last(messages).content)})
+
+      if length(messages) < 4,
+        do: %{code: ~S|lines = String.split(log, "\n")|},
+        else: %{code: ~S|submit(%{answer: "done"})|}
+    end
+
+    lm = %{module: Imp.LM.Static, opts: [handler: handler]}
+    rlm = Imp.Predict.RLM.new("log -> answer", lm: lm, max_iterations: 2)
+
+    assert {:ok, _prediction} = Imp.Predict.RLM.call(rlm, %{log: log})
+    assert_received {:turn, first_bytes}
+    assert_received {:turn, second_bytes}
+    assert second_bytes < first_bytes + 2_500
+  end
+
+  # A tuple, or a list or map holding one, could not be encoded into the turn
+  # message at all.
+  test "every variable's preview is bounded in characters" do
+    parent = self()
+    log = Enum.map_join(1..20_000, "\n", &"#{&1} INFO path=/v1/items/#{&1} status=200")
+
+    handler = fn messages, _opts ->
+      send(parent, {:turn, byte_size(List.last(messages).content), List.last(messages).content})
+
+      if length(messages) < 4,
+        do: %{
+          code: ~S"""
+          lines = String.split(log, "\n")
+          rows = Enum.map(lines, fn line -> %{line => {line, String.length(line)}} end)
+          index = Map.new(lines, fn line -> {line, [line]} end)
+          pair = {log, lines}
+          f = fn x -> x end
+          :ok
+          """
+        },
+        else: %{code: ~S|submit(%{answer: "done"})|}
+    end
+
+    lm = %{module: Imp.LM.Static, opts: [handler: handler]}
+
+    rlm =
+      Imp.Predict.RLM.new("log -> answer",
+        lm: lm,
+        max_iterations: 2,
+        max_preview_chars: 2_000,
+        max_interpreter_steps: 1_000_000
+      )
+
+    assert {:ok, _prediction} = Imp.Predict.RLM.call(rlm, %{log: log})
+    assert_received {:turn, first_bytes, _first}
+    assert_received {:turn, second_bytes, second}
+
+    variables = Jason.decode!(second)["variables"]
+
+    for name <- ~w(log lines rows index pair f) do
+      preview = get_in(variables, [name, "preview"])
+      assert is_binary(preview), name
+      assert String.length(preview) <= 2_000, name
+      assert variables[name]["truncated"] == (name != "f"), name
+    end
+
+    assert variables["lines"]["length"] == 20_000
+    assert variables["index"]["size"] == 20_000
+    assert second_bytes < first_bytes + 6 * 2_500
+  end
+
   test "RLM treats zero budgets and preview limits conservatively" do
     parent = self()
 
@@ -608,9 +684,9 @@ submit(%{answer: child[:answer]})|
     assert_received {:rlm_messages, messages}
     prompt = Enum.map_join(messages, "\n", & &1.content)
     assert prompt =~ ~s("preview":"")
-    assert prompt =~ ~s("preview":[])
     refute prompt =~ "secret"
     refute prompt =~ "1,2,3"
+    refute prompt =~ "1, 2, 3"
   end
 
   test "RLM constructor and call boundaries report invalid inputs clearly" do

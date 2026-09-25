@@ -88,7 +88,7 @@ defmodule Imp.Predict.RLM do
   - `:max_interpreter_steps` - AST execution steps per controller turn.
   - `:max_interpreter_value_bytes` - maximum serialized size of an interpreter value.
   - `:max_interpreter_effects` - external effects allowed per controller turn.
-  - `:max_preview_chars` - how much large input context the controller sees.
+  - `:max_preview_chars` - characters of each variable's printed value the controller sees each turn.
   - `:max_observation_chars` - truncation limit for string observations.
   - `:compaction` / `:compaction_threshold_pct` - summarize root history at a model-context fraction.
   - `:compaction_context_tokens` - context limit paired with the explicit chars/4 token-estimation fallback; Imp.LM currently exposes no standard tokenizer/context metadata.
@@ -1781,24 +1781,47 @@ defmodule Imp.Predict.RLM do
     }
   end
 
-  defp describe_value(value, preview_chars) when is_list(value) do
+  defp describe_value(value, preview_chars) when is_list(value),
+    do: Map.merge(%{type: :list, length: length(value)}, printed_preview(value, preview_chars))
+
+  defp describe_value(value, preview_chars) when is_map(value),
+    do: Map.merge(%{type: :map, size: map_size(value)}, printed_preview(value, preview_chars))
+
+  defp describe_value(value, _preview_chars)
+       when is_number(value) or is_boolean(value) or is_nil(value),
+       do: %{type: type_of(value), value: value}
+
+  defp describe_value(value, preview_chars),
+    do: Map.merge(%{type: type_of(value)}, printed_preview(value, preview_chars))
+
+  # Every preview is at most `preview_chars` characters of the value as the
+  # controller's language prints it, as upstream previews a variable with
+  # `str(value)[:preview_chars]`. A value too large to print in the preview is
+  # printed with inspect's own limits, so a 20,000-line list costs no more to
+  # describe than its preview; any term prints in at least an eighth of its
+  # external size in characters, so such a value is always truncated.
+  defp printed_preview(value, preview_chars) do
+    {printed, cut?} =
+      if :erlang.external_size(value) <= 8 * preview_chars do
+        {inspect(value, limit: :infinity, printable_limit: :infinity), false}
+      else
+        # Each printed item takes at least three characters with its separator.
+        limit = div(preview_chars, 3) + 1
+        {inspect(value, limit: limit, printable_limit: preview_chars), true}
+      end
+
     %{
-      type: :list,
-      length: length(value),
-      preview: Enum.take(value, preview_chars),
-      truncated: length(value) > preview_chars
+      preview: String.slice(printed, 0, preview_chars),
+      truncated: cut? or String.length(printed) > preview_chars
     }
   end
-
-  defp describe_value(value, _preview_chars) when is_map(value),
-    do: %{type: :map, keys: Map.keys(value), size: map_size(value)}
-
-  defp describe_value(value, _preview_chars), do: %{type: type_of(value), value: value}
 
   defp type_of(value) when is_integer(value), do: :integer
   defp type_of(value) when is_float(value), do: :float
   defp type_of(value) when is_boolean(value), do: :boolean
   defp type_of(value) when is_nil(value), do: nil
+  defp type_of(value) when is_atom(value), do: :atom
+  defp type_of(value) when is_tuple(value), do: :tuple
   defp type_of(_value), do: :term
 
   defp tool_metadata(tools) do

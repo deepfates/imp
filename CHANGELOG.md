@@ -417,6 +417,15 @@ User-visible changes to Imp are recorded here.
   failed to parse: gpt-5.4 sends several JSON objects in one reply (its
   action twice, or several actions written ahead of their outputs). Such a
   reply now runs the first object that carries code, as a REPL would.
+- `max_preview_chars` bounds every RLM variable preview in characters. A
+  list was previewed as its first `max_preview_chars` items, so after
+  `lines = String.split(log, "\n")` on a 20,000-line log the controller's
+  turn message grew from 2,351 to 89,312 bytes. A list, map, tuple or other
+  term is now previewed as the first `max_preview_chars` characters of its
+  printed form, with `length` or `size` beside it, as upstream previews
+  `str(value)`; a map's preview shows its values, not only its keys. A
+  variable holding a tuple, which could not be encoded into the turn message
+  and ended the call, is previewed the same way.
 
 ### Errors and shapes
 
