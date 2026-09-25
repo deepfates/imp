@@ -105,7 +105,7 @@ defmodule ImpDeployment.ProgramServer do
       ImpDeployment.Workflow.program()
     else
       path = System.fetch_env!("IMP_ARTIFACT_PATH")
-      Imp.load!(path, registry: ImpDeployment.Callbacks.registry())
+      Imp.read!(path, registry: ImpDeployment.Callbacks.registry())
     end
   end
 
@@ -123,7 +123,7 @@ defmodule ImpDeployment.ProgramServer do
   end
 
   defp read_program(path, current) do
-    program = Imp.load!(path, registry: ImpDeployment.Callbacks.registry())
+    program = Imp.read!(path, registry: ImpDeployment.Callbacks.registry())
 
     if compatible_contract?(current, program) do
       {:ok, program}

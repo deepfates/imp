@@ -563,7 +563,7 @@ defmodule Imp.Optimizer.RandomSearch do
     Enum.reduce(Imp.ProgramParameters.predictors(program), program, fn %{name: name}, acc ->
       Imp.ProgramParameters.update_predictor(acc, name, fn predictor ->
         predictor
-        |> Imp.Predict.Predict.with_demos([])
+        |> Imp.Predict.with_demos([])
         |> then(&%{&1 | metadata: Map.delete(&1.metadata, :optimizer_report)})
       end)
     end)

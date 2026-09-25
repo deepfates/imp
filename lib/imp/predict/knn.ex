@@ -23,7 +23,7 @@ defmodule Imp.Predict.KNN do
       quicksort leaves ties unspecified.
 
   For token-overlap retrieval without an embedding provider, use
-  `Imp.Retrievers.KNN`.
+  `Imp.Retrieve.Memory`.
   """
 
   defstruct [:k, :trainset, :vectorizer, :trainset_vectors]

@@ -22,8 +22,6 @@ defmodule Imp.BenchmarkTruth.BudgetedLM do
   defstruct [:inner, :budget, :max_output_tokens]
 
   @impl true
-  def generate(_messages, _opts), do: {:error, :budgeted_lm_instance_required}
-
   def generate(%__MODULE__{} = lm, messages, opts) do
     lm
     |> Map.from_struct()

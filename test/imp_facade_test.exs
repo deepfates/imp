@@ -34,10 +34,7 @@ defmodule ImpFacadeTest do
   end
 
   test "facade configures, builds, calls, and reads an Elixir-native program" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-    }
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "Paris"} end)
 
     Imp.configure(lm: lm)
 
@@ -48,10 +45,7 @@ defmodule ImpFacadeTest do
   end
 
   test "facade streams and collects one program call" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-    }
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "Paris"} end)
 
     program = Imp.predict("question -> answer", lm: lm)
 
@@ -63,10 +57,7 @@ defmodule ImpFacadeTest do
 
     assert Imp.collect(program, %{question: "Capital of France?"}) == "Paris"
 
-    failing = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> raise "provider down" end]
-    }
+    failing = Imp.LM.Static.new(handler: fn _messages, _opts -> raise "provider down" end)
 
     failing_program = Imp.predict("question -> answer", lm: failing)
 
@@ -203,10 +194,7 @@ defmodule ImpFacadeTest do
 
     assert score > 0
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-    }
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "Paris"} end)
 
     program =
       "question, context -> answer"
@@ -258,7 +246,7 @@ defmodule ImpFacadeTest do
              ])
 
     assert_raise ArgumentError,
-                 ~r/Imp.Predict.Predict.with_demos\/2 expects demos as Imp.Example structs/,
+                 ~r/Imp.Predict.with_demos\/2 expects demos as Imp.Example structs/,
                  fn ->
                    Imp.with_demos(program, [:not_a_demo])
                  end
@@ -272,7 +260,7 @@ defmodule ImpFacadeTest do
       |> Imp.program_of_thought()
       |> Imp.with_demos([demo])
       |> Imp.dump()
-      |> Imp.load()
+      |> Imp.load!()
 
     assert %Imp.Predict.ProgramOfThought{predict: %{demos: [loaded_demo]}} = loaded
     assert Imp.Example.to_map(loaded_demo) == Imp.Example.to_map(demo)
@@ -282,13 +270,10 @@ defmodule ImpFacadeTest do
   test "facade saves and loads portable programs" do
     # A portable program is dynamic or ReqLLM-pinned: dumping refuses a
     # Static-pinned program.
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-    }
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "Paris"} end)
 
     program = Imp.predict("question -> answer")
-    loaded = program |> Imp.dump() |> Imp.load()
+    loaded = program |> Imp.dump() |> Imp.load!()
 
     assert {:ok, prediction} =
              Imp.context([lm: lm], fn ->
@@ -303,14 +288,38 @@ defmodule ImpFacadeTest do
     on_exit(fn -> File.rm(path) end)
 
     assert :ok = Imp.save!(program, path)
-    assert %Imp.Predict.Predict{} = Imp.load!(path)
+    assert %Imp.Predict{} = Imp.read!(path)
+  end
+
+  test "Imp.react builds the ReActV2 agent under one facade name" do
+    assert %Imp.Predict.ReActV2{} = Imp.react("question -> answer", [])
+    refute function_exported?(Imp, :react_v2, 3)
+  end
+
+  test "load returns a tagged result and load! raises; read! reads a saved file" do
+    state = Imp.predict("question -> answer") |> Imp.dump()
+
+    assert {:ok, %Imp.Predict{}} = Imp.load(state)
+    assert %Imp.Predict{} = Imp.load!(state)
+
+    assert {:error, %ArgumentError{message: message}} = Imp.load(%{"type" => "no_such_program"})
+    assert message =~ "unsupported saved Imp program type"
+    assert {:error, %ArgumentError{}} = Imp.load(:not_a_map)
+    assert_raise ArgumentError, fn -> Imp.load!(%{"type" => "no_such_program"}) end
+
+    path =
+      Path.join(System.tmp_dir!(), "imp-facade-read-#{System.unique_integer([:positive])}.json")
+
+    on_exit(fn -> File.rm(path) end)
+    assert :ok = Imp.save!(Imp.predict("question -> answer"), path)
+    assert %Imp.Predict{} = Imp.read!(path)
+
+    # A path is not a saved program; reading files is `read!/2`'s job.
+    assert {:error, %ArgumentError{}} = Imp.load(path)
   end
 
   test "facade evaluates and optimizes through the golden path" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-    }
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "Paris"} end)
 
     program = Imp.predict("question -> answer", lm: lm)
 
@@ -360,7 +369,7 @@ defmodule ImpFacadeTest do
   test "optimize returns tuples and optimize! raises, mirroring train" do
     program =
       Imp.predict("question -> answer",
-        lm: fn _messages, _opts -> %{answer: "Paris"} end
+        lm: Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "Paris"} end)
       )
 
     trainset = [
@@ -426,10 +435,7 @@ defmodule ImpFacadeTest do
   end
 
   test "canonical facade builds and calls directly" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "ok"} end]
-    }
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "ok"} end)
 
     program = Imp.predict("question -> answer", lm: lm)
 

@@ -315,7 +315,7 @@ defmodule Mix.Tasks.Imp.Package.CleanRoom do
     end
 
     loader_registry = Imp.Saving.Registry.new(quality_metric: loader_metric)
-    loaded = Imp.load!(artifact, registry: loader_registry)
+    loaded = Imp.read!(artifact, registry: loader_registry)
 
     runtime_api_key = System.fetch_env!("IMP_CLEAN_ROOM_API_KEY")
 
@@ -341,7 +341,7 @@ defmodule Mix.Tasks.Imp.Package.CleanRoom do
     File.write!(tampered, Jason.encode!(%{envelope | "payload" => payload}))
 
     try do
-      Imp.load!(tampered, registry: loader_registry)
+      Imp.read!(tampered, registry: loader_registry)
       raise "tampered artifact was accepted"
     rescue
       error in ArgumentError ->

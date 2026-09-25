@@ -34,7 +34,7 @@ defmodule Mix.Tasks.ImpAcp.LmstudioDemo do
         cache: false
       )
 
-    Imp.react_v2("question -> answer", [tool], lm: lm, max_iters: 4)
+    Imp.react("question -> answer", [tool], lm: lm, max_iters: 4)
   end
 
   defp model, do: System.get_env("IMP_LMSTUDIO_MODEL", "qwen/qwen3.6-35b-a3b")

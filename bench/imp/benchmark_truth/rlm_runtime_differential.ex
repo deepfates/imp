@@ -372,9 +372,8 @@ print("recover-me")|
   defp run_imp_case!("recursive_depth_boundary") do
     parent = self()
 
-    controller = %{
-      module: Imp.LM.Static,
-      opts: [
+    controller =
+      Imp.LM.Static.new(
         model: "parent-model",
         handler: fn _messages, _opts ->
           %{
@@ -382,8 +381,7 @@ print("recover-me")|
 submit(%{answer: reply})|
           }
         end
-      ]
-    }
+      )
 
     sub_lm =
       static_lm(fn _messages, opts ->
@@ -1093,7 +1091,7 @@ missing()|)
     )
   end
 
-  defp static_lm(handler), do: %{module: Imp.LM.Static, opts: [handler: handler]}
+  defp static_lm(handler), do: Imp.LM.Static.new(handler: handler)
 
   defp observe_imp_boundary(
          %{

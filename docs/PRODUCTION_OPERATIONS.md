@@ -162,7 +162,7 @@ For remote capabilities, prefer an explicitly owned import:
 ```elixir
 server = %{"name" => "account", "type" => "http", "url" => "http://127.0.0.1:4400/mcp"}
 {:ok, imported} = Imp.MCP.connect([server], trusted_servers: [server], owner: self())
-program = Imp.react_v2("question -> answer", imported.tools, lm: lm)
+program = Imp.react("question -> answer", imported.tools, lm: lm)
 # Run the program while its connection owner is alive.
 imported.cleanup.()
 ```

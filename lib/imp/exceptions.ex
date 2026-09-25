@@ -65,7 +65,7 @@ defmodule Imp.AdapterParseError do
   A completion that could not be read as the signature's outputs.
 
   Adapters return `{:error, %Imp.AdapterParseError{}}` from `parse/3`, and
-  `Imp.Predict.Predict` returns the same struct when no completion could be
+  `Imp.Predict` returns the same struct when no completion could be
   parsed, after any fallback it tried. `:kind` says what was wrong:
 
     * `:malformed` — the completion is not in the adapter's format at all: no
@@ -84,7 +84,7 @@ defmodule Imp.AdapterParseError do
   does not report that request's failure as a parse error: the call returns
   the `Imp.LMError` (or `{:lm_failed, client, reason}`) itself.
 
-  `:message` is the feedback a retry shows the model. `Imp.Predict.Predict`
+  `:message` is the feedback a retry shows the model. `Imp.Predict`
   also fills `:trace` (the redacted messages, the raw completion, and which
   output fields were read) and, for an `n > 1` call, `:completion_index`, the
   position of the first completion that failed.

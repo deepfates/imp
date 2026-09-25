@@ -7,15 +7,13 @@ defmodule RLMCancellationTest do
   test "cancellation terminates an active LM effect when no deadline is configured" do
     parent = self()
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           send(parent, {:effect_started, self()})
           Process.sleep(:infinity)
         end
-      ]
-    }
+      )
 
     rlm = RLM.new("question -> answer", lm: lm)
     call_task = Task.async(fn -> RLM.call(rlm, %{question: "cancel me"}) end)

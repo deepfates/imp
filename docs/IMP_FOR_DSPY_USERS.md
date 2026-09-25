@@ -17,7 +17,7 @@ updates, telemetry, and fresh-runtime artifact application.
 | `dspy.Signature` / `"q -> a"` | `Imp.signature("q -> a")` — the same compact input/output idea with Imp type spellings such as `array[...]`, `enum[...]`, and `number` |
 | `dspy.Predict(sig)` | `Imp.predict(sig, lm: lm)` |
 | `dspy.ChainOfThought` | `Imp.chain_of_thought/2` |
-| `dspy.ReAct(sig, tools=[...])` | `Imp.react_v2(sig, tools, tool_policy: [...])` — typed tools, structured observations, and validated `submit` for several or typed outputs; a signature with one text output ends on a step answered in text. `Imp.react/3` builds a different loop, `Imp.Predict.ReAct` |
+| `dspy.ReAct(sig, tools=[...])` | `Imp.react(sig, tools, tool_policy: [...])` — typed tools, structured observations, and validated `submit` for several or typed outputs; a signature with one text output ends on a step answered in text. `Imp.Predict.ReAct` is the earlier loop, with a `mode: :dspy` port of `dspy.ReAct` |
 | `dspy.Example` / `.with_inputs` | `Imp.example/1` / `Imp.with_inputs/2` |
 | `dspy.Prediction` | `%Imp.Prediction{}` — read fields with `Imp.get/2` |
 | `dspy.Evaluate` | `Imp.evaluate/4` — returns score plus per-example rows |
@@ -28,7 +28,7 @@ updates, telemetry, and fresh-runtime artifact application.
 | `COPRO`, `SIMBA`, `MIPROv2`, `GEPA` | Same names; GEPA takes `Prediction`-shaped score+feedback metrics |
 | `BootstrapFinetune`, `Ensemble`, `BetterTogether`, `Avatar` | Same capability families, with explicit BEAM-native contracts: local MLX SFT belongs to `BootstrapFinetune`; `Ensemble` returns one normalized `Prediction` and isolates failed children; `Avatar` uses a bounded typed-action runtime and separate finisher |
 | `GRPO` | Experimental external training through TRL-compatible workers and durable adapter checkpoints |
-| `program.save(path)` / `load` | `Imp.save!/2` / `Imp.load!/1` — checksummed JSON artifact, never credentials |
+| `program.save(path)` / `load` | `Imp.save!/2` / `Imp.read!/1` — checksummed JSON artifact, never credentials |
 | `dspy.configure(lm=...)` | `Imp.configure(lm: ...)` sets a supervised node-local default; explicit `lm:` per program is the recommended style |
 | `dspy.context(lm=...)` | `Imp.context([lm: ...], fn -> ... end)` — process-scoped |
 | `dspy.streamify(program, stream_listeners=[...])` | `Imp.stream(program, inputs, provider_stream: true, stream_listeners: [...])` — runs the real composed program, streams selected named-predictor fields, and ends with the typed prediction |

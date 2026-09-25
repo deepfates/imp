@@ -796,7 +796,7 @@ defmodule Imp.Optimizer.COPRO do
       output_index = length(signature.outputs) - 1
       outputs = List.update_at(signature.outputs, output_index, &%{&1 | prefix: prefix})
 
-      Imp.Predict.Predict.with_signature(predictor, %{
+      Imp.Predict.with_signature(predictor, %{
         signature
         | instructions: instruction,
           outputs: outputs

@@ -390,7 +390,7 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
         max_retry_delay_ms: 0
       )
 
-    result = Imp.Retrievers.HTTP.retrieve(retriever, "beam")
+    result = Imp.Retrievers.HTTP.retrieve(retriever, "beam", [])
     seen = Agent.get(state, &Enum.reverse/1)
     Agent.stop(state)
     keys = Enum.map(seen, &header_value(&1, "idempotency-key"))
@@ -654,17 +654,15 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
   end
 
   defp mipro_fixture(state) do
-    task_lm = %{module: Imp.LM.Static, opts: [handler: fn _, _ -> %{answer: "yes"} end]}
+    task_lm = Imp.LM.Static.new(handler: fn _, _ -> %{answer: "yes"} end)
 
-    prompt_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    prompt_lm =
+      Imp.LM.Static.new(
         handler: fn _, _ ->
           Agent.update(state, &Map.update!(&1, :proposal_calls, fn count -> count + 1 end))
           ["Answer consistently.", "Return yes."]
         end
-      ]
-    }
+      )
 
     program = Imp.predict("question -> answer", lm: task_lm)
     trainset = examples("train", 2)
@@ -694,9 +692,8 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
   end
 
   defp simba_fixture(state) do
-    task_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    task_lm =
+      Imp.LM.Static.new(
         handler: fn messages, opts ->
           Agent.update(state, &Map.update!(&1, :task_calls, fn count -> count + 1 end))
           prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -706,12 +703,10 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
             do: %{answer: "yes"},
             else: %{answer: "no"}
         end
-      ]
-    }
+      )
 
-    prompt_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    prompt_lm =
+      Imp.LM.Static.new(
         handler: fn _, _ ->
           Agent.update(state, &Map.update!(&1, :prompt_calls, fn count -> count + 1 end))
 
@@ -720,8 +715,7 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
             module_advice: %{main: "Answer yes."}
           }
         end
-      ]
-    }
+      )
 
     initial_demo = Imp.example(question: "seed", answer: "yes") |> Imp.with_inputs(:question)
     program = Imp.predict("question -> answer", lm: task_lm, demos: [initial_demo])
@@ -1035,7 +1029,7 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
 
     {:ok, actions} =
       Agent.start_link(fn ->
-        # :dspy_3_2_1 (faithful dspy.ReAct): the model emits next_thought /
+        # :dspy (faithful dspy.ReAct): the model emits next_thought /
         # next_tool_name / next_tool_args as chat fields, terminates with the
         # reserved `finish` tool, then a separate extraction pass produces the
         # outputs.
@@ -1059,24 +1053,22 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
         ]
       end)
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           Agent.get_and_update(actions, fn [next | rest] -> {next, rest} end)
         end
-      ]
-    }
+      )
 
     agent =
-      Imp.react(
+      Imp.Predict.ReAct.new(
         Imp.Signature.new(
           "question -> answer",
           "Use lookup first with query failure-recovery. Once the trajectory contains lookup result pong, stop calling lookup and call finish. A separate step will extract the answer pong. Do not answer directly."
         ),
         [tool],
         lm: lm,
-        mode: :dspy_3_2_1,
+        mode: :dspy,
         tool_policy: [:lookup],
         max_iters: 4
       )

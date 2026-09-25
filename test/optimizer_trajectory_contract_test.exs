@@ -418,7 +418,7 @@ defmodule Imp.Optimizer.TrajectoryContractTest do
 
   test "the general Imp persistence facade uses the canonical trajectory codec" do
     trajectory = Trajectory.project(:gepa, %{index: 0, score: 1.0, trace: []})
-    assert %Trajectory{} = restored = trajectory |> Imp.dump() |> Imp.load()
+    assert %Trajectory{} = restored = trajectory |> Imp.dump() |> Imp.load!()
     assert Trajectory.dump(restored) == Trajectory.dump(trajectory)
   end
 

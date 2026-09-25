@@ -87,15 +87,12 @@ defmodule Imp.Optimize.Anything.RefinerTest do
     secret = "sk-sensitive-value-123456"
 
     lm =
-      %{
-        module: Imp.LM.Static,
-        opts: [
-          handler: fn messages, _opts ->
-            send(parent, {:lm_prompt, messages})
-            raise "provider failed with #{secret}"
-          end
-        ]
-      }
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          send(parent, {:lm_prompt, messages})
+          raise "provider failed with #{secret}"
+        end
+      )
 
     result =
       execute(
@@ -203,15 +200,12 @@ defmodule Imp.Optimize.Anything.RefinerTest do
   defp static_lm(outputs, receiver \\ nil) do
     counter = start_supervised!({Agent, fn -> 0 end})
 
-    %{
-      module: Imp.LM.Static,
-      opts: [
-        handler: fn [%{content: prompt}], _opts ->
-          index = Agent.get_and_update(counter, &{&1, &1 + 1})
-          if receiver, do: send(receiver, {:lm_call, index + 1, prompt})
-          Enum.fetch!(outputs, index)
-        end
-      ]
-    }
+    Imp.LM.Static.new(
+      handler: fn [%{content: prompt}], _opts ->
+        index = Agent.get_and_update(counter, &{&1, &1 + 1})
+        if receiver, do: send(receiver, {:lm_call, index + 1, prompt})
+        Enum.fetch!(outputs, index)
+      end
+    )
   end
 end

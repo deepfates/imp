@@ -40,6 +40,6 @@ defmodule Mix.Tasks.ImpAcp.Demo do
         end
       )
 
-    Imp.react_v2("question -> answer", [tool], lm: lm, max_iters: 2)
+    Imp.react("question -> answer", [tool], lm: lm, max_iters: 2)
   end
 end

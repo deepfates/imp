@@ -46,7 +46,8 @@ defmodule ToolSchemaRuntimeTest do
         %{tool_calls: [%{name: "lookup", arguments: %{}}]}
       end)
 
-    react = Imp.react("question -> answer", [schema_tool(parent)], lm: lm, max_iters: 1)
+    react =
+      Imp.Predict.ReAct.new("question -> answer", [schema_tool(parent)], lm: lm, max_iters: 1)
 
     assert {:error, {:missing_required, ["query"]}} = Imp.call(react, %{question: "q"})
     refute_received {:schema_tool_called, _input}
@@ -64,7 +65,7 @@ defmodule ToolSchemaRuntimeTest do
         end)
       end)
 
-    react = Imp.react_v2("question -> answer", [schema_tool(parent)], lm: lm, max_iters: 2)
+    react = Imp.react("question -> answer", [schema_tool(parent)], lm: lm, max_iters: 2)
 
     assert {:ok, prediction} = Imp.call(react, %{question: "q"})
     assert Imp.get(prediction, :answer) == "recovered"
@@ -175,10 +176,7 @@ defmodule ToolSchemaRuntimeTest do
   end
 
   defp static_lm(handler) do
-    %{
-      module: Imp.LM.Static,
-      opts: [handler: fn messages, _opts -> handler.(messages) end]
-    }
+    Imp.LM.Static.new(handler: fn messages, _opts -> handler.(messages) end)
   end
 
   defp finish_action, do: %{action: %{tool_name: "Finish", tool_input_query: %{}}}

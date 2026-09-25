@@ -117,7 +117,7 @@ defmodule Imp.LocalSIMBAFeedbackTRECExampleTest do
     source = apply(LocalSIMBAFeedbackTREC.Runner, :source_program, [contract])
 
     assert :ok = Imp.save!(source, path)
-    loaded = Imp.load!(path)
+    loaded = Imp.read!(path)
     lm = Imp.ProgramAccess.lm(loaded)
 
     assert lm.model == "ollama:llama3.2:3b"

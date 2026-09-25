@@ -30,7 +30,7 @@ defmodule SavingRebindTest do
     assert :ok = Imp.save!(optimized, artifact, registry: registry)
 
     loaded =
-      Task.async(fn -> Imp.load!(artifact, registry: registry) end)
+      Task.async(fn -> Imp.read!(artifact, registry: registry) end)
       |> Task.await()
 
     rebound = Imp.with_lm(loaded, static_lm("fresh-runtime"))
@@ -40,9 +40,9 @@ defmodule SavingRebindTest do
 
     assert [
              %Imp.Optimizer.KNNFewShot.Program{
-               student: %Imp.Predict.Predict{lm: %{module: Imp.LM.Static}}
+               student: %Imp.Predict{lm: %Imp.LM.Static{}}
              },
-             %Imp.Predict.Predict{lm: %{module: Imp.LM.Static}}
+             %Imp.Predict{lm: %Imp.LM.Static{}}
            ] = rebound.programs
   end
 
@@ -57,7 +57,7 @@ defmodule SavingRebindTest do
     loaded =
       program
       |> Imp.dump(registry: registry)
-      |> Imp.load(registry: registry)
+      |> Imp.load!(registry: registry)
       |> Imp.with_lm(static_lm("rebound"))
 
     assert {:ok, prediction} = Imp.call(loaded, %{question: "works?"})
@@ -167,6 +167,6 @@ defmodule SavingRebindTest do
         do: answer,
         else: fn _messages, _opts -> %{answer: answer} end
 
-    %{module: Imp.LM.Static, opts: [handler: handler]}
+    Imp.LM.Static.new(handler: handler)
   end
 end

@@ -35,14 +35,12 @@ defmodule Imp.Optimizer.DemoCandidatesTest do
   end
 
   test "bootstraps only metric-accepted predictions and preserves labeled capacity" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           if inspect(messages) =~ "good", do: %{answer: "yes"}, else: %{answer: "no"}
         end
-      ]
-    }
+      )
 
     program = Imp.predict("question -> answer", lm: lm)
 
@@ -81,7 +79,7 @@ defmodule Imp.Optimizer.DemoCandidatesTest do
   end
 
   test "zero-shot candidate building still produces grounding demos for proposal" do
-    lm = %{module: Imp.LM.Static, opts: [handler: fn _, _ -> %{answer: "yes"} end]}
+    lm = Imp.LM.Static.new(handler: fn _, _ -> %{answer: "yes"} end)
     program = Imp.predict("question -> answer", lm: lm)
     example = Imp.example(question: "q", answer: "yes") |> Imp.with_inputs(:question)
 
@@ -98,7 +96,7 @@ defmodule Imp.Optimizer.DemoCandidatesTest do
   end
 
   test "keeps the canonical third candidate in source trainset order" do
-    lm = %{module: Imp.LM.Static, opts: [handler: fn _, _ -> %{answer: "yes"} end]}
+    lm = Imp.LM.Static.new(handler: fn _, _ -> %{answer: "yes"} end)
     program = Imp.predict("question -> answer", lm: lm)
 
     trainset =

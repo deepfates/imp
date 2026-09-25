@@ -8,8 +8,6 @@ defmodule Imp.BenchmarkTruth.CampaignBudgetTest do
     defstruct [:owner]
 
     @impl true
-    def generate(_messages, _opts), do: {:error, :counting_lm_instance_required}
-
     def generate(%__MODULE__{owner: owner}, _messages, _opts) do
       send(owner, :provider_called)
       {:ok, %{answer: "ok"}}
@@ -21,8 +19,6 @@ defmodule Imp.BenchmarkTruth.CampaignBudgetTest do
     defstruct []
 
     @impl true
-    def generate(_messages, _opts), do: {:error, :telemetry_lm_instance_required}
-
     def generate(%__MODULE__{}, _messages, _opts) do
       :telemetry.execute(
         [:req_llm, :token_usage],
@@ -39,7 +35,7 @@ defmodule Imp.BenchmarkTruth.CampaignBudgetTest do
     defstruct []
 
     @impl true
-    def generate(_messages, _opts), do: {:error, :timeout}
+    def generate(_lm, _messages, _opts), do: {:error, :timeout}
   end
 
   test "public facade constructs the packaged budget and LM decorator" do

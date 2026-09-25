@@ -192,8 +192,11 @@ defmodule Imp.Clients.ReqLLM do
   end
 
   @impl true
-  def generate(messages, opts) do
-    opts = validate_call_opts!(opts, "#{inspect(__MODULE__)}.generate/2")
+  def generate(lm, messages, opts)
+
+  # The module itself, with the model named in the call's options.
+  def generate(__MODULE__, messages, opts) do
+    opts = validate_call_opts!(opts, "#{inspect(__MODULE__)}.generate/3")
 
     case Keyword.fetch(opts, :model) do
       {:ok, model} -> generate(new(model, opts), messages, opts)

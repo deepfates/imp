@@ -329,10 +329,7 @@ defmodule TaskSupervisionTest do
   test "parallel prediction uses the Imp task boundary" do
     program =
       Imp.predict("question -> answer",
-        lm: %{
-          module: Imp.LM.Static,
-          opts: [handler: fn _messages, _opts -> %{answer: inspect(self())} end]
-        }
+        lm: Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: inspect(self())} end)
       )
 
     results =

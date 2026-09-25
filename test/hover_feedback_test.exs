@@ -10,7 +10,7 @@ defmodule Imp.BenchmarkTruth.HoverFeedbackTest do
   end
 
   test "accepts only the complete source-shaped HoVer predictor graph" do
-    lm = %{module: Imp.LM.Static, opts: [handler: fn _, _ -> %{} end]}
+    lm = Imp.LM.Static.new(handler: fn _, _ -> %{} end)
     program = HoverMultiHop.from_retriever(lm, fn _, _ -> {:ok, []} end)
 
     assert {:ok, callbacks} = HoverFeedback.callbacks_for(program)

@@ -63,12 +63,12 @@ defmodule Imp.Optimizer.Avatar do
       max_negative_inputs: opts[:max_negative_inputs],
       optimize_for: opts[:optimize_for],
       comparator:
-        Imp.Predict.Predict.new(
+        Imp.Predict.new(
           comparator_signature(),
           maybe_lm(common_opts, opts[:comparator_lm] || default_lm)
         ),
       rewriter:
-        Imp.Predict.Predict.new(
+        Imp.Predict.new(
           rewrite_signature(),
           maybe_lm(common_opts, opts[:rewrite_lm] || default_lm)
         )
@@ -250,7 +250,7 @@ defmodule Imp.Optimizer.Avatar do
       neg_input_with_metrics: Enum.map(negative, &Map.from_struct/1)
     }
 
-    result = Imp.Predict.Predict.call(optimizer.comparator, inputs)
+    result = Imp.Predict.call(optimizer.comparator, inputs)
     Imp.OperationalSafetyError.raise_if_present!(result)
 
     case result do
@@ -265,7 +265,7 @@ defmodule Imp.Optimizer.Avatar do
       feedback: feedback
     }
 
-    result = Imp.Predict.Predict.call(optimizer.rewriter, inputs)
+    result = Imp.Predict.call(optimizer.rewriter, inputs)
     Imp.OperationalSafetyError.raise_if_present!(result)
 
     case result do

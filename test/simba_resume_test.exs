@@ -381,9 +381,8 @@ defmodule Imp.Optimizer.SIMBA.ResumeTest do
   end
 
   defp fixture(state, metric \\ Imp.Metrics.exact_match(:answer), identity \\ metric_identity()) do
-    task_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    task_lm =
+      Imp.LM.Static.new(
         handler: fn messages, opts ->
           Agent.update(state, &Map.update!(&1, :task_calls, fn count -> count + 1 end))
           prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -393,12 +392,10 @@ defmodule Imp.Optimizer.SIMBA.ResumeTest do
             do: %{answer: "yes"},
             else: %{answer: "no"}
         end
-      ]
-    }
+      )
 
-    prompt_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    prompt_lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           Agent.update(state, &Map.update!(&1, :prompt_calls, fn count -> count + 1 end))
 
@@ -407,8 +404,7 @@ defmodule Imp.Optimizer.SIMBA.ResumeTest do
             module_advice: %{main: "Answer yes."}
           }
         end
-      ]
-    }
+      )
 
     initial_demo =
       Imp.example(question: "seed", answer: "yes") |> Imp.with_inputs(:question)

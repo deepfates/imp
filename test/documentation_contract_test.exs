@@ -305,10 +305,10 @@ defmodule DocumentationContractTest do
   end
 
   test "README common workflow snippets compose as one coherent path" do
-    typed_lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{sentiment: "positive", confidence: 0.9} end]
-    }
+    typed_lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts -> %{sentiment: "positive", confidence: 0.9} end
+      )
 
     signature =
       Imp.signature(
@@ -322,10 +322,7 @@ defmodule DocumentationContractTest do
     assert Imp.get(typed_prediction, :sentiment) == "positive"
     assert Imp.get(typed_prediction, :confidence) == 0.9
 
-    qa_lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-    }
+    qa_lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "Paris"} end)
 
     qa_program = Imp.predict("question -> answer", lm: qa_lm)
 
@@ -349,14 +346,12 @@ defmodule DocumentationContractTest do
     assert %Imp.Optimizer.Report{optimizer: :random_search} =
              Imp.Optimizer.Report.fetch(compiled)
 
-    tool_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    tool_lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           %{tool_calls: [%{name: :submit, arguments: %{answer: "Paris"}}]}
         end
-      ]
-    }
+      )
 
     lookup =
       Imp.tool(:lookup, "lookup facts", fn %{query: "capital-france"} ->
@@ -364,7 +359,7 @@ defmodule DocumentationContractTest do
       end)
 
     agent =
-      Imp.react("question -> answer: short_span", [lookup],
+      Imp.Predict.ReAct.new("question -> answer: short_span", [lookup],
         lm: tool_lm,
         tool_policy: [:lookup, :submit]
       )
@@ -460,17 +455,15 @@ defmodule DocumentationContractTest do
         ]
       end)
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           Agent.get_and_update(actions, fn
             [action | rest] -> {action, rest}
             [] -> {%{tool_calls: []}, []}
           end)
         end
-      ]
-    }
+      )
 
     lookup =
       Imp.tool(
@@ -484,7 +477,11 @@ defmodule DocumentationContractTest do
         }
       )
 
-    program = Imp.react("question -> answer", [lookup], lm: lm, tool_policy: [:lookup, :submit])
+    program =
+      Imp.Predict.ReAct.new("question -> answer", [lookup],
+        lm: lm,
+        tool_policy: [:lookup, :submit]
+      )
 
     assert {:ok, prediction} =
              Imp.call(program, %{question: "What is the capital of France?"})
@@ -493,10 +490,7 @@ defmodule DocumentationContractTest do
   end
 
   test "the documented Predict and ChainOfThought paths execute" do
-    predict_lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-    }
+    predict_lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "Paris"} end)
 
     program =
       "question -> answer: short_span"
@@ -506,10 +500,10 @@ defmodule DocumentationContractTest do
     assert {:ok, pred} = Imp.call(program, %{question: "Capital of France?"})
     assert Imp.get(pred, :answer) == "Paris"
 
-    cot_lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{reasoning: "add two and two", answer: "4"} end]
-    }
+    cot_lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts -> %{reasoning: "add two and two", answer: "4"} end
+      )
 
     cot = Imp.chain_of_thought("question -> answer", lm: cot_lm)
 
@@ -519,10 +513,7 @@ defmodule DocumentationContractTest do
   end
 
   test "the documented evaluate and optimize path executes through the facade" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-    }
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "Paris"} end)
 
     program = Imp.predict("question -> answer", lm: lm)
 
@@ -557,7 +548,7 @@ defmodule DocumentationContractTest do
     program = Imp.predict("question -> answer")
 
     assert :ok = Imp.Saving.save!(program, path)
-    assert %Imp.Predict.Predict{} = Imp.Saving.load!(path)
+    assert %Imp.Predict{} = Imp.Saving.read!(path)
   end
 
   test "the documented RAG path retrieves context, records metadata, and stays portable" do
@@ -566,9 +557,8 @@ defmodule DocumentationContractTest do
       %{text: "Germany has capital Berlin."}
     ]
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
 
@@ -576,8 +566,7 @@ defmodule DocumentationContractTest do
             do: %{answer: "Paris"},
             else: %{answer: "unknown"}
         end
-      ]
-    }
+      )
 
     retriever = Imp.Retrieve.Memory.new(docs, k: 1)
 
@@ -605,7 +594,7 @@ defmodule DocumentationContractTest do
     on_exit(fn -> File.rm(path) end)
 
     assert :ok = Imp.Saving.save!(program, path)
-    assert %Imp.Predict.RAG{retriever: %Imp.Retrieve.Memory{}} = Imp.Saving.load!(path)
+    assert %Imp.Predict.RAG{retriever: %Imp.Retrieve.Memory{}} = Imp.Saving.read!(path)
   end
 
   test "the documented Optimize Anything path produces an improving result" do

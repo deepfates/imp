@@ -13,10 +13,7 @@ defmodule Imp.Predict.MultiChainComparison do
 
   ## Example
 
-      iex> lm = %{
-      ...>   module: Imp.LM.Static,
-      ...>   opts: [handler: fn _messages, _opts -> %{rationale: "two attempts agree", answer: "Paris"} end]
-      ...> }
+      iex> lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{rationale: "two attempts agree", answer: "Paris"} end)
       iex> program = Imp.Predict.MultiChainComparison.new("question -> answer", lm: lm, m: 2)
       iex> {:ok, prediction} =
       ...>   Imp.Predict.MultiChainComparison.call(program, %{
@@ -78,7 +75,7 @@ defmodule Imp.Predict.MultiChainComparison do
       |> Imp.Signature.prepend_output(%{name: :rationale, desc: "Corrected reasoning"})
 
     %__MODULE__{
-      predict: Imp.Predict.Predict.new(comparison_signature, predict_opts),
+      predict: Imp.Predict.new(comparison_signature, predict_opts),
       last_key: last_key,
       m: m
     }
@@ -151,7 +148,7 @@ defmodule Imp.Predict.MultiChainComparison do
           |> Map.drop([:completions, "completions"])
           |> Map.merge(attempts)
 
-        Imp.Predict.Predict.call(mcc.predict, inputs)
+        Imp.Predict.call(mcc.predict, inputs)
     end
   end
 

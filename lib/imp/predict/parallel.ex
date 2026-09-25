@@ -13,36 +13,30 @@ defmodule Imp.Predict.Parallel do
   `{:error, reason}` tuples so one bad input does not bring down the whole
   batch.
 
-      iex> lm = %{
-      ...>   module: Imp.LM.Static,
-      ...>   opts: [
-      ...>     handler: fn messages, _opts ->
-      ...>       prompt = Enum.map_join(messages, "\\n", &Map.fetch!(&1, :content))
+      iex> lm = Imp.LM.Static.new(
+      ...>   handler: fn messages, _opts ->
+      ...>     prompt = Enum.map_join(messages, "\\n", &Map.fetch!(&1, :content))
       ...>
-      ...>       cond do
-      ...>         prompt =~ "alpha" -> %{answer: "A"}
-      ...>         prompt =~ "beta" -> %{answer: "B"}
-      ...>       end
+      ...>     cond do
+      ...>       prompt =~ "alpha" -> %{answer: "A"}
+      ...>       prompt =~ "beta" -> %{answer: "B"}
       ...>     end
-      ...>   ]
-      ...> }
-      iex> program = Imp.Predict.Predict.new("question -> answer", lm: lm)
+      ...>   end
+      ...> )
+      iex> program = Imp.Predict.new("question -> answer", lm: lm)
       iex> results = Imp.Predict.Parallel.map(program, [%{question: "alpha"}, %{question: "beta"}])
       iex> Enum.map(results, fn {:ok, prediction} -> Imp.Prediction.get(prediction, :answer) end)
       ["A", "B"]
 
   Bad inputs remain local to their result slot:
 
-      iex> lm = %{
-      ...>   module: Imp.LM.Static,
-      ...>   opts: [
-      ...>     handler: fn messages, _opts ->
-      ...>       prompt = Enum.map_join(messages, "\\n", &Map.fetch!(&1, :content))
-      ...>       if prompt =~ "bad", do: raise("boom"), else: %{answer: "ok"}
-      ...>     end
-      ...>   ]
-      ...> }
-      iex> program = Imp.Predict.Predict.new("question -> answer", lm: lm)
+      iex> lm = Imp.LM.Static.new(
+      ...>   handler: fn messages, _opts ->
+      ...>     prompt = Enum.map_join(messages, "\\n", &Map.fetch!(&1, :content))
+      ...>     if prompt =~ "bad", do: raise("boom"), else: %{answer: "ok"}
+      ...>   end
+      ...> )
+      iex> program = Imp.Predict.new("question -> answer", lm: lm)
       iex> results = Imp.Predict.Parallel.map(program, [%{question: "ok"}, %{question: "bad"}])
       iex> match?([{:ok, %Imp.Prediction{}}, {:error, {:lm_failed, Imp.LM.Static, %RuntimeError{}}}], results)
       true

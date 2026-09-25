@@ -20,10 +20,7 @@ defmodule Imp.SettingsIsolationRegressionTest do
   defp compile_demos do
     program =
       Imp.predict("question -> answer",
-        lm: %{
-          module: Imp.LM.Static,
-          opts: [handler: fn _messages, _opts -> %{answer: "generated"} end]
-        }
+        lm: Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "generated"} end)
       )
 
     example = Imp.example(question: "q", answer: "gold") |> Imp.with_inputs(:question)
@@ -35,12 +32,7 @@ defmodule Imp.SettingsIsolationRegressionTest do
   end
 
   defp poison_global_lm do
-    Imp.configure(
-      lm: %{
-        module: Imp.LM.Static,
-        opts: [handler: fn _messages, _opts -> %{answer: "POISON"} end]
-      }
-    )
+    Imp.configure(lm: Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "POISON"} end))
   end
 
   test "BootstrapFewShot demo capture is invariant to a leaked global :lm" do

@@ -246,7 +246,7 @@ defmodule Imp.Optimizer.Playbook.Campaign do
         if context.stage in [:baseline_audit, :candidate_audit] do
           program
           |> Imp.Saving.dump(registry: registry)
-          |> Imp.Saving.load(registry: registry)
+          |> Imp.Saving.load!(registry: registry)
           |> rebind_lm(evaluator_lm)
         else
           program
@@ -401,7 +401,7 @@ defmodule Imp.Optimizer.Playbook.Campaign do
 
   defp rebind_lm(program, lm) do
     Enum.reduce(Imp.ProgramParameters.predictors(program), program, fn %{name: name}, acc ->
-      Imp.ProgramParameters.update_predictor(acc, name, &Imp.Predict.Predict.with_lm(&1, lm))
+      Imp.ProgramParameters.update_predictor(acc, name, &Imp.Predict.with_lm(&1, lm))
     end)
   end
 

@@ -232,10 +232,7 @@ defmodule AvatarTest do
   end
 
   defp actor_lm(handler) do
-    %{
-      module: Imp.LM.Static,
-      opts: [handler: fn messages, _opts -> handler.(prompt(messages)) end]
-    }
+    Imp.LM.Static.new(handler: fn messages, _opts -> handler.(prompt(messages)) end)
   end
 
   defp prompt(messages), do: Enum.map_join(messages, "\n", & &1.content)

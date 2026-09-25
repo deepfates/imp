@@ -8,8 +8,6 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuardTest do
     defstruct [:budget, :actual_model]
 
     @impl true
-    def generate(_messages, _opts), do: {:error, :checked_fixture_instance_required}
-
     def generate(%__MODULE__{} = lm, messages, opts) do
       {:ok, reservation} =
         Imp.BenchmarkTruth.CampaignBudget.reserve(lm.budget, messages, opts)

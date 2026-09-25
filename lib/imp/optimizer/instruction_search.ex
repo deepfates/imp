@@ -96,8 +96,8 @@ defmodule Imp.Optimizer.InstructionSearch do
     kind, reason -> {:error, {kind, reason}}
   end
 
-  def put_instruction(%Imp.Predict.Predict{signature: signature} = program, instruction) do
-    Imp.Predict.Predict.with_signature(program, %{signature | instructions: instruction})
+  def put_instruction(%Imp.Predict{signature: signature} = program, instruction) do
+    Imp.Predict.with_signature(program, %{signature | instructions: instruction})
   end
 
   def put_instruction(%Imp.Predict.ChainOfThought{predict: predict} = program, instruction) do
@@ -134,7 +134,7 @@ defmodule Imp.Optimizer.InstructionSearch do
           "instruction search expects an Imp program struct, got: #{inspect(program)}"
   end
 
-  def current_instruction(%Imp.Predict.Predict{signature: signature}),
+  def current_instruction(%Imp.Predict{signature: signature}),
     do: signature.instructions
 
   def current_instruction(%Imp.Predict.ChainOfThought{predict: predict}),

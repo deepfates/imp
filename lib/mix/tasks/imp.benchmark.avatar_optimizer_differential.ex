@@ -362,12 +362,9 @@ defmodule Mix.Tasks.Imp.Benchmark.AvatarOptimizerDifferential do
   end
 
   defp static_lm(handler) do
-    %{
-      module: Imp.LM.Static,
-      opts: [
-        handler: fn messages, _opts -> handler.(Enum.map_join(messages, "\n", & &1.content)) end
-      ]
-    }
+    Imp.LM.Static.new(
+      handler: fn messages, _opts -> handler.(Enum.map_join(messages, "\n", & &1.content)) end
+    )
   end
 
   defp credential_env_name?(name) do

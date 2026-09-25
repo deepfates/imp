@@ -26,11 +26,32 @@ defmodule Imp.LM do
   provider's, so treat it as evidence to inspect, not as a contract.
   """
 
-  @callback generate(messages :: list(map()), opts :: keyword()) ::
+  @typedoc """
+  An LM: a struct whose module implements this behaviour, or such a module
+  itself for a client that holds no configuration. Every callback receives the
+  LM as its first argument, the struct or the module as it was given.
+  """
+  @type t :: struct() | module()
+
+  @doc """
+  Sends `messages` and returns the model's output: a map of fields, a string,
+  an `Imp.Prediction`, or, when `opts` asks for several completions (`:n`), a
+  list of them.
+  """
+  @callback generate(lm :: t(), messages :: [map()], opts :: keyword()) ::
               {:ok, map() | binary() | Imp.Prediction.t() | list()} | {:error, term()}
-  @callback request(lm :: term(), request :: Imp.Core.LMRequest.t()) ::
+
+  @doc """
+  Executes one provider-neutral request. A client that implements it gets
+  the request's configuration and metadata whole; one that does not is called
+  through `c:generate/3`.
+  """
+  @callback request(lm :: t(), request :: Imp.Core.LMRequest.t()) ::
               {:ok, Imp.Core.LMResponse.t()} | {:error, term()}
-  @callback stream(lm :: term(), messages :: list(map()), opts :: keyword()) :: Enumerable.t()
+
+  @doc "Streams the output of one request, for `Imp.stream/3`."
+  @callback stream(lm :: t(), messages :: [map()], opts :: keyword()) :: Enumerable.t()
+
   @optional_callbacks request: 2, stream: 3
 
   @doc false
@@ -41,8 +62,8 @@ defmodule Imp.LM do
   #
   #   * a struct whose module exports `response_format_capability/1` -> ask it,
   #     so fixtures and custom clients can declare their own tier.
-  #   * anything else (a bare arity-2 callback, a plain module, a configured
-  #     `%{module:, opts:}` map) -> `Imp.LM.Capability.none/0`, the DSPy
+  #   * anything else (a module, or a struct whose module does not declare
+  #     one) -> `Imp.LM.Capability.none/0`, the DSPy
   #     `BaseLM` default, so no `response_format` is sent.
   @spec response_format_capability(term()) :: Imp.LM.Capability.t()
   def response_format_capability(%module{} = lm) do
@@ -220,115 +241,29 @@ defmodule Imp.LM do
   @doc false
   def validate_lm(nil), do: {:ok, nil}
 
-  def validate_lm(module) when is_atom(module) do
-    if Code.ensure_loaded?(module) and function_exported?(module, :generate, 2) do
-      {:ok, module}
-    else
-      {:error, "expected an LM module exporting generate/2"}
-    end
+  def validate_lm(lm) do
+    if lm?(lm),
+      do: {:ok, lm},
+      else: {:error, "expected nil, or an LM struct or module implementing Imp.LM generate/3"}
   end
 
-  def validate_lm(fun) when is_function(fun, 2) do
-    warn_deprecated_shape(:bare_fun)
-    {:ok, fun}
+  defp lm?(%module{}), do: implements_generate?(module)
+  defp lm?(module) when is_atom(module), do: implements_generate?(module)
+  defp lm?(_lm), do: false
+
+  defp implements_generate?(module),
+    do: Code.ensure_loaded?(module) and function_exported?(module, :generate, 3)
+
+  defp dispatch_generate(lm, messages, opts) do
+    module = lm_module(lm)
+
+    if lm?(lm),
+      do: call_lm(fn -> module.generate(lm, messages, opts) end, module),
+      else: {:error, {:not_an_lm, lm}}
   end
 
-  def validate_lm(%module{} = lm) do
-    if Code.ensure_loaded?(module) and
-         (function_exported?(module, :generate, 3) or function_exported?(module, :generate, 2)) do
-      {:ok, lm}
-    else
-      {:error, "expected an LM struct whose module exports generate/3 or generate/2"}
-    end
-  end
-
-  def validate_lm(%{module: module, opts: opts} = lm) when is_atom(module) do
-    warn_deprecated_shape(:module_opts_map)
-
-    cond do
-      not Keyword.keyword?(opts) ->
-        {:error, "expected configured LM :opts to be a keyword list"}
-
-      Code.ensure_loaded?(module) and function_exported?(module, :generate, 2) ->
-        {:ok, lm}
-
-      true ->
-        {:error, "expected configured LM :module to export generate/2"}
-    end
-  end
-
-  def validate_lm(_lm) do
-    {:error, "expected nil, an LM module, or an LM struct"}
-  end
-
-  @deprecated_shape_messages %{
-    module_opts_map:
-      "the %{module: module, opts: keyword} LM shape is deprecated; " <>
-        "use an LM struct instead (for example Imp.LM.Static.new(opts) or Imp.req_llm/2). " <>
-        "Support will be removed in a future release.",
-    bare_fun:
-      "passing a bare arity-2 function as an LM is deprecated; " <>
-        "use an LM struct instead (for example Imp.LM.Static.new(handler: fun)). " <>
-        "Support will be removed in a future release."
-  }
-
-  @doc false
-  # Warns once per VM for an LM shape kept only for compatibility.
-  # `reset_deprecation_warnings/0` re-arms it, for tests.
-  def warn_deprecated_shape(shape) do
-    key = {__MODULE__, :deprecated_shape_warned, shape}
-
-    unless :persistent_term.get(key, false) do
-      :persistent_term.put(key, true)
-      require Logger
-      Logger.warning("Imp.LM: " <> Map.fetch!(@deprecated_shape_messages, shape))
-    end
-
-    :ok
-  end
-
-  @doc false
-  def reset_deprecation_warnings do
-    for shape <- Map.keys(@deprecated_shape_messages) do
-      :persistent_term.erase({__MODULE__, :deprecated_shape_warned, shape})
-    end
-
-    :ok
-  end
-
-  defp dispatch_generate(module, messages, opts) when is_atom(module) do
-    if Code.ensure_loaded?(module) and function_exported?(module, :generate, 2) do
-      call_lm(fn -> module.generate(messages, opts) end, module)
-    else
-      {:error, {:not_an_lm, module}}
-    end
-  end
-
-  defp dispatch_generate(%module{} = lm, messages, opts) do
-    cond do
-      Code.ensure_loaded?(module) and function_exported?(module, :generate, 3) ->
-        call_lm(fn -> module.generate(lm, messages, opts) end, module)
-
-      Code.ensure_loaded?(module) and function_exported?(module, :generate, 2) ->
-        call_lm(fn -> module.generate(messages, opts) end, module)
-
-      true ->
-        {:error, {:not_an_lm, module}}
-    end
-  end
-
-  defp dispatch_generate(%{module: module, opts: client_opts}, messages, opts) do
-    warn_deprecated_shape(:module_opts_map)
-    client_opts = validate_opts!(client_opts, "Imp.LM.generate/3 client :opts")
-    dispatch_generate(module, messages, Keyword.merge(client_opts, opts))
-  end
-
-  defp dispatch_generate(fun, messages, opts) when is_function(fun, 2) do
-    warn_deprecated_shape(:bare_fun)
-    call_lm(fn -> fun.(messages, opts) end, fun)
-  end
-
-  defp dispatch_generate(lm, _messages, _opts), do: {:error, {:not_an_lm, lm}}
+  defp lm_module(%module{}), do: module
+  defp lm_module(module), do: module
 
   defp dispatch_request(%module{} = lm, %Imp.Core.LMRequest{} = request) do
     if Code.ensure_loaded?(module) and function_exported?(module, :request, 2) do
@@ -385,7 +320,6 @@ defmodule Imp.LM do
   end
 
   defp lm_name(lm) when is_atom(lm), do: lm
-  defp lm_name(fun) when is_function(fun), do: :anonymous_lm
   defp lm_name(%module{}), do: module
   defp lm_name(other), do: other
 

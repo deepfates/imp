@@ -11,29 +11,31 @@ defmodule PredictMultiCompletionUsageTest do
 
   use ExUnit.Case, async: true
 
+  defp capture_lm(%Imp.Test.FunLM{fun: response_fun}), do: capture_lm(response_fun)
+
   defp capture_lm(response_fun) do
     test_pid = self()
 
-    fn messages, opts ->
+    Imp.Test.FunLM.new(fn messages, opts ->
       send(test_pid, {:lm_call, messages, opts})
       response_fun.(messages, opts)
-    end
+    end)
   end
 
   defp scripted_multi_lm(responses) do
-    fn _messages, opts ->
+    Imp.Test.FunLM.new(fn _messages, opts ->
       n = Keyword.get(opts, :n, 1)
       {:ok, Enum.take(responses, n)}
-    end
+    end)
   end
 
   describe "n= multi-completion loudness" do
     test "an LM that ignores :n and returns a single output is a loud error, not one quiet completion" do
-      lm = fn _messages, _opts -> {:ok, %{answer: "only one"}} end
-      program = Imp.Predict.Predict.new("question -> answer", lm: lm, config: [n: 3])
+      lm = Imp.Test.FunLM.new(fn _messages, _opts -> {:ok, %{answer: "only one"}} end)
+      program = Imp.Predict.new("question -> answer", lm: lm, config: [n: 3])
 
       assert {:error, {:multi_completion_not_returned, 3, message}} =
-               Imp.Predict.Predict.call(program, %{question: "q"})
+               Imp.Predict.call(program, %{question: "q"})
 
       assert message =~ "n=3"
     end
@@ -42,45 +44,45 @@ defmodule PredictMultiCompletionUsageTest do
       lm = scripted_multi_lm([%{answer: "good"}, "no field markers here at all"])
 
       program =
-        Imp.Predict.Predict.new("question -> answer",
+        Imp.Predict.new("question -> answer",
           lm: lm,
           config: [n: 2, json_fallback: false]
         )
 
       assert {:error,
               %Imp.AdapterParseError{kind: :missing_fields, completion_index: 1, trace: %{}}} =
-               Imp.Predict.Predict.call(program, %{question: "q"})
+               Imp.Predict.call(program, %{question: "q"})
     end
 
     test "an invalid :n is a loud error" do
-      lm = fn _messages, _opts -> {:ok, %{answer: "x"}} end
-      program = Imp.Predict.Predict.new("question -> answer", lm: lm, config: [n: 0])
+      lm = Imp.Test.FunLM.new(fn _messages, _opts -> {:ok, %{answer: "x"}} end)
+      program = Imp.Predict.new("question -> answer", lm: lm, config: [n: 0])
 
       assert {:error, {:invalid_multi_completion_count, 0}} =
-               Imp.Predict.Predict.call(program, %{question: "q"})
+               Imp.Predict.call(program, %{question: "q"})
     end
 
     test "n > 1 with unset or near-zero temperature bumps to 0.7; an explicit temperature survives" do
       lm = capture_lm(scripted_multi_lm([%{answer: "a"}, %{answer: "b"}]))
-      program = Imp.Predict.Predict.new("question -> answer", lm: lm, config: [n: 2])
+      program = Imp.Predict.new("question -> answer", lm: lm, config: [n: 2])
 
-      assert {:ok, _prediction} = Imp.Predict.Predict.call(program, %{question: "q"})
+      assert {:ok, _prediction} = Imp.Predict.call(program, %{question: "q"})
       assert_received {:lm_call, _messages, opts}
       assert opts[:temperature] == 0.7
 
       hot =
-        Imp.Predict.Predict.new("question -> answer", lm: lm, config: [n: 2, temperature: 1.0])
+        Imp.Predict.new("question -> answer", lm: lm, config: [n: 2, temperature: 1.0])
 
-      assert {:ok, _prediction} = Imp.Predict.Predict.call(hot, %{question: "q"})
+      assert {:ok, _prediction} = Imp.Predict.call(hot, %{question: "q"})
       assert_received {:lm_call, _messages, hot_opts}
       assert hot_opts[:temperature] == 1.0
 
       single =
-        Imp.Predict.Predict.new("question -> answer",
+        Imp.Predict.new("question -> answer",
           lm: capture_lm(fn _messages, _opts -> {:ok, %{answer: "a"}} end)
         )
 
-      assert {:ok, _prediction} = Imp.Predict.Predict.call(single, %{question: "q"})
+      assert {:ok, _prediction} = Imp.Predict.call(single, %{question: "q"})
       assert_received {:lm_call, _messages, single_opts}
       refute Keyword.has_key?(single_opts, :temperature)
     end
@@ -113,10 +115,10 @@ defmodule PredictMultiCompletionUsageTest do
 
   describe "usage ledger" do
     test "get_lm_usage is empty when :track_usage is off" do
-      lm = fn _messages, _opts -> {:ok, %{answer: "x"}} end
-      program = Imp.Predict.Predict.new("question -> answer", lm: lm)
+      lm = Imp.Test.FunLM.new(fn _messages, _opts -> {:ok, %{answer: "x"}} end)
+      program = Imp.Predict.new("question -> answer", lm: lm)
 
-      assert {:ok, prediction} = Imp.Predict.Predict.call(program, %{question: "q"})
+      assert {:ok, prediction} = Imp.Predict.call(program, %{question: "q"})
       assert Imp.Prediction.get_lm_usage(prediction) == %{}
     end
 
@@ -159,27 +161,27 @@ defmodule PredictMultiCompletionUsageTest do
   describe "per-call config (call/3)" do
     test "call-time config reaches the LM without mutating the program" do
       lm = capture_lm(fn _messages, _opts -> {:ok, %{answer: "x"}} end)
-      program = Imp.Predict.Predict.new("question -> answer", lm: lm, config: [temperature: 0.3])
+      program = Imp.Predict.new("question -> answer", lm: lm, config: [temperature: 0.3])
 
       assert {:ok, _prediction} =
-               Imp.Predict.Predict.call(program, %{question: "q"}, temperature: 0.9)
+               Imp.Predict.call(program, %{question: "q"}, temperature: 0.9)
 
       assert_received {:lm_call, _messages, override_opts}
       assert override_opts[:temperature] == 0.9
 
       # The program itself is untouched: a plain call/2 uses the stored config.
       assert program.config == [temperature: 0.3]
-      assert {:ok, _prediction} = Imp.Predict.Predict.call(program, %{question: "q"})
+      assert {:ok, _prediction} = Imp.Predict.call(program, %{question: "q"})
       assert_received {:lm_call, _messages, stored_opts}
       assert stored_opts[:temperature] == 0.3
     end
 
     test "non-keyword per-call config raises" do
-      lm = fn _messages, _opts -> {:ok, %{answer: "x"}} end
-      program = Imp.Predict.Predict.new("question -> answer", lm: lm)
+      lm = Imp.Test.FunLM.new(fn _messages, _opts -> {:ok, %{answer: "x"}} end)
+      program = Imp.Predict.new("question -> answer", lm: lm)
 
       assert_raise ArgumentError, ~r/per-call config as a keyword list/, fn ->
-        Imp.Predict.Predict.call(program, %{question: "q"}, %{temperature: 0.9})
+        Imp.Predict.call(program, %{question: "q"}, %{temperature: 0.9})
       end
     end
   end

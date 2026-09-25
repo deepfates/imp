@@ -68,8 +68,6 @@ defmodule Imp.GepaSuiteSpendGuard do
   end
 
   @impl true
-  def generate(_messages, _opts), do: {:error, :gepa_suite_spend_guard_instance_required}
-
   def generate(%__MODULE__{} = lm, messages, opts) do
     with {:ok, reservation_id, reservation_snapshot} <- reserve(lm) do
       emit_spend_event(:reserved, lm.role, reservation_id, %{

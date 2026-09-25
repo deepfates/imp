@@ -178,7 +178,7 @@ defmodule Imp.Optimize.Anything.ConfigTest do
   end
 
   test "persistence rejects runtime-only model, strategy, proposer, stopper, and callback values" do
-    reflection_lm = fn _messages, _opts -> {:ok, "proposal"} end
+    reflection_lm = Imp.Test.FunLM.new(fn _messages, _opts -> {:ok, "proposal"} end)
 
     assert_raise ArgumentError, ~r/runtime-only value/, fn ->
       Config.new(reflection: [reflection_lm: reflection_lm]) |> Config.to_map()

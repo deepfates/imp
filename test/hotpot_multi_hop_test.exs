@@ -6,38 +6,35 @@ defmodule Imp.BenchmarkTruth.HotpotMultiHopTest do
   alias Imp.{Module, Optimizer.Trace, Prediction, ProgramParameters}
 
   defp lm(parent) do
-    %{
-      module: Imp.LM.Static,
-      opts: [
-        handler: fn messages, _opts ->
-          prompt = Enum.map_join(messages, "\n", & &1.content)
-          send(parent, {:prompt, prompt})
+    Imp.LM.Static.new(
+      handler: fn messages, _opts ->
+        prompt = Enum.map_join(messages, "\n", & &1.content)
+        send(parent, {:prompt, prompt})
 
-          cond do
-            prompt =~ "summary_2" ->
-              %{reasoning: "The summaries identify the office.", answer: "Chief of Protocol"}
+        cond do
+          prompt =~ "summary_2" ->
+            %{reasoning: "The summaries identify the office.", answer: "Chief of Protocol"}
 
-            prompt =~ "summary_1" ->
-              %{
-                reasoning: "Search for the actor's office.",
-                query: "Shirley Temple government position"
-              }
+          prompt =~ "summary_1" ->
+            %{
+              reasoning: "Search for the actor's office.",
+              query: "Shirley Temple government position"
+            }
 
-            prompt =~ "context" ->
-              %{
-                reasoning: "Combine the bridge and office.",
-                summary: "Shirley Temple served as Chief of Protocol."
-              }
+          prompt =~ "context" ->
+            %{
+              reasoning: "Combine the bridge and office.",
+              summary: "Shirley Temple served as Chief of Protocol."
+            }
 
-            true ->
-              %{
-                reasoning: "Identify the actor named in the passage.",
-                summary: "Corliss Archer was portrayed by Shirley Temple."
-              }
-          end
+          true ->
+            %{
+              reasoning: "Identify the actor named in the passage.",
+              summary: "Corliss Archer was portrayed by Shirley Temple."
+            }
         end
-      ]
-    }
+      end
+    )
   end
 
   test "runs the source two-hop graph with k=7 and named traces" do

@@ -64,7 +64,7 @@ Prompts name types in neutral words, not Python annotations: `` `team` (one
 of: atlas, harbor) `` where DSPy writes `` `team` (Literal['atlas', 'harbor']) ``,
 "string", "integer", "true or false", "list of strings" and "object" for
 `str`, `int`, `bool`, `list[str]` and `dict[str, Any]`, and ReAct's
-`:dspy_3_2_1` mode lists tool arguments as JSON. `Imp.Adapter.FieldType`
+`:dspy` mode lists tool arguments as JSON. `Imp.Adapter.FieldType`
 declares the wording once. DSPy parity means the same behaviour and the same
 information in the prompt, not DSPy's text (`decisions.md`). The golden
 differential (`mix imp.benchmark.trace` against the pinned `dspy==3.2.1` venv)
@@ -73,7 +73,7 @@ compares prompts after putting DSPy's annotations into Imp's words
 39 of 42 cases match DSPy 3.2.1 on the rendered messages and the per-call
 request envelope — predict, ChainOfThought, typed/enum/list/dict fields,
 few-shot demos, conversation history, multi-line/CRLF/unicode instructions,
-RAG list inputs, ReAct `mode: :dspy_3_2_1`, the XML adapter, the TwoStep
+RAG list inputs, ReAct `mode: :dspy`, the XML adapter, the TwoStep
 adapter (both calls), and capability-gated `response_format`. The 3 that do
 not are Imp's default provider-native ReAct mode, an intentional design
 choice. `mix parity.check` runs it; it needs the pinned DSPy environment and

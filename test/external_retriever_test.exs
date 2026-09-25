@@ -282,6 +282,16 @@ defmodule ExternalRetrieverTest do
     refute_received :retriever_callback_ran
   end
 
+  test "a retriever module is called without options" do
+    retriever = Imp.Retrieve.Memory.new([%{text: "Paris"}])
+    assert {:ok, [%{text: "Paris"}]} = Imp.Retrieve.Memory.retrieve(retriever, "Paris")
+
+    http = Imp.Retrievers.HTTP.new("http://127.0.0.1:1/search", method: :get)
+
+    assert {:error, {:http_method_not_supported, Imp.Retrievers.HTTP, :get}} =
+             Imp.Retrievers.HTTP.retrieve(http, "Paris")
+  end
+
   test "memory retriever treats zero k as explicit no documents and rejects negative k" do
     retriever = Imp.Retrieve.Memory.new([%{text: "Paris"}], k: 0)
     assert {:ok, []} = Imp.Retrieve.retrieve(retriever, "Paris")
@@ -331,30 +341,6 @@ defmodule ExternalRetrieverTest do
 
     assert {:error, {:invalid_memory_document, [:not_a_pair]}} =
              Imp.Retrieve.retrieve(retriever, "Paris")
-  end
-
-  test "KNN retriever reports invalid options clearly" do
-    assert_raise ArgumentError, ~r/Imp\.Retrievers\.KNN\.new\/2: expected keyword options/, fn ->
-      Imp.Retrievers.KNN.new([], :not_options)
-    end
-
-    assert_raise ArgumentError,
-                 ~r/Imp\.Retrievers\.KNN\.new\/2 expects examples to be an enumerable/,
-                 fn ->
-                   Imp.Retrievers.KNN.new(:not_examples)
-                 end
-
-    assert_raise ArgumentError,
-                 ~r/Imp\.Retrievers\.KNN\.new\/2: invalid value for :k option: expected non negative integer/,
-                 fn ->
-                   Imp.Retrievers.KNN.new([], k: -1)
-                 end
-
-    assert_raise ArgumentError,
-                 ~r/Imp\.Retrievers\.KNN\.new\/2: invalid value for :field option: expected an atom\/string field name or a non-empty list of field names/,
-                 fn ->
-                   Imp.Retrievers.KNN.new([], field: [])
-                 end
   end
 
   test "generic HTTP retriever reports request transport decode and mapper failures" do

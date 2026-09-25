@@ -43,9 +43,8 @@ defmodule LocalServiceE2ETest do
         {200, %{documents: [doc]}}
       end)
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
 
@@ -55,8 +54,7 @@ defmodule LocalServiceE2ETest do
             true -> %{answer: "unknown"}
           end
         end
-      ]
-    }
+      )
 
     retriever = Imp.Retrievers.HTTP.new(base_url <> "/retrieve")
     program = Imp.predict("question, context -> answer", lm: lm) |> Imp.rag(retriever, k: 1)
@@ -90,9 +88,8 @@ defmodule LocalServiceE2ETest do
          }}
       end)
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
 
@@ -100,8 +97,7 @@ defmodule LocalServiceE2ETest do
             do: %{answer: "Lisbon", citation: "local"},
             else: %{answer: "unknown", citation: "none"}
         end
-      ]
-    }
+      )
 
     retriever = Imp.Retrievers.HTTP.new(base_url <> "/retrieve")
 
@@ -319,7 +315,7 @@ defmodule LocalServiceE2ETest do
 
     assert :ok = Imp.Saving.save!(compiled, path)
 
-    loaded = Imp.Saving.load!(path)
+    loaded = Imp.Saving.read!(path)
     File.rm(path)
 
     report = Imp.Optimizer.Report.fetch(loaded)
@@ -327,9 +323,8 @@ defmodule LocalServiceE2ETest do
     assert [%{example: %Imp.Example{} = example, selected?: true}] = report.candidates
     assert Imp.Example.get(example, :answer) == "Paris"
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
 
@@ -337,8 +332,7 @@ defmodule LocalServiceE2ETest do
             do: %{answer: "Paris"},
             else: %{answer: "unknown"}
         end
-      ]
-    }
+      )
 
     result =
       Imp.context([lm: lm, adapter: Imp.Adapter.Chat], fn ->
@@ -372,9 +366,8 @@ defmodule LocalServiceE2ETest do
 
     retriever = Imp.Retrieve.Memory.new(docs, k: 1)
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
           current = prompt |> String.split("[[ ## context ## ]]") |> List.last()
@@ -387,8 +380,7 @@ defmodule LocalServiceE2ETest do
             true -> %{answer: "unknown"}
           end
         end
-      ]
-    }
+      )
 
     # The compiled RAG is saved, so the LM comes from context: saving refuses a
     # Static-pinned program.
@@ -418,7 +410,7 @@ defmodule LocalServiceE2ETest do
       Path.join(System.tmp_dir!(), "imp-rag-compiled-#{System.unique_integer([:positive])}.json")
 
     assert :ok = Imp.Saving.save!(compiled, save_path)
-    loaded = Imp.Saving.load!(save_path)
+    loaded = Imp.Saving.read!(save_path)
     File.rm(save_path)
 
     reloaded =
@@ -442,7 +434,7 @@ defmodule LocalServiceE2ETest do
       end)
 
     lm = action_lm(actions)
-    program = Imp.react("question -> answer", [tool], lm: lm, max_iters: 3)
+    program = Imp.Predict.ReAct.new("question -> answer", [tool], lm: lm, max_iters: 3)
 
     assert {:ok, prediction} = Imp.Predict.ReAct.call(program, %{question: "capital?"})
     assert Imp.Prediction.get(prediction, :answer) == "Paris"
@@ -481,16 +473,13 @@ defmodule LocalServiceE2ETest do
   end
 
   defp action_lm(actions) do
-    %{
-      module: Imp.LM.Static,
-      opts: [
-        handler: fn _messages, _opts ->
-          Agent.get_and_update(actions, fn
-            [action | rest] -> {action, rest}
-            [] -> {%{tool_calls: []}, []}
-          end)
-        end
-      ]
-    }
+    Imp.LM.Static.new(
+      handler: fn _messages, _opts ->
+        Agent.get_and_update(actions, fn
+          [action | rest] -> {action, rest}
+          [] -> {%{tool_calls: []}, []}
+        end)
+      end
+    )
   end
 end
