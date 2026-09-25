@@ -159,8 +159,11 @@ builds its program with an explicit model.
 | `track_usage` | `false` | Record token counts and cost on each prediction (`Imp.Prediction.get_lm_usage/1`). |
 | `warn_on_type_mismatch` | `true` | Log a warning when an input does not match its declared type. |
 
-Any other key is stored as given, so a context can carry values of your own
-to code that reads them with `Imp.settings/0`. `Imp.settings/0` returns the
+`two_step_extraction_lm` is the second model `Imp.Adapter.TwoStep` uses.
+`Imp.configure/1` refuses any other key. `Imp.context/2` carries keys of your
+own as given, to code that reads them with `Imp.settings/0`, but refuses
+`:max_errors`, `:retriever` and `:callbacks` with a message saying where each
+belongs: they are options of the optimizer, the program and telemetry. `Imp.settings/0` returns the
 effective settings for the calling process.
 
 ## Cross-links
