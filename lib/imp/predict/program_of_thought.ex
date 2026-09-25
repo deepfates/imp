@@ -86,7 +86,9 @@ defmodule Imp.Predict.ProgramOfThought do
     }
 
     predict_opts =
-      Keyword.update!(opts, :metadata, &Map.put(&1, @max_iters_metadata_key, opts[:max_iters]))
+      opts
+      |> Predict.take_options()
+      |> Keyword.update!(:metadata, &Map.put(&1, @max_iters_metadata_key, opts[:max_iters]))
 
     %__MODULE__{
       signature: original,

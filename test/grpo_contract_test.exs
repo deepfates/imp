@@ -391,7 +391,7 @@ defmodule GRPOContractTest do
           model: "base-model",
           opts: [handler: fn _messages, _opts -> %{answer: "present"} end]
         },
-        json_fallback: false
+        config: [json_fallback: false]
       )
 
     optimizer =

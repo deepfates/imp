@@ -100,6 +100,10 @@ Ordinary Imp startup starts no protocol endpoint.
   `Imp.ACP.Local.start_link/1` raise `ArgumentError` for an option they do
   not know. A transport's own options for `Imp.ACP` go in
   `:transport_options`, and `:capabilities` is spelled `:agent_capabilities`.
+- `Imp.predict/2`, `Imp.chain_of_thought/2` and `Imp.configure/1` raise
+  `ArgumentError` for an option or setting they do not know. Request options
+  such as `:temperature` go under `config:`; a setting of your own goes
+  through `Imp.context/2`.
 - ReActV2 emits no `:final` event; `:run_finished` carries the prediction.
   `Imp.Trajectory.to_atif/2`'s `extra.outcome` is `extra.terminal_event`, and
   a tool result's `extra.outcome` is the recorded `Imp.Tool.outcome/1`

@@ -152,7 +152,9 @@ defmodule Imp.Predict.ReAct do
     }
 
     react_opts =
-      Keyword.update(opts, :config, provider_tool_config(tools, signature, mode), fn config ->
+      opts
+      |> Imp.Predict.Predict.take_options()
+      |> Keyword.update(:config, provider_tool_config(tools, signature, mode), fn config ->
         Keyword.merge(config, provider_tool_config(tools, signature, mode))
       end)
 
@@ -193,7 +195,10 @@ defmodule Imp.Predict.ReAct do
 
     # No provider tool config: the model produces next_tool_name/next_tool_args
     # as ordinary chat output fields, exactly as DSPy's dspy.Predict does.
-    react_opts = Keyword.take(opts, [:lm, :adapter, :demos, :config, :metadata])
+    react_opts =
+      opts
+      |> Imp.Predict.Predict.take_options()
+      |> Keyword.delete(:adapter_opts)
 
     %__MODULE__{
       signature: signature,

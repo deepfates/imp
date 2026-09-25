@@ -5,7 +5,48 @@ defmodule Imp.Predict.ChainOfThought do
 
   defstruct [:predict]
 
+  @option_schema Imp.Predict.Predict.option_schema() ++
+                   [
+                     rationale_field: [
+                       type:
+                         {:or,
+                          [
+                            nil,
+                            {:struct, Imp.Signature.Field},
+                            {:map, :any, :any},
+                            :keyword_list
+                          ]},
+                       doc:
+                         "The reasoning field, as a field map, keyword list or " <>
+                           "`Imp.Signature.Field`; its name is always `:reasoning`. " <>
+                           "When absent or `nil`, a field of `:rationale_field_type`."
+                     ],
+                     rationale_field_type: [
+                       type: :any,
+                       default: :string,
+                       doc:
+                         "The type of the default reasoning field; `:reasoning` asks a " <>
+                           "model that reasons natively for its own reasoning."
+                     ]
+                   ]
+
+  @doc """
+  Builds a program that asks for `:reasoning` before the signature's outputs.
+
+  Takes `Imp.Predict.Predict.new/2`'s options and two of its own. An unknown
+  option raises `ArgumentError`.
+
+  ## Options
+
+  #{NimbleOptions.docs(@option_schema)}
+  """
   def new(signature, opts \\ []) do
+    Imp.Predict.Predict.validate_options!(
+      opts,
+      @option_schema,
+      "Imp.Predict.ChainOfThought.new/2"
+    )
+
     {rationale_field, opts} = Keyword.pop(opts, :rationale_field)
     {rationale_field_type, opts} = Keyword.pop(opts, :rationale_field_type, :string)
 
@@ -25,10 +66,6 @@ defmodule Imp.Predict.ChainOfThought do
           field
           |> Map.new()
           |> Map.put(:name, :reasoning)
-
-        other ->
-          raise ArgumentError,
-                "Imp.chain_of_thought/2 :rationale_field must be a field map, keyword list, or Signature.Field; got: #{inspect(other)}"
       end
 
     signature =

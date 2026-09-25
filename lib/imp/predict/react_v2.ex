@@ -279,7 +279,9 @@ defmodule Imp.Predict.ReActV2 do
       react:
         Imp.Predict.Predict.new(
           react_signature,
-          Keyword.merge(opts, config: config, adapter_opts: adapter_opts)
+          opts
+          |> Imp.Predict.Predict.take_options()
+          |> Keyword.merge(config: config, adapter_opts: adapter_opts)
         ),
       tools: tools,
       max_iters: opts[:max_iters],

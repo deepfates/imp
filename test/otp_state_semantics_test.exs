@@ -61,14 +61,14 @@ defmodule OTPStateSemanticsTest do
   end
 
   test "settings contexts snapshot all effective values at entry" do
-    Imp.configure(lm: :before, stable: :before)
+    Imp.configure(lm: :before, retriever: :before)
     parent = self()
 
     mutator =
       Task.async(fn ->
         receive do
           :mutate ->
-            Imp.configure(lm: :after, stable: :after, added_later: true)
+            Imp.configure(lm: :after, retriever: :after, two_step_extraction_lm: :later)
             send(parent, :mutated)
         end
       end)
@@ -85,15 +85,15 @@ defmodule OTPStateSemanticsTest do
 
     Task.await(mutator)
     assert captured.lm == :before
-    assert captured.stable == :before
+    assert captured.retriever == :before
     assert captured.tenant == :outer
     assert captured.request_id == :inner
-    refute Map.has_key?(captured, :added_later)
+    refute Map.has_key?(captured, :two_step_extraction_lm)
     assert Imp.settings().lm == :after
   end
 
   test "Imp tasks snapshot complete effective settings at submission" do
-    Imp.configure(lm: :global_before, stable: :before)
+    Imp.configure(lm: :global_before, retriever: :before)
     parent = self()
 
     task =
@@ -113,25 +113,25 @@ defmodule OTPStateSemanticsTest do
       end)
 
     assert_receive {:snapshot_worker_ready, worker_pid}
-    Imp.configure(lm: :global_after, stable: :after, added_later: true)
+    Imp.configure(lm: :global_after, retriever: :after, two_step_extraction_lm: :later)
     send(worker_pid, :read_snapshot)
 
     assert {base, nested} = Task.await(task)
     assert base.lm == :outer
-    assert base.stable == :before
+    assert base.retriever == :before
     assert base.tenant == :inner
-    refute Map.has_key?(base, :added_later)
+    refute Map.has_key?(base, :two_step_extraction_lm)
     assert nested.tenant == :worker_nested
     assert nested.lm == :outer
-    assert nested.stable == :before
+    assert nested.retriever == :before
   end
 
   test "async_max_workers requires a positive integer" do
-    assert_raise ArgumentError, ~r/:async_max_workers to be a positive integer/, fn ->
+    assert_raise ArgumentError, ~r/:async_max_workers option: expected positive integer/, fn ->
       Imp.configure(async_max_workers: 0)
     end
 
-    assert_raise ArgumentError, ~r/:async_max_workers to be a positive integer/, fn ->
+    assert_raise ArgumentError, ~r/:async_max_workers option: expected positive integer/, fn ->
       Imp.context([async_max_workers: :many], fn -> :ok end)
     end
   end
@@ -139,11 +139,11 @@ defmodule OTPStateSemanticsTest do
   test "max_errors defaults to ten and settings reject unresolved values" do
     assert Imp.settings().max_errors == 10
 
-    assert_raise ArgumentError, ~r/:max_errors to be :infinity or a non-negative integer/, fn ->
+    assert_raise ArgumentError, ~r/:max_errors option to match/, fn ->
       Imp.configure(max_errors: -1)
     end
 
-    assert_raise ArgumentError, ~r/:max_errors to be :infinity or a non-negative integer/, fn ->
+    assert_raise ArgumentError, ~r/:max_errors option to match/, fn ->
       Imp.context([max_errors: nil], fn -> :ok end)
     end
 
@@ -164,7 +164,7 @@ defmodule OTPStateSemanticsTest do
              {Imp.settings().max_errors, Imp.settings().lm}
            end) == {:infinity, :string_lm}
 
-    assert_raise ArgumentError, ~r/:max_errors to be :infinity or a non-negative integer/, fn ->
+    assert_raise ArgumentError, ~r/:max_errors option to match/, fn ->
       Imp.configure(%{"max_errors" => -1})
     end
 
@@ -177,8 +177,11 @@ defmodule OTPStateSemanticsTest do
     unknown = "untrusted_setting_#{System.unique_integer([:positive])}"
     assert_raise ArgumentError, fn -> String.to_existing_atom(unknown) end
 
-    Imp.configure(%{unknown => :preserved})
-    assert Imp.settings()[unknown] == :preserved
+    assert_raise ArgumentError, ~r/unknown settings/, fn ->
+      Imp.configure(%{unknown => :refused})
+    end
+
+    refute Map.has_key?(Imp.settings(), unknown)
     assert_raise ArgumentError, fn -> String.to_existing_atom(unknown) end
   end
 

@@ -315,6 +315,15 @@ User-visible changes to Imp are recorded here.
   choices, which ReqLLM decodes to an empty message; read as a completion, a
   refused request was a model that said nothing.
 - `Imp.Predict.ReActV2.new/3` documents its options.
+- `Imp.predict/2`, `Imp.chain_of_thought/2` and `Imp.configure/1` raise
+  `ArgumentError` for an option or setting they do not know, and document the
+  ones they take. In 0.4.0 `Imp.predict(sig, temperature: 0)` built a program
+  that ignored the temperature; a request option given at the top level (such
+  as `:temperature`, `:max_tokens` or `:n`) is now refused with a message that
+  says to put it under `config:`. Settings of a caller's own, such as a request
+  id, go through `Imp.context/2`, which still carries any key; both check
+  Imp's own settings the same way, so `:track_usage` and
+  `:warn_on_type_mismatch` must now be booleans.
 
 ### Errors and shapes
 
