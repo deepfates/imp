@@ -1378,7 +1378,10 @@ defmodule ReActV2Test do
     assert Enum.any?(signature.outputs, &(&1.name == name))
     assert Enum.any?(signature.outputs, &(&1.name == :team))
 
-    lm = action_lm([%{tool_calls: [%{name: "submit", arguments: %{"team" => "atlas", name => "Maya"}}]}])
+    lm =
+      action_lm([
+        %{tool_calls: [%{name: "submit", arguments: %{"team" => "atlas", name => "Maya"}}]}
+      ])
 
     assert {:ok, prediction} =
              Imp.react_v2(signature, [], lm: lm, max_iters: 1) |> Imp.call(%{ticket: "t"})

@@ -552,7 +552,6 @@ defmodule Imp.Evaluate do
       end
   end
 
-
   defp metric_error(_index, %Imp.Metrics.Result{
          metadata: %{imp_operational_safety: safety}
        }),
