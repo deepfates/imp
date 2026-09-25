@@ -60,6 +60,11 @@ defmodule Imp.ConstructorOptionsTest do
       assert program.predict.config == [temperature: 0]
       assert hd(program.predict.signature.outputs).type == :reasoning
     end
+
+    test "an explicit nil rationale_field means the default reasoning field" do
+      program = Imp.chain_of_thought("question -> answer", rationale_field: nil)
+      assert hd(program.predict.signature.outputs).name == :reasoning
+    end
   end
 
   describe "Imp.configure/1" do

@@ -10,10 +10,16 @@ defmodule Imp.Predict.ChainOfThought do
                      rationale_field: [
                        type:
                          {:or,
-                          [{:struct, Imp.Signature.Field}, {:map, :any, :any}, :keyword_list]},
+                          [
+                            nil,
+                            {:struct, Imp.Signature.Field},
+                            {:map, :any, :any},
+                            :keyword_list
+                          ]},
                        doc:
                          "The reasoning field, as a field map, keyword list or " <>
-                           "`Imp.Signature.Field`; its name is always `:reasoning`."
+                           "`Imp.Signature.Field`; its name is always `:reasoning`. " <>
+                           "When absent or `nil`, a field of `:rationale_field_type`."
                      ],
                      rationale_field_type: [
                        type: :any,
