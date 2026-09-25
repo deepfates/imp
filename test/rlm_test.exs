@@ -161,17 +161,81 @@ defmodule RLMPublicSurfaceTest do
     assert [%{action: :direct_submit}] = prediction.metadata.rlm_trace
   end
 
-  test "RLM accepts a typed direct submission that arrives as JSON text" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> ~s({"answer":"Paris"}) end]
-    }
+  # Models often send the code reply and a final answer as two JSON objects in
+  # one reply. The code runs; the first turn is not spent on a parse error.
+  # `max_preview_chars` bounds what the controller sees of a large input, in
+  # characters, for a list as for a string.
+  test "a list input's preview is bounded in characters, not items" do
+    parent = self()
+    items = for i <- 1..1_200, do: %{"id" => i, "ticket" => String.duplicate("x", 40)}
 
+    handler = fn messages, _opts ->
+      send(parent, {:prompt, messages |> Enum.map_join("\n", & &1.content) |> byte_size()})
+      ~S|{"reasoning":"count","code":"submit(%{answer: to_string(length(items))})"}|
+    end
+
+    lm = %{module: Imp.LM.Static, opts: [handler: handler]}
+    rlm = Imp.Predict.RLM.new("items -> answer", lm: lm, max_iterations: 1)
+
+    assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{items: items})
+    assert Imp.Prediction.get(prediction, :answer) == "1200"
+    assert_received {:prompt, bytes}
+    assert bytes < 20_000
+  end
+
+  test "a reply of a code object followed by another JSON object runs the code" do
+    reply =
+      ~S|{"reasoning":"compute it","code":"submit(%{answer: \"Paris\"})"}| <>
+        "\n" <> ~S|{"answer":"Paris"}|
+
+    lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> reply end]}
     rlm = Imp.Predict.RLM.new("question -> answer", lm: lm, max_iterations: 1)
 
     assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{question: "Capital of France?"})
     assert Imp.Prediction.get(prediction, :answer) == "Paris"
-    assert [%{action: :direct_submit}] = prediction.metadata.rlm_trace
+    refute Enum.any?(prediction.metadata.rlm_trace, &(&1.action == :action_error))
+  end
+
+  test "RLM accepts a typed direct submission that arrives as JSON text once code has run" do
+    counter = :counters.new(1, [])
+
+    handler = fn _messages, _opts ->
+      :counters.add(counter, 1, 1)
+
+      if :counters.get(counter, 1) == 1,
+        do: ~S|{"reasoning":"look","code":"print(question)"}|,
+        else: ~s({"answer":"Paris"})
+    end
+
+    lm = %{module: Imp.LM.Static, opts: [handler: handler]}
+    rlm = Imp.Predict.RLM.new("question -> answer", lm: lm, max_iterations: 2)
+
+    assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{question: "Capital of France?"})
+    assert Imp.Prediction.get(prediction, :answer) == "Paris"
+    assert [%{action: :run}, %{action: :direct_submit}] = prediction.metadata.rlm_trace
+  end
+
+  # Answering before any code has run is answering from the input's preview.
+  test "a JSON-text answer before any code has run is refused with a reason the model reads" do
+    counter = :counters.new(1, [])
+    parent = self()
+
+    handler = fn messages, _opts ->
+      :counters.add(counter, 1, 1)
+      send(parent, {:messages, :counters.get(counter, 1), messages})
+
+      if :counters.get(counter, 1) == 1,
+        do: ~s({"answer":"a guess"}),
+        else: ~S|{"reasoning":"compute","code":"submit(%{answer: \"Paris\"})"}|
+    end
+
+    lm = %{module: Imp.LM.Static, opts: [handler: handler]}
+    rlm = Imp.Predict.RLM.new("question -> answer", lm: lm, max_iterations: 2)
+
+    assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{question: "Capital of France?"})
+    assert Imp.Prediction.get(prediction, :answer) == "Paris"
+    assert_received {:messages, 2, messages}
+    assert inspect(messages) =~ "compute the answer in code first"
   end
 
   test "RLM direct submission rejects fields outside reasoning and required outputs" do

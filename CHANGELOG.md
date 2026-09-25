@@ -339,9 +339,24 @@ User-visible changes to Imp are recorded here.
   under the cell's step and value budgets. Registered tools, `llm_query` and
   `submit` stay outside such functions. Other module calls return
   `{:function_not_allowed, module, function, arity}`.
-- RLM accepts a controller reply that is JSON text holding exactly the
-  required outputs as the final submission, as its prompt says; it was
-  accepted only when the LM returned a map.
+- RLM controller code may also call the plain-data Kernel functions without
+  a module (`elem/2`, `to_string/1`, `is_map/1` and the other type checks,
+  `length/1`, `map_size/1`, `div/2`, `rem/2`, `max/2`, `min/2`, `abs/1`,
+  `round/1`, `trunc/1`), and a pinned pattern (`fn ^t -> ...`) matches the
+  variable's value; it silently never matched.
+- Calling a value that is not a function (`g = 1; g.(1)`) in RLM code is an
+  error the controller reads, `{:not_a_function, name, value}`. It crashed the
+  whole call with `{:module_call_failed, Imp.Predict.RLM, _}`.
+- The RLM controller prompt asks for one reply shape, a JSON object with
+  `reasoning` and `code`, and a reply of several JSON objects runs the one
+  that carries code; models sent the code object and an answer object
+  together, and the first turn was spent on a parse error. A reply that is
+  JSON text holding exactly the required outputs is the final answer once
+  code has run; before any code has run it is refused with a reason the
+  controller reads, since it can only be read off the inputs' preview.
+- A list input's preview in the RLM prompt is bounded by `max_preview_chars`
+  characters, as a string's is. It took that many items, so 1,200 tickets
+  were all in the prompt and the model answered by reading them.
 
 ### Errors and shapes
 

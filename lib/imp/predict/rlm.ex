@@ -445,16 +445,37 @@ defmodule Imp.Predict.RLM do
     output = unwrap_lm_output(raw)
     required = Enum.map(Imp.Signature.output_names(rlm.signature), &to_string/1)
 
-    # A text LM returns the typed final submission as JSON text.
+    # A text LM returns the typed final submission as JSON text. It is taken
+    # as the answer only once code has run: a model that answers before
+    # computing anything answers from the preview of its inputs, which is a
+    # guess (seen live: counts over 1,200 tickets, wrong on the first reply).
     output =
       with text when is_binary(text) <- output,
            {:ok, decoded} <- Action.decode(text),
            true <- direct_submission?(decoded, required) do
-        decoded
+        if ran_code?(state), do: decoded, else: {:answered_before_computing, text}
       else
         _other -> output
       end
 
+    if match?({:answered_before_computing, _text}, output) do
+      {:answered_before_computing, text} = output
+
+      controller_action_error(
+        text,
+        state,
+        iteration,
+        "compute the answer in code first: reply with {\"reasoning\", \"code\"} " <>
+          "and call submit/1 from the code"
+      )
+    else
+      direct_submit_output(rlm, output, state, iteration, original_error, required)
+    end
+  end
+
+  defp ran_code?(state), do: Enum.any?(state.trace, &(&1.action == :run))
+
+  defp direct_submit_output(rlm, output, state, iteration, original_error, required) do
     if is_map(output) do
       output = stringify_action_keys(output)
 
@@ -608,7 +629,7 @@ defmodule Imp.Predict.RLM do
       %{
         role: :system,
         content:
-          "You are an RLM controller with a persistent, constrained Elixir environment. Follow the task instructions exactly. Return exactly one JSON object such as {\"reasoning\":\"inspect the context\",\"code\":\"context = load(\\\"context\\\")\\nprint(context)\"}; do not use markdown fences or prose around it. Code may inspect and assign variables, use for comprehensions, call SHOW_VARS(), llm_query(prompt, model \\\\ nil), llm_query_batched(prompts, model \\\\ nil), rlm_query(prompt, model \\\\ nil), rlm_query_batched(prompts, model \\\\ nil), recurse(signature, inputs), load(name), registered tools, print(value), and submit(a_map_with_the_required_output_fields). rlm_query creates an isolated recursive constrained environment and falls back to a one-shot query at the configured depth limit. State persists across turns. Explore and compute in code; when every required output is ready, return code that calls submit/1 with non-empty values. A JSON object containing exactly the required output fields is also accepted as a typed final submission.\n\n" <>
+          "You are an RLM controller with a persistent, constrained Elixir environment. Follow the task instructions exactly. Return exactly one JSON object such as {\"reasoning\":\"inspect the context\",\"code\":\"context = load(\\\"context\\\")\\nprint(context)\"}; do not use markdown fences or prose around it. Code may inspect and assign variables, use for comprehensions, call SHOW_VARS(), llm_query(prompt, model \\\\ nil), llm_query_batched(prompts, model \\\\ nil), rlm_query(prompt, model \\\\ nil), rlm_query_batched(prompts, model \\\\ nil), recurse(signature, inputs), load(name), registered tools, print(value), and submit(a_map_with_the_required_output_fields). rlm_query creates an isolated recursive constrained environment and falls back to a one-shot query at the configured depth limit. State persists across turns. Every reply is that one JSON object, including the last one: explore and compute in code, and when every required output is ready, return code that calls submit/1 with non-empty values. Do not answer from the preview of an input; compute the answer in code first.\n\n" <>
             Interpreter.controller_language_guide()
       },
       %{
@@ -1794,12 +1815,27 @@ defmodule Imp.Predict.RLM do
     }
   end
 
+  # A list's preview is as many leading items as fit in `preview_chars`
+  # characters of their printed form, so a large input stays in the
+  # environment and the controller computes over it instead of reading it.
   defp describe_value(value, preview_chars) when is_list(value) do
+    preview =
+      value
+      |> Enum.reduce_while({[], 0}, fn item, {taken, used} ->
+        size = item |> inspect(limit: :infinity, printable_limit: :infinity) |> String.length()
+
+        if used + size <= preview_chars,
+          do: {:cont, {[item | taken], used + size}},
+          else: {:halt, {taken, used}}
+      end)
+      |> elem(0)
+      |> Enum.reverse()
+
     %{
       type: :list,
       length: length(value),
-      preview: Enum.take(value, preview_chars),
-      truncated: length(value) > preview_chars
+      preview: preview,
+      truncated: length(preview) < length(value)
     }
   end
 
