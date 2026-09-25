@@ -501,7 +501,7 @@ defmodule Imp.Adapter.Chat do
     # The blob branch takes only a list of strings (or the empty list, "N/A"),
     # which is all upstream can render. Any other list, such as a `tools` field
     # carrying tool-definition maps, falls back to JSON rather than crashing.
-    if field_annotation(field) == "str" and Enum.all?(value, &is_binary/1) do
+    if Imp.Adapter.FieldType.requirement(field) == nil and Enum.all?(value, &is_binary/1) do
       format_input_list_field_value(value)
     else
       format_value(value)
@@ -655,14 +655,14 @@ defmodule Imp.Adapter.Chat do
   def field_description_string(fields), do: render_field_list(fields)
 
   defp render_field_list(fields) do
-    # Byte-faithful to DSPy: each field renders `N. \`name\` (type): {desc}`
+    # As in DSPy, each field renders `N. \`name\` (type): {desc}`
     # with the colon-space always present, then the whole group is stripped, so
     # a field with no description keeps its trailing space only when it is not
     # the last line in its group.
     fields
     |> Enum.with_index(1)
     |> Enum.map(fn {field, index} ->
-      "#{index}. `#{field.name}` (#{field_annotation(field)}): #{field_description(field)}" <>
+      "#{index}. `#{field.name}` (#{Imp.Adapter.FieldType.label(field)}): #{field_description(field)}" <>
         Imp.Adapter.FieldConstraints.suffix(field)
     end)
     |> Enum.join("\n")
@@ -681,7 +681,7 @@ defmodule Imp.Adapter.Chat do
 
     if code_field?(field) do
       type_description =
-        "Type description of #{code_annotation(field)}: " <>
+        "Type description: " <>
           Imp.Adapter.Types.Code.description(code_language(field))
 
       case base do
@@ -727,58 +727,18 @@ defmodule Imp.Adapter.Chat do
   end
 
   defp render_interaction_template(signature) do
-    # Input fields, and string or reasoning outputs, get no type note. Every
-    # other output field gets an 8-space-indented "# note: the value you
-    # produce ..." suffix.
-    input_lines = Enum.map(signature.inputs, &interaction_field_line(&1, ""))
+    # Every field's placeholder under its marker; output fields that are not
+    # text carry a type note (`Imp.Adapter.FieldType.placeholder/2`).
+    fields =
+      Enum.map(signature.inputs, &{&1, :input}) ++ Enum.map(signature.outputs, &{&1, :output})
 
-    output_lines =
-      Enum.map(signature.outputs, &interaction_field_line(&1, structure_type_note(&1)))
-
-    (input_lines ++ output_lines)
+    fields
+    |> Enum.map(fn {field, kind} ->
+      "[[ ## #{field.name} ## ]]\n" <> Imp.Adapter.FieldType.placeholder(field, kind)
+    end)
     |> Kernel.++(["[[ ## completed ## ]]"])
     |> Enum.join("\n\n")
   end
-
-  defp interaction_field_line(field, note) do
-    """
-    [[ ## #{field.name} ## ]]
-    {#{field.name}}#{note}
-    """
-    |> String.trim()
-  end
-
-  # The note text, keyed on the field's Python type and emitted only for output
-  # fields. Composite types (enum, array, object) resolve through
-  # `Imp.Adapter.CompositeType` first; scalars take the clauses below.
-  defp structure_type_note(field) do
-    case Imp.Adapter.CompositeType.note_desc(field) do
-      nil -> scalar_structure_type_note(field)
-      desc -> structure_note(desc)
-    end
-  end
-
-  defp scalar_structure_type_note(field) do
-    case field_type(field.type) do
-      "str" -> ""
-      "bool" -> structure_note("must be True or False")
-      "int" -> structure_note("must be a single int value")
-      "float" -> structure_note("must be a single float value")
-      _ -> ""
-    end
-  end
-
-  defp structure_note(desc),
-    do: String.duplicate(" ", 8) <> "# note: the value you produce " <> desc
-
-  defp field_type(:string), do: "str"
-  defp field_type(:reasoning), do: "str"
-  defp field_type("reasoning"), do: "str"
-  defp field_type(:integer), do: "int"
-  defp field_type(:float), do: "float"
-  defp field_type(:number), do: "number"
-  defp field_type(:boolean), do: "bool"
-  defp field_type(type), do: to_string(type)
 
   defp fetch_meta(map, key, default \\ nil)
 
@@ -809,9 +769,8 @@ defmodule Imp.Adapter.Chat do
   defp render_response_instruction(_signature, false), do: ""
 
   defp render_response_instruction(signature, true) do
-    # Byte-faithful to DSPy: always the singular "the field ", then every output
-    # marker joined with ", then ", each carrying a Python-type note unless the
-    # field is a string.
+    # Always the singular "the field ", then every output marker joined with
+    # ", then ", each saying how its value must be formatted unless it is text.
     markers =
       signature.outputs
       |> Enum.map(fn field -> "`[[ ## #{field.name} ## ]]`" <> output_type_info(field) end)
@@ -821,19 +780,14 @@ defmodule Imp.Adapter.Chat do
       markers <> ", and then ending with the marker for `[[ ## completed ## ]]`."
   end
 
-  defp output_type_info(field) do
-    case field_annotation(field) do
-      "str" -> ""
-      type_name -> " (must be formatted as a valid Python #{type_name})"
+  @doc false
+  # " (must be formatted as ...)" for an output field that is not text, shared
+  # with the JSON adapter's output requirements.
+  def output_type_info(field) do
+    case Imp.Adapter.FieldType.requirement(field) do
+      nil -> ""
+      requirement -> " (must be formatted as #{requirement})"
     end
-  end
-
-  # The Python annotation name for a field: composite types resolve through
-  # `Imp.Adapter.CompositeType`, scalars through the plain type-name mapping.
-  defp field_annotation(field) do
-    if code_field?(field),
-      do: code_annotation(field),
-      else: Imp.Adapter.CompositeType.annotation_name(field) || field_type(field.type)
   end
 
   defp append_content(content, ""), do: content
@@ -1065,8 +1019,6 @@ defmodule Imp.Adapter.Chat do
     |> fetch_meta(:language, "python")
     |> to_string()
   end
-
-  defp code_annotation(field), do: "Code_#{code_language(field)}"
 
   defp render_demos(_signature, [], _renderer, _input_renderer), do: []
   defp render_demos(_signature, nil, _renderer, _input_renderer), do: []

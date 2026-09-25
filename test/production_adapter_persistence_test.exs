@@ -55,9 +55,9 @@ defmodule ProductionAdapterPersistenceTest do
 
     # Descriptions live in the field-description block (DSPy get_field_description_string).
     assert system =~
-             "`reasoning` (str): Work through the problem step by step before giving the final answer"
+             "`reasoning` (string): Work through the problem step by step before giving the final answer"
 
-    assert system =~ "`answer` (str): final numeric answer"
+    assert system =~ "`answer` (string): final numeric answer"
 
     # Outputs are rendered as a JSON object template (both str fields carry no note).
     assert system =~ "Outputs will be a JSON object with the following fields."
@@ -230,13 +230,13 @@ defmodule ProductionAdapterPersistenceTest do
     [%{role: :system, content: system}, %{role: :user}] =
       Imp.Adapter.Chat.format(signature, %{question: "Q?"}, [])
 
-    assert system =~ "`verdict` (str): Must be exactly yes or no."
+    assert system =~ "`verdict` (string): Must be exactly yes or no."
 
     assert system =~
-             "`amount` (str): Must be only the numeric answer span, with no words or explanation."
+             "`amount` (string): Must be only the numeric answer span, with no words or explanation."
 
     assert system =~
-             "`answer` (str): Must be a concise exact answer span; preserve complete names, titles, locations, dates, and quantities when the task asks for them, and do not add aliases, abbreviations, conversions, or parentheticals unless explicitly requested."
+             "`answer` (string): Must be a concise exact answer span; preserve complete names, titles, locations, dates, and quantities when the task asks for them, and do not add aliases, abbreviations, conversions, or parentheticals unless explicitly requested."
   end
 
   test "chat adapter formats demos as DSPy-style user assistant turns" do

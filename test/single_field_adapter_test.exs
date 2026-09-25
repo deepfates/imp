@@ -48,7 +48,7 @@ defmodule Imp.SingleFieldAdapterTest do
                demos: []
              )
 
-    assert system =~ "Output value: route (Literal['R17', 'R42', 'R68', 'R93'])"
+    assert system =~ "Output value: route (one of: R17, R42, R68, R93)"
     assert system =~ "Return only the value for route"
     refute system =~ "[[ ##"
 

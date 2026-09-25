@@ -267,10 +267,9 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
         "tool_trace_cases" => length(tool_trace_cases),
         "tool_trace_parity" => Enum.all?(tool_trace_cases, & &1["tool_trace_parity"]),
         "imp_semantic_checks" => semantic_summary(semantic_checks),
-        # How many cases render byte-identical prompts to DSPy. The count is
-        # computed, not hardcoded, and is reported rather than asserted:
-        # known divergences remain (chain-of-thought reasoning descriptions,
-        # typed-field type hints, whitespace, ReAct, JSON).
+        # How many cases render the same prompt text as DSPy once DSPy's type
+        # annotations are put in Imp's words. The count is computed, not
+        # hardcoded, and is reported rather than asserted.
         #
         # template_parity is boundary-aware: messages are compared per call,
         # so two different call splittings with the same concatenated text do
@@ -348,12 +347,14 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
       "tool_trace_parity" => if(tool_trace_required?, do: tool_trace_parity),
       "expected_tool_trace" => expected_tool_trace,
       "expected_prediction" => expected,
-      # Whether the rendered messages Imp sends are byte-identical to DSPy's
-      # for the same fixture. A divergence means Imp instructs the model
-      # differently. Messages are compared per call, so a divergence in how
-      # work is split across calls is not masked.
+      # Whether the rendered messages Imp sends carry the same text as DSPy's
+      # for the same fixture once DSPy's Python type annotations are put in
+      # Imp's words (`Imp.DSPyWording`). A divergence means Imp instructs the
+      # model differently. Messages are compared per call, so a divergence in
+      # how work is split across calls is not masked.
       "template_parity" =>
-        canonical(call_messages(imp_calls)) == canonical(call_messages(dspy_calls)),
+        canonical(call_messages(imp_calls)) ==
+          canonical(call_messages(dspy_calls)) |> Imp.DSPyWording.in_imp_words(),
       # The per-call request envelope: LM opts on the Imp side, adapter kwargs
       # on the DSPy side (response_format, tools, tool_choice, temperature,
       # ...). This is false wherever Imp and DSPy send different options.

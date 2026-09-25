@@ -38,7 +38,10 @@ defmodule GoldenTraceTest do
     assert report["fixtures"]["cases"] == 42
 
     # Prompt fidelity (epic dee-8zev): the lane MEASURES whether Imp's rendered
-    # prompt is byte-identical to DSPy's, per case. Every case is measured, and
+    # prompt carries the same text as DSPy's, per case, once DSPy's Python type
+    # annotations are put into Imp's neutral words (`decisions.md`: parity
+    # means behaviour and information, not text). "Byte-identical" below means
+    # identical after that translation. Every case is measured, and
     # the paths proven byte-identical to DSPy are LOCKED as regressions here.
     # Chat (predict/CoT/typed), JSON adapter (dee-ye3h), and the parse-failure
     # ChatAdapter->JSONAdapter fallback (dee-bd34) all hold. The only remaining

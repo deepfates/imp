@@ -427,7 +427,7 @@ defmodule ReActContractTest do
 
     react = agent.react.signature
 
-    # Inputs = original inputs + a `trajectory` (str) input (react.py line 75).
+    # Inputs = original inputs + a `trajectory` (string) input (react.py line 75).
     assert Enum.map(react.inputs, & &1.name) == [:question, :trajectory]
     assert Enum.find(react.inputs, &(&1.name == :trajectory)).type == :string
 
@@ -451,7 +451,7 @@ defmodule ReActContractTest do
 
     assert instr =~
              "(1) lookup, whose description is <desc>Lookup a fact by query.</desc>. " <>
-               "It takes arguments {'query': {'type': 'string'}}."
+               "It takes arguments {\"query\": {\"type\": \"string\"}}."
 
     assert instr =~ "(2) finish, whose description is <desc>Marks the task as complete."
 

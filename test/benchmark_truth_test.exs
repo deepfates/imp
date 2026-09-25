@@ -674,7 +674,7 @@ defmodule BenchmarkTruthTest do
     assert is_integer(row["diagnostic"]["context_length"])
     assert row["diagnostic"]["trace"]["messages"] != []
     [system | _rest] = row["diagnostic"]["trace"]["messages"]
-    assert system["content"] =~ "`answer` (str): short exact answer"
+    assert system["content"] =~ "`answer` (string): short exact answer"
     refute system["content"] =~ "Must be a concise exact answer span"
     assert system["content"] =~ "For yes/no questions, answer exactly yes or no."
     assert system["content"] =~ "Return the canonical exact answer span from the context."

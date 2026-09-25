@@ -345,7 +345,7 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
     calls = collect_tagged_calls(:program_aware_call, 8, [])
 
     assert Enum.map(calls, fn {messages, _opts} -> stringify(messages) end) ==
-             upstream["prompt_messages"]
+             Imp.DSPyWording.in_imp_words(upstream["prompt_messages"])
 
     # DSPy passes max_depth=10 to Predict as an extra input field. Predict
     # ignores it because DescribeModule has no such signature field; it never
@@ -481,6 +481,7 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
       |> Enum.with_index()
       |> Enum.reject(fn {_messages, index} -> index in [3, 6] end)
       |> Enum.map(&elem(&1, 0))
+      |> Imp.DSPyWording.in_imp_words()
 
     assert Enum.map(calls, fn {messages, _opts} -> stringify(messages) end) ==
              upstream_logical_messages
@@ -948,13 +949,14 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
 
     prompt_messages = Enum.map(prompt_calls, fn {messages, _opts} -> stringify(messages) end)
 
-    Enum.zip(prompt_messages, upstream["prompt_messages"])
+    Enum.zip(prompt_messages, Imp.DSPyWording.in_imp_words(upstream["prompt_messages"]))
     |> Enum.with_index()
     |> Enum.each(fn {{actual, expected}, index} ->
       assert actual == expected, "prompt message mismatch at call #{index}"
     end)
 
-    assert task_calls |> Enum.take(9) |> Enum.map(&stringify/1) == upstream["task_messages"]
+    assert task_calls |> Enum.take(9) |> Enum.map(&stringify/1) ==
+             Imp.DSPyWording.in_imp_words(upstream["task_messages"])
 
     assert Enum.map(Enum.drop(prompt_calls, 3), fn {_messages, opts} -> opts[:rollout_id] end) ==
              upstream["rollout_ids"]
@@ -1062,13 +1064,14 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
 
     prompt_messages = Enum.map(prompt_calls, fn {messages, _opts} -> stringify(messages) end)
 
-    Enum.zip(prompt_messages, upstream["prompt_messages"])
+    Enum.zip(prompt_messages, Imp.DSPyWording.in_imp_words(upstream["prompt_messages"]))
     |> Enum.with_index()
     |> Enum.each(fn {{actual, expected}, index} ->
       assert actual == expected, "two-predictor prompt message mismatch at call #{index}"
     end)
 
-    assert Enum.map(task_calls, &stringify/1) == upstream["task_messages"]
+    assert Enum.map(task_calls, &stringify/1) ==
+             Imp.DSPyWording.in_imp_words(upstream["task_messages"])
 
     first_summary_user = prompt_messages |> hd() |> List.last() |> Map.fetch!("content")
     assert first_summary_user =~ upstream["first_batch_repr"]
@@ -1200,7 +1203,7 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
     calls = collect_calls(5, [])
     actual_messages = Enum.map(calls, fn {messages, _opts} -> stringify(messages) end)
 
-    assert actual_messages == upstream["messages"]
+    assert actual_messages == Imp.DSPyWording.in_imp_words(upstream["messages"])
 
     assert Enum.map(Enum.drop(calls, 3), fn {_messages, opts} -> opts[:rollout_id] end) ==
              upstream["rollout_ids"]

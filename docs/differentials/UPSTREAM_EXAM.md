@@ -49,9 +49,9 @@ and passes.
    `[1, 2, 3]`→"[1, 2, 3]"); Literal parsing strips `Literal[...]`/`str[...]`
    wrappers and wrapping quotes before enum matching.
 4. **Literal rendering of non-string members** (1, fixed by dee-xyhv):
-   non-string Literal members render bare via Python `str()`
-   (`Literal[1, 'bar']`, `Literal[True, 3, 'foo']`); only string members are
-   quoted.
+   every member reaches the prompt. Imp now names an enum in words
+   (`one of: 1, bar`, `one of: true, 3, foo`) rather than as a Python
+   `Literal[...]`; see "Type wording" below.
 5. **ToolCalls.format wire shape** (2, fixed by dee-4fuy): `ToolCalls.format`
    emits the OpenAI shape `{"type": "function", "function": {"name",
    "arguments"}}` (Imp's stable id rides at the top level when present).
@@ -62,11 +62,21 @@ and passes.
    splitting and Title Case with acronym preservation; the string-spec parser
    accepts the Python spellings `str` and `dict`.
 
-Notable byte-level passes throughout: chat, JSON, and XML
+Notable full-string passes throughout: chat, JSON, and XML
 `format_system_message` (full-string equality including type notes and
 JSON-schema escapes), conversation-history message shapes for chat and JSON,
 the two-step main+extraction round trip, XML parse/cast/missing-field errors,
-and Literal quoting across all five scenarios.
+and enum members reaching the prompt exactly across all five scenarios.
+
+### Type wording
+
+Where DSPy prints a Python type annotation (`str`, `int`, `list[str]`,
+`Literal['a', 'b']`, `dict[str, Any]`, `Code_python`, "must be formatted as a
+valid Python ..."), Imp names the type in neutral words (`string`, `integer`,
+`list of strings`, `one of: a, b`, `object`, `code in python`, "must be
+formatted as ..."). The ported assertions check Imp's words in those places
+and exact text everywhere else; DSPy parity means the same fields, order,
+constraints and parse results, not the same text (`decisions.md`).
 
 ## Legend
 
@@ -139,7 +149,7 @@ prior-art). Most also require pydantic model schemas. One row each:
 
 | Upstream test | Status | Note |
 |---|---|---|
-| test_chat_adapter_quotes_literals_as_expected | pass (was FAIL, partial) | Scenarios 1–4 always passed byte-for-byte; scenario 5 fixed by dee-xyhv — non-string Literal members render bare (`Literal[1, 'bar']`). |
+| test_chat_adapter_quotes_literals_as_expected | pass (adapted) | Every member, quotes included, reaches the prompt in declared order, named in words (`one of: ...`) rather than as a quoted Python `Literal[...]`; non-string members take their JSON spelling (`one of: true, 3, foo`). |
 | test_chat_adapter_sync_call | pass | Predict + chat adapter + fixture LM returning the marker completion → answer "Paris". |
 | test_chat_adapter_async_call | n/a | asyncio variant of the previous test; BEAM concurrency model. |
 | test_chat_adapter_with_pydantic_models | n/a | Nested pydantic input/output classes; assertions are on Python class names as annotations. |

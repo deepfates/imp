@@ -190,6 +190,16 @@ User-visible changes to Imp are recorded here.
 
 ### ReActV2, adapters and models
 
+- Prompts name types in plain words instead of Python annotations, in every
+  adapter and in ReAct: `` `team` (one of: atlas, harbor, beacon, quill) ``
+  where 0.4.0 wrote `` `team` (Literal['atlas', 'harbor', 'beacon', 'quill']) ``,
+  and "string", "integer", "number", "true or false", "list of strings",
+  "object", "code in python" for `str`, `int`, `float`, `bool`, `list[str]`,
+  `dict[str, Any]` and `Code_python`. "(must be formatted as a valid Python
+  int)" is "(must be formatted as an integer)", and ReAct's `:dspy_3_2_1`
+  mode lists tool arguments as JSON. Fields, order, constraints and parsing
+  are unchanged. A saved program's prompt text changes with this, so an
+  optimized program may be worth re-evaluating.
 - The names follow the glossary: a step answered in text ends as `:answered`,
   the last request of an interrupted turn as `:last_text` with
   `last_request_note`, the step signature declares `metadata[:text_step]`, and
