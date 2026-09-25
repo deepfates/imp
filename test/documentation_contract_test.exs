@@ -23,10 +23,7 @@ defmodule DocumentationContractTest do
     assert benchmarks =~ "mix differential.check"
 
     assert Code.ensure_loaded?(Imp.Embeddings.BagOfWords)
-    assert Code.ensure_loaded?(Imp.MCP.Catalog)
-    assert Code.ensure_loaded?(Imp.MCP.HTTPClient)
-    assert Code.ensure_loaded?(Imp.MCP.StdioClient)
-    assert Code.ensure_loaded?(Imp.MCP.StreamableHTTPClient)
+    assert Code.ensure_loaded?(Imp.MCP)
   end
 
   # A benchmark command a reader cannot run is worse than no command. The file
@@ -447,8 +444,6 @@ defmodule DocumentationContractTest do
           Imp.Core.User,
           Imp.Core.Assistant,
           Imp.Core.Developer,
-          Imp.Core.ToolCall,
-          Imp.Core.ToolResult,
           Imp.Core.LMConfig,
           Imp.Core.LMRequest,
           Imp.Core.LMResponse
@@ -633,25 +628,10 @@ defmodule DocumentationContractTest do
     assert Enum.max(result.validation_scores) == 1.0
   end
 
-  test "the documented MCP import path returns ordinary Imp tools" do
-    # MCP spec dialect: camelCase
-    # "inputSchema", optional description per the MCP spec Tool definition).
-    catalog =
-      Imp.MCP.Catalog.new([
-        %{
-          "name" => "lookup",
-          "inputSchema" => %{"required" => ["key"]},
-          "run" => & &1
-        }
-      ])
-
-    [tool] = Imp.MCP.import_tools(catalog)
-
-    assert tool.name == "lookup"
-    assert {:ok, [^tool]} = Imp.Tool.validate_tools([tool])
-    assert {:error, message} = Imp.Tool.validate_tools([:not_a_tool])
-    assert message =~ "expected a list of Imp.Tool structs"
-    assert Imp.Tool.call(tool, %{key: "value"}) == %{key: "value"}
+  test "the documented MCP import path returns an import with cleanup" do
+    # With no servers nothing is dialed and the ExMCP application is not started.
+    assert {:ok, %Imp.MCP.Import{tools: [], unavailable: []} = import} = Imp.MCP.connect([])
+    assert :ok = import.cleanup.()
   end
 
   test "the documented streaming path collects predictions and parses incremental fields" do

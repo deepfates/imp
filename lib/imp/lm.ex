@@ -217,6 +217,7 @@ defmodule Imp.LM do
     end
   end
 
+  @doc false
   def validate_lm(nil), do: {:ok, nil}
 
   def validate_lm(module) when is_atom(module) do

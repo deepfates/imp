@@ -191,9 +191,11 @@ defmodule Imp.Optimizer.GRPO do
     end
   end
 
+  @doc false
   def compile(%__MODULE__{} = optimizer, program, trainset),
     do: compile(optimizer, program, trainset, [])
 
+  @doc false
   def compile(%__MODULE__{trainer: nil}, _program, _trainset, _opts),
     do: {:error, :trainer_required}
 

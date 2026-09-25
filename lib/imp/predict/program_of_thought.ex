@@ -38,6 +38,7 @@ defmodule Imp.Predict.ProgramOfThought do
     max_iters: [type: :pos_integer, default: 3]
   ]
 
+  @doc false
   def validate_output_field(nil), do: {:ok, nil}
   def validate_output_field(field), do: Imp.FieldSelector.validate_name(field)
 

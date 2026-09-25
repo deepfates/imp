@@ -538,7 +538,7 @@ defmodule ProductionHardeningTest do
     assert_raise ArgumentError,
                  ~r/unknown Imp.MCP options: \[:transport\]/,
                  fn ->
-                   Imp.MCP.HTTPClient.new("https://mcp.example", transport: %{bad: :transport})
+                   Imp.Test.MCPConnect.http!("https://mcp.example", transport: %{bad: :transport})
                  end
 
     assert_raise ArgumentError,
@@ -550,7 +550,7 @@ defmodule ProductionHardeningTest do
     assert_raise ArgumentError,
                  ~r/:timeout must be a positive integer/,
                  fn ->
-                   Imp.MCP.StdioClient.new("/bin/cat", timeout: 0)
+                   Imp.Test.MCPConnect.stdio!("/bin/cat", timeout: 0)
                  end
 
     assert_raise ArgumentError,

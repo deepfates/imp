@@ -71,12 +71,7 @@ defmodule Imp.Optimizer.LabeledFewShot do
     end
   end
 
-  @doc """
-  Attaches up to `k` trainset examples to every exposed predictor.
-
-  Selection is deterministic for the optimizer's `seed:` on this path and
-  through `Imp.optimize/3`.
-  """
+  @doc false
   def compile(%__MODULE__{} = optimizer, program, trainset) do
     {trainset, errors} = materialize_trainset(trainset)
 

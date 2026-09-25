@@ -63,8 +63,9 @@ documented divergence (`decisions.md`) rather than an accident.
 
 `Imp.MCP.connect/2` opens explicitly authorized server descriptors through
 ExMCP. Its clients follow an explicit owner PID; tools retain original source
-identity in `metadata.mcp`, independently of model-facing names. `Imp.ACP.MCP`
-adds ACP presentation hints to that import; it is not another client.
+identity in `metadata.mcp`, independently of model-facing names.
+`Imp.ACP.ToolKind` derives ACP presentation hints from the annotations that
+import carries; it is not another client.
 ExMCP is the Hex package, unpatched. Where Imp needs something ExMCP does not
 do — owned stdio process groups, trust for authorized remote origins, the HTTP
 options public servers need, the browser OAuth flow — Imp does it in its own

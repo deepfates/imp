@@ -117,6 +117,7 @@ defmodule Imp.Embeddings do
         |> Enum.map(&String.downcase/1)
   end
 
+  @doc false
   def validate_texts!(texts, context) when is_list(texts) do
     if Enum.all?(texts, &is_binary/1) do
       texts

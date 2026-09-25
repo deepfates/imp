@@ -62,6 +62,7 @@ defmodule Imp.HTTP do
   defp do_request(transport, method, _url, _headers, _body, _opts),
     do: {:error, {:http_method_not_supported, transport, method}}
 
+  @doc false
   def validate_transport(transport) when is_atom(transport), do: {:ok, transport}
   def validate_transport(transport) when is_function(transport, 4), do: {:ok, transport}
 

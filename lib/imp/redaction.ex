@@ -113,20 +113,7 @@ defmodule Imp.Redaction do
     credential_key?(key) and not semantic_schema_descriptor?(value)
   end
 
-  @doc """
-  Validates custom redaction keys.
-
-  Redaction keys must be atoms or strings because Imp compares them with map
-  keys after normalizing ordinary Elixir key names.
-
-      iex> Imp.Redaction.validate_keys([:api_key, "authorization"])
-      {:ok, [:api_key, "authorization"]}
-
-      iex> {:error, message} = Imp.Redaction.validate_keys([:api_key, 123])
-      iex> message =~ "expected a list of atom or string key names"
-      true
-
-  """
+  @doc false
   def validate_keys(keys) when is_list(keys) do
     case Enum.find(keys, &(not valid_key?(&1))) do
       nil ->

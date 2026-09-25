@@ -233,13 +233,8 @@ Imported clients follow `:owner` (the importing process by default); a temporary
 import worker should name its long-lived owner explicitly. Cleanup is idempotent.
 Closed-client calls return errors rather than exiting their callers.
 
-`Imp.MCP.HTTPClient.new/2`, `StreamableHTTPClient.new/2`, and
-`StdioClient.new/2` are convenience constructors backed by the same ExMCP
-importer. They connect during construction and return `Imp.MCP.Client`;
-close them with `Imp.MCP.Client.close/1`. Connection failures raise at
-construction; use `connect/2` for tagged error handling. A stdio server stays
-alive across discovery and calls until cleanup or owner death; code that needs
-a fresh process per operation opens and closes a catalog per operation. Cancelling a call requests cancellation; a noncooperative server can
+A stdio server stays alive across discovery and calls until cleanup or owner
+death. Cancelling a call requests cancellation; a noncooperative server can
 continue remote work until its connection owner closes it. Cancellation is not
 rollback.
 

@@ -218,6 +218,7 @@ defmodule Imp.Training.FastSlow.Rollout do
           pos_integer(),
           pos_integer() | nil
         ) :: [t()]
+  @doc false
   def validate_complete_group!(rollouts, group_id, cycle, expected_size, prompt_count \\ nil)
 
   def validate_complete_group!(rollouts, group_id, cycle, expected_size, prompt_count)

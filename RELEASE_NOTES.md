@@ -134,6 +134,13 @@ Ordinary Imp startup starts no protocol endpoint.
 - `Imp.Example` and `Imp.Prediction` keep string keys as strings. Code that
   read a field of data loaded from JSON with `map.field` or `map[:field]`
   reads it with `Imp.Example.get/2` or by its string key.
+- `Imp.MCP.Client`, `Imp.MCP.HTTPClient`, `Imp.MCP.StreamableHTTPClient`,
+  `Imp.MCP.StdioClient`, `Imp.MCP.Catalog`, `Imp.MCP.import_tools`,
+  `Imp.ACP.MCP` and `Imp.Core.ToolCall`/`ToolResult` are gone.
+  `Imp.MCP.connect/2` imports tools; `Imp.ACP.ToolKind.derive_all/1` gives an
+  import's ACP tool kinds.
+- An optimizer's `compile/N` is no longer documented where `Imp.optimize` or
+  `Imp.train` runs the optimizer; call those.
 
 ## Upgrade path
 

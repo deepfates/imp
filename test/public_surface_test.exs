@@ -39,8 +39,6 @@ defmodule PublicSurfaceTest do
     Imp.Core.LMResponse,
     Imp.Core.Message,
     Imp.Core.System,
-    Imp.Core.ToolCall,
-    Imp.Core.ToolResult,
     Imp.Core.User,
     Imp.Datasets,
     Imp.Datasets.Colors,
@@ -72,12 +70,8 @@ defmodule PublicSurfaceTest do
     Imp.LM.Static,
     Imp.Logprobs,
     Imp.MCP,
-    Imp.MCP.Catalog,
-    Imp.MCP.HTTPClient,
     Imp.MCP.OAuth,
     Imp.MCP.OAuth.Store,
-    Imp.MCP.StdioClient,
-    Imp.MCP.StreamableHTTPClient,
     Imp.Metrics,
     Imp.Metrics.Result,
     Imp.Module,
@@ -1037,11 +1031,8 @@ defmodule PublicSurfaceTest do
     assert %Imp.Clients.ReqLLM{} = Imp.req_llm("openai:gpt-test")
 
     assert %Imp.Retrievers.HTTP{} = Imp.Retrievers.HTTP.new("https://retriever.example")
-    # Remote constructors now connect; avoid reaching a fictional network host.
     assert {:ok, %Imp.MCP.Import{tools: [], cleanup: cleanup}} = Imp.MCP.connect([])
     assert :ok = cleanup.()
-    assert function_exported?(Imp.MCP.HTTPClient, :new, 2)
-    assert function_exported?(Imp.MCP.StreamableHTTPClient, :new, 2)
 
     assert %Imp.Clients.HTTPTrainer{} =
              Imp.Clients.OpenAITrainer.new(training_file: "file-test")

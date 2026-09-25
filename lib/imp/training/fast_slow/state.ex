@@ -579,6 +579,7 @@ defmodule Imp.Training.FastSlow.State do
     }
   end
 
+  @doc false
   @spec set_stage(t(), :fast | :slow) :: t()
   def set_stage(%__MODULE__{stage: stage} = state, next) when next in [:fast, :slow] do
     allowed = {stage, next} in [{:initialized, :fast}, {:fast, :slow}]
@@ -603,6 +604,7 @@ defmodule Imp.Training.FastSlow.State do
     %{state | stage: next}
   end
 
+  @doc false
   @spec put_lookahead(t(), Lookahead.t()) :: t()
   def put_lookahead(%__MODULE__{stage: stage, terminal: nil} = state, %Lookahead{} = lookahead)
       when stage in [:initialized, :fast] do
@@ -619,6 +621,7 @@ defmodule Imp.Training.FastSlow.State do
   def put_lookahead(%__MODULE__{}, %Lookahead{}),
     do: raise(ArgumentError, "lookahead may only be installed before the current fast update")
 
+  @doc false
   @spec next_cycle(t(), DatasetState.t()) :: t()
   def next_cycle(%__MODULE__{stage: :slow, terminal: nil} = state, %DatasetState{} = dataset) do
     unless state.slow_step == state.t,
@@ -642,6 +645,7 @@ defmodule Imp.Training.FastSlow.State do
   def next_cycle(%__MODULE__{}, %DatasetState{}),
     do: raise(ArgumentError, "a new cycle may only follow the slow stage")
 
+  @doc false
   @spec complete(t(), DatasetState.t(), term()) :: t()
   def complete(state, dataset, details \\ %{})
 
@@ -666,6 +670,7 @@ defmodule Imp.Training.FastSlow.State do
   def complete(%__MODULE__{}, %DatasetState{}, _details),
     do: raise(ArgumentError, "completion requires t slow updates in the final cycle")
 
+  @doc false
   @spec complete_slow_step(t(), term()) :: t()
   def complete_slow_step(%__MODULE__{stage: :slow, terminal: nil} = state, payload) do
     unless state.slow_step < state.t,
@@ -690,6 +695,7 @@ defmodule Imp.Training.FastSlow.State do
   def complete_slow_step(%__MODULE__{}, _payload),
     do: raise(ArgumentError, "a slow update may only complete during the slow stage")
 
+  @doc false
   @spec revise_prompts(t(), [term()], keyword() | map()) :: t()
   def revise_prompts(state, candidates, metadata \\ %{})
 
@@ -720,6 +726,7 @@ defmodule Imp.Training.FastSlow.State do
   def revise_prompts(%__MODULE__{}, _candidates, _metadata),
     do: raise(ArgumentError, "prompts may only be revised during the fast stage")
 
+  @doc false
   @spec put_reuse_cache(t(), ReuseCache.t()) :: t()
   def put_reuse_cache(%__MODULE__{stage: :fast, terminal: nil} = state, %ReuseCache{} = cache) do
     ReuseCache.validate!(cache)
@@ -735,6 +742,7 @@ defmodule Imp.Training.FastSlow.State do
 
   @spec claim_cached(t(), String.t(), String.t(), String.t()) ::
           {:ok, Imp.Training.FastSlow.CachedTrajectory.t(), t()} | :miss
+  @doc false
   def claim_cached(%__MODULE__{stage: :slow} = state, problem_id, input_digest, prompt_digest) do
     case ReuseCache.claim(state.reuse_cache, problem_id, input_digest, prompt_digest) do
       {:ok, trajectory, cache} -> {:ok, trajectory, %{state | reuse_cache: cache}}
@@ -742,6 +750,7 @@ defmodule Imp.Training.FastSlow.State do
     end
   end
 
+  @doc false
   @spec put_dataset(t(), DatasetState.t()) :: t()
   def put_dataset(%__MODULE__{terminal: nil, lookahead: nil} = state, %DatasetState{} = dataset),
     do: %{state | dataset: dataset}
@@ -749,6 +758,7 @@ defmodule Imp.Training.FastSlow.State do
   def put_dataset(%__MODULE__{terminal: nil}, %DatasetState{}),
     do: raise(ArgumentError, "dataset cursor may not move while a lookahead is active")
 
+  @doc false
   @spec put_intent(t(), OperationIntent.t()) :: t()
   def put_intent(%__MODULE__{terminal: nil} = state, %OperationIntent{cycle: cycle} = intent)
       when cycle == state.cycle do
@@ -769,6 +779,7 @@ defmodule Imp.Training.FastSlow.State do
   def put_intent(%__MODULE__{}, %OperationIntent{}),
     do: raise(ArgumentError, "operation intent does not belong to the current cycle")
 
+  @doc false
   @spec reconcile_intent(t(), String.t(), OperationIntent.reconciliation(), term()) :: t()
   def reconcile_intent(%__MODULE__{} = state, id, reconciliation, result \\ nil) do
     intent =
@@ -784,6 +795,7 @@ defmodule Imp.Training.FastSlow.State do
     %{state | pending_operations: pending}
   end
 
+  @doc false
   @spec put_rollout(t(), Rollout.t()) :: t()
   def put_rollout(%__MODULE__{stage: :slow, terminal: nil} = state, %Rollout{} = rollout) do
     Rollout.validate!(rollout)
@@ -802,6 +814,7 @@ defmodule Imp.Training.FastSlow.State do
     end
   end
 
+  @doc false
   @spec claim_rollout(t(), String.t(), String.t()) :: {:ok, t()} | {:error, atom()}
   def claim_rollout(%__MODULE__{stage: :slow, terminal: nil} = state, rollout_id, claim_id) do
     with %Rollout{cycle: cycle} = rollout when cycle == state.cycle <-
@@ -817,6 +830,7 @@ defmodule Imp.Training.FastSlow.State do
 
   def claim_rollout(%__MODULE__{}, _rollout_id, _claim_id), do: {:error, :invalid_stage}
 
+  @doc false
   @spec complete_rollout(t(), String.t(), String.t(), term(), number(), term()) :: t()
   def complete_rollout(state, rollout_id, claim_id, output, score, metrics) do
     rollout =
@@ -827,6 +841,7 @@ defmodule Imp.Training.FastSlow.State do
     %{state | rollout_ledger: Map.put(state.rollout_ledger, rollout_id, rollout)}
   end
 
+  @doc false
   @spec validate_complete_group!(t(), String.t()) :: [Rollout.t()]
   def validate_complete_group!(%__MODULE__{} = state, group_id) do
     state.rollout_ledger
@@ -836,6 +851,7 @@ defmodule Imp.Training.FastSlow.State do
 
   @spec charge_budget(t(), String.t() | atom(), non_neg_integer()) ::
           {:ok, t()} | {:error, :exhausted}
+  @doc false
   def charge_budget(%__MODULE__{} = state, key, amount) do
     case Budget.charge(state.budgets, key, amount) do
       {:ok, budgets} -> {:ok, %{state | budgets: budgets}}
@@ -843,6 +859,7 @@ defmodule Imp.Training.FastSlow.State do
     end
   end
 
+  @doc false
   @spec record_event(t(), Event.t()) :: t()
   def record_event(%__MODULE__{} = state, %Event{sequence: sequence, cycle: cycle} = event) do
     unless sequence == length(state.events) and cycle == state.cycle,
@@ -851,6 +868,7 @@ defmodule Imp.Training.FastSlow.State do
     %{state | events: state.events ++ [event]}
   end
 
+  @doc false
   @spec terminate(t(), atom(), term()) :: t()
   def terminate(state, reason, details \\ %{})
 

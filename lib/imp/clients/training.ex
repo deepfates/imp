@@ -1313,6 +1313,7 @@ defmodule Imp.Clients.Trainer do
 
   def supports_reinforcement_artifact?(_provider), do: false
 
+  @doc false
   def validate_provider(nil), do: {:ok, nil}
   def validate_provider(provider) when is_atom(provider), do: {:ok, provider}
   def validate_provider(provider) when is_function(provider, 3), do: {:ok, provider}
