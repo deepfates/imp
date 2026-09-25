@@ -1,19 +1,20 @@
-# Reproduces docs/TUTORIAL_TICKET_ROUTING.md end to end against the live
-# provider and writes a provenance-stamped, content-addressed run artifact to
+# Measures the support-ticket router behind rows R1 and R2 of
+# research/RESULTS.md end to end against a live provider, and writes a
+# provenance-stamped, content-addressed run artifact to
 # benchmarks/runs/tutorial-ticket-routing/<sha256>.json.
 #
 #     OPENAI_API_KEY=... mix run research/tutorial_ticket_routing_experiment.exs
 #     OPENROUTER_API_KEY=... OPENROUTER_MODEL=openai/gpt-5.4-mini \
 #       mix run research/tutorial_ticket_routing_experiment.exs
 #
-# The experiment is exactly the tutorial's: a zero-shot enum router evaluated
-# on the twenty held-out test tickets, then the same router compiled with
+# The experiment uses the tickets and optimizer from Getting started, with the
+# router configured as in router/1 below: a zero-shot enum router evaluated on
+# the twenty held-out test tickets, then the same router compiled with
 # LabeledFewShot(k: 8) on the twenty train tickets and evaluated on the same
 # held-out twenty. It repeats the full experiment (default three times) so the
-# artifact records honest run-to-run ranges rather than one lucky draw. The
-# in-BEAM response cache is cleared before every repeat and per-repeat cache
-# stats are recorded, so each repeat is genuinely live: zero cache hits is
-# asserted by the artifact test, not assumed.
+# artifact records run-to-run ranges rather than one draw. The in-BEAM response
+# cache is cleared before every repeat and per-repeat cache stats are recorded
+# in the artifact, so a reader can check that each repeat reached the provider.
 
 defmodule TutorialTicketRoutingExperiment do
   @dataset_relative "priv/tutorial/support_tickets.json"
@@ -157,7 +158,7 @@ defmodule TutorialTicketRoutingExperiment do
       },
       "fresh_service" => fresh_service,
       "doc_claims_under_test" => %{
-        "source" => "docs/getting-started/measuring.md",
+        "source" => "research/RESULTS.md",
         "baseline_repeat_range" => [0.30, 0.50],
         "optimized_repeat_range" => [0.90, 1.0],
         "cost_usd_per_repeat_approx" => 0.013,

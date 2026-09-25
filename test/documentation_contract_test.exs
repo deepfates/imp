@@ -3,26 +3,29 @@ defmodule DocumentationContractTest do
   Properties every rendered page holds. The pages are the `extras` in
   `mix.exs`, so a page is checked by being added to the docs.
 
-  Code blocks on a page run in order, sharing one binding, in a scratch
-  directory. The Getting started pages are one walk-through and share one
-  binding across pages:
+  Code on a guide runs in order, one top-level expression at a time, sharing
+  one binding, in a scratch directory. The Getting started pages are one
+  walk-through and share one binding across pages.
 
     * Every Elixir block must parse.
-    * Blocks run with the network refused: provider keys in the environment
-      are replaced by a placeholder, and every HTTP request gets a 401 and is
-      counted. Building a provider client works; a block that sends a request
-      is live, so its results are not checked, and what it binds (variables,
-      modules) is live from then on. A block naming one of `@live_markers`
-      starts other processes or installs packages, so it is live without
-      running.
-    * A block that needs a live variable is skipped the same way. A block that
-      needs a variable no earlier block defined is a fragment and is only
-      parsed, unless it shows a result.
+    * A block fenced with `~~~` is only parsed. Use it for a fragment that
+      needs something the page does not set up, or for a config file.
+    * Code runs with the network refused: provider keys are replaced by a
+      placeholder, and every HTTP request gets a 401 and is counted. Building
+      a provider client works. An expression that sends a request is live: its
+      value is not checked, and what it binds is live from then on. A block
+      naming one of `@live_markers` starts processes or installs packages, and
+      is live without running.
+    * An expression that needs a live variable is live the same way. The
+      expressions around it still run, so a scripted-model example on a page
+      that otherwise calls a provider is checked.
+    * An expression that needs a variable no earlier code defined is a
+      fragment and is only parsed, unless it shows a result.
     * `#=> value` after an expression is a claim about that expression's
-      value, and is checked. The value is read as a pattern (so a map may
-      show some of its keys), then as an expression, then compared with
-      `inspect/1`. Lines beginning `#` and three spaces continue it.
-    * A block fenced with `~~~` is only parsed.
+      value, and is checked unless the expression was live. The value is read
+      as a pattern (so a map may show some of its keys), then as an
+      expression, then compared with `inspect/1`. Lines beginning `#` and
+      three spaces continue it.
 
   Only guides run here. Livebooks run as notebooks under
   `mix livebook.execute.check`; a cheatsheet is a set of separate snippets,
@@ -128,7 +131,7 @@ defmodule DocumentationContractTest do
       failures =
         for page <- pages(),
             page not in @history,
-            name <- page |> File.read!() |> module_references(),
+            name <- page |> File.read!() |> without_output() |> module_references(),
             not MapSet.member?(@module_reference_allowlist, name),
             not MapSet.member?(documented, name),
             uniq: true,
@@ -236,7 +239,28 @@ defmodule DocumentationContractTest do
       ```
       """
 
-      assert %{failures: [], checked: 0, ran: 1, requests: 1} = run_markdown(page)
+      assert %{failures: [], checked: 0, requests: 1, live_vars: live} = run_markdown(page)
+      assert :prediction in live
+      refute :router in live
+    end
+
+    test "a provider-free expression after a request still runs and is checked" do
+      page = """
+      ```elixir
+      lm = Imp.req_llm("openai:gpt-5.4-mini", api_key: System.fetch_env!("OPENAI_API_KEY"))
+      router = Imp.predict("ticket -> team", lm: lm)
+      {:ok, prediction} = Imp.call(router, %{ticket: "charged twice"})
+      ```
+
+      ```elixir
+      always_atlas = Imp.with_lm(router, Imp.LM.Static.new(handler: fn _, _ -> %{team: "atlas"} end))
+      {:ok, scripted} = Imp.call(always_atlas, %{ticket: "charged twice"})
+      Imp.get(scripted, :team)
+      #=> "atlas"
+      ```
+      """
+
+      assert %{failures: [], checked: 1, requests: 1} = run_markdown(page)
     end
 
     test "a real provider key is never visible to a page" do
@@ -276,6 +300,12 @@ defmodule DocumentationContractTest do
     test "a provider-free block that raises fails, unless it is fenced with ~~~" do
       assert %{failures: [_]} = run_markdown("```elixir\nraise \"boom\"\n```\n")
       assert %{failures: []} = run_markdown("~~~elixir\nraise \"boom\"\n~~~\n")
+    end
+
+    test "module names are read from prose and Elixir, not from shown output" do
+      text = "Imp.Prose\n```text\n** (Imp.Printed) boom\n```\n```elixir\nImp.Code.call()\n```\n"
+
+      assert text |> without_output() |> module_references() == ["Imp.Prose", "Imp.Code"]
     end
 
     test "prose excludes code, links and comments" do
@@ -389,6 +419,12 @@ defmodule DocumentationContractTest do
     |> MapSet.new(& &1["module"])
   end
 
+  # Shown output (```text, ```sh) records what the runtime printed, which may
+  # name an internal module; only the page's own words and code are checked.
+  defp without_output(text) do
+    Regex.replace(~r/^\s*(```|~~~)(?!elixir\s*$)[^\n]*\n.*?^\s*\1\s*$/ms, text, "")
+  end
+
   defp module_references(text) do
     ~r/(?<![\w.])Imp(?:\.[A-Z][A-Za-z0-9_]*)+/
     |> Regex.scan(text)
@@ -445,6 +481,7 @@ defmodule DocumentationContractTest do
     without_network(fn requests ->
       state = %{
         binding: [],
+        env: Code.env_for_eval([]),
         live_vars: MapSet.new(),
         live_modules: [],
         failures: [],
@@ -532,7 +569,10 @@ defmodule DocumentationContractTest do
 
   defp taint(state, code) do
     {:ok, ast} = Code.string_to_quoted(code)
+    taint_ast(state, ast)
+  end
 
+  defp taint_ast(state, ast) do
     {_, {vars, modules}} =
       Macro.prewalk(ast, {[], []}, fn
         {:defmodule, _, [{:__aliases__, _, parts} | _]} = node, {vars, modules} ->
@@ -605,13 +645,50 @@ defmodule DocumentationContractTest do
     }
   end
 
+  # A segment runs one top-level expression at a time, so an expression that
+  # sends a request makes only what it binds live; the expressions before it
+  # keep their values, and later ones run unless they need what it bound.
   defp run_segment(%{code: code, expected: expected}, state) do
+    {:ok, quoted} = Code.string_to_quoted(code)
+
+    statements =
+      case quoted do
+        {:__block__, _, statements} -> statements
+        statement -> [statement]
+      end
+
+    result =
+      Enum.reduce_while(statements, {:ok, nil, state, false}, fn statement, {:ok, _, state, _} ->
+        case run_statement(statement, state) do
+          {:ok, value, state} -> {:cont, {:ok, value, state, false}}
+          {:skip, :live} -> {:cont, {:ok, nil, taint_ast(state, statement), true}}
+          other -> {:halt, other}
+        end
+      end)
+
+    case result do
+      {:ok, _value, state, true} ->
+        {:ok, state}
+
+      {:ok, value, state, false} ->
+        case expected && check(value, expected, state.binding) do
+          nil -> {:ok, state}
+          :ok -> {:ok, %{state | checked: state.checked + 1}}
+          {:error, message} -> {:error, message}
+        end
+
+      other ->
+        other
+    end
+  end
+
+  defp run_statement(statement, state) do
     before = :counters.get(state.requests, 1)
 
     {outcome, diagnostics} =
       Code.with_diagnostics(fn ->
         try do
-          {:ok, Code.eval_string(code, state.binding)}
+          {:ok, Code.eval_quoted_with_env(statement, state.binding, state.env)}
         rescue
           error in [CompileError] -> {:compile_error, error}
           error in [UndefinedFunctionError] -> {:undefined, error, __STACKTRACE__}
@@ -630,14 +707,8 @@ defmodule DocumentationContractTest do
       _ when sent_request? ->
         {:skip, :live}
 
-      {:ok, {value, binding}} ->
-        state = %{state | binding: binding}
-
-        case expected && check(value, expected, binding) do
-          nil -> {:ok, state}
-          :ok -> {:ok, %{state | checked: state.checked + 1}}
-          {:error, message} -> {:error, message}
-        end
+      {:ok, {value, binding, env}} ->
+        {:ok, value, %{state | binding: binding, env: env}}
 
       {:compile_error, error} ->
         cond do

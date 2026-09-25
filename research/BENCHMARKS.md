@@ -53,8 +53,10 @@ Also accepts `OPENROUTER_API_KEY` with `openai/gpt-5.4-mini`. Set
   the search optimizers. Twenty rows move in 5-point steps.
 
 This is the one end-to-end effectiveness number an outsider can reproduce from
-scratch. [Getting started](../docs/getting-started/measuring.md) walks through the same
-experiment as ordinary library code.
+scratch. [Getting started](../docs/getting-started/measuring.md) uses the same
+tickets and the same optimizer, but its router is configured differently and
+each page shows a single run, so its numbers are not these rows; this command
+is the repeated measurement.
 
 ### Agent optimization (row R6)
 
