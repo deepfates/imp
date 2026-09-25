@@ -8,7 +8,7 @@ twenty into train, dev and test. SHA-256 of the file:
 The tickets were written for this repository. They are not drawn from any
 external dataset, and no real customer, company or person appears in them. The
 squad names encode a routing convention that no model can guess, which is the
-point of [the tutorial](../../docs/TUTORIAL_TICKET_ROUTING.md): it makes the
+point of [the getting-started guide](../../docs/getting-started/index.md): it makes the
 gap between what a model can read and what an organization means measurable.
 
 **License: MIT, the same as the rest of this repository.** The file ships in the

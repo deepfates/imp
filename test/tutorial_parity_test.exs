@@ -43,7 +43,7 @@ defmodule TutorialParityTest do
           "livebooks/03_evaluate_and_optimize.livemd",
           "livebooks/04_tools_agents_mcp_rlm.livemd",
           "livebooks/05_operate_and_live_checks.livemd",
-          "docs/LEARNING_PATH.md",
+          "docs/getting-started/index.md",
           "docs/differentials/MULTIMODAL_FIDELITY.md",
           "docs/BENCHMARKS.md",
           "examples/deployment/README.md"

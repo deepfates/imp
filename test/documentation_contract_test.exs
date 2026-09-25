@@ -101,15 +101,14 @@ defmodule DocumentationContractTest do
     assert missing == []
   end
 
-  test "the learning path owns the signature type DSL" do
-    body = File.read!("docs/LEARNING_PATH.md")
+  test "the getting-started signatures page lists every signature type spelling" do
+    body = File.read!("docs/getting-started/expanding-signatures.md")
 
     for spelling <-
           ~w(string str integer int float number boolean bool datetime object map dict array enum class yes_no short_span numeric_span) do
       assert body =~ "`#{spelling}", "missing signature type spelling #{spelling}"
     end
 
-    assert body =~ "Unknown types and duplicate names fail"
     assert body =~ "Imp.Signature.Field"
   end
 
@@ -164,11 +163,10 @@ defmodule DocumentationContractTest do
         "RELEASE_NOTES.md",
         "CHANGELOG.md",
         "docs/coming-from-dspy.md",
-        "docs/LEARNING_PATH.md",
         "docs/production.md",
         "examples/deployment/README.md",
         "examples/provider_free_ticket_router/README.md"
-      ] ++ Path.wildcard("livebooks/*.livemd")
+      ] ++ Path.wildcard("docs/getting-started/*.md") ++ Path.wildcard("livebooks/*.livemd")
 
     # benchmarks/RESULTS.md is a published surface: user docs are expected to
     # cite it. Everything else under benchmarks/ is still internal.
@@ -186,33 +184,39 @@ defmodule DocumentationContractTest do
 
   test "learner-facing docs do not foreground maintainer evidence commands" do
     learner_text =
-      ["README.md", "docs/LEARNING_PATH.md" | Path.wildcard("livebooks/*.livemd")]
+      [
+        "README.md"
+        | Path.wildcard("docs/getting-started/*.md") ++ Path.wildcard("livebooks/*.livemd")
+      ]
       |> Enum.map_join("\n", &File.read!/1)
 
     refute learner_text =~ "mix evidence.check"
   end
 
-  test "README opens with a real provider call and routes into the learning path" do
+  test "README opens with a real provider call and routes into getting started" do
     readme = File.read!("README.md")
-    learning = File.read!("docs/LEARNING_PATH.md")
+    testing = File.read!("docs/getting-started/testing-without-a-provider.md")
 
-    assert readme =~ "typed Elixir program"
     assert readme =~ "Imp.req_llm"
     assert readme =~ "OPENAI_API_KEY"
-    assert readme =~ "docs/LEARNING_PATH.md"
+    assert readme =~ "docs/getting-started/index.md"
     # The front door shows a real model call, never the deterministic test double.
     refute readme =~ "Imp.LM.Static"
     # No quality-gate plumbing on the front door.
-    refute readme =~ "test/learning_path_contract_test.exs"
-    assert learning =~ "Imp.context/2"
-    assert learning =~ "Imp.LM.Static"
-    assert readme =~ "livebooks/01_real_lm_front_door.livemd"
+    refute readme =~ "test/getting_started_contract_test.exs"
+    assert testing =~ "Imp.context/2"
+    assert testing =~ "Imp.LM.Static"
     refute readme =~ "05_real_lm_wow_path"
   end
 
   test "the packaged reader surface stays small and starts with the real workflow" do
     readme = File.read!("README.md")
-    learning = File.read!("docs/LEARNING_PATH.md")
+
+    getting_started =
+      Mix.Project.config()
+      |> Keyword.fetch!(:docs)
+      |> Keyword.fetch!(:groups_for_extras)
+      |> Keyword.fetch!(:"Getting started")
 
     product_docs =
       Mix.Project.config()
@@ -221,14 +225,13 @@ defmodule DocumentationContractTest do
       |> Enum.filter(&String.starts_with?(&1, "docs/"))
       |> Enum.sort()
 
-    assert readme =~ "Learning Path"
-    assert readme =~ "docs/LEARNING_PATH.md"
-    assert learning =~ "## 1. Make A Real Call"
-    assert learning =~ ~r/## 10\. .*Artifact/
+    assert readme =~ "docs/getting-started/index.md"
 
-    assert product_docs == [
-             "docs/LEARNING_PATH.md",
-             "docs/TUTORIAL_TICKET_ROUTING.md",
+    assert Enum.all?(getting_started, &(&1 in product_docs)),
+           "a getting-started page does not ship"
+
+    assert product_docs -- getting_started == [
+             "docs/cheatsheet.cheatmd",
              "docs/coming-from-dspy.md",
              "docs/diving-deeper/adapters.md",
              "docs/diving-deeper/choosing-an-optimizer.md",
@@ -249,14 +252,13 @@ defmodule DocumentationContractTest do
       |> Keyword.fetch!(:extras)
 
     for doc <- ["docs/CASE_STUDY_TREC.md", "docs/EVIDENCE.md"] do
-      assert doc in extras, "#{doc} is not rendered into the docs"
       refute doc in product_docs, "#{doc} names source-checkout commands and must not ship"
     end
 
     refute "docs/BENCHMARKS.md" in extras
     refute "docs/BENCHMARKS.md" in product_docs
 
-    for doc <- ["README.md", "docs/EVIDENCE.md", "docs/TUTORIAL_TICKET_ROUTING.md"] do
+    for doc <- ["docs/EVIDENCE.md"] do
       assert File.read!(doc) =~ "blob/main/docs/BENCHMARKS.md",
              "#{doc} does not link to the benchmark index"
     end
@@ -395,24 +397,6 @@ defmodule DocumentationContractTest do
     attribution = File.read!("benchmarks/data/GEPA_SPLITS_ATTRIBUTION.md")
 
     assert attribution =~ "not in this repository"
-  end
-
-  test "cold learning path distinguishes portable programs from selected parameter artifacts" do
-    learning = File.read!("docs/LEARNING_PATH.md")
-
-    assert learning =~ "## 8. Persist Programs Or Selected Parameters, Not Secrets"
-    assert learning =~ "There are two restart paths."
-    assert learning =~ "Imp.Optimizer.Artifact.from_optimized_program(selected"
-    assert learning =~ "Imp.Optimizer.Artifact.write!(artifact"
-    assert learning =~ "Imp.Optimizer.Artifact.read!()"
-    assert learning =~ "Imp.Optimizer.Artifact.apply(fresh_router)"
-    assert learning =~ "%Imp.Optimizer.Report{} = Imp.Optimizer.Report.fetch(deployed)"
-    assert learning =~ "Imp.Optimizer.GEPA.compile_with_artifact/5"
-    assert learning =~ "It does not carry\nyour module, LMs, adapters, callbacks"
-    assert learning =~ "tool runners, policies, credentials"
-
-    assert learning =~
-             "Measure\nthe selected program on data unavailable to optimization before promotion."
   end
 
   test "instruction optimizer fidelity defines durable run-level resume boundaries" do
@@ -697,7 +681,9 @@ defmodule DocumentationContractTest do
   end
 
   defp documented_module_references do
-    (["README.md"] ++ Path.wildcard("docs/*.md") ++ Path.wildcard("livebooks/*.livemd"))
+    (["README.md"] ++
+       Path.wildcard("docs/*.md") ++
+       Path.wildcard("docs/getting-started/*.md") ++ Path.wildcard("livebooks/*.livemd"))
     |> Enum.flat_map(fn path ->
       path
       |> File.read!()

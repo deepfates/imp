@@ -17,11 +17,15 @@ defmodule Imp.MixProject do
         warnings_as_errors: true,
         extras:
           ["README.md"] ++
+            getting_started_extras() ++
             product_docs() ++
-            diving_deeper() ++ livebooks() ++ ["RELEASE_NOTES.md", "CHANGELOG.md"],
+            diving_deeper() ++
+            reference() ++ livebooks() ++ ["RELEASE_NOTES.md", "CHANGELOG.md"],
         groups_for_extras: [
+          "Getting started": getting_started(),
           Guides: product_docs(),
           "Diving deeper": diving_deeper(),
+          Reference: reference(),
           Livebooks: livebooks(),
           Releases: ["RELEASE_NOTES.md", "CHANGELOG.md"]
         ],
@@ -193,8 +197,10 @@ defmodule Imp.MixProject do
        deployment_example_files() ++
        Path.wildcard("examples/provider_free_ticket_router/**/*") ++
        Path.wildcard("examples/workspace_agent/**/*") ++
+       getting_started() ++
        product_docs() ++
        diving_deeper() ++
+       reference() ++
        livebooks() ++
        [
          ".formatter.exs",
@@ -233,10 +239,37 @@ defmodule Imp.MixProject do
     |> Enum.any?(&(&1 in ["_build", "deps"]))
   end
 
+  # One continuous walk-through, in reading order.
+  defp getting_started do
+    ~w(
+      index
+      setting-up
+      first-program
+      expanding-signatures
+      changing-the-module
+      testing-without-a-provider
+      tools-and-agents
+      composing-programs
+      measuring
+      improving
+      save-and-load
+      running-in-your-application
+      where-to-go-next
+    )
+    |> Enum.map(&"docs/getting-started/#{&1}.md")
+  end
+
+  # ExDoc names each page after its file, and "index" would replace the docs'
+  # own index.html, so the path's entry page gets its own name.
+  defp getting_started_extras do
+    Enum.map(getting_started(), fn
+      "docs/getting-started/index.md" = path -> {path, filename: "getting-started"}
+      path -> path
+    end)
+  end
+
   defp product_docs do
     [
-      "docs/LEARNING_PATH.md",
-      "docs/TUTORIAL_TICKET_ROUTING.md",
       "docs/coming-from-dspy.md",
       "docs/production.md"
     ]
@@ -255,6 +288,10 @@ defmodule Imp.MixProject do
       "docs/diving-deeper/runs-and-supervision.md",
       "docs/diving-deeper/settings-and-context.md"
     ]
+  end
+
+  defp reference do
+    ["docs/cheatsheet.cheatmd"]
   end
 
   defp livebooks do
