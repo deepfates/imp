@@ -139,6 +139,11 @@ defmodule Imp.MCP.OwnedStdio do
   @impl ExMCP.Transport
   def capabilities(%__MODULE__{}), do: [:push]
 
+  @doc false
+  # How long a server that ignores SIGTERM lives after its group is signalled.
+  @spec kill_timeout_ms() :: pos_integer()
+  def kill_timeout_ms, do: @kill_timeout_seconds * 1_000
+
   # erlexec's port program exits with status 4 when `SHELL` is unset or empty,
   # which is how containers and service managers often start the VM, and it
   # reads the variable again whenever its supervisor restarts it. It is set in
