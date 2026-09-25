@@ -380,8 +380,10 @@ permission and shows the call. Given "We were charged twice this month.",
 - `permission_policy:` decides tool calls: `:client` (the default) asks the
   client; `:unrestricted` asks no one and leaves the program's own tool
   policy in charge; a function returns `:allow`, `:client` or
-  `{:deny, reason}`. A program with no tools, such as a plain predictor,
-  cannot ask, so the default policy refuses to run it; serve it with
+  `{:deny, reason}`. Only a program that runs tools through a run's
+  authorization (ReAct, RLM, or your own module with `execute/3`) can ask.
+  The default policy refuses any other, a plain predictor included, with
+  the failure `execution_capability_unsupported`; serve such a program with
   `permission_policy: :unrestricted`.
 - `session_store:` is a directory where sessions are saved, so a client can
   load, list and resume them.
