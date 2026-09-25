@@ -111,8 +111,8 @@ escalation =
   )
 ```
 
-With `gpt-5.4-mini`, in three runs, the model called `on_call` for atlas and
-then `submit`, every time:
+With `gpt-5.4-mini`, in three runs of six the model called `on_call` for atlas
+and then `submit`:
 
 ```elixir
 lm = Imp.req_llm("openai:gpt-5.4-mini", api_key: System.fetch_env!("OPENAI_API_KEY"))
@@ -124,12 +124,16 @@ escalate = Imp.react(escalation, [on_call], lm: lm, max_iters: 5)
 #=> {"atlas", "Maya", :submit}
 ```
 
+In the other three it submitted atlas without calling the tool, the turn
+ended in the forced `submit`, and `contact` came back as `""` or `"unknown"`.
+The type check accepts any string; it cannot tell that the model never looked.
+
 In a tool loop the model reads the task's instructions, the tools, and the
 history. The descriptions of your output fields reach it only inside the
 `submit` tool's parameters. Put what the model needs to decide, such as what
 the squads own, in the instructions. With the squad meanings in the `team`
 field's description instead, the same model called `on_call` for all four
-squads and then submitted harbor.
+squads before submitting in five runs of six, and submitted harbor in one.
 
 A scripted model shows the loop without a provider. Each step is either tool
 calls or text:
@@ -203,9 +207,12 @@ reply = Imp.react(Imp.signature("ticket -> reply", "Tell the customer who is han
 
 That is also how a turn ends when the model narrates instead of acting. Given
 "I can't log in after resetting my password." and instructions to look up who
-is on call before replying, `gpt-5.4-mini` answered "I'm checking who's on
-call for the squad that handles identity/login issues, and I'll let you know
-who's taking this." without calling the tool, in three runs of three. When an
+is on call before replying, `gpt-5.4-mini` called the tool and named Ines in
+one run of six. In the other five it wrote text without calling the tool, and
+that text was the answer: twice a sentence about what it was going to do
+("I'm looking into this now and will let you know who's on call for the team
+handling login issues."), twice the tool call or its arguments written out as
+JSON, and once nothing. When an
 answer has to follow a tool call, give the signature a second output, so the
 turn ends only through `submit`, or end it from the tool with `finish_on:`.
 

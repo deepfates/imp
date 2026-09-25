@@ -132,9 +132,9 @@ The last three are answer shapes for extractive question answering: the value
 is text, and its shape is checked.
 
 The description is part of the prompt. On the tutorial's 20 test tickets, the
-router above without the description scored 0.25 in three runs with
-`gpt-5.4-mini`, and 0.70 with it, because the squad names mean nothing to the
-model until something says what they own:
+router above without the description scored 0.35 to 0.40 in three runs with
+`gpt-5.4-mini`, and 0.75 to 0.80 with it, because the squad names mean nothing
+to the model until something says what they own:
 
 ```elixir
 lm = Imp.req_llm("openai:gpt-5.4-mini", api_key: System.fetch_env!("OPENAI_API_KEY"))
@@ -148,7 +148,7 @@ test =
 router = Imp.predict(signature, lm: lm, adapter: Imp.Adapter.JSON)
 
 Imp.evaluate(router, test, Imp.exact_match(:team)).score
-#=> 0.7
+#=> 0.75
 ```
 
 ### The structured form
