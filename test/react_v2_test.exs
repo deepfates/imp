@@ -1120,7 +1120,7 @@ defmodule ReActV2Test do
     lm = action_lm([%{tool_calls: [%{id: "r1", name: "reply", arguments: %{}}]}])
 
     assert {:ok, prediction} =
-             Imp.react_v2(signature, [reply],
+             Imp.react(signature, [reply],
                lm: lm,
                max_iters: 1,
                finish_on: %{
@@ -1413,7 +1413,7 @@ defmodule ReActV2Test do
       ])
 
     assert {:ok, prediction} =
-             Imp.react_v2(signature, [], lm: lm, max_iters: 1) |> Imp.call(%{ticket: "t"})
+             Imp.react(signature, [], lm: lm, max_iters: 1) |> Imp.call(%{ticket: "t"})
 
     assert prediction.metadata[:termination_reason] == :submit
     assert Imp.get(prediction, :team) == "atlas"
@@ -1428,7 +1428,7 @@ defmodule ReActV2Test do
     lm = action_lm([%{next_thought: "team: harbor", tool_calls: []}], parent)
 
     assert {:ok, prediction} =
-             Imp.react_v2("ticket -> team: enum[atlas, harbor]", [], lm: lm, max_iters: 2)
+             Imp.react("ticket -> team: enum[atlas, harbor]", [], lm: lm, max_iters: 2)
              |> Imp.call(%{ticket: "t"})
 
     assert_received {:lm_call, opts}

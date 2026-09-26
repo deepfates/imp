@@ -294,7 +294,7 @@ defmodule Imp.ErrorShapesTest do
         )
 
       write = Imp.tool(:write, "Write", fn _ -> "written" end)
-      program = Imp.react_v2("intent -> answer, confidence: float", [write], lm: lm, max_iters: 3)
+      program = Imp.react("intent -> answer, confidence: float", [write], lm: lm, max_iters: 3)
 
       assert {:ok, run} =
                Imp.start_run(program, %{intent: "hello"},

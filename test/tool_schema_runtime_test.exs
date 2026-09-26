@@ -171,7 +171,7 @@ defmodule ToolSchemaRuntimeTest do
         end)
 
       program =
-        Imp.react_v2("question -> answer", [route_tool(parent)],
+        Imp.react("question -> answer", [route_tool(parent)],
           lm: lm,
           finish_on: %{
             route: fn arguments, _result, _inputs ->
@@ -199,7 +199,8 @@ defmodule ToolSchemaRuntimeTest do
           end)
         end)
 
-      react = Imp.react("question -> answer", [route_tool(parent)], lm: lm, max_iters: 2)
+      react =
+        Imp.Predict.ReAct.new("question -> answer", [route_tool(parent)], lm: lm, max_iters: 2)
 
       assert {:ok, prediction} = Imp.call(react, %{question: "q"})
       assert Imp.get(prediction, :answer) == "atlas"

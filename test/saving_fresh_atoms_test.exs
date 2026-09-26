@@ -36,7 +36,7 @@ defmodule SavingFreshAtomsTest do
       |> Jason.decode!()
       |> rename_atom("ticket", fresh)
 
-    loaded = Imp.Saving.load(state)
+    loaded = Imp.Saving.load!(state)
     [demo] = Imp.ProgramAccess.demos(loaded)
     assert Imp.get(demo, fresh) == "charged twice"
     assert Imp.get(demo, :team) == "atlas"
@@ -62,7 +62,7 @@ defmodule SavingFreshAtomsTest do
       |> rename_atom("context", context)
       |> rename_atom("tag", tag)
 
-    loaded = Imp.Saving.load(state)
+    loaded = Imp.Saving.load!(state)
     assert to_string(loaded.query_field) == query
     assert to_string(loaded.context_field) == context
     assert [%{^tag => "billing"}] = loaded.retriever.docs
@@ -74,7 +74,9 @@ defmodule SavingFreshAtomsTest do
     lookup = fn %{"query" => query} -> "found #{query}" end
     registry = Imp.Saving.Registry.new(lookup_runner: lookup)
     tool = Imp.tool(:lookup, "lookup facts", lookup, schema: %{query: :string})
-    program = Imp.react("question -> answer", [tool], max_iters: 0, tool_policy: [:lookup])
+
+    program =
+      Imp.Predict.ReAct.new("question -> answer", [tool], max_iters: 0, tool_policy: [:lookup])
 
     state =
       program
@@ -83,7 +85,7 @@ defmodule SavingFreshAtomsTest do
       |> Jason.decode!()
       |> rename_atom("lookup", fresh)
 
-    loaded = Imp.load(state, registry: registry)
+    loaded = Imp.load!(state, registry: registry)
     assert Imp.Tool.call(Map.fetch!(loaded.tools, fresh), %{query: "beam"}) == "found beam"
     assert Imp.ToolPolicy.authorize(loaded.tool_policy, fresh, %{}) == :ok
     assert_raise ArgumentError, fn -> String.to_existing_atom(fresh) end
