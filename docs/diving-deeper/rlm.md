@@ -21,8 +21,8 @@ split a task into pieces.
 ### 1. The context lives in variables, not in the prompt
 
 Each input field becomes a variable of the same name. The model sees only a
-description of each variable: its type, its length, and a preview of the
-first `max_preview_chars` characters (2,000 by default). It sees more by
+description of each variable: its type, its length, and a preview, the first
+`max_preview_chars` characters of its printed value (2,000 by default). It sees more by
 writing code: slicing, splitting, filtering, and printing what it wants to
 read. A 900 KB log costs the model the preview until the model decides which
 lines matter.
@@ -51,8 +51,9 @@ question and returns its answer as a string; `llm_query_batched(prompts)`
 asks several at once and returns the answers in order. The usual shape is: find the relevant pieces
 with code, have the sub-model read each piece, combine the answers with code.
 `rlm_query(prompt)` goes one level deeper and runs the question as a child RLM
-with its own interpreter, up to `max_recursion_depth` (1 by default); at the
-limit it becomes a plain `llm_query`.
+with its own interpreter. `max_recursion_depth` (1 by default) is how many
+levels of children may start below the top one; at the limit `rlm_query`
+becomes a plain `llm_query`.
 
 The sub-model is `sub_lm:`, or the controller's own model when it is not
 given. A strong model steering and a cheaper one reading snippets is a good
@@ -60,10 +61,12 @@ split: planning the search is harder than reading one line.
 
 ### 5. The code is a small language Imp interprets itself
 
-The model writes a subset of Elixir: values, assignment, `if`, `for`
-comprehensions, pipelines, and an allowlist of functions. The controller's
-prompt lists exactly what is allowed, and it is the same list the interpreter
-enforces.
+The model writes a subset of Elixir: values, assignment with patterns
+(`{a, b} = pair`, `[first | rest] = lines`), `if`, `for` comprehensions with
+`into:` and `uniq:`, pipelines, anonymous functions, and the data functions
+of `Enum`, `Map`, `List`, `Keyword`, `String` and `Kernel`, except the few
+that make atoms or random choices. The controller's prompt lists exactly what
+is allowed, and it is the same list the interpreter enforces.
 
 Imp parses the code and walks the syntax tree itself; nothing is passed to
 `Code.eval_string/3`, and module calls are limited to an allowlist. This is a
@@ -180,13 +183,11 @@ turn then adds one message with every variable's description and preview, and
 the turns, sub-model calls and time that are left. Earlier turns stay in the conversation as the
 model's code and what it printed.
 
-The model can also submit by replying with a JSON object holding exactly the
-required outputs. That is checked like a `submit/1` call.
-
 ### A log too long to read
 
 The support team's application log has 20,000 lines, about 900 KB. Five of
-them are customer messages; the rest are requests.
+them are customer messages; the rest are requests, each with its time in
+milliseconds.
 
 ```elixir
 messages = %{
@@ -209,9 +210,11 @@ byte_size(log)
 #=> 926857
 ```
 
-Three customers were charged twice. Two others use the same words about
-something else. Keywords cannot tell them apart; a model reading the five
-messages can.
+Two questions about it need different tools. How many requests took 95 ms or
+more is counting, which code does exactly: 1,110. Which customers were
+charged twice is reading: three were, and two others use the same words
+about something else, so keywords cannot tell them apart and a model reading
+the five messages can.
 
 ```elixir
 key = System.fetch_env!("OPENAI_API_KEY")
@@ -219,8 +222,9 @@ key = System.fetch_env!("OPENAI_API_KEY")
 finder =
   Imp.rlm(
     Imp.signature(
-      "log -> customers: array[string]",
-      "The log mixes request lines with support messages. List the customers who were charged twice for the same thing. " <>
+      "log -> customers: array[string], slow_requests: integer",
+      "The log mixes request lines with support messages. List the customers who were charged twice for the same thing, " <>
+        "and count the request lines whose ms is 95 or more. " <>
         "Customers phrase this many ways, so find the support messages with code and have a sub-model judge each one."
     ),
     lm: Imp.req_llm("openai:gpt-5.4", api_key: key),
@@ -231,32 +235,41 @@ finder =
   )
 
 {:ok, prediction} = Imp.call(finder, %{log: log})
-Imp.get(prediction, :customers)
-#=> ["acme", "globex", "initech"]
+{Imp.get(prediction, :customers), Imp.get(prediction, :slow_requests)}
+#=> {["acme", "globex", "initech"], 1110}
 ```
 
-In one run, the model's third turn filtered the lines by keyword, left out
-the request lines, and printed what remained: the five support messages. After
-three turns the interpreter rejected, its seventh turn asked the sub-model about
-each message and kept the ones it answered yes:
+In one run, the model's first turn counted the slow requests, kept the lines
+that are not requests, and printed them with the count:
 
 ```text
-r1 = llm_query("Does this support message indicate the customer was charged twice for the same thing? Reply only yes or no.\n3100 SUPPORT customer=acme msg=\"We were billed two times for September.\"")
-...
-customers = []
-customers = if String.contains?(String.downcase(r1), "yes"), do: customers ++ ["acme"], else: customers
-...
-submit(%{"customers" => customers})
+lines = String.split(log, "\n", trim: true)
+slow_requests = Enum.count(lines, fn line ->
+  String.contains?(line, " INFO ") and String.contains?(line, " ms=") and (
+    (String.split(line, "ms=") |> List.last() |> String.to_integer()) >= 95
+  )
+end)
+support_lines = for line <- lines, not String.contains?(line, " INFO "), do: line
+sample = Enum.take(support_lines, 20)
+print(%{total_lines: length(lines), support_count: length(support_lines), slow_requests: slow_requests, sample: sample})
 ```
 
-The log never entered a prompt; the controller read previews and printed
-lines, and the sub-model read five short messages. The runs vary. With
-`gpt-5.4` steering and `gpt-5.4-mini` reading, six of seven runs returned
-exactly those three customers, in three to seven turns, and one ended in an
-error. Without the instruction's second sentence, the same pair sometimes
-judged the messages in code and missed acme, or submitted names that appear
-nowhere in the log; with `gpt-5.4-mini` steering too, three runs of three
-submitted an empty list from the preview without exploring.
+Its second turn sent the five messages to the sub-model in one question,
+read its answers with code, and submitted:
+
+```text
+prompt = "For each support log line below, decide whether the customer is reporting being charged twice / duplicate billed for the same thing. Return exactly one TSV line per input in the same order: YES or NO, then a tab, then the customer name if YES else blank. No extra text.\n\n" <> Enum.join(support_lines, "\n")
+resp = llm_query(prompt)
+rows = String.split(resp, "\n", trim: true)
+...
+```
+
+The log never entered a prompt. Each turn's message, with every variable's
+description and preview, was 2.3 KB on the first turn and at most 7.8 KB
+after; the largest whole request was 17 KB. The runs vary. With `gpt-5.4`
+steering and `gpt-5.4-mini` reading, four runs each took two turns and cost
+three to five cents; all four counted 1,110, and three of the four returned
+exactly those three customers. The fourth submitted an empty list.
 
 Walking 20,000 lines takes more than the default 10,000 interpreter steps per
 turn, so this program raises `max_interpreter_steps`. The model reads a step
@@ -273,7 +286,7 @@ data saves turns.
 | `max_interpreter_steps` | 10,000 | evaluation steps per turn | the code gets `{:error, :step_limit_exceeded}` |
 | `max_interpreter_value_bytes` | 16 MB | the size of any one value | the code gets an error |
 | `max_interpreter_effects` | 100 | tool and sub-model calls per turn | the code gets an error |
-| `max_recursion_depth` | 1 | how deep `rlm_query` nests | at the limit it becomes `llm_query` |
+| `max_recursion_depth` | 1 | levels of child RLMs below the top one | `rlm_query` becomes `llm_query`; `recurse/2` fails |
 | `max_observation_chars` | 10,000 | how much printed output the model reads back | the output is cut |
 
 Controller turns and the extract pass do not count against `max_llm_calls`;
