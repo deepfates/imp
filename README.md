@@ -47,7 +47,8 @@ same task reason first, use `Imp.chain_of_thought/2`; to give it tools, use
 
 Give Imp labeled examples and a metric, and it scores the program and
 optimizes it. Here `trainset` and `devset` are lists of issues you have
-already labeled, built with `Imp.example/1`, and `strong_lm` is a more
+already labeled (`Imp.example/1`, then `Imp.with_inputs/2` to mark the
+`issue` as the input), and `strong_lm` is a more
 capable model that GEPA uses to reflect on failures:
 
 ```elixir
@@ -81,11 +82,13 @@ fetch =
 
 researcher = Imp.react("question -> answer", [fetch], lm: lm)
 
-question = "What version is in https://raw.githubusercontent.com/elixir-lang/elixir/main/VERSION ?"
+question =
+  "What version does https://raw.githubusercontent.com/elixir-lang/elixir/main/VERSION say? " <>
+    "Reply with just the version."
 
 {:ok, prediction} = Imp.call(researcher, %{question: question})
 Imp.get(prediction, :answer)
-#=> "The version in that file is **1.21.0-dev**."
+#=> "1.21.0-dev"
 ```
 
 ## Run agents as processes
@@ -98,7 +101,9 @@ which tool calls it may make:
 {:ok, run} =
   Imp.start_run(researcher, %{question: question},
     authorize: fn call ->
-      if String.starts_with?(call.arguments["url"], "https://raw.githubusercontent.com/"),
+      url = call.arguments["url"] || ""
+
+      if String.starts_with?(url, "https://raw.githubusercontent.com/"),
         do: :allow,
         else: {:deny, :untrusted_host}
     end
