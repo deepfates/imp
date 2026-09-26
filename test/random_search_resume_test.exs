@@ -131,7 +131,10 @@ defmodule Imp.Optimizer.BootstrapFewShotWithRandomSearch.ResumeTest do
 
     checkpoint =
       optimizer
-      |> RandomSearch.compile(program, trainset, devset, restrict: [-3, -2], max_candidates: 0)
+      |> BootstrapFewShotWithRandomSearch.compile(program, trainset, devset,
+        restrict: [-3, -2],
+        max_candidates: 0
+      )
       |> Report.fetch()
       |> then(& &1.metadata.resume_state)
       |> Jason.encode!()
@@ -139,7 +142,7 @@ defmodule Imp.Optimizer.BootstrapFewShotWithRandomSearch.ResumeTest do
 
     resumed =
       %{optimizer | max_errors: 10}
-      |> RandomSearch.compile(program, trainset, devset,
+      |> BootstrapFewShotWithRandomSearch.compile(program, trainset, devset,
         restrict: [-3, -2],
         resume_state: checkpoint
       )
@@ -149,7 +152,11 @@ defmodule Imp.Optimizer.BootstrapFewShotWithRandomSearch.ResumeTest do
     assert resumed.metadata.max_errors_source == :explicit
 
     assert_refused(fn ->
-      RandomSearch.compile(%{optimizer | max_errors: 9}, program, trainset, devset,
+      BootstrapFewShotWithRandomSearch.compile(
+        %{optimizer | max_errors: 9},
+        program,
+        trainset,
+        devset,
         restrict: [-3, -2],
         resume_state: checkpoint,
         max_candidates: 0
