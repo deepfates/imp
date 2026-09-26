@@ -611,14 +611,12 @@ defmodule Imp.Redaction do
     values = [Map.get(value, "value"), Map.get(value, :value)]
     schema_types = [Map.get(value, "type"), Map.get(value, :type)]
 
-    allowed_keys = MapSet.new(["__imp_type__", :__imp_type__, "value", :value])
-
     (Enum.any?(types, &(&1 in ["atom", :atom])) and
        Enum.any?(
          values,
          &(&1 in ~w(string integer float number boolean object map list array any))
        ) and
-       Enum.all?(Map.keys(value), &MapSet.member?(allowed_keys, &1))) or
+       Enum.all?(Map.keys(value), &(&1 in ["__imp_type__", :__imp_type__, "value", :value]))) or
       (Enum.any?(
          schema_types,
          &(&1 in ([

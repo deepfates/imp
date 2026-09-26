@@ -54,12 +54,11 @@
   {"bench/imp/benchmark_truth/runner.ex", :guard_fail, {651, 55}},
   # defensive clause: ReqLLM.model/1 contracts to ok/error tuples only; the
   # catch-all turns any unexpected registry result into a loud error (#75)
-  # defensive clause/guard: ReqLLM.Response types `usage` as map() on the
-  # struct, but its schema defaults the field to nil and Response.usage/1 is
-  # `map() | nil`, so the nil clause is reachable at runtime.
-  {"lib/imp/clients/req_llm.ex", :guard_fail, 1611},
-  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {1639, 8}},
   {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {154, 7}},
+  # defensive guard: ReqLLM.Response types provider_meta as map() with a %{}
+  # default, but the struct does not enforce it (a caller can build one with
+  # nil), and ReqLLM's own OpenTelemetry attributes guard it with is_map/1.
+  {"lib/imp/clients/req_llm.ex", :guard_fail, 1614},
   # defensive error clause on an always-ok internal call
   {"lib/imp/clients/training.ex", :pattern_match, {1215, 13}},
   # defensive error clause on an always-ok internal call
@@ -93,8 +92,6 @@
   {"lib/imp/optimizer/simba.ex", :pattern_match_cov, {698, 8}},
   # defensive clause for non-covered trace entries
   {"lib/imp/optimizer/trajectory.ex", :pattern_match_cov, {270, 8}},
-  # MapSet opacity on the redaction key set
-  {"lib/imp/redaction.ex", :call_without_opaque, {613, 51}},
   # behaviour callback specs term(); impl narrows to %__MODULE__{} on
   # purpose so bad input crashes loudly
   {"lib/imp/retrieve.ex", :callback_arg_type_mismatch, {158, 9}},

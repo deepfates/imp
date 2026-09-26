@@ -1619,7 +1619,7 @@ defmodule Imp.Clients.ReqLLM do
       model: response.model,
       api: map_value(provider_meta, :api_type),
       finish_reason: response.finish_reason,
-      usage: sanitize_usage(response.usage),
+      usage: sanitize_usage(ReqLLM.Response.usage(response)),
       content: ReqLLM.Response.text(response) || "",
       logprobs: logprobs,
       provider_meta: sanitize_provider_meta(provider_meta, logprobs)
@@ -1639,7 +1639,6 @@ defmodule Imp.Clients.ReqLLM do
 
   defp sanitize_usage(nil), do: nil
   defp sanitize_usage(usage) when is_map(usage), do: sanitize_usage_value(usage)
-  defp sanitize_usage(_usage), do: nil
 
   defp sanitize_provider_meta(provider_meta, logprobs) do
     provider_meta
