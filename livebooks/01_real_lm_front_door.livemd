@@ -174,8 +174,10 @@ end
 ## Add tools with ReAct
 
 Only add tools when the task needs action outside the model. `Imp.react/3`
-keeps tool use inside an explicit policy, and the reserved `submit` tool
-validates the signature, so the loop cannot bypass the output contract:
+keeps tool use inside an explicit policy. Its answer is checked against the
+signature like any prediction. This signature has one plain text output, so
+the model answers in text; any other signature gets a reserved `submit` tool
+whose arguments are the outputs:
 
 ```elixir
 case live_lm.(max_tokens: 400) do
