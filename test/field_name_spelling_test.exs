@@ -26,7 +26,7 @@ defmodule FieldNameSpellingTest do
     signature
   end
 
-  defp static_lm(handler), do: %{module: Imp.LM.Static, opts: [handler: handler]}
+  defp static_lm(handler), do: Imp.LM.Static.new(handler: handler)
 
   defp prompt(messages), do: Enum.map_join(messages, "\n", &to_string(&1.content))
 
@@ -49,7 +49,7 @@ defmodule FieldNameSpellingTest do
     output = fresh("saved_pot_out")
     state = input |> string_signature(output) |> ProgramOfThought.new() |> Imp.Saving.dump()
 
-    loaded = state |> Map.put("output_field", saved_atom(output)) |> Imp.Saving.load()
+    loaded = state |> Map.put("output_field", saved_atom(output)) |> Imp.Saving.load!()
 
     assert loaded.output_field == output
   end
@@ -61,7 +61,7 @@ defmodule FieldNameSpellingTest do
     state =
       input |> string_signature(output) |> MultiChainComparison.new(m: 2) |> Imp.Saving.dump()
 
-    loaded = state |> Map.put("last_key", saved_atom(output)) |> Imp.Saving.load()
+    loaded = state |> Map.put("last_key", saved_atom(output)) |> Imp.Saving.load!()
 
     assert loaded.last_key == output
   end
@@ -177,8 +177,8 @@ defmodule FieldNameSpellingTest do
       end)
 
     refine =
-      Imp.Predict.Refine.new(Imp.Predict.Predict.new(signature, lm: lm), fn _, _ -> false end,
-        max_attempts: 2,
+      Imp.Predict.Refine.new(Imp.Predict.new(signature, lm: lm), fn _, _ -> false end,
+        n: 2,
         feedback_fn: fn _history -> "repair advice" end
       )
 
