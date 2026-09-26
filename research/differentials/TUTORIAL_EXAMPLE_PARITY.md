@@ -14,7 +14,7 @@ checks, not Mix tasks shipped in the Hex package.
 | Email and entity extraction | [01 Real LM Front Door](../../livebooks/01_real_lm_front_door.livemd) uses a typed JSON email extraction program | `LIVE_PROVIDER=1 mix live.check` | Supported real-provider example |
 | Classification | The [README](../../README.md) router uses enum-constrained JSON output | `mix test --only live test/documentation_contract_test.exs` | Supported real-provider example |
 | Evaluation, few-shot optimization, instruction search, and artifact optimization | [03 Evaluate And Optimize](../../livebooks/03_evaluate_and_optimize.livemd) | `mix livebook.execute.check` | Supported tutorial |
-| RAG and multi-hop RAG | `Imp.rag/3` with `hops:` and `Imp.Retrieve` | `mix test test/public_surface_test.exs test/integration/local_service_e2e_test.exs` | Supported local and integration example |
+| RAG and multi-hop RAG | [Retrieval](../../docs/diving-deeper/retrieval.md): `Imp.rag/3` with `hops:` and `Imp.Retrieve` | `mix test test/public_surface_test.exs test/integration/local_service_e2e_test.exs` | Supported local and integration example |
 | Tools, ReAct, agents, and MCP | [04 Tools, Agents, MCP, And RLM](../../livebooks/04_tools_agents_mcp_rlm.livemd) | `mix integration.check` | Supported tutorial; external MCP endpoints stay host-owned |
 | Program of Thought and CodeAct | `Imp.program_of_thought/2` and `Imp.code_act/3` | `mix test test/program_of_thought_fidelity_test.exs` | Supported sandboxed-code example |
 | Recursive control | [04 Tools, Agents, MCP, And RLM](../../livebooks/04_tools_agents_mcp_rlm.livemd) | `mix benchmark.rlm.contract.check` | Supported bounded-control tutorial; paper-scale effectiveness is not claimed |
