@@ -30,6 +30,46 @@ defmodule RLMPublicSurfaceTest do
     Process.delete(:rlm_actions)
   end
 
+  # A model's variable names are usually not atoms in the VM; the interpreter
+  # keeps them as strings, which crashed printing the failed expression.
+  test "calling a value that is not a function is a failed turn the model reads" do
+    parent = self()
+    name = "zq_" <> "notfn"
+
+    actions = [
+      %{reasoning: "call it", code: "#{name} = 1\n#{name}.(1)"},
+      %{reasoning: "finish", code: ~S|submit(%{answer: "done"})|}
+    ]
+
+    lm = %{
+      module: Imp.LM.Static,
+      opts: [
+        handler: fn messages, _opts ->
+          send(parent, {:turn, Enum.map_join(messages, "\n", &to_string(&1.content))})
+          [action | rest] = Process.get(:rlm_actions)
+          Process.put(:rlm_actions, rest)
+          action
+        end
+      ]
+    }
+
+    Process.put(:rlm_actions, actions)
+
+    rlm = Imp.Predict.RLM.new("x: int -> answer", lm: lm, max_iterations: 3)
+    assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{x: 1})
+    assert Imp.Prediction.get(prediction, :answer) == "done"
+
+    assert [%{action: :run_error, output: {:error, reason}}, %{action: :submit}] =
+             prediction.metadata.rlm_trace
+
+    assert reason == {:not_a_function, name, 1}
+    assert_received {:turn, _first}
+    assert_received {:turn, second}
+    assert second =~ "not_a_function"
+  after
+    Process.delete(:rlm_actions)
+  end
+
   test "RLM gives the controller the interpreter-owned language guide" do
     parent = self()
 
@@ -48,6 +88,58 @@ defmodule RLMPublicSurfaceTest do
 
     assert_receive {:controller_system_prompt, system_prompt}
     assert system_prompt =~ Imp.Predict.RLM.Interpreter.controller_language_guide()
+  end
+
+  # The prompt names one reply shape. Offering a second one (a bare JSON
+  # answer) led models to send both, joined, on their first turn.
+  test "the controller prompt names one reply shape" do
+    parent = self()
+
+    lm = %{
+      module: Imp.LM.Static,
+      opts: [
+        handler: fn messages, _opts ->
+          send(parent, {:controller_system_prompt, hd(messages).content})
+          %{code: ~S|submit(%{answer: "done"})|}
+        end
+      ]
+    }
+
+    rlm = Imp.Predict.RLM.new("question -> answer", lm: lm)
+    assert {:ok, _prediction} = Imp.Predict.RLM.call(rlm, %{question: "q"})
+    assert_receive {:controller_system_prompt, system_prompt}
+    assert system_prompt =~ "Every reply is that one JSON object, including the last"
+    refute system_prompt =~ "also accepted"
+  end
+
+  test "a reply of the code object joined to an answer object runs the code" do
+    for reply <- [
+          ~S|{"reasoning":"compute it","code":"submit(%{answer: \"Paris\"})"}| <>
+            "\n" <> ~S|{"answer":"Paris"}|,
+          ~S|{"answer":"Paris"}{"reasoning":"a } in a string","code":"submit(%{answer: \"Paris\"})"}|
+        ] do
+      lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> reply end]}
+      rlm = Imp.Predict.RLM.new("question -> answer", lm: lm, max_iterations: 1)
+
+      assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{question: "Capital of France?"})
+      assert Imp.Prediction.get(prediction, :answer) == "Paris"
+      assert [%{action: :submit}] = prediction.metadata.rlm_trace
+    end
+  end
+
+  # gpt-5.4 answered the RLM page's first turn with its action repeated, or
+  # with several actions written ahead of their outputs.
+  test "a reply of several code objects runs the first" do
+    first = ~S|{"reasoning":"a","code":"submit(%{answer: \"A\"})"}|
+    second = ~S|{"reasoning":"b","code":"submit(%{answer: \"B\"})"}|
+
+    for reply <- [first <> "\n\n" <> first, first <> "\n\n" <> second] do
+      lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> reply end]}
+      rlm = Imp.Predict.RLM.new("question -> answer", lm: lm, max_iterations: 1)
+
+      assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{question: "q"})
+      assert Imp.Prediction.get(prediction, :answer) == "A"
+    end
   end
 
   test "RLM unwraps canonical LM envelopes for controller and sub-LM outputs" do
@@ -476,6 +568,93 @@ submit(%{answer: child[:answer]})|
     assert Enum.map(trace, & &1.action) == [:run]
   end
 
+  # `max_preview_chars` bounds what the controller sees of every variable in
+  # characters. A list was previewed as its first `max_preview_chars` items:
+  # after `lines = String.split(log, "\n")` on a 20,000-line log the turn
+  # message grew from 2,351 to 89,312 bytes.
+  test "a list's preview is bounded in characters, not items" do
+    parent = self()
+    log = Enum.map_join(1..20_000, "\n", &"#{&1} INFO path=/v1/items/#{&1} status=200")
+
+    handler = fn messages, _opts ->
+      send(parent, {:turn, byte_size(List.last(messages).content)})
+
+      if length(messages) < 4,
+        do: %{code: ~S|lines = String.split(log, "\n")|},
+        else: %{code: ~S|submit(%{answer: "done"})|}
+    end
+
+    lm = %{module: Imp.LM.Static, opts: [handler: handler]}
+    rlm = Imp.Predict.RLM.new("log -> answer", lm: lm, max_iterations: 2)
+
+    assert {:ok, _prediction} = Imp.Predict.RLM.call(rlm, %{log: log})
+    assert_received {:turn, first_bytes}
+    assert_received {:turn, second_bytes}
+    assert second_bytes < first_bytes + 2_500
+  end
+
+  # A tuple, or a list or map holding one, could not be encoded into the turn
+  # message at all.
+  test "every variable's preview is bounded in characters" do
+    parent = self()
+    log = Enum.map_join(1..20_000, "\n", &"#{&1} INFO path=/v1/items/#{&1} status=200")
+
+    handler = fn messages, _opts ->
+      send(parent, {:turn, byte_size(List.last(messages).content), List.last(messages).content})
+
+      if length(messages) < 4,
+        do: %{
+          code: ~S"""
+          lines = String.split(log, "\n")
+          rows = Enum.map(lines, fn line -> %{line => {line, String.length(line)}} end)
+          index = Map.new(lines, fn line -> {line, [line]} end)
+          pair = {log, lines}
+          f = fn x -> x end
+          big = Enum.reduce(1..12, 7, fn _, acc -> acc * acc end)
+          huge = Enum.reduce(1..16, 7, fn _, acc -> acc * acc end)
+          :ok
+          """
+        },
+        else: %{code: ~S|submit(%{answer: "done"})|}
+    end
+
+    lm = %{module: Imp.LM.Static, opts: [handler: handler]}
+
+    rlm =
+      Imp.Predict.RLM.new("log -> answer",
+        lm: lm,
+        max_iterations: 2,
+        max_preview_chars: 2_000,
+        max_interpreter_steps: 1_000_000
+      )
+
+    assert {:ok, _prediction} = Imp.Predict.RLM.call(rlm, %{log: log})
+    assert_received {:turn, first_bytes, _first}
+    assert_received {:turn, second_bytes, second}
+
+    variables = Jason.decode!(second)["variables"]
+
+    for name <- ~w(log lines rows index pair f) do
+      preview = get_in(variables, [name, "preview"])
+      assert is_binary(preview), name
+      assert String.length(preview) <= 2_000, name
+      assert variables[name]["truncated"] == (name != "f"), name
+    end
+
+    assert variables["lines"]["length"] == 20_000
+    assert variables["index"]["size"] == 20_000
+
+    # 7^4096 has 3,462 digits and 7^65536 has 55,385.
+    assert %{"type" => "integer", "truncated" => true, "preview" => big} = variables["big"]
+    assert String.length(big) == 2_000
+
+    assert %{"type" => "integer", "truncated" => true, "approximate_digits" => digits} =
+             variables["huge"]
+
+    assert_in_delta digits, 55_385, 100
+    assert second_bytes < first_bytes + 6 * 2_500
+  end
+
   test "RLM treats zero budgets and preview limits conservatively" do
     parent = self()
 
@@ -516,9 +695,9 @@ submit(%{answer: child[:answer]})|
     assert_received {:rlm_messages, messages}
     prompt = Enum.map_join(messages, "\n", & &1.content)
     assert prompt =~ ~s("preview":"")
-    assert prompt =~ ~s("preview":[])
     refute prompt =~ "secret"
     refute prompt =~ "1,2,3"
+    refute prompt =~ "1, 2, 3"
   end
 
   test "RLM constructor and call boundaries report invalid inputs clearly" do

@@ -22,6 +22,18 @@ User-visible changes to Imp are recorded here.
   its value. The ExMCP client's state, which a crash report prints, is redacted
   the same way. Before, a header was hidden only when its name looked like a
   credential, and `Imp.save!` wrote other headers' values to disk.
+- RLM controller code cannot make a struct. A map literal that named
+  `__struct__` was dispatched by every protocol as that struct: a map shaped
+  like a `File.Stream` sent `Enum.join` into the `Enumerable` implementation
+  for `File.Stream`, which read the named file. A map literal, `submit/1` and
+  the result of a library call may no longer carry the key, and a library call
+  takes no struct but a range or MapSet and no Elixir module named as a value.
+  A module is not a value at
+  all (`m = File` fails with `{:module_value_not_allowed, "File"}`); a sorter
+  is `:asc`, `:desc` or a function, since an Erlang module given as a sorter
+  had its `compare/2` called, and `Map.from_struct/1` takes no module; and a
+  library call that hands back a function it was given (`Map.get(m, k, f)`)
+  fails the turn instead of leaving a native closure in a variable.
 
 ### Installing
 
@@ -387,6 +399,53 @@ User-visible changes to Imp are recorded here.
   `:settings` or `:teacher_settings`. `Imp.configure/1`, `Imp.context/2` and an
   optimizer's `:teacher_settings` refuse either key with a message naming where
   it belongs.
+- RLM controller code may call every function of `Enum`, `Keyword`, `List`,
+  `Map` and `String` except `String.to_atom`, `List.to_atom`,
+  `String.splitter`, `Enum.random`, `Enum.shuffle` and `Enum.take_random`, and
+  may pass them anonymous functions and captures, which the interpreter runs
+  under the cell's step and value budgets. Registered tools, `llm_query` and
+  `submit` stay outside such functions; a function's patterns may pin a
+  variable (`fn ^target -> ... end`). Without a module, the Kernel data
+  functions `elem/2`, `to_string/1`, the `is_*` type checks, `length/1`,
+  `map_size/1`, `tuple_size/1`, `byte_size/1`, `abs/1`, `round/1`, `trunc/1`,
+  `div/2`, `rem/2`, `max/2` and `min/2` are available. Other calls return
+  `{:function_not_allowed, ...}`. Assignment takes the same patterns as a
+  function clause (`{a, b} = pair`, `[first | rest] = lines`), `[x | acc]`
+  builds a list, and a `for` generator takes a pattern and a map
+  (`for {key, n} <- counts`) and the `into:` and `uniq:` options. `into:` and
+  `uniq:` were ignored, and `reduce:` is refused with
+  `{:unsupported_for_option, :reduce, ...}`. A function held in a variable or
+  written in place can be called directly (`f.(x)`,
+  `(fn x -> ... end).(x)`), under the same rules as one a library call runs.
+- RLM controller code that calls a value that is not a function (`g = 1;
+  g.(1)`) fails that turn with `{:not_a_function, "g", 1}`, which the
+  controller reads and repairs. It ended the whole call with
+  `{:module_call_failed, Imp.Predict.RLM, ...}` whenever the variable's name
+  was not already an atom. An unexpected error inside the interpreter now
+  fails the turn the same way, as `{:interpreter_error, message}`.
+- The RLM controller prompt names one reply shape, `{"reasoning", "code"}`,
+  for every turn including the last, which calls `submit/1` from code. It
+  also offered a bare JSON object of the outputs as a final answer, which a
+  text reply never in fact got. The controller's first reply almost always
+  failed to parse: gpt-5.4 sends several JSON objects in one reply (its
+  action twice, or several actions written ahead of their outputs). Such a
+  reply now runs the first object that carries code, as a REPL would.
+- `max_preview_chars` bounds every RLM variable preview in characters. A
+  list was previewed as its first `max_preview_chars` items, so after
+  `lines = String.split(log, "\n")` on a 20,000-line log the controller's
+  turn message grew from 2,351 to 89,312 bytes. A list, map, tuple or other
+  term is now previewed as the first `max_preview_chars` characters of its
+  printed form, with `length` or `size` beside it, as upstream previews
+  `str(value)`; a map's preview shows its values, not only its keys. A
+  variable holding a tuple, which could not be encoded into the turn message
+  and ended the call, is previewed the same way, and so is an integer too
+  long for the preview.
+- RLM `max_recursion_depth` is one rule: the number of levels of child RLMs
+  below the root. `recurse/2` already allowed a child at depth
+  `max_recursion_depth`, but `rlm_query*` started one only below it, so the
+  default of 1 gave `recurse/2` a child and `rlm_query` none. Both now allow
+  one level by default; `max_recursion_depth: 0` makes `rlm_query*` a one-shot
+  sub-LM query, as the standalone runtime's `max_depth=1` does.
 
 ### Errors and shapes
 
