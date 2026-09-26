@@ -610,6 +610,8 @@ submit(%{answer: child[:answer]})|
           index = Map.new(lines, fn line -> {line, [line]} end)
           pair = {log, lines}
           f = fn x -> x end
+          big = Enum.reduce(1..12, 7, fn _, acc -> acc * acc end)
+          huge = Enum.reduce(1..16, 7, fn _, acc -> acc * acc end)
           :ok
           """
         },
@@ -641,6 +643,15 @@ submit(%{answer: child[:answer]})|
 
     assert variables["lines"]["length"] == 20_000
     assert variables["index"]["size"] == 20_000
+
+    # 7^4096 has 3,462 digits and 7^65536 has 55,385.
+    assert %{"type" => "integer", "truncated" => true, "preview" => big} = variables["big"]
+    assert String.length(big) == 2_000
+
+    assert %{"type" => "integer", "truncated" => true, "approximate_digits" => digits} =
+             variables["huge"]
+
+    assert_in_delta digits, 55_385, 100
     assert second_bytes < first_bytes + 6 * 2_500
   end
 

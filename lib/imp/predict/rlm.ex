@@ -1790,9 +1790,24 @@ defmodule Imp.Predict.RLM do
   defp describe_value(value, preview_chars) when is_map(value),
     do: Map.merge(%{type: :map, size: map_size(value)}, printed_preview(value, preview_chars))
 
-  defp describe_value(value, _preview_chars)
-       when is_number(value) or is_boolean(value) or is_nil(value),
-       do: %{type: type_of(value), value: value}
+  defp describe_value(value, preview_chars)
+       when is_number(value) or is_boolean(value) or is_nil(value) do
+    bytes = :erlang.external_size(value)
+
+    # An integer can hold millions of digits. One too long for the preview is
+    # printed and cut like any value while printing it is cheap, and past
+    # that is described by its approximate number of digits.
+    cond do
+      not is_integer(value) or 3 * bytes <= preview_chars ->
+        %{type: type_of(value), value: value}
+
+      bytes <= 8 * preview_chars ->
+        Map.merge(%{type: :integer}, printed_preview(value, preview_chars))
+
+      true ->
+        %{type: :integer, approximate_digits: round(bytes * 8 * :math.log10(2)), truncated: true}
+    end
+  end
 
   defp describe_value(value, preview_chars),
     do: Map.merge(%{type: type_of(value)}, printed_preview(value, preview_chars))
