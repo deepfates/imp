@@ -176,7 +176,9 @@ defmodule CredentialInspectTest do
       ExUnit.CaptureLog.capture_log(fn ->
         {:ok, pid} = Agent.start_link(fn -> client end)
         :sys.terminate(pid, :crash)
-        assert_receive {:EXIT, ^pid, :crash}
+        # The exit always arrives, but a loaded CI runner can take longer than
+        # the default 100 ms to deliver it.
+        assert_receive {:EXIT, ^pid, :crash}, 2_000
         Process.sleep(100)
       end)
 
