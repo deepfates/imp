@@ -175,7 +175,7 @@ defmodule ReActV2Test do
 
   test "executes parallel calls, preserves IDs and results, and submits final outputs" do
     parent = self()
-    lookup = Imp.tool(:lookup, "lookup", fn %{query: query} -> "found #{query}" end)
+    lookup = Imp.tool(:lookup, "lookup", fn %{"query" => query} -> "found #{query}" end)
 
     lm =
       action_lm(
@@ -295,7 +295,7 @@ defmodule ReActV2Test do
              |> Imp.call(%{question: "write and verify"})
 
     assert Imp.get(prediction, :answer) == "recovered"
-    assert_received {:write, %{path: "notes.txt"}}
+    assert_received {:write, %{"path" => "notes.txt"}}
     refute_received {:write, %{"command" => "cat"}}
 
     assert %Imp.History{messages: [malformed, _recovered]} = prediction.metadata[:history]
@@ -952,7 +952,7 @@ defmodule ReActV2Test do
   end
 
   test "participates in LM demo and registry-backed persistence lifecycle" do
-    runner = fn %{query: query} -> query end
+    runner = fn %{"query" => query} -> query end
     registry = Imp.Saving.Registry.new(lookup_runner: runner)
     tool = Imp.tool(:lookup, "lookup", runner)
     demo = Imp.example(question: "demo", answer: "demo") |> Imp.with_inputs(:question)
@@ -1069,7 +1069,7 @@ defmodule ReActV2Test do
   # what the host makes of it is the run's answer.
   test "finish_on ends the run on a tool call and records the call" do
     parent = self()
-    reply = Imp.tool(:reply, "reply", fn %{text: text} -> "sent: #{text}" end)
+    reply = Imp.tool(:reply, "reply", fn %{"text" => text} -> "sent: #{text}" end)
 
     lm =
       action_lm(
@@ -1087,7 +1087,7 @@ defmodule ReActV2Test do
                lm: lm,
                finish_on: %{
                  reply: fn arguments, _result, _inputs ->
-                   {:finish, %{answer: arguments.text}}
+                   {:finish, %{answer: arguments["text"]}}
                  end
                }
              )
@@ -1104,6 +1104,35 @@ defmodule ReActV2Test do
 
     assert_received {:lm_call, _only_call}
     refute_received {:lm_call, _second}
+  end
+
+  # A string signature keeps a field name as a string when its atom does not
+  # exist yet; `finish_on` may return that field under the atom, which exists
+  # by then. The outputs are matched to the signature by text.
+  test "finish_on outputs keyed by an atom fill a field the signature names by a string" do
+    name = "contact_" <> Integer.to_string(System.unique_integer([:positive]))
+    signature = Imp.signature("ticket -> team, " <> name)
+    assert Enum.any?(signature.outputs, &(&1.name == name))
+    field = String.to_atom(name)
+
+    reply = Imp.tool(:reply, "Reply", fn _arguments -> "sent" end)
+
+    lm = action_lm([%{tool_calls: [%{id: "r1", name: "reply", arguments: %{}}]}])
+
+    assert {:ok, prediction} =
+             Imp.react(signature, [reply],
+               lm: lm,
+               max_iters: 1,
+               finish_on: %{
+                 reply: fn _arguments, _result, _inputs ->
+                   {:finish, %{:team => "atlas", field => "Maya"}}
+                 end
+               }
+             )
+             |> Imp.call(%{ticket: "t"})
+
+    assert prediction.metadata[:termination_reason] == :finished_by_tool
+    assert Imp.get(prediction, name) == "Maya"
   end
 
   test "finish_on returning :continue leaves the loop running" do
@@ -1212,7 +1241,7 @@ defmodule ReActV2Test do
                |> Imp.call(%{question: "say hello"})
 
       assert Imp.get(prediction, :answer) == "done"
-      assert_received {:replied, %{text: "hello"}}
+      assert_received {:replied, %{"text" => "hello"}}
     end
   end
 
@@ -1367,6 +1396,50 @@ defmodule ReActV2Test do
     # without an answer is the deadline, not the step limit before it.
     assert prediction.metadata[:termination_reason] == :incomplete
     assert prediction.metadata[:termination_cause] == :deadline_exceeded
+  end
+
+  # Submit arguments have string keys, while a string signature names a field
+  # by an atom when the atom exists (`team`) and by a string when it does not.
+  # Submit finds both by their text.
+  test "submit finds outputs named by atoms and by strings" do
+    name = "contact_" <> Integer.to_string(System.unique_integer([:positive]))
+    signature = Imp.signature("ticket -> team, " <> name)
+    assert Enum.any?(signature.outputs, &(&1.name == name))
+    assert Enum.any?(signature.outputs, &(&1.name == :team))
+
+    lm =
+      action_lm([
+        %{tool_calls: [%{name: "submit", arguments: %{"team" => "atlas", name => "Maya"}}]}
+      ])
+
+    assert {:ok, prediction} =
+             Imp.react(signature, [], lm: lm, max_iters: 1) |> Imp.call(%{ticket: "t"})
+
+    assert prediction.metadata[:termination_reason] == :submit
+    assert Imp.get(prediction, :team) == "atlas"
+    assert Imp.get(prediction, name) == "Maya"
+  end
+
+  # The text answer is for one unconstrained text output. An enum is a string
+  # the model can get wrong, so it is filled through submit, whose schema
+  # carries the allowed values.
+  test "an enum output keeps submit, and text it rejects is not a complete answer" do
+    parent = self()
+    lm = action_lm([%{next_thought: "team: harbor", tool_calls: []}], parent)
+
+    assert {:ok, prediction} =
+             Imp.react("ticket -> team: enum[atlas, harbor]", [], lm: lm, max_iters: 2)
+             |> Imp.call(%{ticket: "t"})
+
+    assert_received {:lm_call, opts}
+    submit = Enum.find(opts[:tools] || [], &(&1.function.name == "submit"))
+    assert submit.function.parameters["properties"]["team"]["enum"] == ["atlas", "harbor"]
+
+    # The step wrote text instead of calling submit, and the forced submit and
+    # the extraction after it got the same text, which the enum rejects.
+    assert prediction.metadata[:termination_reason] == :incomplete
+    assert prediction.metadata[:termination_cause] == :empty_tool_calls
+    refute Imp.Prediction.complete?(prediction)
   end
 
   defp action_lm(actions, notify \\ nil) do

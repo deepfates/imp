@@ -46,15 +46,9 @@ tool struct, which keeps policy and tracing consistent.
 
 ```elixir
 lookup =
-  Imp.tool(:lookup, "lookup a fact", fn
-    %{query: "capital-france"} -> "Paris"
-    %{"query" => "capital-france"} -> "Paris"
-    %{query: query} when is_binary(query) -> "Paris"
-    %{"query" => query} when is_binary(query) -> "Paris"
-    _other -> "Paris"
-  end)
+  Imp.tool(:lookup, "lookup a fact", fn %{"query" => _query} -> "Paris" end)
 
-Imp.Tool.call(lookup, %{query: "capital-france"})
+Imp.Tool.call(lookup, %{"query" => "capital-france"})
 ```
 
 ## Owning The Loop Yourself
@@ -65,7 +59,7 @@ Elixir: tools are values, and calling one is just a function call your own
 supervised process can orchestrate.
 
 ```elixir
-Imp.Tool.call(lookup, %{query: "capital-france"})
+Imp.Tool.call(lookup, %{"query" => "capital-france"})
 ```
 
 Policy lives where the model chooses actions: any react-family program takes

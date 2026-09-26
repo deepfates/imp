@@ -651,7 +651,7 @@ defmodule ImpTest do
   end
 
   test "react can execute a requested tool" do
-    tool = Imp.Tool.new(:lookup, "Lookup a value", fn %{query: "x"} -> "found x" end)
+    tool = Imp.Tool.new(:lookup, "Lookup a value", fn %{"query" => "x"} -> "found x" end)
 
     lm =
       Imp.LM.Static.new(

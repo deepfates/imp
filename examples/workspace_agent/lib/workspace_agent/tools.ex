@@ -472,9 +472,8 @@ defmodule WorkspaceAgent.Tools do
       else: String.slice(text, 0, limit) <> "\n[truncated]"
   end
 
-  defp fetch(map, key, default \\ nil) when is_map(map) do
-    Map.get(map, key, Map.get(map, Atom.to_string(key), default))
-  end
+  defp fetch(map, key, default \\ nil) when is_map(map),
+    do: Map.get(map, Atom.to_string(key), default)
 
   defp object_schema(properties, required \\ []) do
     %{"type" => "object", "properties" => properties, "required" => required}

@@ -120,7 +120,7 @@ defmodule Imp.BenchmarkTruth.AxContract do
   defp imp_cases do
     signature = signature()
     schema = Signature.json_schema(signature)
-    tool = Imp.Tool.new(:lookup, "Lookup a value", &%{found: true, key: &1.key})
+    tool = Imp.Tool.new(:lookup, "Lookup a value", &%{found: true, key: &1["key"]})
     tool_result = Imp.Tool.call(tool, %{key: "alpha"})
 
     tools = Imp.Tool.index_tools!([tool], "Ax contract")

@@ -58,7 +58,7 @@ defmodule Imp.Benchmarks do
         inputs: [:text],
         outputs: [
           %{name: :sentiment, type: :string, constraints: %{enum: ["positive", "negative"]}},
-          %{name: :confidence, type: :number, constraints: %{min: 0.5, max: 1.0}}
+          %{name: :confidence, type: :number, constraints: %{minimum: 0.5, maximum: 1.0}}
         ]
       })
 
@@ -74,7 +74,7 @@ defmodule Imp.Benchmarks do
   end
 
   defp supervised_tool_policy_task do
-    tool = Imp.Tool.new(:double, "double a number", fn %{x: x} -> %{y: x * 2} end)
+    tool = Imp.Tool.new(:double, "double a number", fn %{"x" => x} -> %{y: x * 2} end)
     :ok = Imp.ToolPolicy.authorize([:double], tool.name, %{x: 4})
     task = Imp.Tasks.async(fn -> Imp.Tool.call(tool, %{x: 4}) end)
 
@@ -150,7 +150,7 @@ defmodule Imp.Benchmarks do
         inputs: [:text],
         outputs: [
           %{name: :sentiment, type: :string, constraints: %{enum: ["positive", "negative"]}},
-          %{name: :confidence, type: :number, constraints: %{min: 0.5, max: 1.0}}
+          %{name: :confidence, type: :number, constraints: %{minimum: 0.5, maximum: 1.0}}
         ]
       })
 

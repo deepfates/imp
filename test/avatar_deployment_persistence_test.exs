@@ -2,7 +2,7 @@ defmodule AvatarDeploymentPersistenceTest do
   use ExUnit.Case, async: true
 
   test "checksummed Avatar artifact loads in a fresh task and executes rebound callbacks" do
-    runner = fn %{country: "France"} -> "Paris" end
+    runner = fn %{"country" => "France"} -> "Paris" end
 
     policy = fn name, _arguments ->
       if name in [:lookup, "lookup"], do: :allow, else: {:deny, :not_lookup}
