@@ -390,5 +390,6 @@ them, from runtime configuration.
   search through tools.
 - [Metrics and evaluation](metrics-and-evaluation.md): measuring retrieval
   and answers together.
-- `Imp.Retrieve`, `Imp.Predict.RAG`, `Imp.Embeddings` and the retrievers
-  under `Imp.Retrievers` list every option.
+- `Imp.Retrieve`, `Imp.Predict.RAG`, `Imp.Embeddings`,
+  `Imp.Retrievers.HTTP`, `Imp.Retrievers.Weaviate` and
+  `Imp.Retrievers.Databricks` list every option.
