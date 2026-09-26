@@ -113,6 +113,7 @@
         "Imp.Optimizer.SIMBA",
         "Imp.Predict",
         "Imp.Predict.ChainOfThought",
+        "Imp.Predict.ReActV2",
         "Imp.Retrieve.Memory",
         "Imp.ToolPolicy"
       ],
@@ -222,7 +223,6 @@
         "Imp.Predict.RAG",
         "Imp.Predict.RLM",
         "Imp.Predict.ReAct",
-        "Imp.Predict.ReActV2",
         "Imp.Predict.Refine",
         "Imp.Predict.Search",
         "Imp.ProgramParameters",

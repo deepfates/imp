@@ -618,8 +618,8 @@ Every change here is breaking for code that matches on the old shape.
   `Imp.Predict.ReAct`, the earlier loop, has no facade name; its port of
   DSPy's `dspy.ReAct` is `mode: :dspy`, which was `:dspy_3_2_1`. A program
   saved with `"dspy_3_2_1"` still loads.
-- `Imp.Predict.Predict` is `Imp.Predict`. It and `Imp.Predict.ChainOfThought`
-  are stable.
+- `Imp.Predict.Predict` is `Imp.Predict`. It, `Imp.Predict.ChainOfThought`
+  and `Imp.Predict.ReActV2`, which `Imp.react/3` builds, are stable.
 - `Imp.Signature.ParseError`, which every signature constructor raises, is
   documented, with its `:input` and `:position` fields.
 - `Imp.Retrievers.KNN` is deleted. It did not implement `Imp.Retrieve`, and
