@@ -734,7 +734,7 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
           "version" => 1,
           "config" => %{"field" => "answer"}
         },
-        max_concurrency: 1,
+        num_threads: 1,
         seed: 41
       )
 

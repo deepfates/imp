@@ -36,10 +36,10 @@ defmodule Imp.LocalRandomSearchBanking77ExampleTest do
   test "front door keeps frozen rows outside optimization and rejects bootstrap facades" do
     source = File.read!(@source)
 
-    assert source =~ "RandomSearch.compile("
+    assert source =~ "Imp.optimize!(source, &1, examples(rows.train), examples(rows.selection)"
     assert source =~ "examples(rows.train)"
     assert source =~ "examples(rows.selection)"
-    refute source =~ "RandomSearch.compile(source, examples(rows.test)"
+    refute source =~ "Imp.optimize!(source, &1, examples(rows.test)"
     assert source =~ "stage.accepted_augmented_demos > 0"
     assert source =~ "stage.augmented_demo_rendered_calls > 0"
     assert source =~ "TrainingJob.rebind(job, selected)"

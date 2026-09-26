@@ -107,11 +107,11 @@ defmodule Imp.Predict.ReActV2 do
   A step's outputs are `next_thought` and `tool_calls`. The provider holds the
   tool roster natively, so a step normally comes back as native tool calls. A
   step that comes back as plain text with no tool call is read as that text
-  being `next_thought` and no tool calls, by the `:text_step` metadata on the
+  being `next_thought` and no tool calls, by the `:text_field` metadata on the
   internal step signature that `Imp.Adapter.Chat` honors: it is a thought that
   called nothing, not a parse failure, so it costs one LM call rather than two
   and keeps the provider's prefix cache. That thought is appended to the
-  history as its own turn. A tool call the model writes as
+  history as its own step. A tool call the model writes as
   JSON rather than calling natively is accepted with `tool` for `name` and
   `args` or `parameters` for `arguments` (`Imp.Adapter.Types.ToolCall`); a map
   that names no tool at all is kept as a malformed-call observation.
@@ -126,7 +126,7 @@ defmodule Imp.Predict.ReActV2 do
   This is lossy prompt selection, not summarization or deletion of memory.
 
   Tool history retains provider-native reasoning text and opaque reasoning
-  details for continuation, including after `Imp.History.dump/1` and `Imp.History.load/1`.
+  details for continuation, including after `Imp.History.dump/1` and `Imp.History.load!/1`.
   These are operational protocol data and must remain unmodified. Store history
   privately; use redacted events or `Imp.History.redact/1` for diagnostic copies.
   """
@@ -260,7 +260,7 @@ defmodule Imp.Predict.ReActV2 do
         # completion as `next_thought`, and `tool_calls` takes its declared
         # default of none, which ends the turn: as the answer when the
         # signature has one text output, and at the forced submit otherwise.
-        metadata: %{text_step: :next_thought}
+        metadata: %{text_field: :next_thought}
       }
 
     config = Keyword.merge(opts[:config], provider_tool_config(tools, signature))
@@ -271,11 +271,7 @@ defmodule Imp.Predict.ReActV2 do
     # previous step's request plus the newest exchange, which is what a
     # provider's prompt cache is keyed on.
     adapter_opts =
-      Keyword.merge(Keyword.get(opts, :adapter_opts, []),
-        guidance: guidance(signature, tools),
-        response_instruction: false,
-        omit_empty_request: true
-      )
+      Keyword.merge(Keyword.get(opts, :adapter_opts, []), loop_adapter_opts(signature, tools))
 
     %__MODULE__{
       signature: signature,
@@ -348,6 +344,39 @@ defmodule Imp.Predict.ReActV2 do
           {to_string(resolved), fun}
       end
     end)
+  end
+
+  # What the loop itself tells the adapter: its guidance, and a request shape
+  # that ends on the newest exchange with no response instruction.
+  defp loop_adapter_opts(signature, tools),
+    do: [
+      guidance: guidance(signature, tools),
+      response_instruction: false,
+      omit_empty_request: true
+    ]
+
+  @doc false
+  # The step predictor's loop-owned parts, derived from the task signature and
+  # tools: the provider tool roster, the adapter guidance and request shape, and
+  # which output a text reply fills. A saved program does not carry them, and
+  # `Imp.Saving` rebuilds them here, so a loaded agent asks the model what the
+  # agent it was saved from asked. A host's own `:adapter_opts` (renderers are
+  # functions) are not saved; the host passes them again.
+  def restore_loop(%__MODULE__{react: react} = agent) do
+    metadata =
+      react.signature.metadata
+      |> Map.delete("text_field")
+      |> Map.put(:text_field, :next_thought)
+
+    react = %{
+      react
+      | config: Keyword.merge(react.config, provider_tool_config(agent.tools, agent.signature)),
+        adapter_opts:
+          Keyword.merge(react.adapter_opts, loop_adapter_opts(agent.signature, agent.tools)),
+        signature: %{react.signature | metadata: metadata}
+    }
+
+    %{agent | react: react}
   end
 
   @doc false
@@ -515,7 +544,7 @@ defmodule Imp.Predict.ReActV2 do
     case forced_submit_prediction(react, history, pending) do
       {:ok, prediction, history} ->
         calls = prediction |> Imp.get(:tool_calls, []) |> normalize_calls(turn)
-        emit_reasoning(prediction, turn, forced?: true)
+        emit_reasoning(prediction, turn, forced: true)
 
         finish_forced_submit(
           react,
@@ -1059,8 +1088,7 @@ defmodule Imp.Predict.ReActV2 do
         safe_tool_call(tool, arguments)
 
       {:deny, reason} ->
-        {{:error, {:tool_authorization_denied, tool.name, Imp.Redaction.redact(reason)}}, true,
-         :refused}
+        {{:error, {:tool_denied, tool.name, Imp.Redaction.redact(reason)}}, true, :refused}
 
       {:cancel, reason} ->
         {:cancel, reason}
@@ -1152,7 +1180,7 @@ defmodule Imp.Predict.ReActV2 do
         Imp.Run.emit(:reasoning,
           component: __MODULE__,
           reasoning: reasoning,
-          metadata: Map.merge(%{turn: turn}, Map.new(metadata))
+          metadata: Map.merge(%{step: turn}, Map.new(metadata))
         )
     end
   end
@@ -1295,14 +1323,14 @@ defmodule Imp.Predict.ReActV2 do
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
-  # What the adapter needs to say about the loop, as data. `finish_tool` is the
+  # What the adapter needs to say about the loop, as data. `submit_tool` is the
   # tool that ends the turn, so a renderer never has to know its name, and nil
   # when the signature has no `submit` and the answer is plain text. `outputs`
   # are the task's output fields, so each step says what every output means;
   # otherwise their descriptions reach the model only inside `submit`'s schema.
   defp guidance(signature, tools) do
     %{
-      finish_tool: if(single_text_output?(signature), do: nil, else: :submit),
+      submit_tool: if(single_text_output?(signature), do: nil, else: :submit),
       input_names: Imp.Signature.input_names(signature),
       output_names: Imp.Signature.output_names(signature),
       outputs: signature.outputs,

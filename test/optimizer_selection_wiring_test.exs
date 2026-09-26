@@ -69,9 +69,18 @@ defmodule OptimizerSelectionWiringTest do
     evaluator = Imp.Evaluate.new(devset(), metric)
 
     optimizer =
-      Imp.Optimizer.RandomSearch.new(metric, candidates: 4, demos_per_candidate: 1)
+      Imp.Optimizer.BootstrapFewShotWithRandomSearch.new(metric,
+        num_candidate_programs: 4,
+        max_bootstrapped_demos: 1
+      )
 
-    compiled = Imp.Optimizer.RandomSearch.compile(optimizer, program, trainset(), devset())
+    compiled =
+      Imp.Optimizer.BootstrapFewShotWithRandomSearch.compile(
+        optimizer,
+        program,
+        trainset(),
+        devset()
+      )
 
     assert Imp.Evaluate.run(evaluator, compiled).score == 1.0
   end

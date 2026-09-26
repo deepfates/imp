@@ -258,7 +258,7 @@ User-visible changes to Imp are recorded here.
   (string)`), where it wrote empty parentheses.
 - The names follow the glossary: a step answered in text ends as `:answered`,
   the last request of an interrupted turn as `:last_text` with
-  `last_request_note`, the step signature declares `metadata[:text_step]`, and
+  `last_request_note`, the step signature declares `metadata[:text_field]`, and
   the tool list sent to a provider is the `:tools_sent` event. Builds of
   `main` between 0.4.0 and 0.5.0 called them `:last_prose`,
   `last_prose_note` (later `last_text_note`, beside `forced_submit_notice`),
@@ -333,7 +333,7 @@ User-visible changes to Imp are recorded here.
   recorded as that turn's thought in the history and shown back to the model as
   a plain assistant turn in any next request. `Imp.Adapter.Chat` reads a
   marker-free completion this way only for a signature that declares
-  `metadata[:text_step]`; every other signature parses exactly as before, JSON
+  `metadata[:text_field]`; every other signature parses exactly as before, JSON
   fallback included.
 - ReActV2 preserves provider-native reasoning text and opaque reasoning details
   across tool calls and saved-history reloads. ReqLLM receives the original
@@ -523,14 +523,15 @@ Every change here is breaking for code that matches on the old shape.
   reports, `Imp.History.dump/1`) as its inspected text. Before, the write
   raised `Protocol.UndefinedError`.
 - `Imp.Predict.Refine` and `Imp.Predict.Assertions` return
-  `{:error, reason}` like every `Imp.Module`: `:no_attempts` with
-  `max_attempts: 0`, `{:refine_fail_count_exceeded, reason}`, or the last
+  `{:error, reason}` like every `Imp.Module`: `:no_attempts` with `n: 0`
+  (`max_attempts: 0` for `Assertions`), `{:refine_fail_count_exceeded, reason}`,
+  or the last
   attempt's reason. In 0.4.0 they returned `{:error, reason, history}`, which
   `Imp.call/2` reported as `{:invalid_module_result, module, text}`.
-- A tool a tool policy does not allow is
-  `{:tool_authorization_denied, tool, :tool_policy}`, the tag a run's
-  `:authorize` callback already denies with. In 0.4.0 it was
-  `{:tool_denied, tool}`.
+- A tool a tool policy does not allow is `{:tool_denied, tool, :tool_policy}`,
+  and a tool a run's `:authorize` callback refuses is
+  `{:tool_denied, tool, reason}` with the callback's reason. In 0.4.0 they
+  were `{:tool_denied, tool}` and `{:tool_authorization_denied, tool, reason}`.
 - MCP import refusals: a tool named after one in `:reserved_tool_names` is
   `{:mcp_tool_name_reserved, tool, servers}` (it shared
   `:mcp_tool_name_collision` with two servers offering one name); an
@@ -558,7 +559,7 @@ Every change here is breaking for code that matches on the old shape.
   was given, and look keys up by their text. In 0.4.0 a string key became an
   atom whenever that atom already existed in the VM, so the same data could
   come back keyed either way. Data read from JSON now keeps its string keys:
-  a history turn loaded with `Imp.History.load/1`, or a demo field a
+  a history turn loaded with `Imp.History.load!/1`, or a demo field a
   signature does not declare in a saved optimizer artifact.
 
 ### Public surface: what is exported
@@ -623,9 +624,8 @@ Every change here is breaking for code that matches on the old shape.
   documented, with its `:input` and `:position` fields.
 - `Imp.Retrievers.KNN` is deleted. It did not implement `Imp.Retrieve`, and
   `Imp.Retrieve.Memory` is the token-overlap retriever.
-- The `compile` functions of `Imp.Optimizer.BootstrapRS` and
-  `Imp.Optimizer.BootstrapFewShotWithRandomSearch` are hidden, like
-  `Imp.Optimizer.RandomSearch`'s; `Imp.optimize/4` runs all three.
+- The `compile` function of `Imp.Optimizer.BootstrapFewShotWithRandomSearch`
+  is hidden, like the other optimizers'; `Imp.optimize/4` runs it.
 - `Imp.Adapter.Types.Document`, `History`, `Citation` and `Type`, and
   `Imp.Datasets.Error`, are documented. `priv/public_api.json` now lists every
   packaged module, the `@moduledoc false` ones among `excluded_modules`.
@@ -641,6 +641,72 @@ Every change here is breaking for code that matches on the old shape.
 - `Imp.Retrieve` declares `retrieve(retriever, query, opts)`; a module
   retriever receives itself first, as an LM does. A two-argument function is
   still a retriever.
+
+### Public surface: one name per idea
+
+- MCP names a server descriptor a descriptor and a server's name
+  `server_name`. `Imp.MCP.CallFailure` has `server_name`, `tool_name` and the
+  descriptor's `index` where it had `server` and `tool`; an `unavailable` entry
+  has `server_name` where it had `server`; `tool.metadata.mcp` gains `index`;
+  `:authorize`'s two-argument context is `%{cwd:, descriptor:}`.
+- One allow/deny vocabulary: `:allow` or `{:deny, reason}`, as `Imp.Run`'s
+  `:authorize` and `Imp.ACP`'s `:permission_policy` already answer.
+  `Imp.MCP.connect/2`'s `:authorize` returned `:ok` or `true`; a refused
+  descriptor is now `{:mcp_server_not_authorized, server_name, reason}`, with
+  `:not_trusted` for one outside `:trusted_servers`. A `:tool_policy` function
+  returned `true`, `:ok` or `false`; a refused call is now
+  `{:tool_denied, name, reason}`, where `reason` names what denied it:
+  `:tool_policy` for a name or list policy, or the function's own reason.
+  Any other answer refuses with `{:invalid_decision, answer}`.
+  `Imp.ToolPolicy` is documented.
+- DSPy's names for DSPy's ideas. `num_threads` is the concurrency option of
+  `Imp.Evaluate`, `Imp.evaluate/4`, `Imp.Predict.Parallel`,
+  `Imp.Predict.Search`, `Imp.Experiment`'s evaluation options,
+  `Imp.Clients.ReqLLMBatch`, and the GEPA, MIPROv2, SIMBA, BetterTogether and
+  BootstrapFinetune optimizers, where it was `max_concurrency`; COPRO, InferRules
+  and random search already said `num_threads`. COPRO's
+  `proposal_max_concurrency` is `proposal_concurrency`, as GEPA's is. `Imp.Predict.Refine` counts its attempts in `n`,
+  as `Imp.Predict.BestOfN` and DSPy's `Refine` do, where it had `max_attempts`;
+  a Refine saved with `"max_attempts"` still loads. `Imp.Predict.RLM` takes
+  `max_iterations` only, DSPy RLM's name; `max_iters` was a second spelling.
+- `Imp.Optimizer.RandomSearch`, `Imp.Optimizer.BootstrapRS` and
+  `Imp.Optimizer.BootstrapFewShotWithRandomSearch` were three names for one
+  optimizer; it is `Imp.Optimizer.BootstrapFewShotWithRandomSearch`, DSPy's
+  class name. Its `candidates` and `demos_per_candidate` options, second names
+  for `num_candidate_programs` and `max_bootstrapped_demos`, are gone.
+- The ReActV2 loop's guidance key `finish_tool` is `submit_tool`, the tool it
+  names. The step signature's `metadata[:text_step]` is
+  `metadata[:text_field]`: it names the output field a text reply fills.
+- A ReActV2 `:reasoning` event says `forced: true` where it said `forced?`,
+  and names its step as `step:` where it said `turn:`: a turn is one call of
+  the agent, and a step is one request inside it.
+- `Imp.MCP.connect/2`'s `:credentials` option is `:credential_store`, the
+  `Imp.MCP.OAuth.Store` a descriptor's `"credential"` is looked up in.
+  `Imp.MCP.OAuth.Pending` has `server_url` where it had `resource_url`, the
+  name `begin/3` and `authorization_header/3` give the same URL. Credentials
+  already on disk load unchanged.
+- An `Imp.Clients.MLXLMTrainer` `:runner` is called with `cwd:` where it was
+  called with `cd:`, the name ACP, MCP and `Imp.MCP.connect/2` use.
+- `Imp.Optimizer.GEPA.Callback` hooks take `(event, context)` only; a bare
+  callback module's context is `nil`. A bare module's one-argument hooks were
+  called and its two-argument ones were not.
+- A ReActV2 agent loaded from a saved program asks the model what the agent it
+  was saved from asked. Loading lost the step predictor's loop guidance, its
+  request shape (`response_instruction: false`, `omit_empty_request: true`)
+  and its tool roster's atom keys; they are rebuilt from the signature and
+  tools. A host's own `:adapter_opts`, such as renderers, are functions and
+  are not saved; pass them again.
+- `Imp.load/2` given a string says to read a file with `Imp.read!/1`.
+- One `load` contract: `load` returns `{:ok, value}` or `{:error, reason}`,
+  `load!` raises, and `read!` reads a file. The `load` of `Imp.Signature`,
+  `Imp.History` and `Imp.Optimizer.Report` raised, so each is now
+  `load!/1`. `Imp.Clients.TrainingJob`'s `load` is `load!/2`, and its old
+  `load!`, which read a checkpoint file, is `read!/2`.
+  The dataset loaders that read a file are `read!`:
+  `Imp.Datasets.GSM8K.read!/1`, `Imp.Datasets.HotPotQA.read!/1`,
+  `Imp.Datasets.MATH.read!/1` and `Imp.Datasets.DataLoader.read!/3`.
+  The `load` of `Imp.Datasets.Colors`, which builds examples from records and raises,
+  is `load!/1`.
 
 ## 0.4.0 — 2026-09-17
 

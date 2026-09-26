@@ -115,7 +115,7 @@ defmodule GRPOMultiStudentFreshProcessTest do
 
     jobs =
       for index <- 0..1 do
-        root |> Path.join("job-#{index}.json") |> TrainingJob.load!()
+        root |> Path.join("job-#{index}.json") |> TrainingJob.read!()
       end
 
     assert Enum.map(jobs, & &1.model) == summary["job_models"]

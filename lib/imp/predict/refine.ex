@@ -2,13 +2,16 @@ defmodule Imp.Predict.Refine do
   @moduledoc """
   Iteratively call a program until a metric passes or attempts are exhausted.
 
+  `:n` is how many attempts it makes (3 by default), as `N` is in DSPy's
+  `dspy.Refine` and in `Imp.Predict.BestOfN`.
+
   With no explicit `:feedback_fn`, Refine uses the wrapped program's LM to ask
   for bounded repair advice after a below-threshold attempt. The advice is
   passed to the next attempt as `:hint_`. An explicit callback selects custom
   feedback generation and takes precedence over automatic feedback.
 
   Like every `Imp.Module`, `call/2` returns `{:ok, prediction}` or
-  `{:error, reason}`. With `max_attempts: 0` the reason is `:no_attempts`; when
+  `{:error, reason}`. With `n: 0` the reason is `:no_attempts`; when
   more attempts fail than `:fail_count` allows it is
   `{:refine_fail_count_exceeded, reason}`; when every attempt failed it is the
   last attempt's reason.
@@ -21,7 +24,7 @@ defmodule Imp.Predict.Refine do
     :metric,
     :feedback_fn,
     :fail_count,
-    max_attempts: 3,
+    n: 3,
     threshold: 1.0
   ]
 
@@ -31,7 +34,7 @@ defmodule Imp.Predict.Refine do
       default: nil
     ],
     fail_count: [type: {:or, [:non_neg_integer, nil]}, default: nil],
-    max_attempts: [type: :non_neg_integer, default: 3],
+    n: [type: :non_neg_integer, default: 3],
     threshold: [type: {:or, [:integer, :float, nil]}, default: 1.0]
   ]
 
@@ -44,7 +47,7 @@ defmodule Imp.Predict.Refine do
       metric: metric,
       feedback_fn: opts[:feedback_fn],
       fail_count: opts[:fail_count],
-      max_attempts: opts[:max_attempts],
+      n: opts[:n],
       threshold: opts[:threshold]
     }
   end
@@ -57,11 +60,11 @@ defmodule Imp.Predict.Refine do
     {:error, "expected nil or a unary function, got: #{inspect(feedback_fn)}"}
   end
 
-  def call(%__MODULE__{max_attempts: 0}, _inputs), do: {:error, :no_attempts}
+  def call(%__MODULE__{n: 0}, _inputs), do: {:error, :no_attempts}
 
   def call(%__MODULE__{} = refine, inputs) do
-    rollout_ids = Attempt.rollout_ids(refine.program, refine.max_attempts)
-    failure_budget = refine.fail_count || refine.max_attempts
+    rollout_ids = Attempt.rollout_ids(refine.program, refine.n)
+    failure_budget = refine.fail_count || refine.n
 
     run_attempts(refine, inputs, rollout_ids, 1, nil, [], nil, 0, failure_budget)
   end

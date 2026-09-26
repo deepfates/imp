@@ -135,7 +135,7 @@ defmodule WorkspaceAgent do
 
   defp mcp_authorizer do
     case mcp_authority() do
-      :host -> fn _server, _context -> true end
+      :host -> fn _descriptor, _context -> :allow end
       :deny -> nil
     end
   end

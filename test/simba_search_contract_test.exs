@@ -123,7 +123,7 @@ defmodule Imp.Optimizer.SIMBA.SearchContractTest do
         max_steps: 1,
         max_demos: 0,
         prompt_lm: Imp.LM.Static.new(handler: fn _, _ -> %{module_advice: %{}} end),
-        max_concurrency: 1,
+        num_threads: 1,
         seed: 0
       )
 
@@ -159,7 +159,7 @@ defmodule Imp.Optimizer.SIMBA.SearchContractTest do
         max_steps: 1,
         max_demos: 0,
         prompt_lm: %SafetyLM{error: safety},
-        max_concurrency: 1,
+        num_threads: 1,
         seed: 0
       )
 
@@ -281,7 +281,7 @@ defmodule Imp.Optimizer.SIMBA.SearchContractTest do
         max_steps: 1,
         max_demos: 0,
         prompt_lm: prompt_lm,
-        max_concurrency: 1,
+        num_threads: 1,
         seed: 0
       )
       |> Imp.Optimizer.SIMBA.compile(program, [example], [example])
@@ -328,7 +328,7 @@ defmodule Imp.Optimizer.SIMBA.SearchContractTest do
       max_demos: 0,
       prompt_lm: prompt_lm,
       teacher_lm: teacher_lm,
-      max_concurrency: 1,
+      num_threads: 1,
       seed: 2
     )
     |> Imp.Optimizer.SIMBA.compile(program, [example])
@@ -385,7 +385,7 @@ defmodule Imp.Optimizer.SIMBA.SearchContractTest do
       max_steps: 1,
       max_demos: 0,
       prompt_lm: prompt_lm,
-      max_concurrency: 1,
+      num_threads: 1,
       seed: 3
     )
     |> Imp.Optimizer.SIMBA.compile(program, trainset)
@@ -440,7 +440,7 @@ defmodule Imp.Optimizer.SIMBA.SearchContractTest do
       max_steps: 1,
       max_demos: 0,
       prompt_lm: prompt_lm,
-      max_concurrency: 1,
+      num_threads: 1,
       seed: 0
     )
     |> Imp.Optimizer.SIMBA.compile(program, [example], [example])
@@ -483,7 +483,7 @@ defmodule Imp.Optimizer.SIMBA.SearchContractTest do
       max_demos: 1,
       demo_input_field_maxlen: 2,
       prompt_lm: prompt_lm,
-      max_concurrency: 1,
+      num_threads: 1,
       seed: 0
     )
     |> Imp.Optimizer.SIMBA.compile(program, [example])

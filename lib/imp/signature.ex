@@ -160,18 +160,18 @@ defmodule Imp.Signature do
     do: Imp.Schema.json_schema(signature.outputs)
 
   @doc "Loads a signature produced by `dump/1`."
-  def load(%{"inputs" => inputs, "outputs" => outputs} = state) do
+  def load!(%{"inputs" => inputs, "outputs" => outputs} = state) do
     %__MODULE__{
-      inputs: build_fields!(inputs, :input, "Imp.Signature.load/1 \"inputs\""),
-      outputs: build_fields!(outputs, :output, "Imp.Signature.load/1 \"outputs\""),
+      inputs: build_fields!(inputs, :input, "Imp.Signature.load!/1 \"inputs\""),
+      outputs: build_fields!(outputs, :output, "Imp.Signature.load!/1 \"outputs\""),
       instructions: Map.get(state, "instructions"),
       metadata: Map.get(state, "metadata", %{})
     }
   end
 
-  def load(state) do
+  def load!(state) do
     raise ArgumentError,
-          "Imp.Signature.load/1 expects a map with \"inputs\" and \"outputs\", got: #{inspect(state)}"
+          "Imp.Signature.load!/1 expects a map with \"inputs\" and \"outputs\", got: #{inspect(state)}"
   end
 
   # As in DSPy's `make_signature`, nil and the empty string both mean "no

@@ -137,7 +137,7 @@ defmodule Imp.BenchmarkTruth.LocalMLXCampaign do
 
     job = train!(trainer, examples)
     TrainingJob.save!(job, job_path)
-    verified_job = TrainingJob.load!(job_path)
+    verified_job = TrainingJob.read!(job_path)
     manifest = verify_replay!(trainer, examples, job, verified_job)
     adapter_path = Path.expand(job.metadata.adapter_path, job.result_model)
 

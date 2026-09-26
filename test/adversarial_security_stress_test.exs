@@ -22,7 +22,7 @@ defmodule AdversarialSecurityStressTest do
   test "parallel prediction timeouts kill slow tasks without exiting the caller" do
     assert [{:error, :timeout}, {:ok, prediction}] =
              Imp.Predict.Parallel.map(%SlowProgram{}, [50, 0],
-               max_concurrency: 2,
+               num_threads: 2,
                timeout: 5
              )
 
@@ -39,7 +39,7 @@ defmodule AdversarialSecurityStressTest do
                ":not_a_module_result"}}
            ] =
              Imp.Predict.Parallel.map(%ExplodingProgram{}, [:ok, :raise, :throw, :invalid],
-               max_concurrency: 2
+               num_threads: 2
              )
 
     assert Imp.Prediction.get(ok_prediction, :value) == :ok

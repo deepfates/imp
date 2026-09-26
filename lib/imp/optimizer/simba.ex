@@ -44,7 +44,7 @@ defmodule Imp.Optimizer.SIMBA do
     max_steps: 8,
     max_demos: 4,
     demo_input_field_maxlen: 100_000,
-    max_concurrency: 1,
+    num_threads: 1,
     timeout: :infinity,
     sampling_temperature: 0.2,
     candidate_temperature: 0.2,
@@ -61,7 +61,7 @@ defmodule Imp.Optimizer.SIMBA do
     :teacher_lm,
     :reflection_grounding,
     :demo_input_field_maxlen,
-    :max_concurrency,
+    :num_threads,
     :timeout,
     :sampling_temperature,
     :candidate_temperature,
@@ -90,7 +90,7 @@ defmodule Imp.Optimizer.SIMBA do
       teacher_lm: opts[:teacher_lm],
       reflection_grounding: Keyword.get(opts, :reflection_grounding, :structure),
       demo_input_field_maxlen: Keyword.get(opts, :demo_input_field_maxlen, 100_000),
-      max_concurrency: Keyword.get(opts, :max_concurrency, 1),
+      num_threads: Keyword.get(opts, :num_threads, 1),
       timeout: Keyword.get(opts, :timeout, :infinity),
       sampling_temperature: Keyword.get(opts, :sampling_temperature, 0.2),
       candidate_temperature: Keyword.get(opts, :candidate_temperature, 0.2),
@@ -486,7 +486,7 @@ defmodule Imp.Optimizer.SIMBA do
           end
         end,
         ordered: true,
-        max_concurrency: optimizer.max_concurrency,
+        max_concurrency: optimizer.num_threads,
         timeout: optimizer.timeout,
         on_timeout: :kill_task
       )
@@ -584,7 +584,7 @@ defmodule Imp.Optimizer.SIMBA do
           %{optimizer: :simba, step: step, trial: trial, batch_size: length(examples)},
           fn ->
             TrajectoryRunner.run(candidate.program, examples, optimizer.metric,
-              max_concurrency: optimizer.max_concurrency,
+              max_concurrency: optimizer.num_threads,
               timeout: optimizer.timeout,
               runtime: :simba
             )
@@ -999,7 +999,7 @@ defmodule Imp.Optimizer.SIMBA do
     |> Enum.reduce(state, fn {finalist, finalist_index}, state ->
       trajectories =
         TrajectoryRunner.run(finalist, final_set, optimizer.metric,
-          max_concurrency: optimizer.max_concurrency,
+          max_concurrency: optimizer.num_threads,
           timeout: optimizer.timeout,
           runtime: :simba
         )
@@ -1091,7 +1091,7 @@ defmodule Imp.Optimizer.SIMBA do
         max_demos: optimizer.max_demos,
         demo_input_field_maxlen: optimizer.demo_input_field_maxlen,
         reflection_grounding: grounding_identity(optimizer.reflection_grounding, program),
-        max_concurrency: optimizer.max_concurrency,
+        max_concurrency: optimizer.num_threads,
         timeout: optimizer.timeout,
         sampling_temperature: optimizer.sampling_temperature,
         candidate_temperature: optimizer.candidate_temperature,
@@ -1213,7 +1213,7 @@ defmodule Imp.Optimizer.SIMBA do
           {:max_steps, optimizer.max_steps, 0},
           {:max_demos, optimizer.max_demos, 0},
           {:demo_input_field_maxlen, optimizer.demo_input_field_maxlen, 0},
-          {:max_concurrency, optimizer.max_concurrency, 1},
+          {:max_concurrency, optimizer.num_threads, 1},
           {:seed, optimizer.seed, 0}
         ] do
       unless is_integer(value) and value >= minimum,

@@ -74,7 +74,10 @@ defmodule Imp.Adapter.ChatToolErrorTextTest do
         "data" => %{"type" => "validation"}
       }
 
-      assert Chat.format_tool_result({:error, CallFailure.returned("kite", "reply", error)}) ==
+      assert Chat.format_tool_result(
+               {:error,
+                CallFailure.returned(%{index: 0, server_name: "kite", tool_name: "reply"}, error)}
+             ) ==
                "Error: Invalid params: uri is required"
 
       assert Chat.format_tool_result({:error, {:json_rpc_error, error}}) ==
@@ -88,7 +91,10 @@ defmodule Imp.Adapter.ChatToolErrorTextTest do
         "data" => %{"type" => "handler_crash"}
       }
 
-      assert Chat.format_tool_result({:error, CallFailure.returned("kite", "reply", crash)}) ==
+      assert Chat.format_tool_result(
+               {:error,
+                CallFailure.returned(%{index: 0, server_name: "kite", tool_name: "reply"}, crash)}
+             ) ==
                "Error: the tool crashed while running, so it may have been carried out."
 
       slow = %{
@@ -97,7 +103,10 @@ defmodule Imp.Adapter.ChatToolErrorTextTest do
         "data" => %{"type" => "handler_timeout"}
       }
 
-      assert Chat.format_tool_result({:error, CallFailure.returned("kite", "reply", slow)}) ==
+      assert Chat.format_tool_result(
+               {:error,
+                CallFailure.returned(%{index: 0, server_name: "kite", tool_name: "reply"}, slow)}
+             ) ==
                "Error: the server stopped waiting for the tool, so it may have been carried out."
     end
   end
@@ -106,35 +115,57 @@ defmodule Imp.Adapter.ChatToolErrorTextTest do
   # words say so: "no answer came back" alone reads as nothing having happened.
   describe "a call that got no answer" do
     test "a timeout says it timed out and may have been carried out" do
-      assert Chat.format_tool_result({:error, CallFailure.returned("kite", "reply", :timeout)}) ==
+      assert Chat.format_tool_result(
+               {:error,
+                CallFailure.returned(
+                  %{index: 0, server_name: "kite", tool_name: "reply"},
+                  :timeout
+                )}
+             ) ==
                "Error: no answer came back; it timed out, so it may have been carried out."
 
       exit = {:timeout, {GenServer, :call, [self(), {:request, "tools/call", %{}, %{}}, 300]}}
 
-      assert Chat.format_tool_result({:error, CallFailure.exited("kite", "reply", exit)}) ==
+      assert Chat.format_tool_result(
+               {:error,
+                CallFailure.exited(%{index: 0, server_name: "kite", tool_name: "reply"}, exit)}
+             ) ==
                "Error: no answer came back; it timed out, so it may have been carried out."
     end
 
     test "a connection that closed under the call says it may have been carried out" do
       closed = ExMCP.Error.connection_error("Transport closed: :normal")
 
-      assert Chat.format_tool_result({:error, CallFailure.returned("kite", "reply", closed)}) ==
+      assert Chat.format_tool_result(
+               {:error,
+                CallFailure.returned(%{index: 0, server_name: "kite", tool_name: "reply"}, closed)}
+             ) ==
                "Error: no answer came back; the connection closed, so it may have been carried out."
 
       exit = {:normal, {GenServer, :call, [self(), :request, 300]}}
 
-      assert Chat.format_tool_result({:error, CallFailure.exited("kite", "reply", exit)}) ==
+      assert Chat.format_tool_result(
+               {:error,
+                CallFailure.exited(%{index: 0, server_name: "kite", tool_name: "reply"}, exit)}
+             ) ==
                "Error: no answer came back; the connection closed, so it may have been carried out."
     end
 
     test "a connection that is not open says so" do
       exit = {:noproc, {GenServer, :call, [self(), :request, 300]}}
 
-      assert Chat.format_tool_result({:error, CallFailure.exited("kite", "reply", exit)}) ==
+      assert Chat.format_tool_result(
+               {:error,
+                CallFailure.exited(%{index: 0, server_name: "kite", tool_name: "reply"}, exit)}
+             ) ==
                "Error: no answer came back; the connection is not open."
 
       assert Chat.format_tool_result(
-               {:error, CallFailure.returned("kite", "reply", :not_connected)}
+               {:error,
+                CallFailure.returned(
+                  %{index: 0, server_name: "kite", tool_name: "reply"},
+                  :not_connected
+                )}
              ) ==
                "Error: no answer came back; the connection is not open."
     end
@@ -145,7 +176,13 @@ defmodule Imp.Adapter.ChatToolErrorTextTest do
         message: "Failed to send request: %Mint.TransportError{reason: :econnrefused}"
       }
 
-      assert Chat.format_tool_result({:error, CallFailure.returned("kite", "reply", refused)}) ==
+      assert Chat.format_tool_result(
+               {:error,
+                CallFailure.returned(
+                  %{index: 0, server_name: "kite", tool_name: "reply"},
+                  refused
+                )}
+             ) ==
                "Error: it was not sent, so it was not carried out."
     end
 
@@ -156,7 +193,10 @@ defmodule Imp.Adapter.ChatToolErrorTextTest do
           "Failed to send request: {:http_receive_failed, %Mint.TransportError{reason: :closed}}"
       }
 
-      assert Chat.format_tool_result({:error, CallFailure.returned("kite", "reply", closed)}) ==
+      assert Chat.format_tool_result(
+               {:error,
+                CallFailure.returned(%{index: 0, server_name: "kite", tool_name: "reply"}, closed)}
+             ) ==
                "Error: no answer came back; the connection failed, so it may have been carried out."
     end
 
@@ -171,11 +211,21 @@ defmodule Imp.Adapter.ChatToolErrorTextTest do
         message: "Failed to send request: {:unauthorized, 401, \"\", nil}"
       }
 
-      assert Chat.format_tool_result({:error, CallFailure.returned("kite", "reply", forbidden)}) ==
+      assert Chat.format_tool_result(
+               {:error,
+                CallFailure.returned(
+                  %{index: 0, server_name: "kite", tool_name: "reply"},
+                  forbidden
+                )}
+             ) ==
                "Error: the server refused the call."
 
       assert Chat.format_tool_result(
-               {:error, CallFailure.returned("kite", "reply", unauthorized)}
+               {:error,
+                CallFailure.returned(
+                  %{index: 0, server_name: "kite", tool_name: "reply"},
+                  unauthorized
+                )}
              ) ==
                "Error: the server refused the credential, so it was not carried out."
     end
@@ -188,7 +238,13 @@ defmodule Imp.Adapter.ChatToolErrorTextTest do
             "The response stream broke after delivery; the server may have completed the request."
         })
 
-      assert Chat.format_tool_result({:error, CallFailure.returned("kite", "reply", unknown)}) ==
+      assert Chat.format_tool_result(
+               {:error,
+                CallFailure.returned(
+                  %{index: 0, server_name: "kite", tool_name: "reply"},
+                  unknown
+                )}
+             ) ==
                "Error: no answer came back; the connection broke after the request was sent, " <>
                  "so it may have been carried out."
     end
@@ -223,7 +279,7 @@ defmodule Imp.Adapter.ChatToolErrorTextTest do
     end
 
     test "a denied tool and an unreadable call say so" do
-      assert Chat.format_tool_result({:error, {:tool_authorization_denied, :post, :tool_policy}}) ==
+      assert Chat.format_tool_result({:error, {:tool_denied, :post, :tool_policy}}) ==
                "Error: post is not allowed."
 
       assert Chat.format_tool_result({:error, {:malformed_tool_call, %{"function" => nil}}}) ==

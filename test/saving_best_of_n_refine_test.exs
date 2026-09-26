@@ -33,16 +33,32 @@ defmodule SavingBestOfNRefineTest do
     restored =
       Imp.predict("question -> answer")
       |> Imp.Predict.Refine.new(context.metric,
-        max_attempts: 5,
+        n: 5,
         threshold: nil,
         fail_count: 2,
         feedback_fn: context.feedback
       )
       |> json_round_trip(context.registry)
 
-    assert %Imp.Predict.Refine{max_attempts: 5, threshold: nil, fail_count: 2} = restored
+    assert %Imp.Predict.Refine{n: 5, threshold: nil, fail_count: 2} = restored
     assert restored.metric == context.metric
     assert restored.feedback_fn == context.feedback
+  end
+
+  test "a Refine saved with its attempt count under the pre-0.5.0 key loads", context do
+    state =
+      Imp.predict("question -> answer")
+      |> Imp.Predict.Refine.new(context.metric, n: 4)
+      |> Imp.Saving.dump(registry: context.registry)
+
+    assert state["n"] == 4
+    old = state |> Map.delete("n") |> Map.put("max_attempts", 4)
+
+    assert %Imp.Predict.Refine{n: 4} =
+             old
+             |> Jason.encode!()
+             |> Jason.decode!()
+             |> Imp.Saving.load!(registry: context.registry)
   end
 
   test "callback predictor payloads require all current fields", context do
@@ -52,7 +68,7 @@ defmodule SavingBestOfNRefineTest do
       |> Map.delete("threshold")
 
     refine_state =
-      Imp.Predict.Refine.new(Imp.predict("question -> answer"), context.metric, max_attempts: 4)
+      Imp.Predict.Refine.new(Imp.predict("question -> answer"), context.metric, n: 4)
       |> Imp.dump(registry: context.registry)
       |> Map.drop(["threshold", "fail_count"])
 
@@ -101,13 +117,15 @@ defmodule SavingBestOfNRefineTest do
       Imp.load!(Map.put(best_state, "n", 2.0), registry: context.registry)
     end
 
-    assert_raise ArgumentError,
-                 ~r/saved Refine max_attempts must be a non-negative integer/,
-                 fn ->
-                   Imp.load!(Map.put(refine_state, "max_attempts", -1),
-                     registry: context.registry
-                   )
-                 end
+    assert_raise ArgumentError, ~r/saved Refine n must be a non-negative integer/, fn ->
+      Imp.load!(Map.put(refine_state, "n", -1), registry: context.registry)
+    end
+
+    old_key = refine_state |> Map.delete("n") |> Map.put("max_attempts", -1)
+
+    assert_raise ArgumentError, ~r/saved Refine n must be a non-negative integer/, fn ->
+      Imp.load!(old_key, registry: context.registry)
+    end
   end
 
   defp json_round_trip(program, registry) do

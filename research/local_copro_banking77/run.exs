@@ -100,12 +100,11 @@ defmodule LocalCOPROBanking77.Runner do
           depth: 1,
           init_temperature: 0,
           proposer_lm: proposer,
-          proposal_max_concurrency: 1,
+          proposal_concurrency: 1,
           proposal_response_format: :required
         )
-        |> COPRO.compile(baseline, examples(rows.train), [],
-          num_threads: 1,
-          max_errors: :infinity
+        |> then(
+          &Imp.optimize!(baseline, &1, examples(rows.train), num_threads: 1, max_errors: :infinity)
         )
 
       report = Report.fetch(selected)
@@ -213,7 +212,7 @@ defmodule LocalCOPROBanking77.Runner do
   defp preflight!(paths, verify_proposer?) do
     unless sha256_file(paths.data) == @data_sha256, do: raise("Banking77 data digest drift")
     if verify_proposer?, do: verify_ollama!()
-    job = TrainingJob.load!(paths.job)
+    job = TrainingJob.read!(paths.job)
     {:ok, _manifest} = Imp.Clients.MLXLMTrainer.verify_job(job)
     rows = split_rows!(paths.data)
 
@@ -252,7 +251,7 @@ defmodule LocalCOPROBanking77.Runner do
       )
 
     {:ok, rebound} = TrainingJob.rebind(job, source)
-    Imp.Predict.with_lm(rebound, observed(Imp.ProgramAccess.lm(rebound), observer, :task))
+    Imp.Predict.with_lm(rebound, observed(rebound.lm, observer, :task))
   end
 
   defp ollama_lm do

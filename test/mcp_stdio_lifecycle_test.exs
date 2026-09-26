@@ -202,7 +202,7 @@ defmodule Imp.MCPStdioLifecycleTest do
           %{type: :transport_error, message: "Failed to send request: :request_too_large"}
         ] do
       assert %Imp.MCP.CallFailure{outcome: :not_sent} =
-               Imp.MCP.CallFailure.returned("s", "t", reason)
+               Imp.MCP.CallFailure.returned(%{index: 0, server_name: "s", tool_name: "t"}, reason)
     end
   end
 

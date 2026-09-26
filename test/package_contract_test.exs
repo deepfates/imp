@@ -770,7 +770,7 @@ defmodule PackageContractTest do
     random_search =
       Imp.optimize!(
         program,
-        Imp.Optimizer.RandomSearch.new(metric,
+        Imp.Optimizer.BootstrapFewShotWithRandomSearch.new(metric,
           num_candidate_programs: 0,
           max_bootstrapped_demos: 1,
           max_labeled_demos: 1
@@ -794,7 +794,7 @@ defmodule PackageContractTest do
              %Imp.Optimizer.Report{optimizer: :random_search},
              Imp.Optimizer.Report.fetch(random_deployed)
            ) do
-      raise "RandomSearch package artifact lost its optimizer report on application"
+      raise "BootstrapFewShotWithRandomSearch package artifact lost its optimizer report on application"
     end
 
     verify_program_optimizer.(:random_search_artifact, :random_search, random_deployed)
@@ -1000,7 +1000,7 @@ defmodule PackageContractTest do
 
     [{:ok, batch_prediction}] =
       Imp.parallel(program, [%{question: "What city is the Eiffel Tower in?"}],
-        max_concurrency: 1
+        num_threads: 1
       )
 
     unless Imp.get(batch_prediction, :answer) == "Paris" do

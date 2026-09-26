@@ -3,7 +3,11 @@ defmodule AvatarPersistenceTest do
 
   test "Avatar round-trips portable actor state through named callbacks" do
     runner = fn %{query: query} -> "found #{query}" end
-    policy = fn name, _arguments -> name in [:lookup, "lookup"] end
+
+    policy = fn name, _arguments ->
+      if name in [:lookup, "lookup"], do: :allow, else: {:deny, :not_lookup}
+    end
+
     registry = Imp.Saving.Registry.new(lookup_runner: runner, avatar_policy: policy)
 
     avatar =

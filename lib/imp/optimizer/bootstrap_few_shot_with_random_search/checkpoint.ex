@@ -1,4 +1,4 @@
-defmodule Imp.Optimizer.RandomSearch.Checkpoint do
+defmodule Imp.Optimizer.BootstrapFewShotWithRandomSearch.Checkpoint do
   @moduledoc false
 
   alias Imp.Optimizer.Report
@@ -39,12 +39,13 @@ defmodule Imp.Optimizer.RandomSearch.Checkpoint do
              is_map(expected_compatibility) and is_map(encoded_state) and
              is_struct(runtime_program) do
     unless checksum(payload) == payload_sha256 do
-      raise ArgumentError, "RandomSearch resume state checksum does not match its payload"
+      raise ArgumentError,
+            "BootstrapFewShotWithRandomSearch resume state checksum does not match its payload"
     end
 
     unless compatibility == expected_compatibility do
       raise ArgumentError,
-            "RandomSearch resume state does not match the program runtime, datasets, or configuration"
+            "BootstrapFewShotWithRandomSearch resume state does not match the program runtime, datasets, or configuration"
     end
 
     state = encoded_state |> Report.decode_term() |> load_state!(runtime_program)
@@ -52,12 +53,16 @@ defmodule Imp.Optimizer.RandomSearch.Checkpoint do
   rescue
     error in [KeyError, ArgumentError] ->
       reraise ArgumentError,
-              [message: "invalid RandomSearch resume state: #{Exception.message(error)}"],
+              [
+                message:
+                  "invalid BootstrapFewShotWithRandomSearch resume state: #{Exception.message(error)}"
+              ],
               __STACKTRACE__
   end
 
   def load!(value, _expected_compatibility, _runtime_program) do
-    raise ArgumentError, "invalid RandomSearch resume state: #{inspect(value)}"
+    raise ArgumentError,
+          "invalid BootstrapFewShotWithRandomSearch resume state: #{inspect(value)}"
   end
 
   defp dump_state(state) do
@@ -72,7 +77,10 @@ defmodule Imp.Optimizer.RandomSearch.Checkpoint do
 
   defp load_state!(value, _runtime_program),
     do:
-      raise(ArgumentError, "RandomSearch checkpoint state must be a map, got: #{inspect(value)}")
+      raise(
+        ArgumentError,
+        "BootstrapFewShotWithRandomSearch checkpoint state must be a map, got: #{inspect(value)}"
+      )
 
   defp load_records!(records, runtime_program) when is_list(records) do
     Enum.map(records, fn
@@ -80,12 +88,17 @@ defmodule Imp.Optimizer.RandomSearch.Checkpoint do
         Map.put(record, :program, load_program!(snapshot, runtime_program))
 
       record ->
-        raise ArgumentError, "RandomSearch checkpoint record is invalid: #{inspect(record)}"
+        raise ArgumentError,
+              "BootstrapFewShotWithRandomSearch checkpoint record is invalid: #{inspect(record)}"
     end)
   end
 
   defp load_records!(value, _runtime_program),
-    do: raise(ArgumentError, "RandomSearch checkpoint records must be a list: #{inspect(value)}")
+    do:
+      raise(
+        ArgumentError,
+        "BootstrapFewShotWithRandomSearch checkpoint records must be a list: #{inspect(value)}"
+      )
 
   defp dump_program(program) do
     %{
@@ -105,12 +118,13 @@ defmodule Imp.Optimizer.RandomSearch.Checkpoint do
 
     unless Enum.map(snapshots, & &1.name) == runtime_names do
       raise ArgumentError,
-            "RandomSearch checkpoint predictor names do not match the runtime program"
+            "BootstrapFewShotWithRandomSearch checkpoint predictor names do not match the runtime program"
     end
 
     Enum.reduce(snapshots, runtime_program, fn snapshot, program ->
       unless is_binary(snapshot.instruction) and is_list(snapshot.demos) do
-        raise ArgumentError, "RandomSearch checkpoint predictor snapshot is invalid"
+        raise ArgumentError,
+              "BootstrapFewShotWithRandomSearch checkpoint predictor snapshot is invalid"
       end
 
       program
@@ -120,14 +134,18 @@ defmodule Imp.Optimizer.RandomSearch.Checkpoint do
   end
 
   defp load_program!(value, _runtime_program),
-    do: raise(ArgumentError, "RandomSearch checkpoint program is invalid: #{inspect(value)}")
+    do:
+      raise(
+        ArgumentError,
+        "BootstrapFewShotWithRandomSearch checkpoint program is invalid: #{inspect(value)}"
+      )
 
   defp validate_state!(state) do
     unless Enum.sort(Map.keys(state)) == [:errors, :next_index, :records, :stopped] and
              is_list(state.records) and is_list(state.errors) and
              is_integer(state.next_index) and state.next_index >= 0 and
              is_boolean(state.stopped) and Enum.all?(state.records, &valid_record?/1) do
-      raise ArgumentError, "RandomSearch checkpoint state is invalid"
+      raise ArgumentError, "BootstrapFewShotWithRandomSearch checkpoint state is invalid"
     end
 
     state

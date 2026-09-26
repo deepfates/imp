@@ -58,7 +58,7 @@ defmodule AvatarTest do
           finalizer?(prompt) ->
             %{answer: "recovered"}
 
-          prompt =~ "unknown_tool" or prompt =~ "tool_authorization_denied" or
+          prompt =~ "unknown_tool" or prompt =~ "tool_denied" or
               prompt =~ "tool_error" ->
             finish_action()
 
@@ -92,7 +92,7 @@ defmodule AvatarTest do
 
     assert [
              %ActionOutput{
-               tool_output: {:error, {:tool_authorization_denied, :lookup, :tool_policy}},
+               tool_output: {:error, {:tool_denied, :lookup, :tool_policy}},
                error?: true
              }
            ] =

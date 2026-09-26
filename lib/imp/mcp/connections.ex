@@ -3,7 +3,7 @@ defmodule Imp.MCP.Import do
   An owned remote tool catalog; cleanup closes its connections.
 
   `unavailable` is empty unless the import ran with `on_failure: :drop`, in
-  which case it holds one `%{server: name, index: index, reason: reason}` entry
+  which case it holds one `%{server_name: name, index: index, reason: reason}` entry
   per server that was left out. The tools of every server that did connect are
   in `tools`.
 
@@ -20,7 +20,7 @@ defmodule Imp.MCP.Import do
   """
   defstruct tools: [], annotations: %{}, provenance: %{}, cleanup: nil, unavailable: []
 
-  @type absence :: %{server: String.t(), index: non_neg_integer(), reason: term()}
+  @type absence :: %{server_name: String.t(), index: non_neg_integer(), reason: term()}
 
   @type t :: %__MODULE__{
           tools: [Imp.Tool.t()],
@@ -85,9 +85,11 @@ defmodule Imp.MCP.Connections do
   without it.
 
   Only descriptors the caller authorized are dialed. `trusted_servers:` lists
-  them exactly; `authorize:` is a function of the descriptor (and optionally
-  a `%{cwd: cwd, server: descriptor}` context) that returns `:ok` or `true` to
-  allow it; anything else refuses it:
+  them exactly; `authorize:` is a function of the descriptor (and optionally a
+  `%{cwd: cwd, descriptor: descriptor}` context) that returns `:allow` or
+  `{:deny, reason}`. A refused descriptor refuses the import with
+  `{:mcp_server_not_authorized, server_name, reason}`; one not in
+  `trusted_servers:` has the reason `:not_trusted`:
 
       {:ok, import} = Imp.MCP.connect([server], trusted_servers: [server])
       tool = Enum.find(import.tools, &(to_string(&1.name) == "read_text_file"))
@@ -102,7 +104,7 @@ defmodule Imp.MCP.Connections do
 
       %{"type" => "oauth", "credential" => "readwise"}
 
-  resolves through the `Imp.MCP.OAuth.Store` passed as the `:credentials`
+  resolves through the `Imp.MCP.OAuth.Store` passed as the `:credential_store`
   option, refreshing the grant when it is near expiry. The credential must have
   been authorized for this descriptor's `"url"`; naming another server's
   credential is refused rather than resolved. See `Imp.MCP.OAuth`.
@@ -202,8 +204,9 @@ defmodule Imp.MCP.Connections do
   unnoticed for as long as one of them is absent, and then refuses the import
   the first time both answer.
 
-  `Imp.Tool` provenance (`tool.metadata.mcp`) carries the server and the name
-  the server published, whatever the tool ended up called.
+  `Imp.Tool` provenance (`tool.metadata.mcp`) carries the descriptor's `index`,
+  its `server_name`, and the `tool_name` the server published, whatever the
+  tool ended up called.
 
   Dropping covers failures of the connection and of `tools/list`, not of the
   declaration. A descriptor that `:authorize` refused
@@ -216,7 +219,7 @@ defmodule Imp.MCP.Connections do
   list), a tool name two servers both claim, and anything raised by the
   caller's own `:tool_filter` all refuse the import under either setting.
 
-  A server left out under `:drop` is `%{server: name, index: index, reason:
+  A server left out under `:drop` is `%{server_name: name, index: index, reason:
   reason}` in the import's `unavailable` list, where `reason` is the term the
   import would have refused with under `:refuse`. A connection that failed is
   `{:mcp_connection_failed, detail}` and a catalog that could not be listed is
@@ -229,8 +232,9 @@ defmodule Imp.MCP.Connections do
 
   alias Imp.MCP.{CallFailure, Import}
 
-  @type server :: map()
-  @type context :: %{cwd: String.t(), server: server()}
+  @typedoc "A server descriptor: a map with string keys (see Descriptors above)."
+  @type descriptor :: map()
+  @type context :: %{cwd: String.t(), descriptor: descriptor()}
 
   @option_keys [
     :authorize,
@@ -242,7 +246,7 @@ defmodule Imp.MCP.Connections do
     :owner,
     :call_meta,
     :tool_filter,
-    :credentials,
+    :credential_store,
     :on_failure,
     :pool_size
   ]
@@ -256,7 +260,7 @@ defmodule Imp.MCP.Connections do
 
   @doc false
   # `Imp.MCP.connect/2` is the entry point; this module documents its options.
-  @spec connect([server()], keyword()) :: {:ok, Import.t()} | {:error, term()}
+  @spec connect([descriptor()], keyword()) :: {:ok, Import.t()} | {:error, term()}
   def connect(servers, opts \\ [])
 
   def connect(servers, opts) when is_list(servers) and is_list(opts) do
@@ -802,7 +806,7 @@ defmodule Imp.MCP.Connections do
   # What the import says about a server it left out: the reason is the term the
   # refusal would have carried under `on_failure: :refuse`, unchanged.
   defp absence(server, index, reason),
-    do: %{server: server_name(server), index: index, reason: reason}
+    do: %{server_name: server_name(server), index: index, reason: reason}
 
   defp shorten({tag, detail}) when is_atom(tag), do: {tag, summary(detail)}
 
@@ -853,6 +857,7 @@ defmodule Imp.MCP.Connections do
         schema =
           Map.put(schema, "metadata", %{
             mcp: %{
+              index: index,
               server_name: server_name(server),
               tool_name: name,
               schema: Map.drop(schema, ["run", "metadata"]),
@@ -862,7 +867,7 @@ defmodule Imp.MCP.Connections do
 
         Map.put(schema, "run", fn
           arguments when not pooled? ->
-            call_tool(client, name, arguments, server, opts)
+            call_tool(client, index, name, arguments, server, opts)
 
           arguments ->
             borrowed_call(bridge, index, name, arguments, server, opts)
@@ -883,7 +888,7 @@ defmodule Imp.MCP.Connections do
     case Imp.MCP.Clients.checkout(bridge, index, timeout(opts)) do
       {:ok, client} ->
         result =
-          case await_call(client, name, arguments, server, opts) do
+          case await_call(client, index, name, arguments, server, opts) do
             {:raised, kind, reason, stacktrace} ->
               Imp.MCP.Clients.retire(bridge, client)
               :erlang.raise(kind, reason, stacktrace)
@@ -902,7 +907,7 @@ defmodule Imp.MCP.Connections do
         result
 
       {:error, reason} ->
-        {:error, CallFailure.returned(server_name(server), name, reason)}
+        {:error, CallFailure.returned(source(index, server, name), reason)}
     end
   end
 
@@ -915,14 +920,14 @@ defmodule Imp.MCP.Connections do
   # timeout, `:unknown` (`reason: :timeout`), while the request runs on. The
   # answer the caller no longer waits for goes to an alias that is gone by
   # then. This retires if ExMCP leaves a timed-out request's stream open.
-  defp await_call(client, name, arguments, server, opts) do
+  defp await_call(client, index, name, arguments, server, opts) do
     reply_to = :erlang.alias([:reply])
     whole = Keyword.put(opts, :timeout, request_limit(opts))
 
     spawn(fn ->
       answer =
         try do
-          call_tool(client, name, arguments, server, whole)
+          call_tool(client, index, name, arguments, server, whole)
         catch
           kind, reason -> {:raised, kind, reason, __STACKTRACE__}
         end
@@ -939,7 +944,7 @@ defmodule Imp.MCP.Connections do
         receive do
           {^reply_to, answer} -> answer
         after
-          0 -> {:error, CallFailure.returned(server_name(server), name, :timeout)}
+          0 -> {:error, CallFailure.returned(source(index, server, name), :timeout)}
         end
     end
   end
@@ -953,7 +958,7 @@ defmodule Imp.MCP.Connections do
   defp still_out?({:error, %CallFailure{reason: {:exit, {:timeout, _call}}}}), do: true
   defp still_out?(_result), do: false
 
-  defp call_tool(client, name, arguments, server, opts) do
+  defp call_tool(client, index, name, arguments, server, opts) do
     # A lost response does not establish that a write did not happen.
     # ExMCP defaults modern stream retries to at-least-once; this tool
     # boundary has no server idempotency contract, so never opt into it.
@@ -968,11 +973,14 @@ defmodule Imp.MCP.Connections do
         Imp.MCP.tool_result(result, result_mode(opts))
 
       {:error, reason} ->
-        {:error, CallFailure.returned(server_name(server), name, reason)}
+        {:error, CallFailure.returned(source(index, server, name), reason)}
     end
   catch
-    :exit, reason -> {:error, CallFailure.exited(server_name(server), name, reason)}
+    :exit, reason -> {:error, CallFailure.exited(source(index, server, name), reason)}
   end
+
+  defp source(index, server, tool_name),
+    do: %{index: index, server_name: server_name(server), tool_name: tool_name}
 
   defp call_meta(server, opts) do
     case Keyword.get(opts, :call_meta) do
@@ -1127,25 +1135,31 @@ defmodule Imp.MCP.Connections do
   # callback's own answer, or `:not_trusted` for a descriptor that is not one
   # of `:trusted_servers`.
   defp authorize(server, opts) do
-    context = %{cwd: Keyword.get(opts, :cwd), server: server}
+    context = %{cwd: Keyword.get(opts, :cwd), descriptor: server}
 
-    answer =
+    decision =
       case Keyword.get(opts, :authorize) do
-        callback when is_function(callback, 2) ->
-          safe_authorize(callback, server, context)
-
-        callback when is_function(callback, 1) ->
-          safe_authorize(callback, server)
-
-        nil ->
-          if Enum.any?(Keyword.get(opts, :trusted_servers, []), &exact_server?(&1, server)),
-            do: :ok,
-            else: :not_trusted
+        callback when is_function(callback, 2) -> safe_authorize(callback, server, context)
+        callback when is_function(callback, 1) -> safe_authorize(callback, server)
+        nil -> trusted(Keyword.get(opts, :trusted_servers, []), server)
       end
 
-    if answer in [true, :ok],
-      do: :ok,
-      else: {:error, {:mcp_server_not_authorized, server_name(server), answer}}
+    case decision do
+      :allow ->
+        :ok
+
+      {:deny, reason} ->
+        {:error, {:mcp_server_not_authorized, server_name(server), reason}}
+
+      other ->
+        {:error, {:mcp_server_not_authorized, server_name(server), {:invalid_decision, other}}}
+    end
+  end
+
+  defp trusted(trusted_servers, server) do
+    if Enum.any?(trusted_servers, &exact_server?(&1, server)),
+      do: :allow,
+      else: {:deny, :not_trusted}
   end
 
   defp safe_authorize(callback, server, context), do: callback.(server, context)
@@ -1295,7 +1309,7 @@ defmodule Imp.MCP.Connections do
   end
 
   defp credential_store(server, opts) do
-    case Keyword.get(opts, :credentials) do
+    case Keyword.get(opts, :credential_store) do
       %Imp.MCP.OAuth.Store{} = store ->
         {:ok, store}
 
@@ -1303,7 +1317,7 @@ defmodule Imp.MCP.Connections do
         {:error,
          auth_unavailable(
            server,
-           "oauth auth needs the :credentials option, an Imp.MCP.OAuth.store/1 value"
+           "oauth auth needs the :credential_store option, an Imp.MCP.OAuth.store/1 value"
          )}
     end
   end
@@ -1523,7 +1537,7 @@ defmodule Imp.MCP.Connections do
       raise ArgumentError, ":trusted_servers must be a list of exact server maps"
     end
 
-    case Keyword.get(opts, :credentials) do
+    case Keyword.get(opts, :credential_store) do
       nil ->
         :ok
 
@@ -1532,7 +1546,7 @@ defmodule Imp.MCP.Connections do
 
       _other ->
         raise ArgumentError,
-              ":credentials must be an Imp.MCP.OAuth.Store from Imp.MCP.OAuth.store/1"
+              ":credential_store must be an Imp.MCP.OAuth.Store from Imp.MCP.OAuth.store/1"
     end
 
     reserved_tool_names = Keyword.get(opts, :reserved_tool_names, [])

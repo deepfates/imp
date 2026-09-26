@@ -36,7 +36,7 @@ defmodule Imp.Optimizer.GEPA do
   Fisher-Yates minibatch sampling, perfect minibatches are skipped at `1.0`,
   evaluation caching is disabled, and one failed batched reflection is retried
   once as the corresponding single task. Candidate proposal remains serial,
-  while `:max_concurrency` may bound the same concurrent row evaluation used by
+  while `:num_threads` may bound the same concurrent row evaluation used by
   the source artifact. Like pinned GEPA, `max_metric_calls` is checked between
   iterations: an iteration that legally starts is allowed to finish. Separate
   internal metric/reflection envelopes bound that legal overshoot; they are not
@@ -107,7 +107,7 @@ defmodule Imp.Optimizer.GEPA do
     selection_strategy: :all_improvements,
     proposal_concurrency: 1,
     proposal_timeout: 30_000,
-    max_concurrency: 1,
+    num_threads: 1,
     timeout: 30_000,
     minibatch_size: nil,
     seed: 0,
@@ -159,7 +159,7 @@ defmodule Imp.Optimizer.GEPA do
       default: 1
     ],
     proposal_timeout: [type: {:or, [nil, :timeout]}, default: nil],
-    max_concurrency: [type: :pos_integer, default: 1],
+    num_threads: [type: :pos_integer, default: 1],
     timeout: [type: :timeout, default: 30_000],
     minibatch_size: [type: {:or, [nil, :pos_integer]}, default: nil],
     seed: [type: :non_neg_integer, default: 0],
@@ -240,7 +240,7 @@ defmodule Imp.Optimizer.GEPA do
       selection_strategy: validate_selection_strategy!(opts[:selection_strategy]),
       proposal_concurrency: opts[:proposal_concurrency],
       proposal_timeout: opts[:proposal_timeout] || opts[:timeout],
-      max_concurrency: opts[:max_concurrency],
+      num_threads: opts[:num_threads],
       timeout: opts[:timeout],
       minibatch_size: opts[:minibatch_size],
       seed: opts[:seed],
@@ -321,7 +321,7 @@ defmodule Imp.Optimizer.GEPA do
 
     adapter =
       ProgramAdapter.new(program, optimizer.metric,
-        max_concurrency: optimizer.max_concurrency,
+        max_concurrency: optimizer.num_threads,
         timeout: optimizer.timeout,
         component_feedback: optimizer.component_feedback,
         reflection_record_mode: optimizer.reflection_record_mode
@@ -415,7 +415,7 @@ defmodule Imp.Optimizer.GEPA do
           sampling_strategy: optimizer.sampling_strategy,
           selection_strategy: policy_name(optimizer.selection_strategy),
           proposal_timeout: optimizer.proposal_timeout,
-          max_concurrency: optimizer.max_concurrency,
+          max_concurrency: optimizer.num_threads,
           timeout: optimizer.timeout,
           implementation: __MODULE__,
           engine: Engine,

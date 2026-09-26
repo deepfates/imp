@@ -4,9 +4,8 @@ defmodule MCPReferenceServerLiveTest do
   (`@modelcontextprotocol/server-filesystem` via npx, stdio transport).
 
   This is the honest version of the import path: a real spec-compliant server
-  whose tools/list emits camelCase `inputSchema` (MCP spec, Tool definition).
-  Before dee-05qd, `Imp.MCP.import_tools/1` raised on every tool this server
-  returns. Excluded by default; run with:
+  whose tools/list emits camelCase `inputSchema` (MCP spec, Tool definition),
+  imported through `Imp.MCP.connect/2`. Excluded by default; run with:
 
       mix test --include live test/mcp_reference_server_live_test.exs
   """

@@ -10,7 +10,7 @@ defmodule ImpDoctestTest do
   doctest Imp.Metrics
   doctest Imp.Module
   doctest Imp.Observability.Inspection
-  doctest Imp.Optimizer.RandomSearch
+  doctest Imp.Optimizer.BootstrapFewShotWithRandomSearch
   doctest Imp.Prediction
   doctest Imp.Predict.Aggregation
   doctest Imp.Predict.MultiChainComparison

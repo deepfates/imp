@@ -1,7 +1,7 @@
 defmodule Mix.Tasks.Imp.Benchmark.ClassicalOptimizerDifferential do
   @moduledoc false
 
-  alias Imp.Optimizer.{RandomSearch, Report}
+  alias Imp.Optimizer.{BootstrapFewShotWithRandomSearch, Report}
 
   @task_path "lib/mix/tasks/imp.benchmark.classical_optimizer_differential.ex"
   @script_path "scripts/dspy_classical_optimizer_differential.py"
@@ -271,7 +271,7 @@ defmodule Mix.Tasks.Imp.Benchmark.ClassicalOptimizerDifferential do
     metric = Imp.Metrics.exact_match(:answer)
 
     report =
-      RandomSearch.new(metric,
+      BootstrapFewShotWithRandomSearch.new(metric,
         num_candidate_programs: config["num_candidate_programs"],
         max_bootstrapped_demos: config["max_bootstrapped_demos"],
         max_labeled_demos: config["max_labeled_demos"],
@@ -279,7 +279,7 @@ defmodule Mix.Tasks.Imp.Benchmark.ClassicalOptimizerDifferential do
         max_errors: 10,
         num_threads: 1
       )
-      |> RandomSearch.compile(fixture_program(answers), rows, valset,
+      |> BootstrapFewShotWithRandomSearch.compile(fixture_program(answers), rows, valset,
         restrict: config["restrict"]
       )
       |> then(fn compiled -> Report.fetch(compiled.main) end)
@@ -487,9 +487,9 @@ defmodule Mix.Tasks.Imp.Benchmark.BootstrapFewShotDifferential do
 end
 
 defmodule Mix.Tasks.Imp.Benchmark.RandomSearchDifferential do
-  @moduledoc "Capture provider-free RandomSearch C1 differential evidence."
+  @moduledoc "Capture provider-free BootstrapFewShotWithRandomSearch C1 differential evidence."
   use Mix.Task
-  @shortdoc "Capture provider-free RandomSearch C1 evidence"
+  @shortdoc "Capture provider-free BootstrapFewShotWithRandomSearch C1 evidence"
   @impl true
   def run(args),
     do: Mix.Tasks.Imp.Benchmark.ClassicalOptimizerDifferential.run_family("random_search", args)

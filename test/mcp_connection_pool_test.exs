@@ -167,7 +167,7 @@ defmodule Imp.MCPConnectionPoolTest do
     Process.sleep(100)
 
     {elapsed, result} = ms(fn -> Imp.Tool.call(tools["fast"], %{}) end)
-    assert {:error, %CallFailure{outcome: :not_sent, tool: "fast"}} = result
+    assert {:error, %CallFailure{outcome: :not_sent, tool_name: "fast"}} = result
     assert elapsed >= 300
 
     send(holder.pid, :release)
@@ -241,7 +241,7 @@ defmodule Imp.MCPConnectionPoolTest do
     # ones would hold until 8_300 ms, and the import is given up at 8_000.
     authorize = fn _descriptor ->
       Process.sleep(7_300)
-      :ok
+      :allow
     end
 
     assert {:error, :mcp_import_timeout} =
@@ -582,7 +582,7 @@ defmodule Imp.MCPConnectionPoolTest do
           Process.sleep(:infinity)
 
         _descriptor ->
-          :ok
+          :allow
       end
 
       task =
@@ -620,8 +620,10 @@ defmodule Imp.MCPConnectionPoolTest do
   # a task killed at its own deadline. The connections already made must close
   # with it, and with them their hold on the server's origin.
   describe "a caller that dies while its import connects" do
-    test "leaves no connection open when the rest connect", do: caller_dies(:ok)
-    test "leaves no connection open when the rest are refused", do: caller_dies(false)
+    test "leaves no connection open when the rest connect", do: caller_dies(:allow)
+
+    test "leaves no connection open when the rest are refused",
+      do: caller_dies({:deny, :refused})
   end
 
   defp caller_dies(second_answer) do
@@ -638,7 +640,7 @@ defmodule Imp.MCPConnectionPoolTest do
             second_answer
 
           _descriptor ->
-            :ok
+            :allow
         end
 
         Imp.MCP.connect([first, second], authorize: authorize, pool_size: 2)

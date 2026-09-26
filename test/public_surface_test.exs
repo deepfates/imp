@@ -97,7 +97,7 @@ defmodule PublicSurfaceTest do
     Imp.Optimizer.BootstrapFewShot,
     Imp.Optimizer.BootstrapFewShotWithRandomSearch,
     Imp.Optimizer.BootstrapFinetune,
-    Imp.Optimizer.BootstrapRS,
+    Imp.Optimizer.BootstrapFewShotWithRandomSearch,
     Imp.Optimizer.COPRO,
     Imp.Optimizer.Ensemble,
     Imp.Optimizer.GEPA,
@@ -146,7 +146,7 @@ defmodule PublicSurfaceTest do
     Imp.Optimizer.Playbook,
     Imp.Optimizer.Playbook.Result,
     Imp.Optimizer.Playbook.Usage,
-    Imp.Optimizer.RandomSearch,
+    Imp.Optimizer.BootstrapFewShotWithRandomSearch,
     Imp.Optimizer.Report,
     Imp.Optimizer.Sampling,
     Imp.Optimizer.SIMBA,
@@ -397,16 +397,14 @@ defmodule PublicSurfaceTest do
 
     assert {:ok, refined} =
              program
-             |> Imp.refine(metric, max_attempts: 1)
+             |> Imp.refine(metric, n: 1)
              |> Imp.call(%{question: "2+2?"})
 
     assert Imp.get(refined, :answer) == "4"
     assert [%{attempt: 1}] = Imp.get(refined, :refine_history)
 
     assert [{:ok, first}, {:ok, second}] =
-             Imp.parallel(program, [%{question: "2+2?"}, %{question: "sqrt 16?"}],
-               max_concurrency: 2
-             )
+             Imp.parallel(program, [%{question: "2+2?"}, %{question: "sqrt 16?"}], num_threads: 2)
 
     assert Enum.map([first, second], &Imp.get(&1, :answer)) == ["4", "4"]
 
@@ -912,7 +910,7 @@ defmodule PublicSurfaceTest do
              %Imp.Streaming.Messages.StreamResponse{chunk: "ok", done: true}
 
     examples =
-      Imp.Datasets.Colors.load([
+      Imp.Datasets.Colors.load!([
         %{input: "red", label: "warm"},
         %{input: "blue", label: "cool"}
       ])
