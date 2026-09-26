@@ -36,6 +36,7 @@ something better.
 | `dspy.ReAct`, `dspy.ReActV2` | `Imp.react(sig, tools, lm: lm)`, the ReActV2 design ([ReAct](diving-deeper/react.md)) |
 | `dspy.Tool(fn)` | `Imp.tool(name, description, fn, schema: ...)` |
 | `dspy.Tool.from_mcp_tool(session, tool)` | `Imp.MCP.connect(descriptors, trusted_servers: ...)` ([Tools and MCP](diving-deeper/tools-and-mcp.md)) |
+| `dspy.Retrieve`, a RAG `forward` | `Imp.retrieve(retriever, query, k: 3)`, `Imp.rag(program, retriever)` ([Retrieval](diving-deeper/retrieval.md)) |
 | `dspy.BestOfN`, `dspy.Refine` | `Imp.best_of_n(program, metric, n: 3)`, `Imp.refine(program, metric, n: 3)` |
 | `dspy.majority` | `Imp.majority(values, field: :answer)`, which returns the winning value |
 | `dspy.MultiChainComparison` | `Imp.multi_chain_comparison(sig, m: 3)` |
