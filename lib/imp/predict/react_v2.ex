@@ -45,7 +45,7 @@ defmodule Imp.Predict.ReActV2 do
 
   ## How a turn ends
 
-    * `:answered` (one text output). A step that says something and calls no
+    * `:answered` (one unconstrained text output). A step that says something and calls no
       tool is the answer, in that one request.
     * `:submit` (every other signature). The model calls `submit` with the
       signature's outputs.
@@ -68,14 +68,17 @@ defmodule Imp.Predict.ReActV2 do
 
   A turn is interrupted when it reaches `max_iters`, when a step's request
   fails (`:prediction_error`, `:parse_error`), or when a step of a signature
-  with `submit` calls no tool (`:empty_tool_calls`).
+  with `submit` calls no tool (`:empty_tool_calls`). An `enum` output is such a
+  signature: text that is not a `submit` call is `:empty_tool_calls`, never
+  an answer, and a turn with no valid `submit`, the forced one included, ends
+  `:incomplete`.
 
-  With one text output, a step that calls no tool and says nothing is not an
+  With one unconstrained text output, a step that calls no tool and says nothing is not an
   interruption: it is an empty answer, and the turn ends there
   (`:answered`). Saying nothing is how a model declines to answer, and asking
   it again would make declining cost a second request.
 
-  With one text output, every interruption takes the same path: one more
+  With one unconstrained text output, every interruption takes the same path: one more
   request, and its text is the answer (`:last_text`).
   The request is a step like any other: the same tools and the same
   `tool_choice: "auto"`. A provider may refuse a history of tool calls when no
@@ -190,7 +193,7 @@ defmodule Imp.Predict.ReActV2 do
       default: 20,
       doc:
         "Steps before the turn is interrupted. An interrupted turn ends with the " <>
-          "forced `submit`, or, for a signature with one text output, one last " <>
+          "forced `submit`, or, for a signature with one unconstrained text output, one last " <>
           "text-only request."
     ],
     tool_policy: [
@@ -204,7 +207,7 @@ defmodule Imp.Predict.ReActV2 do
       doc:
         "One line of host text put in front of the last request of an interrupted " <>
           "turn, as a user message, and kept in the history: the last text-only " <>
-          "request for a signature with one text output, the forced `submit` for " <>
+          "request for a signature with one unconstrained text output, the forced `submit` for " <>
           "every other. `nil` says nothing; Imp writes no sentence of its own."
     ],
     finish_on: [

@@ -68,4 +68,24 @@ defmodule SavingFreshAtomsTest do
     assert [%{^tag => "billing"}] = loaded.retriever.docs
     assert_raise ArgumentError, fn -> String.to_existing_atom(query) end
   end
+
+  test "a saved tool name and tool policy load with names this VM never created" do
+    fresh = "never_tool_" <> Integer.to_string(System.unique_integer([:positive]))
+    lookup = fn %{"query" => query} -> "found #{query}" end
+    registry = Imp.Saving.Registry.new(lookup_runner: lookup)
+    tool = Imp.tool(:lookup, "lookup facts", lookup, schema: %{query: :string})
+    program = Imp.react("question -> answer", [tool], max_iters: 0, tool_policy: [:lookup])
+
+    state =
+      program
+      |> Imp.dump(registry: registry)
+      |> Jason.encode!()
+      |> Jason.decode!()
+      |> rename_atom("lookup", fresh)
+
+    loaded = Imp.load(state, registry: registry)
+    assert Imp.Tool.call(Map.fetch!(loaded.tools, fresh), %{query: "beam"}) == "found beam"
+    assert Imp.ToolPolicy.authorize(loaded.tool_policy, fresh, %{}) == :ok
+    assert_raise ArgumentError, fn -> String.to_existing_atom(fresh) end
+  end
 end

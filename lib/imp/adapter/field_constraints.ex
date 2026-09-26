@@ -67,5 +67,4 @@ defmodule Imp.Adapter.FieldConstraints do
 
   defp normalize(%{} = constraints), do: Imp.Schema.normalize_constraints(constraints)
   defp normalize(_other), do: %{}
-
 end
