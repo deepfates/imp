@@ -98,7 +98,7 @@ train.
 
 Demos are cheap to find, easy to read and often enough. On the
 [README](../../README.md)'s ticket router, eight labeled examples took
-`gpt-5.4-mini` from 25–35% to 75–85% on unseen tickets in three runs, for
+`gpt-5.4-mini` from 20–45% to 75–85% on unseen tickets in six runs, for
 about a cent each. Instruction search earns its cost when the wording is the
 problem: the task has a rule the examples do not show, or the program has
 several steps whose instructions interact.
