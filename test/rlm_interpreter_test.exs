@@ -25,7 +25,6 @@ defmodule Imp.Predict.RLM.InterpreterTest do
 
     for {source, named_trap} <- [
           {"case true do true -> 1 end", "`case`"},
-          {"f = fn x -> x end\nf.(1)", "calling a function stored in a variable"},
           {"hd([1])", "`hd`"},
           {~S|"value: #{1}"|, "binary `<<>>`"}
         ] do
@@ -468,6 +467,52 @@ missing()|
     end
   end
 
+  describe "calling a function directly" do
+    test "a function written in place or held in a variable can be called" do
+      interpreter = Interpreter.new(%{line: "7 INFO ms=97"}, %{}, nil)
+
+      source = ~S"""
+      slow = (fn l -> String.to_integer(List.last(String.split(l, "ms="))) >= 95 end).(line)
+      double = fn x -> x * 2 end
+      pick = fn
+        {:ok, v} -> v
+        _ -> nil
+      end
+      [slow, double.(21), pick.({:ok, "a"}), pick.(:error), (fn -> 1 end).()]
+      """
+
+      assert {:ok, [true, 42, "a", nil, 1], next} = Interpreter.execute(interpreter, source)
+      refute Map.has_key?(next.vars, :l)
+      refute Map.has_key?(next.vars, :v)
+    end
+
+    test "a direct call keeps the function rules and the cell's budgets" do
+      interpreter =
+        Interpreter.new(%{}, %{"llm_query" => :llm_query}, nil, max_steps: 500)
+
+      assert {:error, {:effect_inside_fn, "llm_query"}, _next} =
+               Interpreter.execute(interpreter, ~S|(fn p -> llm_query(p) end).("q")|)
+
+      assert {:error, :submit_inside_fn, _next} =
+               Interpreter.execute(interpreter, ~S|(fn -> submit(%{a: 1}) end).()|)
+
+      assert {:error, {:wrong_arity, "f", 1, 2}, _next} =
+               Interpreter.execute(interpreter, "f = fn x -> x end\nf.(1, 2)")
+
+      assert {:error, {:fn_clause_not_matched, [2]}, _next} =
+               Interpreter.execute(interpreter, "(fn 1 -> :one end).(2)")
+
+      # A function that is handed itself recurses until the step budget ends it.
+      assert {:error, :step_limit_exceeded, _next} =
+               Interpreter.execute(interpreter, "loop = fn g -> g.(g) end\nloop.(loop)")
+
+      assert {:ok, "ab", next} =
+               Interpreter.execute(interpreter, ~S|(fn x -> print(x) end).("ab")|)
+
+      assert next.output == "ab"
+    end
+  end
+
   describe "patterns" do
     test "assignment destructures tuples, lists and maps" do
       interpreter = Interpreter.new(%{row: %{"id" => 7}}, %{}, nil)
@@ -559,11 +604,6 @@ missing()|
       source = "zq_" <> "notfn = 1\nzq_" <> "notfn.(1)"
       assert {:error, reason, _next} = Interpreter.execute(interpreter, source)
       assert reason == {:not_a_function, "zq_notfn", 1}
-
-      assert {:error, {:unsupported_expression, text}, _next} =
-               Interpreter.execute(interpreter, "f = fn x -> x end\nf.(1)")
-
-      assert text =~ "calling a function held in a variable"
 
       assert {:error, {:function_not_allowed, "zq_" <> "other", :call, 0}, _next} =
                Interpreter.execute(interpreter, "zq_" <> "other.call()")

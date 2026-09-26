@@ -414,7 +414,9 @@ User-visible changes to Imp are recorded here.
   builds a list, and a `for` generator takes a pattern and a map
   (`for {key, n} <- counts`) and the `into:` and `uniq:` options. `into:` and
   `uniq:` were ignored, and `reduce:` is refused with
-  `{:unsupported_for_option, :reduce, ...}`.
+  `{:unsupported_for_option, :reduce, ...}`. A function held in a variable or
+  written in place can be called directly (`f.(x)`,
+  `(fn x -> ... end).(x)`), under the same rules as one a library call runs.
 - RLM controller code that calls a value that is not a function (`g = 1;
   g.(1)`) fails that turn with `{:not_a_function, "g", 1}`, which the
   controller reads and repairs. It ended the whole call with

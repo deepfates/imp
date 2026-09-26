@@ -154,7 +154,8 @@ defmodule Imp.Predict.RLM.Interpreter do
     Supported values and data are strings, numbers, booleans, nil, existing atom literals, lists, maps, tuples, and integer ranges; unfamiliar atom literals are represented as strings rather than creating VM atoms. Supported control is assignment to a variable or a pattern (`{a, b} = pair`, `[first | rest] = lines`), `if condition, do: value, else: value`, and bounded `for pattern <- list_range_or_map, filter, do: expression` comprehensions, which take `into:` and `uniq:` but not `reduce:`. `[item | list]` builds a list. Pipelines with `|>` are supported. Supported operators are #{format_operators(@binary_operators ++ @unary_operators)}. Use `Access.get(container, key)` or `container[key]` for map/list/string access.
     Every function of `Enum`, `Keyword`, `List`, `Map` and `String` is available except #{format_refused()}; a sorter is `:asc`, `:desc` or a function, never a module. Other modules cannot be called or used as values. Without a module, #{format_kernel()} are available.
     Anonymous functions (`fn x -> ... end`, with several clauses, guards, and tuple, list or map patterns) and captures (`&String.downcase/1`, `&(&1 + 1)`) can be passed to those functions. Inside a function, `print` works but registered tools, the task built-ins and `submit` do not; call those from a `for` comprehension instead.
-    Important traps: `case`, `hd`, and calling a function stored in a variable are not supported. Use `if` or a multi-clause `fn` instead of `case`, `List.first` instead of `hd`, and string concatenation with `<>` instead of interpolation or binary `<<>>` syntax. String literals themselves are supported.
+    A function held in a variable, or written in place, can also be called directly: `f.(x)`, `(fn x -> x * 2 end).(3)`.
+    Important traps: `case` and `hd` are not supported. Use `if` or a multi-clause `fn` instead of `case`, `List.first` instead of `hd`, and string concatenation with `<>` instead of interpolation or binary `<<>>` syntax. String literals themselves are supported.
     Registered tools and the built-ins named in the task prompt are the only effectful calls. A failed cell rolls back its assignments while retaining already-completed effects for deterministic repair.
     """
     |> String.trim()
@@ -579,20 +580,17 @@ defmodule Imp.Predict.RLM.Interpreter do
     {:ok, "Available variables: #{inspect(variables)}", state}
   end
 
-  # `f.(x)`. An interpreter function runs only where a library function
-  # applies it, and a variable that holds anything else is not a function at
-  # all. Either way the model reads why.
+  # `f.(x)` and `(fn x -> ... end).(x)`. An interpreter function is AST the
+  # interpreter runs, so calling one directly is the same evaluation a library
+  # call makes through `call_fn/3`, on this state: its steps and output count
+  # against the cell, its bindings stay inside it, and inside it effects and
+  # `submit` are refused. A value that is not a function is an error the model
+  # reads.
   defp eval_node({{:., _, [callee]}, _, args}, state) when is_list(args) do
     with {:ok, value, state} <- eval(callee, state) do
       case value do
-        %Fn{} ->
-          {:error,
-           {:unsupported_expression,
-            "calling a function held in a variable (#{render(callee)}.(...)); " <>
-              "pass it to an Enum function, or write its body inline"}, state}
-
-        _other ->
-          {:error, {:not_a_function, render(callee), value}, state}
+        %Fn{} = function -> call_direct(function, render(callee), args, state)
+        _other -> {:error, {:not_a_function, render(callee), value}, state}
       end
     end
   end
@@ -1145,6 +1143,31 @@ defmodule Imp.Predict.RLM.Interpreter do
 
       {:error, reason, _state} ->
         throw({@fn_failure, reason})
+    end
+  end
+
+  defp call_direct(%Fn{arity: arity, clauses: clauses}, name, args, state) do
+    with {:ok, values, state} <- eval_arguments(args, state) do
+      if length(values) == arity do
+        inner = %{state | in_function: true}
+
+        result =
+          with {:ok, body, inner} <- select_clause(clauses, values, inner),
+               do: eval(body, inner)
+
+        case result do
+          {:ok, value, next} ->
+            {:ok, value, %{next | vars: state.vars, in_function: state.in_function}}
+
+          {:error, reason, next} ->
+            {:error, reason, %{next | vars: state.vars, in_function: state.in_function}}
+
+          other ->
+            other
+        end
+      else
+        {:error, {:wrong_arity, name, arity, length(values)}, state}
+      end
     end
   end
 
