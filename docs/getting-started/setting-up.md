@@ -30,8 +30,9 @@ lm = Imp.req_llm("openai:gpt-5.4-mini", api_key: System.fetch_env!("OPENAI_API_K
 Any ReqLLM provider string works in its place: `"anthropic:..."`,
 `"google:..."`, `"openrouter:..."`, a local server, and more. Every example in
 this guide runs unchanged with any of them, except that the agent in
-[Tools and agents](tools-and-agents.md) needs a model with native tool calling. We used `gpt-5.4-mini` for the
-outputs shown; yours will differ a little, because models do.
+[Tools and agents](tools-and-agents.md) needs a model with native tool
+calling. We used `gpt-5.4-mini` for the outputs shown; yours will differ a
+little, because models do.
 
 `lm` is a plain struct. We'll pass it to each program with `lm:`, which keeps
 the dependency visible in the code and makes it easy to swap. When we'd rather

@@ -9,7 +9,8 @@ what it costs, and when it is the right one.
 
 Read it once you have a program, a metric and some labeled examples. How to
 write the metric is on [Metrics and evaluation](metrics-and-evaluation.md);
-what to do with the result is on [Saving and artifacts](saving-and-artifacts.md).
+what to do with the result is on
+[Saving and artifacts](saving-and-artifacts.md).
 
 ## Design decisions
 
@@ -118,16 +119,16 @@ table at the end of this page is the closest thing to a recommendation.
 ## A two-axis decision
 
 **What is holding the program back?** If the wording is wrong, instruction
-optimizers help (COPRO, GEPA, MIPROv2). If the model needs examples to get
-the format or the categories right, demo optimizers help (LabeledFewShot,
-BootstrapFewShot, BootstrapFewShotWithRandomSearch). If the model itself is the limit and you can
-train it, tune weights (BootstrapFinetune).
+optimizers help (COPRO, GEPA, MIPROv2). If the model needs examples to get the
+format or the categories right, demo optimizers help (LabeledFewShot,
+BootstrapFewShot, BootstrapFewShotWithRandomSearch). If the model itself is
+the limit and you can train it, tune weights (BootstrapFinetune).
 
 **What can you spend?** LabeledFewShot costs nothing and BootstrapFewShot
-little. Search (BootstrapFewShotWithRandomSearch, MIPROv2, GEPA, SIMBA) costs real money, roughly
-in proportion to candidates times validation examples. Combinations
-(BetterTogether) pay for each step. To put a hard ceiling on any of them, wrap
-the task and proposal models with `Imp.budgeted_lm/3` under
+little. Search (BootstrapFewShotWithRandomSearch, MIPROv2, GEPA, SIMBA) costs
+real money, roughly in proportion to candidates times validation examples.
+Combinations (BetterTogether) pay for each step. To put a hard ceiling on any
+of them, wrap the task and proposal models with `Imp.budgeted_lm/3` under
 `Imp.start_optimizer_budget/1`; a call that would exceed the ceiling is
 refused before it is sent.
 
@@ -245,8 +246,9 @@ ensemble = Imp.Optimizer.Ensemble.new(reduce_fn: &Imp.majority/1)
 
 **`BetterTogether`** runs a sequence such as `strategy: "p -> w -> p"`
 (prompt, then weights, then prompt again), evaluates the original and every
-prefix, and returns the best. Its default prompt step is `BootstrapFewShotWithRandomSearch`; its
-weight step needs a configured trainer.
+prefix, and returns the best. Its default prompt step is
+`BootstrapFewShotWithRandomSearch`; its weight step needs a configured
+trainer.
 
 **`Ensemble`** is not a search. `Imp.Optimizer.Ensemble.compile(ensemble,
 programs)` builds one program that calls several and reduces their answers,

@@ -94,8 +94,8 @@ Values that are present but falsy, like `false`, `0`, or `""`, are kept as
 they are. `Imp.Signature.Field` lists every key a field accepts.
 
 A signature is plain data either way, so it can be built at runtime from
-configuration, stored, and compared. [Signatures](../diving-deeper/signatures.md)
-in Diving deeper covers the rest.
+configuration, stored, and compared.
+[Signatures](../diving-deeper/signatures.md) in Diving deeper covers the rest.
 
 ---
 

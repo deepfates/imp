@@ -163,8 +163,8 @@ builds its program with an explicit model.
 `Imp.configure/1` refuses any other key. `Imp.context/2` carries keys of your
 own as given, to code that reads them with `Imp.settings/0`, but refuses
 `:max_errors`, `:retriever` and `:callbacks` with a message saying where each
-belongs: they are options of the optimizer, the program and telemetry. `Imp.settings/0` returns the
-effective settings for the calling process.
+belongs: they are options of the optimizer, the program and telemetry.
+`Imp.settings/0` returns the effective settings for the calling process.
 
 ## Cross-links
 

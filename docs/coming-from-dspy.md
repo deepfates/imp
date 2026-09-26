@@ -73,11 +73,11 @@ evaluated is the program you ship.
 That explicit seam is why a test swaps in `Imp.LM.Static` without patching
 anything.
 
-**Supervision is the execution model.** Evaluation, parallel calls, tool
-calls and interpreted code run in bounded, supervised tasks. A slow provider
-call ends in a timeout rather than a hung program, and one failing example is
-one error row, not a crashed run. The
-[deployment example](https://github.com/deepfates/imp/blob/main/examples/deployment/README.md)
+**Supervision is the execution model.** Evaluation, parallel calls, tool calls
+and interpreted code run in bounded, supervised tasks. A slow provider call
+ends in a timeout rather than a hung program, and one failing example is one
+error row, not a crashed run. The
+[deployment example](https://github.com/deepfates/imp/blob/v0.5.0/examples/deployment/README.md)
 is a complete OTP application.
 
 **Optimizers see what you name.** DSPy finds predictors by walking a module's
@@ -119,5 +119,5 @@ code optimizer has no Imp counterpart.
 
 [ds_ex](https://github.com/nshkrdotcom/ds_ex) and
 [dspy.ex](https://github.com/arthurcolle/dspy.ex) explored DSPy-style
-programming in Elixir before Imp, and [gepa_ex](https://github.com/nshkrdotcom/gepa_ex)
-explored GEPA.
+programming in Elixir before Imp, and
+[gepa_ex](https://github.com/nshkrdotcom/gepa_ex) explored GEPA.

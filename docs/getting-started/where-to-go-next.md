@@ -44,17 +44,18 @@ The module documentation is the reference for every function.
 
 ## Run it in production
 
-[Running Imp in production](../production.md) covers what the last page
-began: supervision, provider failures, runs you can observe and cancel, and
-telemetry. The [deployment example](https://github.com/deepfates/imp/blob/main/examples/deployment/README.md)
+[Running Imp in production](../production.md) covers what the last page began:
+supervision, provider failures, runs you can observe and cancel, and
+telemetry. The
+[deployment example](https://github.com/deepfates/imp/blob/v0.5.0/examples/deployment/README.md)
 is a complete application to copy from.
 
 ## Try it in a notebook
 
-The tutorials are Livebook notebooks that run the same ideas, offline or
-with a key: [01](../../livebooks/01_real_lm_front_door.livemd) the first
-calls, [02](../../livebooks/02_without_a_provider.livemd) the exact messages
-with a scripted model, [03](../../livebooks/03_evaluate_and_optimize.livemd)
-evaluation and optimization, [04](../../livebooks/04_tools_agents_mcp_rlm.livemd)
-tools, agents and RLM, and [05](../../livebooks/05_operating_imp.livemd)
-operating Imp.
+The tutorials are Livebook notebooks that run the same ideas, offline or with
+a key: [01](../../livebooks/01_real_lm_front_door.livemd) the first calls,
+[02](../../livebooks/02_without_a_provider.livemd) the exact messages with a
+scripted model, [03](../../livebooks/03_evaluate_and_optimize.livemd)
+evaluation and optimization,
+[04](../../livebooks/04_tools_agents_mcp_rlm.livemd) tools, agents and RLM,
+and [05](../../livebooks/05_operating_imp.livemd) operating Imp.

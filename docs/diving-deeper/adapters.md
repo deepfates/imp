@@ -231,8 +231,9 @@ Each fallback, retry and final parse failure also emits telemetry:
 
 - On the program: `Imp.predict(signature, adapter: Imp.Adapter.JSON)`.
 - For every program that does not name one: `Imp.configure(adapter: ...)`.
-- For everything inside a function: `Imp.context([adapter: ...], fn -> ... end)`.
-  A program built with an explicit `adapter:` keeps its own.
+- For everything inside a function:
+  `Imp.context([adapter: ...], fn -> ... end)`. A program built with an
+  explicit `adapter:` keeps its own.
 
 ## Cross-links
 

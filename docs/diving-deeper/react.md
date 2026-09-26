@@ -34,10 +34,10 @@ The history comes back as `prediction.metadata.history`. Pass it as the
 
 ### 2. How a turn ends depends on the outputs
 
-A signature with **one unconstrained text output** (`ticket -> reply`) ends the way most
-tool loops end: when the model stops calling tools and writes text, that text
-is the answer. No `submit` tool is offered. This costs one request fewer and
-matches what models are trained to do.
+A signature with **one unconstrained text output** (`ticket -> reply`) ends
+the way most tool loops end: when the model stops calling tools and writes
+text, that text is the answer. No `submit` tool is offered. This costs one
+request fewer and matches what models are trained to do.
 
 **Every other signature** (several outputs, one that is not text, or one text
 output with a constraint such as an enum, a pattern or an answer shape) gets a

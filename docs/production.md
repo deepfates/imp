@@ -1,11 +1,11 @@
 # Running Imp in production
 
-An Imp program is a value. Your application decides which processes call
-it, where its credentials come from, how long a call may take and what it may
+An Imp program is a value. Your application decides which processes call it,
+where its credentials come from, how long a call may take and what it may
 cost. This page covers those decisions in the order you meet them: starting
 Imp, credentials, concurrency, timeouts, cost and caching, persistence and
 telemetry. The
-[deployment example](https://github.com/deepfates/imp/tree/main/examples/deployment)
+[deployment example](https://github.com/deepfates/imp/tree/v0.5.0/examples/deployment)
 is a complete OTP application that puts them together.
 
 ## Imp in your supervision tree
@@ -133,8 +133,8 @@ end)
 ~~~
 
 To stop a call from outside, start it as a run and cancel it. Tool calls are
-different from model calls: a tool that times out may already have acted,
-and Imp never retries one (see
+different from model calls: a tool that times out may already have acted, and
+Imp never retries one (see
 [Runs and supervision](diving-deeper/runs-and-supervision.md)).
 
 ## Cost and caching
@@ -160,14 +160,13 @@ end)
 #=> [{"beacon", [%{input_tokens: 209, output_tokens: 10}]}, {"beacon", []}]
 ~~~
 
-The second call cost nothing: it was an identical request, and Imp answered
-it from its response cache. The cache is on by default for `Imp.req_llm/2`
-clients. It lives in memory, keyed on the model, the messages and the
-request options, and is empty after a restart. Identical requests get
-identical answers, which is what you want for a classifier and not always
-for a program that should vary. Turn it off for one client with
-`cache: false`, or bound it with
-`Imp.Cache.configure(ttl: :timer.hours(1), max_entries: 10_000)`.
+The second call cost nothing: it was an identical request, and Imp answered it
+from its response cache. The cache is on by default for `Imp.req_llm/2`
+clients. It lives in memory, keyed on the model, the messages and the request
+options, and is empty after a restart. Identical requests get identical
+answers, which is what you want for a classifier and not always for a program
+that should vary. Turn it off for one client with `cache: false`, or bound it
+with `Imp.Cache.configure(ttl: :timer.hours(1), max_entries: 10_000)`.
 
 For a hard spending ceiling, such as for an optimizer run, start a ledger
 with `Imp.start_optimizer_budget/1` and wrap each model with
@@ -247,10 +246,10 @@ standard error.
 
 ## The reference application
 
-[`examples/deployment`](https://github.com/deepfates/imp/tree/main/examples/deployment)
-is a small OTP application that loads a checksummed artifact at startup, reads its key
-from the environment, serves calls from bounded supervised tasks, answers
-overload and timeouts with errors instead of blocking, and reloads
+[`examples/deployment`](https://github.com/deepfates/imp/tree/v0.5.0/examples/deployment)
+is a small OTP application that loads a checksummed artifact at startup, reads
+its key from the environment, serves calls from bounded supervised tasks,
+answers overload and timeouts with errors instead of blocking, and reloads
 parameters without a restart. Its `run_workflow.exs` runs the whole path
 offline, from optimizing to serving.
 

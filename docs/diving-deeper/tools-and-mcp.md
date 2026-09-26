@@ -218,10 +218,10 @@ key and option.
 #### Local servers
 
 A stdio server runs in its own process group. Closing its connection, or the
-end of the process it belongs to, sends the group SIGTERM, then SIGKILL a second later, so a
-server that ignores its input closing, and any children it started, stop
-with it. A child that starts its own session (`setsid`) leaves the group and
-is not reached.
+end of the process it belongs to, sends the group SIGTERM, then SIGKILL a
+second later, so a server that ignores its input closing, and any children it
+started, stop with it. A child that starts its own session (`setsid`) leaves
+the group and is not reached.
 
 The server sees only `HOME`, `LANG`, `LOGNAME`, `PATH`, `SHELL`, `TEMP`,
 `TMP`, `TMPDIR`, `TZ`, `USER`, the certificate-path variables and `LC_*` from

@@ -17,11 +17,11 @@ version control, or load parameters into a running service.
 ### 1. Two forms: the whole program, or its parameters
 
 Save the whole program when it is made of Imp's modules: `Imp.predict/2`,
-`Imp.chain_of_thought/2`, RAG, BestOfN, Refine and the others. Save
-parameters when the program is your own struct implementing `Imp.Module`, or
-when you want the program's code to live in your release and only its tuned
-text to cross the persistence boundary. The
-[deployment example](https://github.com/deepfates/imp/tree/main/examples/deployment)
+`Imp.chain_of_thought/2`, RAG, BestOfN, Refine and the others. Save parameters
+when the program is your own struct implementing `Imp.Module`, or when you
+want the program's code to live in your release and only its tuned text to
+cross the persistence boundary. The
+[deployment example](https://github.com/deepfates/imp/tree/v0.5.0/examples/deployment)
 does the second.
 
 ### 2. JSON with a checksum

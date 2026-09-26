@@ -36,12 +36,11 @@ runs is what you read.
 Optimizers improve predictors: their instructions, their demos, their request
 config. Imp does not search your struct for them. A module that wants its
 steps optimized says which predictors it has, under which names, and how to
-put an updated one back, with two callbacks:
-`optimizer_predictors/1` and `update_optimizer_predictor/3`. The names become
-the parameter IDs you see in a saved program (`predictor/route/instruction`).
-Anything you leave out stays exactly as you wrote it, and a predictor held
-somewhere unexpected (inside a closure, in a process) is never silently
-missed or silently included.
+put an updated one back, with two callbacks: `optimizer_predictors/1` and
+`update_optimizer_predictor/3`. The names become the parameter IDs you see in
+a saved program (`predictor/route/instruction`). Anything you leave out stays
+exactly as you wrote it, and a predictor held somewhere unexpected (inside a
+closure, in a process) is never silently missed or silently included.
 
 The built-in modules already do this: each exposes the predictor it wraps as
 `:main`.
@@ -146,11 +145,11 @@ improved = Imp.optimize!(support, Imp.Optimizer.LabeledFewShot.new(k: 1), trains
 under a run's authorization (see [Tools and MCP](tools-and-mcp.md)), and a
 pair of callbacks for optimizing data other than predictors.
 
-A custom module is your code, so it is not saved as a whole. What an
-optimizer chose for it is data: `Imp.ProgramParameters.values/1` reads it,
+A custom module is your code, so it is not saved as a whole. What an optimizer
+chose for it is data: `Imp.ProgramParameters.values/1` reads it,
 `Imp.ProgramParameters.apply_values/2` puts it on a freshly built program, and
 `Imp.Optimizer.Artifact` writes it to a checksummed file. The
-[deployment example](https://github.com/deepfates/imp/blob/main/examples/deployment/README.md)
+[deployment example](https://github.com/deepfates/imp/blob/v0.5.0/examples/deployment/README.md)
 does this in a supervised application.
 
 ### Built-in variants

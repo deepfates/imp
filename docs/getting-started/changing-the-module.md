@@ -15,9 +15,9 @@ Imp.get(prediction, :team)
 #=> "harbor"
 ```
 
-The signature and the call are the same as the router's. `Imp.chain_of_thought/2`
-adds a `reasoning` output in front of ours, so the model writes out its
-thinking first, and we can read it:
+The signature and the call are the same as the router's.
+`Imp.chain_of_thought/2` adds a `reasoning` output in front of ours, so the
+model writes out its thinking first, and we can read it:
 
 ```elixir
 Imp.get(prediction, :reasoning)

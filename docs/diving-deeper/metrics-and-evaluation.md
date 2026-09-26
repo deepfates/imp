@@ -250,13 +250,12 @@ app or plan you're using." Replies and verdicts vary between runs. On
 another run, with no facts, the judge passed a reply that promised dark mode:
 a judge knows only what its inputs tell it.
 
-Imp also ships DSPy's two judges as programs.
-`Imp.Evaluate.SemanticF1` asks a model for the precision and recall of a
-response against a reference and scores their F1; `Imp.Evaluate.CompleteAndGrounded`
-scores completeness against the reference and grounding in retrieved
-context. Call either with `%{example: example, pred: prediction}` inside a
-metric and return the prediction it gives back; its `:score` field is the
-score.
+Imp also ships DSPy's two judges as programs. `Imp.Evaluate.SemanticF1` asks a
+model for the precision and recall of a response against a reference and
+scores their F1; `Imp.Evaluate.CompleteAndGrounded` scores completeness
+against the reference and grounding in retrieved context. Call either with
+`%{example: example, pred: prediction}` inside a metric and return the
+prediction it gives back; its `:score` field is the score.
 
 ### Train, validation and test
 
