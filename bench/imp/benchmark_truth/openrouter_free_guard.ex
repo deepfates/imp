@@ -740,8 +740,6 @@ defmodule Imp.BenchmarkTruth.OpenRouterFreeGuard.CheckedLM do
   ]
 
   @impl true
-  def generate(_messages, _opts), do: {:error, :checked_lm_instance_required}
-
   def generate(%__MODULE__{} = lm, messages, opts) do
     Imp.BenchmarkTruth.OpenRouterFreeGuard.checked_generate(
       lm.inner,

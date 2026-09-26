@@ -37,7 +37,7 @@ defmodule Mix.Tasks.ImpAcp.HostDemo do
         end
       )
 
-    Imp.react_v2("question -> answer", [read_file], lm: lm, max_iters: 2)
+    Imp.react("question -> answer", [read_file], lm: lm, max_iters: 2)
   end
 
   defp tool_turn(thought, name, id, arguments) do

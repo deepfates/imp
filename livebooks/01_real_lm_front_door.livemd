@@ -196,11 +196,11 @@ case live_lm.(max_completion_tokens: 400) do
       Imp.react(
         Imp.signature(
           "question -> answer",
-          "Answer using the lookup tool: first call lookup with query \"capital-france\", then call submit with the answer it returned."
+          "Answer using the lookup tool: first call lookup with query \"capital-france\", then answer with the city it returned."
         ),
         [lookup],
         lm: lm,
-        tool_policy: [:lookup, :submit],
+        tool_policy: [:lookup],
         max_iters: 4
       )
 
@@ -265,7 +265,7 @@ case live_lm.([]) do
 
     %{
       credential_in_artifact?: inspect(state) =~ api_key,
-      loadable?: match?(%{__struct__: Imp.Predict.Predict}, Imp.load(state))
+      loadable?: match?(%{__struct__: Imp.Predict}, Imp.load!(state))
     }
 
   :missing_key ->

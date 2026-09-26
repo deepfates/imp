@@ -33,7 +33,7 @@ defmodule Imp.Predict.ChainOfThought do
   @doc """
   Builds a program that asks for `:reasoning` before the signature's outputs.
 
-  Takes `Imp.Predict.Predict.new/2`'s options and two of its own. An unknown
+  Takes `Imp.Predict.new/2`'s options and two of its own. An unknown
   option raises `ArgumentError`.
 
   ## Options
@@ -75,10 +75,10 @@ defmodule Imp.Predict.ChainOfThought do
       # opts into the native-capable reasoning type.
       |> Imp.Signature.prepend_output(rationale_field)
 
-    %__MODULE__{predict: Imp.Predict.Predict.new(signature, opts)}
+    %__MODULE__{predict: Imp.Predict.new(signature, opts)}
   end
 
   @impl true
   def call(%__MODULE__{predict: predict}, inputs),
-    do: Imp.Predict.Predict.call(predict, inputs)
+    do: Imp.Predict.call(predict, inputs)
 end

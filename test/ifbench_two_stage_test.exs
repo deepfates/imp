@@ -33,9 +33,8 @@ defmodule Imp.BenchmarkTruth.IFBenchTwoStageTest do
   test "passes query and response through both stages and returns only the final response" do
     test_pid = self()
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
 
@@ -47,8 +46,7 @@ defmodule Imp.BenchmarkTruth.IFBenchTwoStageTest do
             %{reasoning: "drafted", response: "DRAFT"}
           end
         end
-      ]
-    }
+      )
 
     assert {:ok, prediction} =
              IFBenchTwoStage.new(lm, adapter: Chat)
@@ -83,9 +81,8 @@ defmodule Imp.BenchmarkTruth.IFBenchTwoStageTest do
   end
 
   test "captures both named stages in order for optimizer trajectories" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
 
@@ -93,8 +90,7 @@ defmodule Imp.BenchmarkTruth.IFBenchTwoStageTest do
             do: %{reasoning: "checked", final_response: "FINAL"},
             else: %{reasoning: "drafted", response: "DRAFT"}
         end
-      ]
-    }
+      )
 
     program = IFBenchTwoStage.new(lm, adapter: Chat)
     example = Imp.example(prompt: "Follow this", response: "FINAL") |> Imp.with_inputs(:prompt)

@@ -119,10 +119,11 @@ defmodule OptimizeAnythingCodeArtifactTest do
   test "provider-free reflection receives grammar and public training inputs" do
     test_pid = self()
 
-    lm = fn messages, _opts ->
-      send(test_pid, {:reflection_prompt, messages})
-      {:ok, "```elixir\n#{CodeArtifact.comparator()}\n```"}
-    end
+    lm =
+      Imp.Test.FunLM.new(fn messages, _opts ->
+        send(test_pid, {:reflection_prompt, messages})
+        {:ok, "```elixir\n#{CodeArtifact.comparator()}\n```"}
+      end)
 
     result =
       OptimizeAnything.run(

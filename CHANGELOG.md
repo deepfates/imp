@@ -94,7 +94,7 @@ User-visible changes to Imp are recorded here.
   out. `Imp.Adapter.Chat.format_tool_result/1`
   renders these, `Imp.Adapter.Chat.tool_error_text/1` gives the words without
   `Error: `, and `Imp.MCP.failure_text/1` gives the MCP ones. The recorded
-  error term is unchanged. `Imp.Predict.ReAct`'s `:dspy_3_2_1` observations
+  error term is unchanged. `Imp.Predict.ReAct`'s `:dspy` observations
   use the same words after `Execution error in <tool>: `, where they showed
   `inspect/1` of the reason.
 - `Imp.MCP.connect/2` takes `pool_size:` (1 by default): that many
@@ -227,7 +227,7 @@ User-visible changes to Imp are recorded here.
   and "string", "integer", "number", "true or false", "list of strings",
   "object", "code in python" for `str`, `int`, `float`, `bool`, `list[str]`,
   `dict[str, Any]` and `Code_python`. "(must be formatted as a valid Python
-  int)" is "(must be formatted as an integer)", and ReAct's `:dspy_3_2_1`
+  int)" is "(must be formatted as an integer)", and ReAct's `:dspy`
   mode lists tool arguments as JSON. Fields, order, constraints and parsing
   are unchanged. A saved program's prompt text changes with this, so an
   optimized program may be worth re-evaluating.
@@ -281,7 +281,7 @@ User-visible changes to Imp are recorded here.
   turn names the same interruption, unless its context window was full or
   its `Imp.Deadline` had passed, which are named instead, so a turn that hit
   `max_iters` and then ran out of time is `:deadline_exceeded`. `Imp.Predict.ReAct`
-  follows the same rule: `:dspy_3_2_1` mode's extraction after `max_iters`, a
+  follows the same rule: `:dspy` mode's extraction after `max_iters`, a
   parse failure or an empty step is `:extracted` with that cause, spelled
   `:parse_error` (it was `:parse_failure`), and `:provider_native` mode's
   `:direct` is `:answered` with `termination_cause: :empty_tool_calls`.
@@ -490,7 +490,7 @@ Every change here is breaking for code that matches on the old shape.
   and `:training_cancel_failed`, and `Imp.Retrievers.HTTP`'s
   `{:transport, reason}`),
   `{:embedding_provider_failed, provider, reason}` from `Imp.Embeddings`, and
-  `Imp.Predict.Predict`'s `{:adapter_format_failed, adapter, reason}` and
+  `Imp.Predict`'s `{:adapter_format_failed, adapter, reason}` and
   `{:adapter_lm_opts_failed, adapter, reason}`, and
   `{:program_runtime_error, reason}` from `Imp.Predict.ProgramOfThought` and
   `Imp.Predict.CodeAct`, whose model still reads the exception's message.
@@ -504,7 +504,7 @@ Every change here is breaking for code that matches on the old shape.
   `Imp.Predict.ReAct`'s final outputs follow the same rule: in 0.4.0 a missing
   output was `{:missing_output_fields, names}` and one of the wrong type an
   `%Imp.AdapterParseError{}` with no `kind`.
-- `Imp.Predict.Predict` returns that struct, with `trace` (the redacted
+- `Imp.Predict` returns that struct, with `trace` (the redacted
   messages, the raw completion, and which output fields were read) and, for
   `n > 1`, `completion_index`. In 0.4.0 it returned
   `%{reason: {:error, reason}, trace: trace}`, and an `n > 1` failure
@@ -512,7 +512,7 @@ Every change here is breaking for code that matches on the old shape.
   a `ReActV2` step that could not be parsed was recorded as
   `termination_cause: :prediction_error`; it is now `:parse_error`.
 - When the chat or XML adapter's JSON fallback makes its request and that
-  request fails, `Imp.Predict.Predict` returns the LM's error. In 0.4.0 it
+  request fails, `Imp.Predict` returns the LM's error. In 0.4.0 it
   returned the original parse failure with the LM error inside it.
   `Imp.Adapter.TwoStep`'s extraction request does the same: when it fails,
   the call returns that `Imp.LMError` (or `{:lm_failed, _, _}`), so a 429
@@ -606,6 +606,41 @@ Every change here is breaking for code that matches on the old shape.
   Imp's version, not as `imp-acp` `0.1.0`.
 - Plug is no longer a dependency of Imp. The demo MCP servers, its only user,
   are not in the package.
+
+### Public surface: facade and behaviours
+
+- `Imp.load/2` takes the map `Imp.dump/1` returns and gives `{:ok, program}`
+  or `{:error, %ArgumentError{}}`; `Imp.load!/2` is its raising form.
+  Reading a file `Imp.save!/2` wrote is `Imp.read!/2`, which was
+  `Imp.load!/1`. `Imp.Saving` has the same four functions.
+- `Imp.react/3` builds `Imp.Predict.ReActV2`, and `Imp.react_v2` is gone.
+  `Imp.Predict.ReAct`, the earlier loop, has no facade name; its port of
+  DSPy's `dspy.ReAct` is `mode: :dspy`, which was `:dspy_3_2_1`. A program
+  saved with `"dspy_3_2_1"` still loads.
+- `Imp.Predict.Predict` is `Imp.Predict`. It and `Imp.Predict.ChainOfThought`
+  are stable.
+- `Imp.Signature.ParseError`, which every signature constructor raises, is
+  documented, with its `:input` and `:position` fields.
+- `Imp.Retrievers.KNN` is deleted. It did not implement `Imp.Retrieve`, and
+  `Imp.Retrieve.Memory` is the token-overlap retriever.
+- The `compile` functions of `Imp.Optimizer.BootstrapRS` and
+  `Imp.Optimizer.BootstrapFewShotWithRandomSearch` are hidden, like
+  `Imp.Optimizer.RandomSearch`'s; `Imp.optimize/4` runs all three.
+- `Imp.Adapter.Types.Document`, `History`, `Citation` and `Type`, and
+  `Imp.Datasets.Error`, are documented. `priv/public_api.json` now lists every
+  packaged module, the `@moduledoc false` ones among `excluded_modules`.
+- `Imp.LM` declares `generate(lm, messages, opts)`, where `lm` is the struct
+  or the module it was given; `request/2` and `stream/3` stay optional. An LM
+  is a struct or module implementing it. The `%{module: module, opts: opts}`
+  map and a bare two-argument function, both deprecated in 0.4.0, are
+  refused: at construction with the `:lm` option's error, and by
+  `Imp.LM.generate/3` as `{:error, {:not_an_lm, lm}}`. The clients'
+  `generate/2` is gone; call a client through `Imp.LM.generate/3`, as
+  `Imp.LM.generate(Imp.Clients.ReqLLM.new(model), messages)`. `Imp.LM.Static.new/1` takes
+  `:model`, the model a static client stands in for.
+- `Imp.Retrieve` declares `retrieve(retriever, query, opts)`; a module
+  retriever receives itself first, as an LM does. A two-argument function is
+  still a retriever.
 
 ## 0.4.0 — 2026-09-17
 

@@ -282,7 +282,7 @@ defmodule Imp.Optimizer.SignatureOptimizerTest do
     :ok = Imp.save!(portable, path)
 
     code = """
-    program = Imp.load!(#{inspect(path)})
+    program = Imp.read!(#{inspect(path)})
     report = Imp.Optimizer.Report.fetch(program)
     IO.puts(Jason.encode!(%{
       optimizer: report.optimizer,

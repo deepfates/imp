@@ -2,15 +2,12 @@ defmodule Imp.Optimizer.MIPROv2.SearchContractTest do
   use ExUnit.Case, async: true
 
   test "runs the exact objective budget and selects only from full evaluations" do
-    task_lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "yes"} end]
-    }
+    task_lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "yes"} end)
 
-    prompt_lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{"instructions" => ["Answer consistently."]} end]
-    }
+    prompt_lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts -> %{"instructions" => ["Answer consistently."]} end
+      )
 
     program = Imp.predict("question -> answer", lm: task_lm)
 
@@ -54,8 +51,8 @@ defmodule Imp.Optimizer.MIPROv2.SearchContractTest do
   end
 
   test "same seed reproduces parameter trials" do
-    task_lm = %{module: Imp.LM.Static, opts: [handler: fn _, _ -> %{answer: "yes"} end]}
-    prompt_lm = %{module: Imp.LM.Static, opts: [handler: fn _, _ -> ["A", "B", "C"] end]}
+    task_lm = Imp.LM.Static.new(handler: fn _, _ -> %{answer: "yes"} end)
+    prompt_lm = Imp.LM.Static.new(handler: fn _, _ -> ["A", "B", "C"] end)
     program = Imp.predict("question -> answer", lm: task_lm)
     examples = [Imp.example(question: "q", answer: "yes") |> Imp.with_inputs(:question)]
 
@@ -97,7 +94,7 @@ defmodule Imp.Optimizer.MIPROv2.SearchContractTest do
       Imp.Optimizer.MIPROv2.compile(optimizer, program, [example], [example])
     end
 
-    lm = %{module: Imp.LM.Static, opts: [handler: fn _, _ -> %{answer: "yes"} end]}
+    lm = Imp.LM.Static.new(handler: fn _, _ -> %{answer: "yes"} end)
 
     compiled =
       Imp.Optimizer.MIPROv2.new(metric,

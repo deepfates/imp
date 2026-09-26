@@ -65,15 +65,13 @@ defmodule KNNDspyDifferentialTest do
     # --- KNNFewShot: metric-gated bootstrapped demos per call --------------
     {:ok, calls} = Agent.start_link(fn -> [] end)
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           Agent.update(calls, &(&1 ++ [messages]))
           %{answer: "4"}
         end
-      ]
-    }
+      )
 
     metric = fn example, prediction ->
       Imp.Prediction.get(prediction, :answer) == Imp.Example.get(example, :answer)

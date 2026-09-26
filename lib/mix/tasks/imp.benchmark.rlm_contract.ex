@@ -66,15 +66,9 @@ defmodule Mix.Tasks.Imp.Benchmark.RlmContract do
     {:ok, calls} = Agent.start_link(fn -> [] end)
     Process.put(:rlm_contract_turns, contract["elixir_controller_code_turns"])
 
-    controller = %{
-      module: Imp.LM.Static,
-      opts: [handler: controller_handler(contract)]
-    }
+    controller = Imp.LM.Static.new(handler: controller_handler(contract))
 
-    sub_lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: sub_lm_handler(contract, calls)]
-    }
+    sub_lm = Imp.LM.Static.new(handler: sub_lm_handler(contract, calls))
 
     rlm =
       Imp.rlm(signature(contract),

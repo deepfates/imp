@@ -1925,7 +1925,7 @@ defmodule Imp.Predict.RLM do
       "signature, iteration, variables, observations, tools, budget -> action"
       |> Imp.Signature.ensure()
 
-    Imp.Predict.Predict.new(signature, lm: resolve_lm(rlm), adapter: resolve_adapter(rlm))
+    Imp.Predict.new(signature, lm: resolve_lm(rlm), adapter: resolve_adapter(rlm))
   end
 
   defp extract_predictor(%__MODULE__{} = rlm) do
@@ -1933,11 +1933,11 @@ defmodule Imp.Predict.RLM do
       "signature, variables, observations, trace -> output"
       |> Imp.Signature.ensure()
 
-    Imp.Predict.Predict.new(signature, lm: resolve_lm(rlm), adapter: resolve_adapter(rlm))
+    Imp.Predict.new(signature, lm: resolve_lm(rlm), adapter: resolve_adapter(rlm))
   end
 
   defp subquery_predictor(%__MODULE__{} = rlm) do
-    Imp.Predict.Predict.new(rlm.signature,
+    Imp.Predict.new(rlm.signature,
       lm: resolve_sub_lm(rlm),
       adapter: resolve_adapter(rlm)
     )

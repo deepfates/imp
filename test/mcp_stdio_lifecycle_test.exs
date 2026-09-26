@@ -70,7 +70,7 @@ defmodule Imp.MCPStdioLifecycleTest do
         end
       )
 
-    program = Imp.react_v2("question -> answer", [tool], lm: lm)
+    program = Imp.react("question -> answer", [tool], lm: lm)
     assert {:ok, run} = Imp.start_run(program, %{question: "block"})
     wait_for_file!(started_file)
 

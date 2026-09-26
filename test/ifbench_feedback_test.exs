@@ -60,9 +60,8 @@ defmodule Imp.BenchmarkTruth.IFBenchFeedbackTest do
       end
     end
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
 
@@ -70,8 +69,7 @@ defmodule Imp.BenchmarkTruth.IFBenchFeedbackTest do
             do: %{reasoning: "corrected", final_response: "FINAL"},
             else: %{reasoning: "drafted", response: "DRAFT"}
         end
-      ]
-    }
+      )
 
     program = IFBenchTwoStage.new(lm, adapter: Imp.Adapter.Chat)
 

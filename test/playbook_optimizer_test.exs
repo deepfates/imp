@@ -115,7 +115,7 @@ defmodule Imp.Optimizer.PlaybookTest do
     assert restored.promoted?
     assert restored.program.playbook == result.candidate_playbook
     assert restored.scores == result.scores
-    assert Imp.Saving.load(Imp.Saving.dump(restored.program)) == restored.program
+    assert Imp.Saving.load!(Imp.Saving.dump(restored.program)) == restored.program
 
     path =
       Path.join(

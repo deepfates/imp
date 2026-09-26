@@ -2,11 +2,13 @@ defmodule Imp.ProgramAccess do
   @moduledoc """
   Internal. Uniform structural access to program structs: reaches through
   wrapper programs (ChainOfThought, RAG, Assertions, and friends) to the
-  underlying `Imp.Predict.Predict`, its signature, demos, LM, and metadata,
+  underlying `Imp.Predict`, its signature, demos, LM, and metadata,
   and writes those back via `put_lm/2` and the metadata helpers. Knowledge of
   each program type's internal shape is centralized here so callers like
   `Imp.with_lm/2` and the optimizers never pattern-match on it themselves.
   """
+
+  alias Imp.Predict
 
   alias Imp.Predict.{
     Assertions,
@@ -15,7 +17,6 @@ defmodule Imp.ProgramAccess do
     ChainOfThought,
     CodeAct,
     MultiChainComparison,
-    Predict,
     ProgramOfThought,
     RAG,
     ReAct,

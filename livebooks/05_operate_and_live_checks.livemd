@@ -156,7 +156,7 @@ program = Imp.predict("question -> answer", lm: lm)
 path = Path.join(System.tmp_dir!(), "imp-no-secret.json")
 Imp.save!(program, path)
 state = File.read!(path)
-loaded = Imp.load!(path)
+loaded = Imp.read!(path)
 File.rm(path)
 
 {

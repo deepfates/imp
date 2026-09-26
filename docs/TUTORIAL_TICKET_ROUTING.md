@@ -206,7 +206,7 @@ your application:
 ```elixir
 :ok = Imp.save!(compiled, "ticket_router.json")
 
-router = Imp.load!("ticket_router.json")
+router = Imp.read!("ticket_router.json")
 ```
 
 Credentials never enter the artifact; bind the live model at runtime with

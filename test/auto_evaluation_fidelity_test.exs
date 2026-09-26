@@ -116,13 +116,10 @@ defmodule AutoEvaluationFidelityTest do
   end
 
   defp static_lm(handler) do
-    %{
-      module: Imp.LM.Static,
-      opts: [
-        handler: fn messages, _opts ->
-          messages |> Enum.map_join("\n", & &1.content) |> handler.()
-        end
-      ]
-    }
+    Imp.LM.Static.new(
+      handler: fn messages, _opts ->
+        messages |> Enum.map_join("\n", & &1.content) |> handler.()
+      end
+    )
   end
 end

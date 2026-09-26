@@ -136,7 +136,7 @@ defmodule Imp.BenchmarkTruth.ProviderTrainingCampaign do
     {:ok, rebound} = TrainingJob.rebind(job, base_program, path: program_path)
     direct = evaluate(rebound, dataset["held_out"], concurrency)
     deployment_lm = Imp.ProgramAccess.lm(rebound)
-    loaded = program_path |> Imp.load!() |> restore_runtime_credentials!(deployment_lm)
+    loaded = program_path |> Imp.read!() |> restore_runtime_credentials!(deployment_lm)
     reloaded = evaluate(loaded, dataset["held_out"], concurrency)
     acceptance = acceptance(state["baseline"], direct, reloaded)
     accounting = accounting(job, state, direct, reloaded, max_cost_usd)

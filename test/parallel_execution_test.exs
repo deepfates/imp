@@ -92,7 +92,7 @@ defmodule Imp.ParallelExecutionTest do
     child_metadata =
       Enum.filter(
         metadata,
-        &(&1.module == Imp.Predict.Predict and
+        &(&1.module == Imp.Predict and
             &1.parent_call_id == parent_metadata.call_id)
       )
 

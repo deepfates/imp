@@ -3,7 +3,8 @@ defmodule Imp.GEPAFamilyProgramFidelityTest do
 
   alias Imp.Adapter.Chat
   alias Imp.Optimizer.GEPA.{Candidate, Evaluation, ProgramAdapter}
-  alias Imp.Predict.{ChainOfThought, Predict}
+  alias Imp.Predict
+  alias Imp.Predict.ChainOfThought
   alias Imp.Prediction
   alias Imp.ProgramParameters
   alias Imp.Signature
@@ -111,9 +112,6 @@ defmodule Imp.GEPAFamilyProgramFidelityTest do
   end
 
   defp static_lm(handler) do
-    %{
-      module: Imp.LM.Static,
-      opts: [handler: fn messages, _opts -> handler.(messages) end]
-    }
+    Imp.LM.Static.new(handler: fn messages, _opts -> handler.(messages) end)
   end
 end

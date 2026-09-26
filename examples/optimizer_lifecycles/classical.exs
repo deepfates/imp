@@ -141,7 +141,7 @@ defmodule ImpOptimizerLifecycles.Classical do
           artifact |> Artifact.read!() |> Artifact.apply(router(runtime_lm))
 
         "knn_few_shot" ->
-          artifact |> Imp.load!(registry: saving_registry()) |> Imp.with_lm(runtime_lm)
+          artifact |> Imp.read!(registry: saving_registry()) |> Imp.with_lm(runtime_lm)
 
         other ->
           raise "unknown family #{inspect(other)}"

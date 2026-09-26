@@ -108,7 +108,7 @@ tool results must follow a unique matching call. `dump/1` emits the only
 supported cross-runtime JSON representation and redacts credentials in
 structured fields before they cross that boundary. Opaque image, audio, and
 file bytes remain byte-for-byte intact; callers must not place credentials in
-attachment payloads. `Imp.dump/1` and `Imp.load/1` use this same codec.
+attachment payloads. `Imp.dump/1` and `Imp.load!/1` use this same codec.
 `load/1` accepts only the exact versioned schema,
 known typed values, valid accounting, ordered events, and aligned tool calls.
 It returns `{:error, %Imp.Optimizer.Trajectory.DecodeError{}}` for malformed or

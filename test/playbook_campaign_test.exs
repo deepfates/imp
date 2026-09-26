@@ -57,7 +57,7 @@ defmodule Imp.Optimizer.Playbook.CampaignTest do
       |> Imp.with_playbook(playbook)
 
     restored =
-      program |> Imp.Saving.dump() |> Jason.encode!() |> Jason.decode!() |> Imp.Saving.load()
+      program |> Imp.Saving.dump() |> Jason.encode!() |> Jason.decode!() |> Imp.Saving.load!()
 
     assert restored.program.config == [native_json_schema: true]
     assert restored.playbook == playbook
@@ -81,7 +81,7 @@ defmodule Imp.Optimizer.Playbook.CampaignTest do
       |> Imp.Saving.dump(registry: registry)
       |> Jason.encode!()
       |> Jason.decode!()
-      |> Imp.Saving.load(registry: registry)
+      |> Imp.Saving.load!(registry: registry)
 
     restored_tool = restored.program.tools[:solve_equation]
     assert Imp.Tool.call(restored_tool, %{equation: "2 ? 3 ? 4 = 14"}) == "2 + 3 * 4 = 14"

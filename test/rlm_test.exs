@@ -7,16 +7,14 @@ defmodule RLMPublicSurfaceTest do
       %{reasoning: "finish", code: ~S|submit(%{answer: "done"})|}
     ]
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           [action | rest] = Process.get(:rlm_actions)
           Process.put(:rlm_actions, rest)
           action
         end
-      ]
-    }
+      )
 
     Process.put(:rlm_actions, actions)
 
@@ -41,17 +39,15 @@ defmodule RLMPublicSurfaceTest do
       %{reasoning: "finish", code: ~S|submit(%{answer: "done"})|}
     ]
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           send(parent, {:turn, Enum.map_join(messages, "\n", &to_string(&1.content))})
           [action | rest] = Process.get(:rlm_actions)
           Process.put(:rlm_actions, rest)
           action
         end
-      ]
-    }
+      )
 
     Process.put(:rlm_actions, actions)
 
@@ -73,15 +69,13 @@ defmodule RLMPublicSurfaceTest do
   test "RLM gives the controller the interpreter-owned language guide" do
     parent = self()
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           send(parent, {:controller_system_prompt, hd(messages).content})
           %{code: ~S|submit(%{answer: "done"})|}
         end
-      ]
-    }
+      )
 
     rlm = Imp.Predict.RLM.new("question -> answer", lm: lm)
     assert {:ok, _prediction} = Imp.Predict.RLM.call(rlm, %{question: "q"})
@@ -95,15 +89,13 @@ defmodule RLMPublicSurfaceTest do
   test "the controller prompt names one reply shape" do
     parent = self()
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           send(parent, {:controller_system_prompt, hd(messages).content})
           %{code: ~S|submit(%{answer: "done"})|}
         end
-      ]
-    }
+      )
 
     rlm = Imp.Predict.RLM.new("question -> answer", lm: lm)
     assert {:ok, _prediction} = Imp.Predict.RLM.call(rlm, %{question: "q"})
@@ -118,7 +110,7 @@ defmodule RLMPublicSurfaceTest do
             "\n" <> ~S|{"answer":"Paris"}|,
           ~S|{"answer":"Paris"}{"reasoning":"a } in a string","code":"submit(%{answer: \"Paris\"})"}|
         ] do
-      lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> reply end]}
+      lm = Imp.LM.Static.new(handler: fn _messages, _opts -> reply end)
       rlm = Imp.Predict.RLM.new("question -> answer", lm: lm, max_iterations: 1)
 
       assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{question: "Capital of France?"})
@@ -134,7 +126,7 @@ defmodule RLMPublicSurfaceTest do
     second = ~S|{"reasoning":"b","code":"submit(%{answer: \"B\"})"}|
 
     for reply <- [first <> "\n\n" <> first, first <> "\n\n" <> second] do
-      lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> reply end]}
+      lm = Imp.LM.Static.new(handler: fn _messages, _opts -> reply end)
       rlm = Imp.Predict.RLM.new("question -> answer", lm: lm, max_iterations: 1)
 
       assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{question: "q"})
@@ -148,28 +140,24 @@ defmodule RLMPublicSurfaceTest do
       Jason.encode!(%{reasoning: "submit", code: ~S|submit(%{answer: result["answer"]})|})
     ]
 
-    controller = %{
-      module: Imp.LM.Static,
-      opts: [
+    controller =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           [action | rest] = Process.get(:wrapped_rlm_actions)
           Process.put(:wrapped_rlm_actions, rest)
           %{__imp_lm_output__: action, __imp_lm_metadata__: %{provider: "test"}}
         end
-      ]
-    }
+      )
 
-    sub_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    sub_lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           %{
             "__imp_lm_output__" => %{"answer" => "wrapped"},
             "__imp_lm_metadata__" => %{"provider" => "test"}
           }
         end
-      ]
-    }
+      )
 
     Process.put(:wrapped_rlm_actions, actions)
 
@@ -181,10 +169,10 @@ defmodule RLMPublicSurfaceTest do
   end
 
   test "RLM rejects legacy discrete action responses" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{"action" => "submit", "answer" => "Paris"} end]
-    }
+    lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts -> %{"action" => "submit", "answer" => "Paris"} end
+      )
 
     rlm = Imp.Predict.RLM.new("question -> answer", lm: lm)
 
@@ -202,7 +190,7 @@ defmodule RLMPublicSurfaceTest do
     ]
 
     Enum.each(responses, fn response ->
-      lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> response end]}
+      lm = Imp.LM.Static.new(handler: fn _messages, _opts -> response end)
       rlm = Imp.Predict.RLM.new("question -> answer", lm: lm)
 
       assert {:error, reason} = Imp.Predict.RLM.call(rlm, %{question: "q"})
@@ -219,16 +207,14 @@ defmodule RLMPublicSurfaceTest do
       Jason.encode!(%{reasoning: "repaired", code: ~S|submit(%{answer: "done"})|})
     ])
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           [response | rest] = Process.get(:rlm_action_repairs)
           Process.put(:rlm_action_repairs, rest)
           response
         end
-      ]
-    }
+      )
 
     rlm = Imp.Predict.RLM.new("question -> answer", lm: lm, max_iterations: 2)
     assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{question: "q"})
@@ -239,12 +225,10 @@ defmodule RLMPublicSurfaceTest do
   end
 
   test "RLM accepts exactly the required outputs as a typed direct submission" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts -> %{"reasoning" => "finished", "answer" => "Paris"} end
-      ]
-    }
+      )
 
     rlm = Imp.Predict.RLM.new("question -> answer", lm: lm)
 
@@ -255,7 +239,7 @@ defmodule RLMPublicSurfaceTest do
 
   test "RLM direct submission rejects fields outside reasoning and required outputs" do
     output = %{"reasoning" => "finished", "answer" => "Paris", "untrusted" => true}
-    lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> output end]}
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> output end)
     rlm = Imp.Predict.RLM.new("question -> answer", lm: lm)
 
     assert {:error, {:invalid_rlm_action, "expected a map with a binary code field", ^output}} =
@@ -265,16 +249,14 @@ defmodule RLMPublicSurfaceTest do
   test "RLM repairs empty typed direct submissions" do
     Process.put(:direct_submit_repairs, [%{"answer" => ""}, %{"answer" => "repaired"}])
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           [output | rest] = Process.get(:direct_submit_repairs)
           Process.put(:direct_submit_repairs, rest)
           output
         end
-      ]
-    }
+      )
 
     rlm = Imp.Predict.RLM.new("question -> answer", lm: lm, max_iterations: 2)
     assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{question: "q"})
@@ -294,16 +276,14 @@ defmodule RLMPublicSurfaceTest do
 
     Process.put(:empty_submit_repairs, actions)
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           [action | rest] = Process.get(:empty_submit_repairs)
           Process.put(:empty_submit_repairs, rest)
           action
         end
-      ]
-    }
+      )
 
     rlm = Imp.Predict.RLM.new("question -> answer", lm: lm, max_iterations: 2)
     assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{question: "q"})
@@ -329,23 +309,17 @@ defmodule RLMPublicSurfaceTest do
       }
     ]
 
-    controller = %{
-      module: Imp.LM.Static,
-      opts: [
+    controller =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           [action | rest] = Process.get(:symbolic_rlm_actions)
           Process.put(:symbolic_rlm_actions, rest)
           action
         end
-      ]
-    }
+      )
 
-    sub_lm = %{
-      module: Imp.LM.Static,
-      opts: [
-        handler: fn [%{content: prompt}], _opts -> String.upcase(prompt) end
-      ]
-    }
+    sub_lm =
+      Imp.LM.Static.new(handler: fn [%{content: prompt}], _opts -> String.upcase(prompt) end)
 
     Process.put(:symbolic_rlm_actions, actions)
 
@@ -373,9 +347,8 @@ defmodule RLMPublicSurfaceTest do
   test "programmatic batches reserve the full shared call budget and permit repair" do
     parent = self()
 
-    controller = %{
-      module: Imp.LM.Static,
-      opts: [
+    controller =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           turn = Process.get(:over_budget_turn, 0)
           Process.put(:over_budget_turn, turn + 1)
@@ -384,13 +357,10 @@ defmodule RLMPublicSurfaceTest do
             do: %{code: ~S|llm_query_batched(["one", "two", "three"])|},
             else: %{code: ~S|submit(%{answer: "repaired"})|}
         end
-      ]
-    }
+      )
 
-    sub_lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> send(parent, :unexpected_subcall) end]
-    }
+    sub_lm =
+      Imp.LM.Static.new(handler: fn _messages, _opts -> send(parent, :unexpected_subcall) end)
 
     rlm =
       Imp.Predict.RLM.new("question -> answer",
@@ -418,16 +388,14 @@ submit(%{answer: child[:answer]})|
       %{reasoning: "answer child", code: ~S|submit(%{answer: "child answer"})|}
     ]
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           [action | rest] = Process.get(:symbolic_recursive_actions)
           Process.put(:symbolic_recursive_actions, rest)
           action
         end
-      ]
-    }
+      )
 
     Process.put(:symbolic_recursive_actions, actions)
 
@@ -454,10 +422,7 @@ submit(%{answer: child[:answer]})|
     ]
 
     Enum.each(actions, fn action ->
-      lm = %{
-        module: Imp.LM.Static,
-        opts: [handler: fn _messages, _opts -> action end]
-      }
+      lm = Imp.LM.Static.new(handler: fn _messages, _opts -> action end)
 
       rlm = Imp.Predict.RLM.new("question -> answer", lm: lm)
 
@@ -472,15 +437,13 @@ submit(%{answer: child[:answer]})|
     hidden = "DO_NOT_PROMPT_FULL_CONTEXT"
     context = String.duplicate("a", 40) <> hidden
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           Process.put(:rlm_controller_messages, messages)
           %{code: ~S|submit(%{answer: "ok"})|}
         end
-      ]
-    }
+      )
 
     rlm = Imp.Predict.RLM.new("context, question -> answer", lm: lm, max_preview_chars: 10)
 
@@ -500,9 +463,8 @@ submit(%{answer: child[:answer]})|
   test "RLM uses extract fallback after iteration exhaustion and enforces sub-LM budgets" do
     parent = self()
 
-    loop_then_extract_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    loop_then_extract_lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
           send(parent, {:rlm_prompt, prompt})
@@ -513,8 +475,7 @@ submit(%{answer: child[:answer]})|
             %{code: "x + 1"}
           end
         end
-      ]
-    }
+      )
 
     rlm = Imp.Predict.RLM.new("x: int -> answer", lm: loop_then_extract_lm, max_iterations: 1)
     assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{x: 1})
@@ -525,15 +486,9 @@ submit(%{answer: child[:answer]})|
     assert_received {:rlm_prompt, extract_prompt}
     assert extract_prompt =~ ~s("exhausted_at_iteration":2)
 
-    sub_lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "ok"} end]
-    }
+    sub_lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "ok"} end)
 
-    query_lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{code: ~S|llm_query("q")|} end]
-    }
+    query_lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{code: ~S|llm_query("q")|} end)
 
     rlm =
       Imp.Predict.RLM.new("question -> answer",
@@ -549,16 +504,14 @@ submit(%{answer: child[:answer]})|
   end
 
   test "RLM rejects empty required outputs from extraction fallback" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           if Enum.any?(messages, &String.contains?(&1.content, "RLM extract pass")),
             do: %{answer: "   "},
             else: %{code: "1 + 1"}
         end
-      ]
-    }
+      )
 
     rlm = Imp.Predict.RLM.new("question -> answer", lm: lm, max_iterations: 1)
 
@@ -584,7 +537,7 @@ submit(%{answer: child[:answer]})|
         else: %{code: ~S|submit(%{answer: "done"})|}
     end
 
-    lm = %{module: Imp.LM.Static, opts: [handler: handler]}
+    lm = Imp.LM.Static.new(handler: handler)
     rlm = Imp.Predict.RLM.new("log -> answer", lm: lm, max_iterations: 2)
 
     assert {:ok, _prediction} = Imp.Predict.RLM.call(rlm, %{log: log})
@@ -618,7 +571,7 @@ submit(%{answer: child[:answer]})|
         else: %{code: ~S|submit(%{answer: "done"})|}
     end
 
-    lm = %{module: Imp.LM.Static, opts: [handler: handler]}
+    lm = Imp.LM.Static.new(handler: handler)
 
     rlm =
       Imp.Predict.RLM.new("log -> answer",
@@ -658,15 +611,13 @@ submit(%{answer: child[:answer]})|
   test "RLM treats zero budgets and preview limits conservatively" do
     parent = self()
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           send(parent, {:rlm_messages, messages})
           %{code: ~S|submit(%{answer: "ok"})|}
         end
-      ]
-    }
+      )
 
     exhausted =
       Imp.Predict.RLM.new("question -> answer",
@@ -754,17 +705,15 @@ submit(%{answer: child[:answer]})|
       %{code: ~S|submit(%{answer: scratch})|}
     ]
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           Process.put(:rlm_tool_prompt, Enum.map_join(messages, "\n", & &1.content))
           [action | rest] = Process.get(:rlm_actions)
           Process.put(:rlm_actions, rest)
           action
         end
-      ]
-    }
+      )
 
     lookup = Imp.Tool.new(:lookup, "lookup a key", fn %{key: "capital"} -> "Paris" end)
     Process.put(:rlm_actions, actions)
@@ -787,16 +736,14 @@ submit(%{answer: child[:answer]})|
       %{reasoning: "use interpreter state", code: ~S|submit(%{answer: derived})|}
     ]
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           [action | rest] = Process.get(:mixed_rlm_actions)
           Process.put(:mixed_rlm_actions, rest)
           action
         end
-      ]
-    }
+      )
 
     Process.put(:mixed_rlm_actions, actions)
     rlm = Imp.Predict.RLM.new("question -> answer: integer", lm: lm)
@@ -828,17 +775,15 @@ submit(%{answer: child[:answer]})|
       %{code: ~S|submit(%{answer: "loaded"})|}
     ]
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           send(parent, {:rlm_serializable_prompt, Enum.map_join(messages, "\n", & &1.content)})
           [action | rest] = Process.get(:rlm_actions)
           Process.put(:rlm_actions, rest)
           action
         end
-      ]
-    }
+      )
 
     Process.put(:rlm_actions, actions)
 
@@ -868,13 +813,13 @@ submit(%{answer: child[:answer]})|
   end
 
   test "RLM exposes optimizer-visible internal predictors" do
-    lm = %{module: Imp.LM.Static, opts: []}
+    lm = Imp.LM.Static.new()
     rlm = Imp.Predict.RLM.new("question -> answer", lm: lm)
 
     assert %{
-             action: %Imp.Predict.Predict{},
-             extract: %Imp.Predict.Predict{},
-             subquery: %Imp.Predict.Predict{}
+             action: %Imp.Predict{},
+             extract: %Imp.Predict{},
+             subquery: %Imp.Predict{}
            } = Imp.ProgramAccess.internal_predictors(rlm)
 
     assert Imp.ProgramAccess.task_signature(rlm) == rlm.signature
@@ -886,17 +831,15 @@ submit(%{answer: child[:answer]})|
       %{code: ~S|submit(%{answer: "corrected"})|}
     ]
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           Process.put(:rlm_submit_prompt, Enum.map_join(messages, "\n", & &1.content))
           [action | rest] = Process.get(:rlm_actions)
           Process.put(:rlm_actions, rest)
           action
         end
-      ]
-    }
+      )
 
     Process.put(:rlm_actions, actions)
 
@@ -913,16 +856,14 @@ submit(%{answer: child[:answer]})|
   test "RLM supports batched sub-LM queries with per-prompt budget accounting" do
     parent = self()
 
-    sub_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    sub_lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
           send(parent, {:sub_prompt, prompt})
           %{answer: if(prompt =~ "first", do: "one", else: "two")}
         end
-      ]
-    }
+      )
 
     actions = [
       %{
@@ -933,14 +874,12 @@ submit(%{answer: child[:answer]})|
 
     {:ok, action_queue} = Agent.start_link(fn -> actions end)
 
-    controller_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    controller_lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           Agent.get_and_update(action_queue, fn [action | rest] -> {action, rest} end)
         end
-      ]
-    }
+      )
 
     rlm =
       Imp.Predict.RLM.new("question -> answer",
@@ -967,14 +906,12 @@ submit(%{answer: child[:answer]})|
     Agent.stop(action_queue)
     {:ok, over_budget_queue} = Agent.start_link(fn -> actions end)
 
-    over_budget_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    over_budget_lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           Agent.get_and_update(over_budget_queue, fn [action | rest] -> {action, rest} end)
         end
-      ]
-    }
+      )
 
     over_budget =
       Imp.Predict.RLM.new("question -> answer",
@@ -997,16 +934,14 @@ submit(%{answer: child[:answer]})|
       %{code: ~S|submit(%{answer: "Paris"})|}
     ]
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           [action | rest] = Process.get(:rlm_actions)
           Process.put(:rlm_actions, rest)
           action
         end
-      ]
-    }
+      )
 
     lookup = Imp.Tool.new(:lookup, "lookup a key", fn %{key: "capital"} -> "Paris" end)
     Process.put(:rlm_actions, actions)
@@ -1028,16 +963,14 @@ submit(%{answer: child[:answer]})|
       %{code: ~S|submit(%{answer: "parent answer"})|}
     ]
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           [action | rest] = Process.get(:rlm_recurse_actions)
           Process.put(:rlm_recurse_actions, rest)
           action
         end
-      ]
-    }
+      )
 
     Process.put(:rlm_recurse_actions, actions)
 
@@ -1065,16 +998,14 @@ submit(%{answer: child[:answer]})|
 
     Process.put(:rlm_invalid_child_actions, actions)
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           [action | rest] = Process.get(:rlm_invalid_child_actions)
           Process.put(:rlm_invalid_child_actions, rest)
           action
         end
-      ]
-    }
+      )
 
     rlm = Imp.Predict.RLM.new("question -> answer", lm: lm, max_iterations: 2)
     assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{question: "parent"})
@@ -1112,17 +1043,15 @@ submit(%{answer: child[:answer]})|
     Enum.each(cases, fn {code, tools, tool_policy, expected} ->
       {:ok, turns} = Agent.start_link(fn -> 0 end)
 
-      lm = %{
-        module: Imp.LM.Static,
-        opts: [
+      lm =
+        Imp.LM.Static.new(
           handler: fn _messages, _opts ->
             Agent.get_and_update(turns, fn
               0 -> {%{code: code}, 1}
               _ -> {%{code: ~S|submit(%{answer: "repaired"})|}, 1}
             end)
           end
-        ]
-      }
+        )
 
       rlm =
         Imp.Predict.RLM.new("question -> answer",
@@ -1154,16 +1083,14 @@ submit(%{answer: child[:answer]})|
       %{code: ~S|submit(%{answer: "ok"})|}
     ]
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           [action | rest] = Process.get(:bounded_trace_actions)
           Process.put(:bounded_trace_actions, rest)
           action
         end
-      ]
-    }
+      )
 
     Process.put(:bounded_trace_actions, actions)
 
@@ -1186,15 +1113,13 @@ submit(%{answer: child[:answer]})|
   end
 
   test "RLM enforces wall-clock budget" do
-    timeout_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    timeout_lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           Process.sleep(2)
           %{code: "1 + 1"}
         end
-      ]
-    }
+      )
 
     timeout = Imp.Predict.RLM.new("question -> answer", lm: timeout_lm, max_time_ms: 0)
 
@@ -1203,20 +1128,16 @@ submit(%{answer: child[:answer]})|
   end
 
   test "RLM deadline interrupts a blocked sub-LM effect" do
-    controller = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{code: ~S|llm_query("slow")|} end]
-    }
+    controller =
+      Imp.LM.Static.new(handler: fn _messages, _opts -> %{code: ~S|llm_query("slow")|} end)
 
-    sub_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    sub_lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           Process.sleep(250)
           "late"
         end
-      ]
-    }
+      )
 
     rlm =
       Imp.Predict.RLM.new("question -> answer",
@@ -1238,22 +1159,17 @@ submit(%{answer: child[:answer]})|
     prompts = Enum.map(1..24, &"prompt-#{&1}")
     code = "llm_query_batched(#{inspect(prompts)})"
 
-    controller = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{code: code} end]
-    }
+    controller = Imp.LM.Static.new(handler: fn _messages, _opts -> %{code: code} end)
 
-    sub_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    sub_lm =
+      Imp.LM.Static.new(
         handler: fn [%{content: prompt}], _opts ->
           send(parent, {:batch_started, run_ref, prompt})
           Process.sleep(80)
           send(parent, {:batch_finished, run_ref, prompt})
           prompt
         end
-      ]
-    }
+      )
 
     rlm =
       Imp.Predict.RLM.new("question -> answer",

@@ -179,7 +179,7 @@ defmodule Imp.BenchmarkTruth.LocalMLXCampaign do
           )
 
         {:ok, _rebound} = TrainingJob.rebind(job, base_program, lm: lm, path: program_path)
-        loaded = program_path |> Imp.load!() |> restore_runtime_credentials!(lm)
+        loaded = program_path |> Imp.read!() |> restore_runtime_credentials!(lm)
 
         reloaded =
           ProviderTrainingCampaign.evaluate(

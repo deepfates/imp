@@ -228,7 +228,7 @@ defmodule LocalSIMBATREC.Runner do
     observer = observer!()
 
     try do
-      source = Imp.load!(paths.program)
+      source = Imp.read!(paths.program)
       assert_runtime!(source)
       baseline = observe_program(source, observer)
       artifact = Artifact.read!(paths.artifact)
@@ -304,7 +304,7 @@ defmodule LocalSIMBATREC.Runner do
   end
 
   defp observe_program(program, observer) do
-    Imp.Predict.Predict.with_lm(
+    Imp.Predict.with_lm(
       program,
       observed(Imp.ProgramAccess.lm(program), observer, :task)
     )

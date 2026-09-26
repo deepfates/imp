@@ -222,7 +222,7 @@ credentials at runtime.
 ```elixir
 path = Path.join(System.tmp_dir!(), "imp-livebook-program.json")
 Imp.save!(qa_program, path)
-loaded = Imp.load!(path)
+loaded = Imp.read!(path)
 File.rm(path)
 
 loaded.signature |> Imp.Signature.to_spec()

@@ -547,55 +547,64 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizerLift do
 
   defp classification_program(calls) do
     Imp.predict("input -> label",
-      lm: fn messages, _opts ->
-        Agent.update(calls, &(&1 + 1))
-        prompt = prompt_text(messages)
-        input = prompt_field(prompt, "input")
+      lm:
+        Imp.LM.Static.new(
+          handler: fn messages, _opts ->
+            Agent.update(calls, &(&1 + 1))
+            prompt = prompt_text(messages)
+            input = prompt_field(prompt, "input")
 
-        label =
-          if String.contains?(prompt, "warm") and String.contains?(prompt, "cool") do
-            if input in ["red", "orange", "yellow"], do: "warm", else: "cool"
-          else
-            "unknown"
+            label =
+              if String.contains?(prompt, "warm") and String.contains?(prompt, "cool") do
+                if input in ["red", "orange", "yellow"], do: "warm", else: "cool"
+              else
+                "unknown"
+              end
+
+            %{label: label}
           end
-
-        {:ok, %{label: label}}
-      end
+        )
     )
   end
 
   defp qa_program(calls) do
     Imp.predict("question -> answer",
-      lm: fn messages, _opts ->
-        Agent.update(calls, &(&1 + 1))
-        prompt = prompt_text(messages)
-        question = prompt_field(prompt, "question")
+      lm:
+        Imp.LM.Static.new(
+          handler: fn messages, _opts ->
+            Agent.update(calls, &(&1 + 1))
+            prompt = prompt_text(messages)
+            question = prompt_field(prompt, "question")
 
-        answer =
-          cond do
-            String.contains?(prompt, "Paris") and String.contains?(question, "France") ->
-              "Paris"
+            answer =
+              cond do
+                String.contains?(prompt, "Paris") and String.contains?(question, "France") ->
+                  "Paris"
 
-            String.contains?(prompt, "Berlin") and String.contains?(question, "Germany") ->
-              "Berlin"
+                String.contains?(prompt, "Berlin") and String.contains?(question, "Germany") ->
+                  "Berlin"
 
-            true ->
-              "unknown"
+                true ->
+                  "unknown"
+              end
+
+            %{answer: answer}
           end
-
-        {:ok, %{answer: answer}}
-      end
+        )
     )
   end
 
   defp instruction_program(calls) do
     Imp.predict("instruction -> answer",
-      lm: fn messages, _opts ->
-        Agent.update(calls, &(&1 + 1))
-        prompt = prompt_text(messages)
-        answer = if String.contains?(prompt, "answer OK"), do: "OK", else: "not ok"
-        {:ok, %{answer: answer}}
-      end
+      lm:
+        Imp.LM.Static.new(
+          handler: fn messages, _opts ->
+            Agent.update(calls, &(&1 + 1))
+            prompt = prompt_text(messages)
+            answer = if String.contains?(prompt, "answer OK"), do: "OK", else: "not ok"
+            %{answer: answer}
+          end
+        )
     )
   end
 
@@ -668,26 +677,28 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizerLift do
 
   defp program(calls) do
     Imp.predict("question -> answer",
-      lm: fn messages, _opts ->
-        Agent.update(calls, &(&1 + 1))
-        prompt = Enum.map_join(messages, "\n", &to_string(&1.content))
+      lm:
+        Imp.LM.Static.new(
+          handler: fn messages, _opts ->
+            Agent.update(calls, &(&1 + 1))
+            prompt = Enum.map_join(messages, "\n", &to_string(&1.content))
 
-        cond do
-          String.contains?(prompt, "Propose one complete Imp task instruction") ->
-            {:ok, %{instructions: ["Always answer Paris when asked about France."]}}
+            cond do
+              String.contains?(prompt, "Propose one complete Imp task instruction") ->
+                %{instructions: ["Always answer Paris when asked about France."]}
 
-          String.contains?(prompt, "better_program_trajectory") ->
-            {:ok,
-             %{
-               discussion: "The better trajectory identifies the expected capital.",
-               module_advice: %{main: "Always answer Paris when asked about France."}
-             }}
+              String.contains?(prompt, "better_program_trajectory") ->
+                %{
+                  discussion: "The better trajectory identifies the expected capital.",
+                  module_advice: %{main: "Always answer Paris when asked about France."}
+                }
 
-          true ->
-            answer = if should_answer_paris?(prompt), do: "Paris", else: "unknown"
-            {:ok, %{answer: answer}}
-        end
-      end
+              true ->
+                answer = if should_answer_paris?(prompt), do: "Paris", else: "unknown"
+                %{answer: answer}
+            end
+          end
+        )
     )
   end
 
@@ -742,7 +753,7 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizerLift do
 
   defp optimizer_trace(report, compiled, _optimized_result), do: optimizer_trace(report, compiled)
 
-  defp demos(%Imp.Predict.Predict{demos: demos}), do: demos
+  defp demos(%Imp.Predict{demos: demos}), do: demos
   defp demos(%Imp.Predict.ChainOfThought{predict: predict}), do: demos(predict)
   defp demos(_other), do: []
 

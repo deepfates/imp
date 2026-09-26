@@ -139,10 +139,7 @@ defmodule Imp.BenchmarkTruth.ProviderTrainingCampaignTest do
     assert {:ok, prediction} = Imp.Adapter.Chat.parse(signature, assistant.content, [])
     assert Imp.get(prediction, :route) == "R42"
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> assistant.content end]
-    }
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> assistant.content end)
 
     program = ProviderTrainingCampaign.evaluation_program(signature, lm)
 
@@ -160,7 +157,7 @@ defmodule Imp.BenchmarkTruth.ProviderTrainingCampaignTest do
     loaded =
       Imp.predict("question -> answer", lm: runtime_lm)
       |> Imp.Saving.dump()
-      |> Imp.Saving.load()
+      |> Imp.Saving.load!()
 
     refute Keyword.has_key?(Imp.ProgramAccess.lm(loaded).opts, :api_key)
 

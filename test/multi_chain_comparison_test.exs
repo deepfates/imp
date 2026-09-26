@@ -59,15 +59,13 @@ defmodule MultiChainComparisonTest do
   end
 
   defp comparison(parent, opts \\ []) do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, lm_opts ->
           send(parent, {:lm_call, messages, lm_opts})
           %{rationale: "selected", answer: "alpha"}
         end
-      ]
-    }
+      )
 
     Imp.multi_chain_comparison("question -> answer", Keyword.merge([lm: lm, m: 2], opts))
   end

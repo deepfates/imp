@@ -9,15 +9,13 @@ defmodule Imp.Playbook.WithContextTest do
   test "injects active guidance once without exposing provenance" do
     test_pid = self()
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           send(test_pid, {:messages, messages})
           %{answer: "ok"}
         end
-      ]
-    }
+      )
 
     digest = String.duplicate("a", 64)
 
@@ -73,15 +71,13 @@ defmodule Imp.Playbook.WithContextTest do
   test "empty playbooks leave runtime messages unchanged" do
     test_pid = self()
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           send(test_pid, {:messages, messages})
           %{answer: "ok"}
         end
-      ]
-    }
+      )
 
     program = Imp.predict("question -> answer", lm: lm)
     wrapper = Imp.with_playbook(program, Playbook.new(id: "empty"))
@@ -99,7 +95,7 @@ defmodule Imp.Playbook.WithContextTest do
 
     wrapper = Imp.with_playbook(Imp.predict("question -> answer"), playbook)
     state = Imp.Saving.dump(wrapper)
-    restored = Imp.Saving.load(state)
+    restored = Imp.Saving.load!(state)
 
     assert restored == wrapper
     assert Imp.Saving.dump(restored) == state

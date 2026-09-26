@@ -112,7 +112,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Overhead do
 
     program =
       Imp.predict(signature,
-        lm: fn _messages, _opts -> {:ok, response} end,
+        lm: Imp.LM.Static.new(handler: fn _messages, _opts -> response end),
         adapter: Imp.Adapter.Chat
       )
 

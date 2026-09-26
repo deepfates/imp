@@ -114,9 +114,9 @@ defmodule ProductionHardeningTest do
     program = Imp.predict("question -> answer", lm: lm)
 
     assert {:error, %Imp.LMError{reason: :temporary_unavailable}} =
-             Imp.Predict.Predict.call(program, %{question: "recover?"})
+             Imp.Predict.call(program, %{question: "recover?"})
 
-    assert {:ok, prediction} = Imp.Predict.Predict.call(program, %{question: "recover?"})
+    assert {:ok, prediction} = Imp.Predict.call(program, %{question: "recover?"})
     assert Imp.Prediction.get(prediction, :answer) == "recovered"
     assert Process.get(:flaky_count) == 2
   end
@@ -400,15 +400,9 @@ defmodule ProductionHardeningTest do
       Imp.LM.generate(Imp.LM.Static, [%{role: :user, content: "hello"}], %{handler: nil})
     end
 
-    assert_raise ArgumentError,
-                 ~r/Imp.LM.generate\/3 client :opts expects keyword options/,
-                 fn ->
-                   Imp.LM.generate(
-                     %{module: Imp.LM.Static, opts: %{handler: fn _messages, _opts -> "ok" end}},
-                     [%{role: :user, content: "hello"}],
-                     []
-                   )
-                 end
+    assert_raise ArgumentError, ~r/Imp.LM.Static.new\/1 expects keyword options/, fn ->
+      Imp.LM.Static.new(%{handler: fn _messages, _opts -> "ok" end})
+    end
 
     assert {:error, {:not_an_lm, :not_an_lm}} =
              Imp.LM.generate(:not_an_lm, [%{role: :user, content: "hello"}], [])
@@ -417,64 +411,76 @@ defmodule ProductionHardeningTest do
              Imp.LM.generate(%{provider: :missing}, [%{role: :user, content: "hello"}], [])
 
     assert {:ok, "static"} =
-             Imp.LM.generate(fn _messages, _opts -> {:ok, "static"} end, [], [])
-
-    assert {:error, {:invalid_lm_result, :not_a_valid_lm_result}} =
-             Imp.LM.generate(fn _messages, _opts -> :not_a_valid_lm_result end, [], [])
-
-    assert {:error, {:invalid_lm_result, :not_a_valid_lm_result}} =
              Imp.LM.generate(
-               fn _messages, _opts -> {:ok, :not_a_valid_lm_result} end,
+               Imp.Test.FunLM.new(fn _messages, _opts -> {:ok, "static"} end),
                [],
                []
              )
 
-    assert {:error, {:lm_failed, :anonymous_lm, %RuntimeError{message: "lm exploded"}}} =
-             Imp.LM.generate(fn _messages, _opts -> raise "lm exploded" end, [], [])
+    assert {:error, {:invalid_lm_result, :not_a_valid_lm_result}} =
+             Imp.LM.generate(
+               Imp.Test.FunLM.new(fn _messages, _opts -> :not_a_valid_lm_result end),
+               [],
+               []
+             )
+
+    assert {:error, {:invalid_lm_result, :not_a_valid_lm_result}} =
+             Imp.LM.generate(
+               Imp.Test.FunLM.new(fn _messages, _opts -> {:ok, :not_a_valid_lm_result} end),
+               [],
+               []
+             )
+
+    assert {:error, {:lm_failed, Imp.Test.FunLM, %RuntimeError{message: "lm exploded"}}} =
+             Imp.LM.generate(
+               Imp.Test.FunLM.new(fn _messages, _opts -> raise "lm exploded" end),
+               [],
+               []
+             )
 
     assert {:ok, "prefix:value"} =
              Imp.LM.generate(%StructLM{prefix: "prefix"}, [], suffix: "value")
   end
 
   test "Predict reports adapter callback boundary failures explicitly" do
-    lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "ok"} end]}
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "ok"} end)
 
     format_program = Imp.predict("question -> answer", lm: lm, adapter: RaisingFormatAdapter)
 
     assert {:error,
             {:adapter_format_failed, RaisingFormatAdapter,
              %RuntimeError{message: "format exploded"}}} =
-             Imp.Predict.Predict.call(format_program, %{question: "q"})
+             Imp.Predict.call(format_program, %{question: "q"})
 
     lm_opts_program = Imp.predict("question -> answer", lm: lm, adapter: RaisingLMOptsAdapter)
 
     assert {:error,
             {:adapter_lm_opts_failed, RaisingLMOptsAdapter,
              %RuntimeError{message: "lm opts exploded"}}} =
-             Imp.Predict.Predict.call(lm_opts_program, %{question: "q"})
+             Imp.Predict.call(lm_opts_program, %{question: "q"})
 
     invalid_opts_program =
       Imp.predict("question -> answer", lm: lm, adapter: InvalidLMOptsAdapter)
 
     assert {:error, {:invalid_adapter_lm_opts, InvalidLMOptsAdapter, %{response_format: _}}} =
-             Imp.Predict.Predict.call(invalid_opts_program, %{question: "q"})
+             Imp.Predict.call(invalid_opts_program, %{question: "q"})
 
     assert_raise ArgumentError,
-                 ~r/Imp\.Predict\.Predict\.new\/2: invalid value for :adapter option: expected an adapter module exporting format\/3 and parse\/3/,
+                 ~r/Imp\.Predict\.new\/2: invalid value for :adapter option: expected an adapter module exporting format\/3 and parse\/3/,
                  fn ->
                    Imp.predict("question -> answer", lm: lm, adapter: :"Elixir.MissingAdapter")
                  end
   end
 
   test "Static LM validates direct-call options and handler shape" do
-    assert_raise ArgumentError, ~r/Imp.LM.Static.generate\/2 expects keyword options/, fn ->
-      Imp.LM.Static.generate([], %{handler: fn _messages, _opts -> "ok" end})
+    assert_raise ArgumentError, ~r/Imp.LM.Static.generate\/3 expects keyword options/, fn ->
+      Imp.LM.Static.generate(Imp.LM.Static, [], %{handler: fn _messages, _opts -> "ok" end})
     end
 
     assert {:error, {:lm_failed, Imp.LM.Static, %ArgumentError{message: message}}} =
              Imp.LM.generate(Imp.LM.Static, [], handler: :not_a_function)
 
-    assert message =~ "Imp.LM.Static.generate/2 expects :handler"
+    assert message =~ "Imp.LM.Static.generate/3 expects :handler"
   end
 
   test "invalid test harness provider mode fails closed" do
@@ -501,7 +507,7 @@ defmodule ProductionHardeningTest do
     assert {:ok, Imp.LM.Static} = Imp.LM.validate_lm(Imp.LM.Static)
     assert {:ok, Imp.Adapter.Chat} = Imp.Adapter.validate_adapter(Imp.Adapter.Chat)
     assert {:error, message} = Imp.LM.validate_lm(%{provider: :missing})
-    assert message =~ "expected nil, an LM module"
+    assert message =~ "expected nil, or an LM struct or module implementing Imp.LM generate/3"
     assert {:error, message} = Imp.Adapter.validate_adapter(String)
     assert message =~ "expected an adapter module exporting format/3 and parse/3"
 
@@ -516,13 +522,13 @@ defmodule ProductionHardeningTest do
                  end
 
     assert_raise ArgumentError,
-                 ~r/Imp\.Predict\.Predict\.new\/2: invalid value for :lm option: expected nil, an LM module/,
+                 ~r/Imp\.Predict\.new\/2: invalid value for :lm option: expected nil, or an LM struct or module/,
                  fn ->
                    Imp.predict("question -> answer", lm: %{provider: :missing})
                  end
 
     assert_raise ArgumentError,
-                 ~r/Imp\.Predict\.Predict\.new\/2: invalid value for :adapter option: expected an adapter module exporting format\/3 and parse\/3/,
+                 ~r/Imp\.Predict\.new\/2: invalid value for :adapter option: expected an adapter module exporting format\/3 and parse\/3/,
                  fn ->
                    Imp.predict("question -> answer", adapter: String)
                  end
@@ -570,7 +576,7 @@ defmodule ProductionHardeningTest do
 
   test "saving rejects unsupported program types explicitly" do
     assert_raise ArgumentError, ~r/unsupported saved Imp program type/, fn ->
-      Imp.Saving.load(%{"type" => "unknown"})
+      Imp.Saving.load!(%{"type" => "unknown"})
     end
 
     error =
@@ -585,11 +591,11 @@ defmodule ProductionHardeningTest do
 
   test "saving rejects malformed program artifacts with explicit errors" do
     assert_raise ArgumentError, ~r/saved Imp program must be a map/, fn ->
-      Imp.Saving.load(["not", "a", "map"])
+      Imp.Saving.load!(["not", "a", "map"])
     end
 
     assert_raise ArgumentError, ~r/missing required key "type"/, fn ->
-      Imp.Saving.load(%{})
+      Imp.Saving.load!(%{})
     end
 
     base = %{
@@ -603,35 +609,35 @@ defmodule ProductionHardeningTest do
     }
 
     assert_raise ArgumentError, ~r/missing required keys: \["signature"\]/, fn ->
-      base |> Map.delete("signature") |> Imp.Saving.load()
+      base |> Map.delete("signature") |> Imp.Saving.load!()
     end
 
     assert_raise ArgumentError, ~r/saved Imp demos must be a list/, fn ->
-      base |> Map.put("demos", %{"bad" => true}) |> Imp.Saving.load()
+      base |> Map.put("demos", %{"bad" => true}) |> Imp.Saving.load!()
     end
 
     assert_raise ArgumentError, ~r/saved Imp demo must be a map or keyword list/, fn ->
-      base |> Map.put("demos", ["bad"]) |> Imp.Saving.load()
+      base |> Map.put("demos", ["bad"]) |> Imp.Saving.load!()
     end
 
     assert_raise ArgumentError, ~r/invalid saved Imp config entry/, fn ->
-      base |> Map.put("config", [:temperature]) |> Imp.Saving.load()
+      base |> Map.put("config", [:temperature]) |> Imp.Saving.load!()
     end
 
     assert_raise ArgumentError, ~r/invalid saved Imp LM client/, fn ->
-      base |> Map.put("lm", %{"model" => "missing-provider"}) |> Imp.Saving.load()
+      base |> Map.put("lm", %{"model" => "missing-provider"}) |> Imp.Saving.load!()
     end
 
     assert_raise ArgumentError, ~r/invalid saved Imp adapter reference/, fn ->
-      base |> Map.put("adapter", %{"module" => "Elixir.Imp.Adapter.Chat"}) |> Imp.Saving.load()
+      base |> Map.put("adapter", %{"module" => "Elixir.Imp.Adapter.Chat"}) |> Imp.Saving.load!()
     end
 
     assert_raise ArgumentError, ~r/saved req_llm client is missing required key "model"/, fn ->
-      base |> Map.put("lm", %{"provider" => "req_llm"}) |> Imp.Saving.load()
+      base |> Map.put("lm", %{"provider" => "req_llm"}) |> Imp.Saving.load!()
     end
 
     assert_raise ArgumentError, ~r/saved Imp program_of_thought is missing required keys/, fn ->
-      Imp.Saving.load(%{
+      Imp.Saving.load!(%{
         "type" => "program_of_thought",
         "signature" => Imp.Signature.dump(Imp.Signature.new("x -> answer")),
         "output_field" => %{"__imp_type__" => "atom", "value" => "answer"}
@@ -650,7 +656,7 @@ defmodule ProductionHardeningTest do
       |> Imp.Saving.dump()
 
     assert_raise ArgumentError, ~r/nested predict must be a saved Predict program/, fn ->
-      pot_state |> Map.put("predict", rag_state) |> Imp.Saving.load()
+      pot_state |> Map.put("predict", rag_state) |> Imp.Saving.load!()
     end
 
     mismatched_instruction =
@@ -659,7 +665,7 @@ defmodule ProductionHardeningTest do
       end)
 
     assert_raise ArgumentError, ~r/planner instructions must match task instructions/, fn ->
-      Imp.Saving.load(mismatched_instruction)
+      Imp.Saving.load!(mismatched_instruction)
     end
 
     bad_planner_outputs =
@@ -668,19 +674,19 @@ defmodule ProductionHardeningTest do
       end)
 
     assert_raise ArgumentError, ~r/planner outputs must be \[:program, :tool, :arguments\]/, fn ->
-      Imp.Saving.load(bad_planner_outputs)
+      Imp.Saving.load!(bad_planner_outputs)
     end
 
     assert_raise ArgumentError, ~r/output_field must name one of the task outputs/, fn ->
       pot_state
       |> Map.put("output_field", %{"__imp_type__" => "atom", "value" => "missing"})
-      |> Imp.Saving.load()
+      |> Imp.Saving.load!()
     end
 
     assert_raise ArgumentError, ~r/saved ReqLLM options must be a list/, fn ->
       base
       |> Map.put("lm", %{"provider" => "req_llm", "model" => "openai:gpt-test", "opts" => 1})
-      |> Imp.Saving.load()
+      |> Imp.Saving.load!()
     end
   end
 
@@ -706,7 +712,7 @@ defmodule ProductionHardeningTest do
     }
 
     assert_raise ArgumentError, ~r/saved provider clients must use req_llm/, fn ->
-      Imp.Saving.load(state)
+      Imp.Saving.load!(state)
     end
   after
     previous = Process.get(:previous_openai_api_key)
@@ -732,24 +738,22 @@ defmodule ProductionHardeningTest do
     }
 
     assert_raise ArgumentError, ~r/unsupported saved Imp adapter/, fn ->
-      Imp.Saving.load(state)
+      Imp.Saving.load!(state)
     end
   end
 
   test "prediction and program traces redact secret-shaped values" do
     secret = "sk-secretvalue123"
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           %{answer: "saw #{secret}"}
         end
-      ]
-    }
+      )
 
     program = Imp.predict("question -> answer", lm: lm)
-    assert {:ok, prediction} = Imp.Predict.Predict.call(program, %{question: secret})
+    assert {:ok, prediction} = Imp.Predict.call(program, %{question: secret})
     trace_text = inspect(prediction.metadata.trace)
     refute trace_text =~ secret
     assert trace_text =~ "[REDACTED]"
@@ -758,9 +762,8 @@ defmodule ProductionHardeningTest do
   test "ReAct CodeAct and RLM traces redact tool and observation secrets" do
     secret = "Bearer abcdefghijklmnop"
 
-    react_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    react_lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           %{
             tool_calls: [
@@ -769,24 +772,21 @@ defmodule ProductionHardeningTest do
             ]
           }
         end
-      ]
-    }
+      )
 
     leak = Imp.Tool.new(:leak, "leak", fn _args -> secret end)
     react = Imp.Predict.ReAct.new("question -> answer", [leak], lm: react_lm)
     assert {:ok, react_prediction} = Imp.Predict.ReAct.call(react, %{question: "q"})
     refute inspect(react_prediction.metadata[:history]) =~ secret
 
-    code_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    code_lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           [action | rest] = Process.get(:code_redaction_actions)
           Process.put(:code_redaction_actions, rest)
           action
         end
-      ]
-    }
+      )
 
     code_tool = Imp.Tool.new(:leak, "leak", fn _args -> secret end)
 
@@ -798,16 +798,14 @@ defmodule ProductionHardeningTest do
     assert {:ok, code_prediction} = Imp.Predict.CodeAct.call(code_act, %{question: "q"})
     refute inspect(code_prediction.metadata.code_act_trace) =~ secret
 
-    rlm_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    rlm_lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           [action | rest] = Process.get(:rlm_redaction_actions)
           Process.put(:rlm_redaction_actions, rest)
           action
         end
-      ]
-    }
+      )
 
     Process.put(:rlm_redaction_actions, [
       %{code: "token = #{inspect(secret)}"},
@@ -894,7 +892,7 @@ defmodule ProductionHardeningTest do
   end
 
   test "parallel maps preserve per-input success shape under concurrency" do
-    lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "ok"} end]}
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "ok"} end)
     program = Imp.predict("question -> answer", lm: lm)
 
     results =
@@ -908,7 +906,7 @@ defmodule ProductionHardeningTest do
   end
 
   test "parallel map reports invalid options clearly" do
-    program = Imp.predict("question -> answer", lm: %{module: Imp.LM.Static, opts: []})
+    program = Imp.predict("question -> answer", lm: Imp.LM.Static.new())
 
     assert_raise ArgumentError,
                  ~r/Imp\.Predict\.Parallel\.map\/3: expected keyword options/,

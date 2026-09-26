@@ -228,15 +228,9 @@ defmodule ImpTest do
   end
 
   test "configured settings resolve dynamically for existing programs" do
-    first = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "first"} end]
-    }
+    first = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "first"} end)
 
-    second = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "second"} end]
-    }
+    second = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "second"} end)
 
     Imp.configure(lm: first)
     program = Imp.predict("question -> answer")
@@ -250,55 +244,53 @@ defmodule ImpTest do
   end
 
   test "predict reports missing required inputs before calling the LM" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           flunk("LM should not be called when required inputs are missing")
         end
-      ]
-    }
+      )
 
     program = Imp.predict("question, context -> answer", lm: lm)
 
     assert {:error, {:missing_input_fields, [:context]}} =
-             Imp.Predict.Predict.call(program, %{question: "q"})
+             Imp.Predict.call(program, %{question: "q"})
   end
 
   test "predict constructor and call report invalid inputs clearly" do
     assert_raise ArgumentError,
-                 ~r/Imp\.Predict\.Predict\.new\/2: expected keyword options/,
+                 ~r/Imp\.Predict\.new\/2: expected keyword options/,
                  fn ->
                    Imp.predict("question -> answer", :not_options)
                  end
 
     assert_raise ArgumentError,
-                 ~r/Imp\.Predict\.Predict\.new\/2.*:config.*expected.*keyword/s,
+                 ~r/Imp\.Predict\.new\/2.*:config.*expected.*keyword/s,
                  fn ->
                    Imp.predict("question -> answer", config: :not_config)
                  end
 
     assert_raise ArgumentError,
-                 ~r/Imp\.Predict\.Predict\.new\/2.*:metadata.*expected.*map/s,
+                 ~r/Imp\.Predict\.new\/2.*:metadata.*expected.*map/s,
                  fn ->
                    Imp.predict("question -> answer", metadata: :not_metadata)
                  end
 
-    program = Imp.predict("question -> answer", lm: %{module: Imp.LM.Static, opts: []})
+    program = Imp.predict("question -> answer", lm: Imp.LM.Static.new())
 
     assert {:error, {:invalid_predict_inputs, message}} =
-             Imp.Predict.Predict.call(program, :not_inputs)
+             Imp.Predict.call(program, :not_inputs)
 
     assert message =~ "expected a map or field pair list"
 
     assert {:error, {:invalid_predict_inputs, "expected inputs as {key, value} pairs"}} =
-             Imp.Predict.Predict.call(program, [:not_a_pair])
+             Imp.Predict.call(program, [:not_a_pair])
   end
 
   test "predict normalizes constructor demos into examples" do
     program =
       Imp.predict("question -> answer",
-        lm: %{module: Imp.LM.Static, opts: []},
+        lm: Imp.LM.Static.new(),
         demos: [question: "2+2?", answer: "4"]
       )
 
@@ -306,20 +298,17 @@ defmodule ImpTest do
     assert Imp.Example.to_map(demo) == %{question: "2+2?", answer: "4"}
 
     assert_raise ArgumentError,
-                 ~r/Imp.Predict.Predict.new\/2 expects demos as Imp.Example structs/,
+                 ~r/Imp.Predict.new\/2 expects demos as Imp.Example structs/,
                  fn ->
                    Imp.predict("question -> answer",
-                     lm: %{module: Imp.LM.Static, opts: []},
+                     lm: Imp.LM.Static.new(),
                      demos: [:not_a_demo]
                    )
                  end
   end
 
   test "predict accepts string-key inputs and allows optional inputs to be absent" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "ok"} end]
-    }
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "ok"} end)
 
     signature =
       Imp.Signature.new(%{
@@ -332,20 +321,14 @@ defmodule ImpTest do
 
     program = Imp.predict(signature, lm: lm)
 
-    assert {:ok, prediction} = Imp.Predict.Predict.call(program, %{"question" => "q"})
+    assert {:ok, prediction} = Imp.Predict.call(program, %{"question" => "q"})
     assert Imp.Prediction.get(prediction, :answer) == "ok"
   end
 
   test "context settings are process-local and restored" do
-    global = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "global"} end]
-    }
+    global = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "global"} end)
 
-    local = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "local"} end]
-    }
+    local = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "local"} end)
 
     Imp.configure(lm: global)
     program = Imp.predict("question -> answer")
@@ -366,15 +349,9 @@ defmodule ImpTest do
   end
 
   test "Imp-owned task fan-out inherits context settings" do
-    global = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "global"} end]
-    }
+    global = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "global"} end)
 
-    local = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "local"} end]
-    }
+    local = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "local"} end)
 
     Imp.configure(lm: global)
     program = Imp.predict("question -> answer")
@@ -392,15 +369,15 @@ defmodule ImpTest do
   end
 
   test "RLM controller LM resolves settings dynamically" do
-    first = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{code: ~S|submit(%{answer: "first"})|} end]
-    }
+    first =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts -> %{code: ~S|submit(%{answer: "first"})|} end
+      )
 
-    second = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{code: ~S|submit(%{answer: "second"})|} end]
-    }
+    second =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts -> %{code: ~S|submit(%{answer: "second"})|} end
+      )
 
     Imp.configure(lm: first)
     rlm = Imp.rlm("question -> answer")
@@ -433,21 +410,18 @@ defmodule ImpTest do
     # bare "Answer: Paris" label line is a parse error upstream (dee-coia), so
     # the fixture LM speaks the marker dialect.
     raw = "[[ ## answer ## ]]\nParis\n\n[[ ## completed ## ]]"
-    lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> raw end]}
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> raw end)
     program = Imp.predict("question -> answer", lm: lm)
 
     assert {:ok, prediction} =
-             Imp.Predict.Predict.call(program, question: "Capital of France?")
+             Imp.Predict.call(program, question: "Capital of France?")
 
     assert Imp.Prediction.get(prediction, :answer) == "Paris"
     assert %{messages: [_system, _user], raw: ^raw} = prediction.metadata.trace
   end
 
   test "chain of thought adds reasoning before answer" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{reasoning: "math", answer: "4"} end]
-    }
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{reasoning: "math", answer: "4"} end)
 
     program = Imp.chain_of_thought("question -> answer", lm: lm)
 
@@ -531,7 +505,7 @@ defmodule ImpTest do
   end
 
   test "evaluate scores a program against examples" do
-    lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "4"} end)
     program = Imp.predict("question -> answer", lm: lm)
 
     devset = [
@@ -550,10 +524,7 @@ defmodule ImpTest do
   end
 
   test "parallel evaluate records timed-out rows without exiting the caller" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> Process.sleep(:infinity) end]
-    }
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> Process.sleep(:infinity) end)
 
     program = Imp.predict("question -> answer", lm: lm)
 
@@ -595,7 +566,7 @@ defmodule ImpTest do
       if prompt =~ "slow", do: Process.sleep(:infinity), else: %{answer: "wrong"}
     end
 
-    lm = %{module: Imp.LM.Static, opts: [handler: handler]}
+    lm = Imp.LM.Static.new(handler: handler)
     program = Imp.predict("question -> answer", lm: lm)
 
     devset = [
@@ -636,7 +607,7 @@ defmodule ImpTest do
       if prompt =~ "[[ ## answer ## ]]\n6", do: %{answer: "6"}, else: %{answer: "4"}
     end
 
-    lm = %{module: Imp.LM.Static, opts: [handler: handler]}
+    lm = Imp.LM.Static.new(handler: handler)
     program = Imp.predict("question -> answer", lm: lm)
 
     trainset = [
@@ -667,10 +638,8 @@ defmodule ImpTest do
     {:ok, docs} = Imp.Retrieve.retrieve(retriever, "What is France's capital?", k: 1)
     context = docs |> hd() |> Map.fetch!(:text)
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "Paris", context: context} end]
-    }
+    lm =
+      Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "Paris", context: context} end)
 
     program = Imp.predict("question, context -> answer", lm: lm)
 
@@ -686,9 +655,8 @@ defmodule ImpTest do
   test "react can execute a requested tool" do
     tool = Imp.Tool.new(:lookup, "Lookup a value", fn %{query: "x"} -> "found x" end)
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           %{
             tool_calls: [
@@ -697,10 +665,9 @@ defmodule ImpTest do
             ]
           }
         end
-      ]
-    }
+      )
 
-    program = Imp.react("question -> answer", [tool], lm: lm)
+    program = Imp.Predict.ReAct.new("question -> answer", [tool], lm: lm)
 
     assert {:ok, prediction} = Imp.Predict.ReAct.call(program, %{question: "Find x"})
     assert Imp.Prediction.get(prediction, :answer) == "found x"

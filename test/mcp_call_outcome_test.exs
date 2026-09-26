@@ -450,7 +450,7 @@ defmodule Imp.MCPCallOutcomeTest do
           end
         )
 
-      program = Imp.react_v2("question -> answer", [exits], lm: lm, max_iters: 2)
+      program = Imp.react("question -> answer", [exits], lm: lm, max_iters: 2)
       owner = self()
 
       {:ok, run} =
@@ -480,7 +480,7 @@ defmodule Imp.MCPCallOutcomeTest do
         )
 
       program =
-        Imp.react_v2("question -> answer", [reply],
+        Imp.react("question -> answer", [reply],
           lm: lm,
           max_iters: 2,
           finish_on: %{reply: fn _arguments, _result, _inputs -> {:finish, %{}} end}
@@ -524,7 +524,7 @@ defmodule Imp.MCPCallOutcomeTest do
       end
 
       program =
-        Imp.react_v2("question -> answer", [echo, post],
+        Imp.react("question -> answer", [echo, post],
           lm: lm,
           max_iters: 2,
           tool_policy: policy

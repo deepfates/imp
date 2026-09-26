@@ -14,7 +14,7 @@ defmodule Imp.Predict.ReAct do
       lookup = Imp.tool(:lookup, "lookup facts", fn %{query: query} -> query end)
 
       program =
-        Imp.react("question -> answer", [lookup],
+        Imp.Predict.ReAct.new("question -> answer", [lookup],
           tool_policy: [:lookup, :submit],
           max_iters: 4
         )
@@ -29,7 +29,7 @@ defmodule Imp.Predict.ReAct do
   - final outputs that are missing or do not fit the signature return
     `{:error, %Imp.AdapterParseError{kind: :missing_fields | :invalid_fields}}`.
 
-  ## `:dspy_3_2_1` — a port of DSPy 3.2.1 `dspy.ReAct`
+  ## `:dspy` — a port of DSPy 3.2.1 `dspy.ReAct`
 
   This mode reproduces upstream `dspy/predict/react.py`, not a
   provider-tool-calling loop. It builds the same reasoning signature DSPy
@@ -76,7 +76,7 @@ defmodule Imp.Predict.ReAct do
       followed answered.
     * `:answered` — as above, but the forced `submit` did not answer, so the
       step's own text is projected onto the outputs.
-    * `:extracted` — a `:dspy_3_2_1` turn that ended at `max_iters`, on a step
+    * `:extracted` — a `:dspy` turn that ended at `max_iters`, on a step
       that could not be parsed, or on a step with no tool call, answered by
       DSPy's extraction pass; `termination_cause` is `:max_iters`,
       `:parse_error` or `:empty_tool_calls`.
@@ -109,7 +109,7 @@ defmodule Imp.Predict.ReAct do
     config: [type: :keyword_list, default: []],
     metadata: [type: {:map, :any, :any}, default: %{}],
     max_iters: [type: :non_neg_integer, default: 20],
-    mode: [type: {:in, [:provider_native, :dspy_3_2_1]}, default: :provider_native],
+    mode: [type: {:in, [:provider_native, :dspy]}, default: :provider_native],
     tool_policy: [
       type: {:custom, Imp.ToolPolicy, :validate, []},
       default: :allow
@@ -121,7 +121,7 @@ defmodule Imp.Predict.ReAct do
     opts = Imp.Predict.Options.validate!(opts, @option_schema, "Imp.Predict.ReAct.new/3")
     # index_tools!/2 validates the list and raises on invalid entries; keep the
     # original `tools` list because DSPy tool order is load-bearing for the
-    # `next_tool_name` Literal and the instruction listing (:dspy_3_2_1).
+    # `next_tool_name` Literal and the instruction listing (:dspy).
     _tool_map = Imp.Tool.index_tools!(tools, "Imp.Predict.ReAct.new/3")
     build_agent(opts[:mode], signature, tools, opts)
   end
@@ -161,7 +161,7 @@ defmodule Imp.Predict.ReAct do
 
     %__MODULE__{
       signature: signature,
-      react: Imp.Predict.Predict.new(react_signature, react_opts),
+      react: Imp.Predict.new(react_signature, react_opts),
       tools: tools,
       max_iters: non_negative_integer(opts[:max_iters]),
       tool_policy: opts[:tool_policy],
@@ -170,11 +170,11 @@ defmodule Imp.Predict.ReAct do
   end
 
   # ------------------------------------------------------------------
-  # :dspy_3_2_1 construction — the reasoning signature and instructions built
+  # :dspy construction — the reasoning signature and instructions built
   # by dspy/predict/react.py ReAct.__init__.
   # ------------------------------------------------------------------
 
-  defp build_agent(:dspy_3_2_1 = mode, signature, tools_list, opts) do
+  defp build_agent(:dspy = mode, signature, tools_list, opts) do
     finish = finish_tool(signature)
     ordered = tools_list ++ [finish]
     tools = Map.new(ordered, &{&1.name, &1})
@@ -203,7 +203,7 @@ defmodule Imp.Predict.ReAct do
 
     %__MODULE__{
       signature: signature,
-      react: Imp.Predict.Predict.new(react_signature, react_opts),
+      react: Imp.Predict.new(react_signature, react_opts),
       tools: tools,
       max_iters: non_negative_integer(opts[:max_iters]),
       tool_policy: opts[:tool_policy],
@@ -233,15 +233,15 @@ defmodule Imp.Predict.ReAct do
 
   @doc false
   # The reserved control tool name for a mode: `:submit` (provider-native) or
-  # `:finish` (dspy_3_2_1). Used by Imp.Saving to strip/rebuild it on dump/load.
+  # `:finish` (dspy). Used by Imp.Saving to strip/rebuild it on dump/load.
   def reserved_tool_name(:provider_native), do: :submit
-  def reserved_tool_name(:dspy_3_2_1), do: :finish
+  def reserved_tool_name(:dspy), do: :finish
 
   @doc false
-  # Rebuild the reserved control tool for a mode + signature (the dspy_3_2_1
+  # Rebuild the reserved control tool for a mode + signature (the dspy
   # `finish` description references the signature's output fields).
   def reserved_tool(:provider_native, _signature), do: submit_tool(:provider_native)
-  def reserved_tool(:dspy_3_2_1, signature), do: finish_tool(signature)
+  def reserved_tool(:dspy, signature), do: finish_tool(signature)
 
   defp submit_tool(:provider_native),
     do: Imp.Tool.new(:submit, "Submit final outputs", fn args -> args end)
@@ -331,7 +331,7 @@ defmodule Imp.Predict.ReAct do
   end
 
   @impl true
-  def call(%__MODULE__{mode: :dspy_3_2_1} = agent, inputs)
+  def call(%__MODULE__{mode: :dspy} = agent, inputs)
       when is_list(inputs) or is_map(inputs) do
     with {:ok, inputs} <- normalize_inputs(inputs),
          {max_iters, inputs} <- pop_max_iters(inputs, agent.max_iters),
@@ -376,7 +376,7 @@ defmodule Imp.Predict.ReAct do
   defp validate_call_max_iters(max_iters),
     do: {:error, {:invalid_react_max_iters, max_iters}}
 
-  defp run_loop(%{mode: :dspy_3_2_1} = agent, inputs, history, 0) do
+  defp run_loop(%{mode: :dspy} = agent, inputs, history, 0) do
     extract_final(agent, inputs, history, :max_iters)
   end
 
@@ -392,7 +392,7 @@ defmodule Imp.Predict.ReAct do
       {:ok, prediction, effective_history} ->
         handle_action_prediction(agent, inputs, effective_history, remaining, prediction)
 
-      {:error, reason, effective_history} when agent.mode == :dspy_3_2_1 ->
+      {:error, reason, effective_history} when agent.mode == :dspy ->
         if action_parse_failure?(reason) do
           extract_final(agent, inputs, effective_history, :parse_error)
         else
@@ -409,7 +409,7 @@ defmodule Imp.Predict.ReAct do
       call_inputs =
         Map.merge(inputs, %{history: effective_history, tools: tool_descriptions})
 
-      Imp.Predict.Predict.call(agent.react, call_inputs)
+      Imp.Predict.call(agent.react, call_inputs)
     end
 
     call_with_trajectory_truncation(agent.mode, call, history)
@@ -417,7 +417,7 @@ defmodule Imp.Predict.ReAct do
 
   defp handle_action_prediction(agent, inputs, history, remaining, prediction) do
     case Imp.Prediction.get(prediction, :tool_calls, []) do
-      [] when agent.mode == :dspy_3_2_1 ->
+      [] when agent.mode == :dspy ->
         extract_final(agent, inputs, history, :empty_tool_calls)
 
       [] ->
@@ -432,7 +432,7 @@ defmodule Imp.Predict.ReAct do
           failure ->
             failure
 
-          submitted? and agent.mode == :dspy_3_2_1 ->
+          submitted? and agent.mode == :dspy ->
             extract_final(agent, inputs, history, :submit)
 
           final ->
@@ -512,13 +512,13 @@ defmodule Imp.Predict.ReAct do
           else: final
 
       state = {events ++ [event], final, failure || call_failure, submitted?}
-      halt_on_submit? = submitted? and agent.mode == :dspy_3_2_1
+      halt_on_submit? = submitted? and agent.mode == :dspy
 
       if call_failure || final || halt_on_submit?, do: {:halt, state}, else: {:cont, state}
     end)
   end
 
-  defp attach_thought(:dspy_3_2_1, prediction, [event | events]) do
+  defp attach_thought(:dspy, prediction, [event | events]) do
     case Imp.Prediction.get(prediction, :next_thought) do
       nil -> [event | events]
       thought -> [Imp.Redaction.redact(Map.put(event, :thought, thought)) | events]
@@ -623,12 +623,12 @@ defmodule Imp.Predict.ReAct do
   defp interpret_outcome(:provider_native, _name, {:error, reason}),
     do: {{:error, reason}, {:error, reason}}
 
-  defp interpret_outcome(:dspy_3_2_1, name, {:ok, {:error, reason}}),
+  defp interpret_outcome(:dspy, name, {:ok, {:error, reason}}),
     do: {"Execution error in #{display_tool_name(name)}: #{format_tool_error(reason)}", nil}
 
-  defp interpret_outcome(:dspy_3_2_1, _name, {:ok, result}), do: {result, nil}
+  defp interpret_outcome(:dspy, _name, {:ok, result}), do: {result, nil}
 
-  defp interpret_outcome(:dspy_3_2_1, name, {:error, reason}) do
+  defp interpret_outcome(:dspy, name, {:error, reason}) do
     if observable_tool_failure?(reason) do
       {tool_failure_observation(name, reason), nil}
     else
@@ -660,7 +660,7 @@ defmodule Imp.Predict.ReAct do
   defp action_parse_failure?(_reason), do: false
 
   # ------------------------------------------------------------------
-  # :dspy_3_2_1 loop — faithful reproduction of ReAct.forward.
+  # :dspy loop — faithful reproduction of ReAct.forward.
   #
   # `trajectory` is an ORDERED list of {key, value} pairs (Elixir maps do not
   # preserve insertion order, and DSPy's trajectory keys must render in
@@ -677,7 +677,7 @@ defmodule Imp.Predict.ReAct do
 
   defp run_faithful_loop(agent, inputs, idx, trajectory, max_iters) do
     reason_call = fn trajectory_text ->
-      Imp.Predict.Predict.call(agent.react, Map.put(inputs, :trajectory, trajectory_text))
+      Imp.Predict.call(agent.react, Map.put(inputs, :trajectory, trajectory_text))
     end
 
     case faithful_trajectory_call(reason_call, trajectory) do
@@ -738,7 +738,7 @@ defmodule Imp.Predict.ReAct do
 
   defp run_faithful_tool(agent, false, resolved, requested_name, args) do
     outcome = execute_tool_call(agent, resolved, requested_name, args)
-    interpret_outcome(:dspy_3_2_1, resolved || requested_name, outcome)
+    interpret_outcome(:dspy, resolved || requested_name, outcome)
   end
 
   defp faithful_extract(agent, inputs, trajectory, reason) do
@@ -904,7 +904,7 @@ defmodule Imp.Predict.ReAct do
     end
   end
 
-  defp call_with_trajectory_truncation(:dspy_3_2_1, call, history),
+  defp call_with_trajectory_truncation(:dspy, call, history),
     do: retry_trajectory_call(call, history, @trajectory_call_attempts)
 
   defp call_with_trajectory_truncation(_mode, call, history) do
@@ -992,7 +992,7 @@ defmodule Imp.Predict.ReAct do
   # How the turn ended, and what interrupted it when something did. The model
   # calling `submit` or `finish` ends a turn on its own terms. In
   # `:provider_native` mode a step that calls no tool is answered by a forced
-  # `submit`, or failing that by its own text (`:answered`); in `:dspy_3_2_1`
+  # `submit`, or failing that by its own text (`:answered`); in `:dspy`
   # mode every other ending is DSPy's extraction pass (`:extracted`).
   defp termination(reason) when reason in [:submit, :finish],
     do: %{termination_reason: reason}
@@ -1051,7 +1051,7 @@ defmodule Imp.Predict.ReAct do
     [tools: tools, tool_choice: "auto"]
   end
 
-  defp tool_parameters(%Imp.Tool{name: :submit}, _signature, :dspy_3_2_1),
+  defp tool_parameters(%Imp.Tool{name: :submit}, _signature, :dspy),
     do: %{"type" => "object", "properties" => %{}, "additionalProperties" => false}
 
   defp tool_parameters(%Imp.Tool{name: :submit}, signature, :provider_native),

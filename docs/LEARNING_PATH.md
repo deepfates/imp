@@ -267,7 +267,7 @@ redacted trace before raising them.
 ## 8. Persist Programs Or Selected Parameters, Not Secrets
 
 There are two restart paths. A portable program — including one a few-shot
-optimizer compiled — round-trips through `Imp.save!/2` and `Imp.load!/1` as a
+optimizer compiled — round-trips through `Imp.save!/2` and `Imp.read!/1` as a
 checksummed JSON artifact. Credentials are never persisted: rebind the live
 model at load time with `Imp.with_lm/2` or a scoped `Imp.context/2`. Saving a
 program pinned to a non-portable runtime LM fails loudly instead of silently
@@ -281,7 +281,7 @@ path = Path.join(System.tmp_dir!(), "ticket-router-#{System.unique_integer([:pos
 try do
   router = Imp.predict("ticket -> team")
   :ok = Imp.save!(router, path)
-  loaded = Imp.load!(path)
+  loaded = Imp.read!(path)
 
   {:ok, prediction} =
     Imp.context([lm: lm], fn ->

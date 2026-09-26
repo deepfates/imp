@@ -251,7 +251,7 @@ defmodule Imp.Predict.Refine do
     entries = Imp.ProgramParameters.predictors(refine.program)
     predictor_names = predictor_names(entries)
 
-    feedback_program = Imp.Predict.Predict.new(feedback_signature(), lm: lm)
+    feedback_program = Imp.Predict.new(feedback_signature(), lm: lm)
 
     feedback_inputs = %{
       program_code: program_definition(refine.program),
@@ -265,7 +265,7 @@ defmodule Imp.Predict.Refine do
       reward_value: metric_result.score
     }
 
-    case Imp.Predict.Predict.call(feedback_program, feedback_inputs) do
+    case Imp.Predict.call(feedback_program, feedback_inputs) do
       {:ok, advice_prediction} ->
         {:per_predictor, parse_advice(advice_prediction, predictor_names)}
 

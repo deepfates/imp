@@ -2,17 +2,20 @@ defmodule Imp.SavingReActModeTest do
   use ExUnit.Case, async: true
 
   test "round-trips provider-native ReAct mode" do
-    loaded = round_trip(Imp.react("question -> answer", [], mode: :provider_native))
+    loaded = round_trip(Imp.Predict.ReAct.new("question -> answer", [], mode: :provider_native))
 
     assert loaded.mode == :provider_native
     assert loaded.tools.submit.description == "Submit final outputs"
     assert Imp.Tool.call(loaded.tools.submit, %{answer: "Paris"}) == %{answer: "Paris"}
   end
 
-  test "round-trips DSPy 3.2.1 ReAct mode" do
-    loaded = round_trip(Imp.react("question -> answer", [], mode: :dspy_3_2_1))
+  test "round-trips the DSPy ReAct mode" do
+    program = Imp.Predict.ReAct.new("question -> answer", [], mode: :dspy)
+    assert Imp.Saving.dump(program)["mode"] == "dspy"
 
-    assert loaded.mode == :dspy_3_2_1
+    loaded = round_trip(program)
+
+    assert loaded.mode == :dspy
 
     # The faithful mode's reserved control tool is `finish` (dspy.ReAct), not
     # `submit`, and its description references the signature's output fields.
@@ -24,14 +27,24 @@ defmodule Imp.SavingReActModeTest do
     assert Imp.Tool.call(loaded.tools.finish, %{answer: "ignored"}) == "Completed."
   end
 
+  test "loads a program saved under the mode's name before 0.5.0" do
+    state =
+      Imp.Predict.ReAct.new("question -> answer", [], mode: :dspy)
+      |> Imp.Saving.dump()
+      |> Map.put("mode", "dspy_3_2_1")
+
+    assert %Imp.Predict.ReAct{mode: :dspy} = loaded = Imp.Saving.load!(state)
+    assert Map.has_key?(loaded.tools, :finish)
+  end
+
   test "rejects ReAct state missing the current mode field" do
     stale_state =
-      Imp.react("question -> answer", [])
+      Imp.Predict.ReAct.new("question -> answer", [])
       |> Imp.Saving.dump()
       |> Map.delete("mode")
 
     assert_raise ArgumentError, ~r/missing required keys: \["mode"\]/, fn ->
-      Imp.Saving.load(stale_state)
+      Imp.Saving.load!(stale_state)
     end
   end
 
@@ -40,22 +53,22 @@ defmodule Imp.SavingReActModeTest do
     state = react_state() |> Map.put("mode", unknown_mode)
 
     assert_raise ArgumentError, ~r/invalid saved ReAct mode/, fn ->
-      Imp.Saving.load(state)
+      Imp.Saving.load!(state)
     end
 
     assert_raise ArgumentError, fn -> String.to_existing_atom(unknown_mode) end
   end
 
   test "rejects non-string tampered mode values" do
-    state = react_state() |> Map.put("mode", :dspy_3_2_1)
+    state = react_state() |> Map.put("mode", :dspy)
 
     assert_raise ArgumentError, ~r/invalid saved ReAct mode/, fn ->
-      Imp.Saving.load(state)
+      Imp.Saving.load!(state)
     end
   end
 
   defp react_state do
-    Imp.react("question -> answer", [])
+    Imp.Predict.ReAct.new("question -> answer", [])
     |> Imp.Saving.dump()
   end
 
@@ -64,6 +77,6 @@ defmodule Imp.SavingReActModeTest do
     |> Imp.Saving.dump()
     |> Jason.encode!()
     |> Jason.decode!()
-    |> Imp.Saving.load()
+    |> Imp.Saving.load!()
   end
 end

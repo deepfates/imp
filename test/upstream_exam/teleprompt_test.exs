@@ -44,7 +44,7 @@ defmodule UpstreamExam.TelepromptTest do
     end
   end
 
-  defp static_lm(handler), do: %{module: Imp.LM.Static, opts: [handler: handler]}
+  defp static_lm(handler), do: Imp.LM.Static.new(handler: handler)
 
   # Upstream trainset (test_bootstrap.py).
   defp bootstrap_trainset do
@@ -110,7 +110,7 @@ defmodule UpstreamExam.TelepromptTest do
 
     # Upstream asserts compiled_student._compiled is set; Imp has no mutable
     # compilation flag — the optimizer report is the compilation evidence.
-    assert %Imp.Predict.Predict{} = compiled
+    assert %Imp.Predict{} = compiled
     assert %Report{} = Report.fetch(compiled)
   end
 
@@ -212,7 +212,7 @@ defmodule UpstreamExam.TelepromptTest do
     ]
 
     compiled = RandomSearch.compile(optimizer, student, trainset, nil, teacher: teacher)
-    assert %Imp.Predict.Predict{} = compiled
+    assert %Imp.Predict{} = compiled
   end
 
   # ---------------------------------------------------------------------------
@@ -411,7 +411,7 @@ defmodule UpstreamExam.TelepromptTest do
         error -> {:raised, error}
       end
 
-    refute match?({:ok, %Imp.Predict.Predict{}}, result) and
+    refute match?({:ok, %Imp.Predict{}}, result) and
              Report.fetch(elem(result, 1)) == nil
   end
 
@@ -473,7 +473,7 @@ defmodule UpstreamExam.TelepromptTest do
       Imp.Optimizer.GEPA.new(metric, reflection_lm: reflection_lm)
       |> Imp.Optimizer.GEPA.compile(student, trainset, trainset)
 
-    assert %Imp.Predict.Predict{} = optimized
+    assert %Imp.Predict{} = optimized
 
     assert Imp.Optimizer.GEPA.Candidate.from_program(optimized) == %{
              main: "Answer with the exact expected output."
@@ -502,17 +502,12 @@ defmodule UpstreamExam.TelepromptTest do
       %__MODULE__{
         classifier:
           Imp.predict("input -> category",
-            lm: %{
-              module: Imp.LM.Static,
-              opts: [handler: fn _messages, _opts -> %{category: "test_category"} end]
-            }
+            lm:
+              Imp.LM.Static.new(handler: fn _messages, _opts -> %{category: "test_category"} end)
           ),
         generator:
           Imp.predict("category, input -> output",
-            lm: %{
-              module: Imp.LM.Static,
-              opts: [handler: fn _messages, _opts -> %{output: "test_output"} end]
-            }
+            lm: Imp.LM.Static.new(handler: fn _messages, _opts -> %{output: "test_output"} end)
           )
       }
     end
@@ -783,7 +778,7 @@ defmodule UpstreamExam.TelepromptTest do
       )
       |> Imp.Optimizer.GEPA.compile(student, trainset, trainset)
 
-    assert %Imp.Predict.Predict{} = result
+    assert %Imp.Predict{} = result
 
     assert_received :external_reflection_lm_called,
                     "External reflection LM should have been called by the custom proposer"
@@ -817,7 +812,7 @@ defmodule UpstreamExam.TelepromptTest do
       Imp.Optimizer.GEPA.new(metric, reflection_lm: reflection_lm, generations: 2)
       |> Imp.Optimizer.GEPA.compile_with_report(student, trainset, trainset)
 
-    assert %Imp.Predict.Predict{} = result
+    assert %Imp.Predict{} = result
 
     # Upstream asserts "Exception during reflection/proposal" never surfaces;
     # Imp records reflection failures as loud report errors, so none of the

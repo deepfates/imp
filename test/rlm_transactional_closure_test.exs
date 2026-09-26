@@ -107,14 +107,12 @@ missing()|},
     {:ok, actions} = Agent.start_link(fn -> actions end)
     {signature, opts} = Keyword.pop(opts, :signature, "question -> answer")
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           Agent.get_and_update(actions, fn [action | rest] -> {action, rest} end)
         end
-      ]
-    }
+      )
 
     Imp.Predict.RLM.new(signature, Keyword.put(opts, :lm, lm))
   end

@@ -522,11 +522,11 @@ surface. Ranked by owner-steer relevance (API boundary first):
    response drops non-first choices); LMs honoring the list contract
    (`Imp.LM.Static`, custom clients) support it.
 2. **FIXED (de-hzcv)** — extra inputs now warn loudly
-   (test_extra_fields_warning): `Imp.Predict.Predict.warn_extra_inputs/3`
+   (test_extra_fields_warning): `Imp.Predict.warn_extra_inputs/3`
    matches DSPy's logger.warning-and-proceed semantics.
 3. **FIXED (de-hzcv)** — input type-mismatch warnings (the 16-test warning
    family): with the new `warn_on_type_mismatch` setting on (default true,
-   as upstream), `Imp.Predict.Predict` soft-validates each provided input
+   as upstream), `Imp.Predict` soft-validates each provided input
    against its field's declared type/enum/array-items and logs a warning
    ("type mismatch for field '...': expected ...") while the call proceeds —
    DSPy's logger.warning semantics, at the same boundary as the extra-inputs
@@ -554,7 +554,7 @@ surface. Ranked by owner-steer relevance (API boundary first):
    `{:error, {:best_of_n_fail_count_exceeded, reason}}` (defaults to `n`,
    matching upstream's `fail_count or N`).
 6. **FIXED (de-hzcv)** — per-prediction usage ledger (test_lm_usage*):
-   with the `:track_usage` setting on, `Imp.Predict.Predict.call` runs in an
+   with the `:track_usage` setting on, `Imp.Predict.call` runs in an
    `Imp.Usage` tracker and `Imp.Prediction.get_lm_usage/1` returns the
    per-model merged usage, as upstream's `Prediction.get_lm_usage()` does.
 7. **FIXED (de-hzcv)** — RLM rejects reserved tool names
@@ -569,7 +569,7 @@ surface. Ranked by owner-steer relevance (API boundary first):
    loudly required — the default machinery cannot mask a missing input.
 9. **FIXED (de-hzcv)** — per-call LM kwargs pass-through
    (test_predicted_outputs_piped_from_predict_to_lm_call):
-   `Imp.Predict.Predict.call/3` takes a per-call config keyword list merged
+   `Imp.Predict.call/3` takes a per-call config keyword list merged
    over the program config for that invocation only (the program is not
    mutated); every entry — including a predicted-outputs `prediction`
    payload — reaches the LM request. Signature inputs never do.
@@ -672,11 +672,11 @@ and propagate telemetry lineage into every worker.
 | test_reset_method | n/a | In-place mutable reset; Imp programs are immutable values. |
 | test_lm_after_dump_and_load_state | n/a | litellm LM kwargs dump_state contract; Imp LMs are validated refs / portable ReqLLM clients. |
 | test_call_method | pass | |
-| test_instructions_after_dump_and_load_state | pass | `Imp.dump/1` → `Imp.load/1` preserves "original instructions". |
+| test_instructions_after_dump_and_load_state | pass | `Imp.dump/1` → `Imp.load!/1` preserves "original instructions". |
 | test_demos_after_dump_and_load_state | pass | Demos survive dump → JSON round trip → load with content intact ("¿Qué tal?"). |
 | test_typed_demos_after_dump_and_load_state | n/a | pydantic models inside demos. |
 | test_typed_demos_after_dump_and_load_state (commented duplicate) | n/a | Commented out upstream (TypedPredictor removed). |
-| test_signature_fields_after_dump_and_load_state | pass (adapted) | `Imp.save!/load!` file round trip; loaded signature dump equals the original and differs from a maliciously re-declared one. (Imp.load! returns the program; no merge-into-instance surface.) |
+| test_signature_fields_after_dump_and_load_state | pass (adapted) | `Imp.save!/read!` file round trip; loaded signature dump equals the original and differs from a maliciously re-declared one. (Imp.read! returns the program; no merge-into-instance surface.) |
 | test_lm_field_after_dump_and_load_state | n/a | pickle + litellm LM state. |
 | test_load_ignores_serialized_endpoint_override_by_default | n/a | litellm endpoint-override security plumbing. Imp never serializes provider endpoints — non-portable LMs fail loudly at dump (portable-LM doctrine), so the attack surface does not exist. |
 | test_load_allows_serialized_endpoint_override_with_opt_in | n/a | Same. |
@@ -713,7 +713,7 @@ and propagate telemetry lineage into every worker.
 | test_per_module_history_size_limit | n/a | No mutable per-module history on immutable programs; observability owns history. |
 | test_per_module_history_disabled | n/a | Same. |
 | test_input_field_default_value | pass (was blocked) | Fixed by de-hzcv gap #8: `default:` on an input field fills the omitted input before the checks; the default value reaches the rendered prompt. The port also pins that a field WITHOUT a default stays a loud `{:error, {:missing_input_fields, _}}`. |
-| test_extra_fields_warning | pass (was blocked) | Fixed by de-hzcv gap #2: `Imp.Predict.Predict.warn_extra_inputs/3` logs a per-call warning ("not in signature", offending keys, expected keys) and the call proceeds — DSPy's exact semantics (logger.warning, extras ignored). ReActV2 warns at its own entry (it filters inputs before Predict); PoT/CodeAct loop-state carrier keys and RAG-consumed query fields are documented exemptions. |
+| test_extra_fields_warning | pass (was blocked) | Fixed by de-hzcv gap #2: `Imp.Predict.warn_extra_inputs/3` logs a per-call warning ("not in signature", offending keys, expected keys) and the call proceeds — DSPy's exact semantics (logger.warning, extras ignored). ReActV2 warns at its own entry (it filters inputs before Predict); PoT/CodeAct loop-state carrier keys and RAG-consumed query fields are documented exemptions. |
 | test_warning_images | blocked | Warning subsystem now exists (gap #3), but there is no Image SIGNATURE field type to declare a mismatch against (Image is an adapter content type), and the string-sniffing `dspy.Image(...)` constructor is n/a. |
 | test_type_mismatch_warning | pass (was blocked) | Fixed by de-hzcv gap #3: string on an `:integer` field logs "type mismatch for field 'count': expected integer" and the call proceeds. |
 | test_correct_types_no_warning | pass (was n/a) | Meaningful now the warning subsystem exists: correct types produce no extra-field and no type-mismatch warnings. |
@@ -768,7 +768,7 @@ step/trace surface.
 
 ## tests/predict/test_react.py (9)
 
-Ports run ReAct in `:dspy_3_2_1` mode (the faithful reproduction of
+Ports run ReAct in `:dspy` mode (the faithful reproduction of
 dspy/predict/react.py). DSPy's `result.trajectory` dict maps to Imp's
 `:history` entries (`%{thought, tool, arguments, result}` per tool call).
 

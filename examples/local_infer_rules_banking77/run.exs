@@ -171,7 +171,7 @@ defmodule LocalInferRulesBanking77.Runner do
   defp fresh do
     paths = paths!()
     {job, rows} = preflight!(paths, false)
-    selected = Imp.load!(paths.saved_program)
+    selected = Imp.read!(paths.saved_program)
     {:ok, rebound} = TrainingJob.rebind(job, selected)
     observer = observer!()
     observed = Imp.with_lm(rebound, observed(Imp.ProgramAccess.lm(rebound), observer, :task))

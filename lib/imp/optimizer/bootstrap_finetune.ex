@@ -1202,11 +1202,11 @@ defmodule Imp.Optimizer.BootstrapFinetune do
 
   defp executable_program?(_program), do: false
 
-  defp resolve_adapter(%Imp.Predict.Predict{dynamic_adapter?: true}),
+  defp resolve_adapter(%Imp.Predict{dynamic_adapter?: true}),
     do: Imp.Settings.get().adapter
 
-  defp resolve_adapter(%Imp.Predict.Predict{adapter: nil}), do: Imp.Settings.get().adapter
-  defp resolve_adapter(%Imp.Predict.Predict{adapter: adapter}), do: adapter
+  defp resolve_adapter(%Imp.Predict{adapter: nil}), do: Imp.Settings.get().adapter
+  defp resolve_adapter(%Imp.Predict{adapter: adapter}), do: adapter
 
   defp message_role(%{role: "system"}), do: :system
   defp message_role(%{role: "user"}), do: :user

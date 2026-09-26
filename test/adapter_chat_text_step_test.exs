@@ -93,9 +93,9 @@ defmodule AdapterChatTextStepTest do
   test "a prose step costs one LM call: no JSON-adapter fallback" do
     lm = counting_lm("I have nothing to look up.")
 
-    program = Imp.Predict.Predict.new(react_signature(), lm: lm)
+    program = Imp.Predict.new(react_signature(), lm: lm)
 
-    assert {:ok, prediction} = Imp.Predict.Predict.call(program, %{question: "Capital?"})
+    assert {:ok, prediction} = Imp.Predict.call(program, %{question: "Capital?"})
     assert Imp.get(prediction, :next_thought) == "I have nothing to look up."
     assert Imp.get(prediction, :tool_calls) == []
     assert call_count() == 1
@@ -121,9 +121,9 @@ defmodule AdapterChatTextStepTest do
         end
       )
 
-    program = Imp.Predict.Predict.new(plain, lm: lm)
+    program = Imp.Predict.new(plain, lm: lm)
 
-    assert {:ok, prediction} = Imp.Predict.Predict.call(program, %{question: "Capital?"})
+    assert {:ok, prediction} = Imp.Predict.call(program, %{question: "Capital?"})
     assert Imp.get(prediction, :answer) == "Paris"
     assert call_count() == 2
   end

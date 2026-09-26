@@ -319,9 +319,8 @@ defmodule ProductionAdapterPersistenceTest do
     # which is now capability-gated (dee-ps19). This LM declares no capability
     # (a plain configured-map test double), so like DSPy's BaseLM default the
     # JSON fallback retry sends NO response_format.
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, opts ->
           send(parent, {:lm_call, messages, opts})
 
@@ -337,8 +336,7 @@ defmodule ProductionAdapterPersistenceTest do
             "[[ ## answer ## ]]\nParis\n[[ ## completed ## ]]"
           end
         end
-      ]
-    }
+      )
 
     program =
       Imp.predict("question -> answer: string, confidence: number",
@@ -374,15 +372,13 @@ defmodule ProductionAdapterPersistenceTest do
   test "predict can disable chat JSON fallback for strict single-call behavior" do
     parent = self()
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, opts ->
           send(parent, {:lm_call, messages, opts})
           "[[ ## answer ## ]]\nParis\n[[ ## completed ## ]]"
         end
-      ]
-    }
+      )
 
     program =
       Imp.predict("question -> answer: string, confidence: number",
@@ -464,7 +460,7 @@ defmodule ProductionAdapterPersistenceTest do
       Path.join(System.tmp_dir!(), "Imp-save-#{System.unique_integer([:positive])}.json")
 
     assert :ok = Imp.Saving.save!(program, path)
-    loaded = Imp.Saving.load!(path)
+    loaded = Imp.Saving.read!(path)
     File.rm(path)
 
     assert loaded.adapter == Imp.Adapter.JSON
@@ -498,7 +494,7 @@ defmodule ProductionAdapterPersistenceTest do
     File.write!(path, Jason.encode!(tampered))
 
     assert_raise ArgumentError, ~r/payload checksum mismatch/, fn ->
-      Imp.Saving.load!(path)
+      Imp.Saving.read!(path)
     end
 
     assert :ok = Imp.Saving.save!(original, path)
@@ -507,7 +503,7 @@ defmodule ProductionAdapterPersistenceTest do
       Imp.Saving.save!(%Imp.Predict.BestOfN{}, path)
     end
 
-    assert %Imp.Predict.Predict{} = Imp.Saving.load!(path)
+    assert %Imp.Predict{} = Imp.Saving.read!(path)
   end
 
   test "file load rejects an unwrapped program state" do
@@ -516,18 +512,18 @@ defmodule ProductionAdapterPersistenceTest do
     File.write!(path, Jason.encode!(Imp.Saving.dump(Imp.predict("question -> answer"))))
 
     assert_raise ArgumentError, ~r/not a checksummed program artifact envelope/, fn ->
-      Imp.Saving.load!(path)
+      Imp.Saving.read!(path)
     end
   end
 
   test "portable structural program types round-trip and remain executable" do
     comparison = Imp.Predict.MultiChainComparison.new("question -> answer", m: 2)
-    loaded_comparison = comparison |> Imp.Saving.dump() |> Imp.Saving.load()
+    loaded_comparison = comparison |> Imp.Saving.dump() |> Imp.Saving.load!()
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{rationale: "agreed", answer: "Paris"} end]
-    }
+    lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts -> %{rationale: "agreed", answer: "Paris"} end
+      )
 
     assert {:ok, prediction} =
              Imp.context([lm: lm], fn ->
@@ -550,7 +546,7 @@ defmodule ProductionAdapterPersistenceTest do
     loaded_knn =
       Imp.Predict.KNN.new(1, examples, vectorizer: Imp.Embeddings.BagOfWords)
       |> Imp.Saving.dump()
-      |> Imp.Saving.load()
+      |> Imp.Saving.load!()
 
     assert [%Imp.Example{} = nearest] = Imp.Predict.KNN.call(loaded_knn, %{question: "france"})
     assert Imp.Example.get(nearest, :answer) == "Paris"
@@ -584,13 +580,10 @@ defmodule ProductionAdapterPersistenceTest do
       Enum.map(programs, fn program ->
         program
         |> Imp.dump(registry: registry)
-        |> Imp.load(registry: registry)
+        |> Imp.load!(registry: registry)
       end)
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-    }
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "Paris"} end)
 
     Enum.each(loaded, fn program ->
       assert {:ok, prediction} =
@@ -602,7 +595,7 @@ defmodule ProductionAdapterPersistenceTest do
     state = Imp.dump(hd(programs), registry: registry)
 
     assert_raise ArgumentError, ~r/unknown registry callback "answer_metric"/, fn ->
-      Imp.load(state)
+      Imp.load!(state)
     end
   end
 
@@ -612,7 +605,7 @@ defmodule ProductionAdapterPersistenceTest do
     registry = Imp.Saving.Registry.new(lookup_runner: lookup, tool_policy: policy)
     tool = Imp.tool(:lookup, "lookup facts", lookup, schema: %{query: :string})
 
-    react = Imp.react("question -> answer", [tool], max_iters: 0, tool_policy: policy)
+    react = Imp.Predict.ReAct.new("question -> answer", [tool], max_iters: 0, tool_policy: policy)
     code_act = Imp.code_act("question -> answer", [tool], max_iters: 0, tool_policy: policy)
 
     rlm =
@@ -633,7 +626,7 @@ defmodule ProductionAdapterPersistenceTest do
         state = Imp.dump(program, registry: registry)
         refute inspect(state) =~ "not-persisted"
         refute inspect(state) =~ "also-not-persisted"
-        Imp.load(state, registry: registry)
+        Imp.load!(state, registry: registry)
       end)
 
     assert Imp.Tool.call(loaded_react.tools[:lookup], %{query: "beam"}) == "found beam"
@@ -676,12 +669,11 @@ defmodule ProductionAdapterPersistenceTest do
 
     [loaded_knn, loaded_ensemble, loaded_semantic, loaded_grounded] =
       Enum.map([knn_program, ensemble, semantic, grounded], fn program ->
-        program |> Imp.dump(registry: registry) |> Imp.load(registry: registry)
+        program |> Imp.dump(registry: registry) |> Imp.load!(registry: registry)
       end)
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
 
@@ -710,8 +702,7 @@ defmodule ProductionAdapterPersistenceTest do
               %{answer: "Paris"}
           end
         end
-      ]
-    }
+      )
 
     Imp.context([lm: lm], fn ->
       assert {:ok, knn_prediction} = Imp.call(loaded_knn, %{question: "france"})
@@ -745,12 +736,9 @@ defmodule ProductionAdapterPersistenceTest do
     state = Imp.dump(original)
     refute inspect(state) =~ "must-not-survive"
 
-    loaded = Imp.load(state)
+    loaded = Imp.load!(state)
 
-    replacement = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "rebound"} end]
-    }
+    replacement = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "rebound"} end)
 
     rebound = Imp.with_lm(loaded, replacement)
 
@@ -765,13 +753,10 @@ defmodule ProductionAdapterPersistenceTest do
       Path.join(System.tmp_dir!(), "Imp-dynamic-save-#{System.unique_integer([:positive])}.json")
 
     assert :ok = Imp.Saving.save!(program, path)
-    loaded = Imp.Saving.load!(path)
+    loaded = Imp.Saving.read!(path)
     File.rm(path)
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "settings-ok"} end]
-    }
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "settings-ok"} end)
 
     assert {:ok, prediction} =
              Imp.context([lm: lm, adapter: Imp.Adapter.Chat], fn ->
@@ -802,7 +787,7 @@ defmodule ProductionAdapterPersistenceTest do
       )
 
     assert :ok = Imp.Saving.save!(compiled, path)
-    loaded = Imp.Saving.load!(path)
+    loaded = Imp.Saving.read!(path)
     File.rm(path)
 
     assert %Imp.Optimizer.Report{optimizer: :labeled_few_shot} =
@@ -823,7 +808,7 @@ defmodule ProductionAdapterPersistenceTest do
       "question -> answer"
       |> Imp.predict(demos: [demo])
       |> Imp.Saving.dump()
-      |> Imp.Saving.load()
+      |> Imp.Saving.load!()
 
     assert [%Imp.Example{} = loaded_demo] = loaded.demos
     assert Imp.Example.to_map(loaded_demo) == Imp.Example.to_map(demo)
@@ -837,9 +822,8 @@ defmodule ProductionAdapterPersistenceTest do
   end
 
   test "save/load preserves local memory RAG programs" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
 
@@ -847,8 +831,7 @@ defmodule ProductionAdapterPersistenceTest do
             do: %{answer: "Paris"},
             else: %{answer: "unknown"}
         end
-      ]
-    }
+      )
 
     rag =
       "question, context -> answer"
@@ -861,7 +844,7 @@ defmodule ProductionAdapterPersistenceTest do
       Path.join(System.tmp_dir!(), "Imp-rag-save-#{System.unique_integer([:positive])}.json")
 
     assert :ok = Imp.Saving.save!(rag, path)
-    loaded = Imp.Saving.load!(path)
+    loaded = Imp.Saving.read!(path)
     File.rm(path)
 
     assert %Imp.Predict.RAG{retriever: %Imp.Retrieve.Memory{}, program: program} = loaded
@@ -887,7 +870,7 @@ defmodule ProductionAdapterPersistenceTest do
     assert rag.k == 0
     state = Imp.Saving.dump(rag)
     assert state["k"] == 0
-    assert %Imp.Predict.RAG{k: 0} = Imp.Saving.load(state)
+    assert %Imp.Predict.RAG{k: 0} = Imp.Saving.load!(state)
   end
 
   test "save/load preserves multi-hop RAG settings and rejects missing current fields" do
@@ -901,20 +884,17 @@ defmodule ProductionAdapterPersistenceTest do
 
     state = Imp.Saving.dump(rag)
     assert state["hops"] == 2
-    assert %Imp.Predict.RAG{hops: 2} = Imp.Saving.load(state)
+    assert %Imp.Predict.RAG{hops: 2} = Imp.Saving.load!(state)
 
     stale_state = Map.delete(state, "hops")
 
     assert_raise ArgumentError, ~r/missing required keys: \["hops"\]/, fn ->
-      Imp.Saving.load(stale_state)
+      Imp.Saving.load!(stale_state)
     end
   end
 
   test "save/load preserves ProgramOfThought programs" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{program: "x * 2"} end]
-    }
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{program: "x * 2"} end)
 
     program =
       Imp.Predict.ProgramOfThought.new("x -> doubled",
@@ -926,12 +906,12 @@ defmodule ProductionAdapterPersistenceTest do
       Path.join(System.tmp_dir!(), "Imp-pot-save-#{System.unique_integer([:positive])}.json")
 
     assert :ok = Imp.Saving.save!(program, path)
-    loaded = Imp.Saving.load!(path)
+    loaded = Imp.Saving.read!(path)
     File.rm(path)
 
     assert %Imp.Predict.ProgramOfThought{
              signature: %Imp.Signature{},
-             predict: %Imp.Predict.Predict{},
+             predict: %Imp.Predict{},
              output_field: :doubled
            } = loaded
 
@@ -953,7 +933,7 @@ defmodule ProductionAdapterPersistenceTest do
       |> Imp.program_of_thought(output_field: :doubled)
       |> Imp.Optimizer.InstructionSearch.put_instruction("Double exactly.")
       |> Imp.Saving.dump()
-      |> Imp.Saving.load()
+      |> Imp.Saving.load!()
 
     assert program.signature.instructions == "Double exactly."
     assert program.predict.signature.instructions == "Double exactly."

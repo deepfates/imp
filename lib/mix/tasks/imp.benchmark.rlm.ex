@@ -82,10 +82,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Rlm do
   defp direct_prompt_row(example) do
     answer = answer_from_context(example["question"], example["context"])
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: answer} end]
-    }
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: answer} end)
 
     program = Imp.predict("question, context -> answer", lm: lm)
 
@@ -106,10 +103,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Rlm do
     retriever = Imp.memory(Enum.map(docs, &%{text: &1}), k: 2)
     answer = answer_from_context(example["question"], example["context"])
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: answer} end]
-    }
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: answer} end)
 
     program = Imp.rag(Imp.predict("question, context -> answer", lm: lm), retriever, k: 2)
 
@@ -150,24 +144,20 @@ defmodule Mix.Tasks.Imp.Benchmark.Rlm do
     {:ok, action_queue} = Agent.start_link(fn -> actions end)
 
     try do
-      controller_lm = %{
-        module: Imp.LM.Static,
-        opts: [
+      controller_lm =
+        Imp.LM.Static.new(
           handler: fn _messages, _opts ->
             Agent.get_and_update(action_queue, fn [action | rest] -> {action, rest} end)
           end
-        ]
-      }
+        )
 
-      sub_lm = %{
-        module: Imp.LM.Static,
-        opts: [
+      sub_lm =
+        Imp.LM.Static.new(
           handler: fn messages, _opts ->
             send(parent, {:rlm_benchmark_subcall, messages})
             %{answer: "supporting fact"}
           end
-        ]
-      }
+        )
 
       rlm =
         Imp.rlm("context, question -> answer",

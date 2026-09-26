@@ -91,7 +91,7 @@ defmodule PropertyInvariantsTest do
           metadata: %{"source" => "property"}
         )
 
-      loaded = program |> Imp.Saving.dump() |> Imp.Saving.load()
+      loaded = program |> Imp.Saving.dump() |> Imp.Saving.load!()
 
       assert Imp.Saving.dump(loaded) == Imp.Saving.dump(program)
     end

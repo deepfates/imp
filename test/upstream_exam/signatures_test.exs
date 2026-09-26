@@ -35,10 +35,10 @@ defmodule UpstreamExam.SignaturesTest do
   defp capture_lm(response_fun) do
     test_pid = self()
 
-    fn messages, opts ->
+    Imp.Test.FunLM.new(fn messages, opts ->
       send(test_pid, {:lm_call, messages, opts})
       response_fun.(messages)
-    end
+    end)
   end
 
   # ---------------------------------------------------------------------------
@@ -206,7 +206,7 @@ defmodule UpstreamExam.SignaturesTest do
 
     # Upstream: tests/signatures/test_signature.py::test_multiline_instructions
     test "multiline instructions" do
-      lm = fn _messages, _opts -> {:ok, %{output: "short answer"}} end
+      lm = Imp.Test.FunLM.new(fn _messages, _opts -> {:ok, %{output: "short answer"}} end)
 
       signature =
         Imp.signature(" -> output", "First line\nSecond line\n    Third line")

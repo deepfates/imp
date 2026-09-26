@@ -130,7 +130,7 @@ defmodule ProtocolTrainingProviderLifecycleTest do
     assert Imp.get(prediction, :answer) == "4"
 
     assert %Imp.Clients.ReqLLM{model: "openai:ft:gpt-training-test:imp:live-gate"} =
-             Imp.ProgramAccess.lm(Imp.load!(path))
+             Imp.ProgramAccess.lm(Imp.read!(path))
 
     assert {:ok, cancelled} = Imp.Clients.TrainingJob.cancel(job)
     assert cancelled.status == :cancelled
@@ -217,7 +217,7 @@ defmodule ProtocolTrainingProviderLifecycleTest do
 
     assert {:ok, prediction} = Imp.call(compiled, %{question: "2+2?"})
     assert Imp.get(prediction, :answer) == "4"
-    assert Imp.ProgramAccess.lm(Imp.load!(path)).model == "dbx:model:imp-live-gate"
+    assert Imp.ProgramAccess.lm(Imp.read!(path)).model == "dbx:model:imp-live-gate"
 
     assert {:ok, cancelled} = Imp.Clients.TrainingJob.cancel(job)
     assert cancelled.status == :cancelled

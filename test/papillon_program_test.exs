@@ -8,14 +8,13 @@ defmodule Imp.BenchmarkTruth.PapillonProgramTest do
     defstruct [:error]
 
     def generate(%__MODULE__{error: error}, _messages, _opts), do: {:error, error}
-    def generate(_messages, _opts), do: {:error, :instance_required}
   end
 
   test "constructs the source-faithful ChainOfThought and Predict stages" do
     program = Papillon.new(static_lm(fn _messages -> "external" end))
 
     assert %Imp.Predict.ChainOfThought{} = program.craft_redacted_request
-    assert %Imp.Predict.Predict{} = program.respond_to_query
+    assert %Imp.Predict{} = program.respond_to_query
 
     craft = program.craft_redacted_request.predict.signature
     assert Imp.Signature.input_names(craft) == [:user_query]
@@ -197,10 +196,7 @@ defmodule Imp.BenchmarkTruth.PapillonProgramTest do
   end
 
   defp static_lm(handler) do
-    %{
-      module: Imp.LM.Static,
-      opts: [handler: fn messages, _opts -> handler.(messages) end]
-    }
+    Imp.LM.Static.new(handler: fn messages, _opts -> handler.(messages) end)
   end
 
   defp prompt(messages), do: Enum.map_join(messages, "\n", &Map.get(&1, :content, ""))
