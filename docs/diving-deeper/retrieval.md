@@ -73,7 +73,7 @@ paraphrase. The Weaviate and Databricks retrievers ask a vector search
 service, which ranks by meaning on its side. For retrieval by meaning over
 your own documents, compute embeddings with any provider and rank by
 similarity in your retriever. On the example below, that was the difference
-between 60% and 85–90%.
+between 50–70% and 85–90%.
 
 ## API walkthrough
 
@@ -108,9 +108,9 @@ Enum.map(docs, &{&1.id, &1.score})
 #=> [{"beacon", 3}]
 ```
 
-It always returns `k` documents, including ones that share no word with the
-query; their `:score` is 0. Filter on the score when "nothing matched" should
-mean no context.
+It returns at most `k` documents and leaves out any that share no word with
+the query, so a query that matches nothing gets `{:ok, []}` and the program
+gets no context.
 
 A function is a retriever:
 
@@ -155,7 +155,7 @@ Imp.retrieve(fn _query, _opts -> {:error, :index_offline} end, "refunds")
 #=> {:error, :index_offline}
 
 Imp.retrieve(fn _query, _opts -> raise "connection refused" end, "refunds")
-#=> {:error, {:retriever_failed, :anonymous_retriever, "connection refused"}}
+#=> {:error, {:retriever_failed, :anonymous_retriever, %RuntimeError{message: "connection refused"}}}
 ```
 
 ### `Imp.rag/3`
@@ -177,7 +177,7 @@ router =
 
 routed = Imp.rag(router, retriever, query_field: :ticket, k: 1)
 
-{:ok, prediction} = Imp.call(routed, %{ticket: "I was charged for a plan I cancelled."})
+{:ok, prediction} = Imp.call(routed, %{ticket: "I was charged twice for plans I cancelled."})
 {Imp.get(prediction, :team), Enum.map(prediction.metadata.retrieval.docs, & &1.id)}
 #=> {"atlas", ["atlas"]}
 ```
@@ -198,7 +198,7 @@ offline =
     query_field: :ticket
   )
 
-Imp.call(offline, %{ticket: "I was charged for a plan I cancelled."})
+Imp.call(offline, %{ticket: "I was charged twice for plans I cancelled."})
 #=> {:error, :index_offline}
 ```
 
@@ -256,7 +256,7 @@ by_meaning = fn query, opts ->
 end
 
 Imp.evaluate(by_words, test, Imp.exact_match(:team)).score
-#=> 0.6
+#=> 0.55
 
 Imp.evaluate(
   Imp.rag(router, by_meaning, query_field: :ticket, k: 1),
@@ -267,21 +267,21 @@ Imp.evaluate(
 ~~~
 
 Over three runs on the 20 test tickets, the router scored 0.2–0.4 without
-context (the same router with the signature `ticket -> team`), 0.6 with the
-charter chosen by shared words, and 0.85–0.9 with the charter chosen by
+context (the same router with the signature `ticket -> team`), 0.5–0.7 with
+the charter chosen by shared words, and 0.85–0.9 with the charter chosen by
 meaning, for a few cents in all. By shared words, only 5 of the 20 tickets
-get the right charter, and 5 share no word with any charter at all. "Refund
-attempts fail with a gateway timeout error" is one of those: "Refund" is not
-"refunds", and atlas's charter came back only because it is first in the
-list. The prompt the model saw, which it answered with atlas (the ticket is
-harbor's):
+get the right charter, and 5 share no word with any charter, so they get no
+context at all. "Refund attempts fail with a gateway timeout error" is one of
+those: "Refund" is not "refunds". The prompt the model saw:
 
 ~~~text
 [[ ## ticket ## ]]
 Refund attempts fail with a gateway timeout error.
 
 [[ ## context ## ]]
-atlas owns money: charges, refunds, invoices, plans, taxes, receipts.
+
+
+Respond with a JSON object in the following order of fields: `team` (must be formatted as one of: atlas, harbor, beacon, quill).
 ~~~
 
 With four charters, putting all of them in the prompt also works, and is
@@ -323,7 +323,7 @@ search_charters =
     "Find the squad charters that match a query.",
     fn %{"query" => query} ->
       {:ok, docs} = Imp.retrieve(retriever, query, k: 2)
-      docs |> Enum.filter(&(&1.score > 0)) |> Enum.map_join("\n", & &1.text)
+      Enum.map_join(docs, "\n", & &1.text)
     end,
     schema: %{
       "type" => "object",
