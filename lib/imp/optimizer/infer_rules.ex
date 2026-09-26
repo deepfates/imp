@@ -902,15 +902,12 @@ defmodule Imp.Optimizer.InferRules do
     names
     |> Enum.flat_map(fn name ->
       case fetch_field(fields, name) do
-        {:ok, value} -> ["#{name}: #{format_value(value)}"]
+        {:ok, value} -> ["#{name}: #{Imp.Adapter.Chat.format_value(value)}"]
         :error -> []
       end
     end)
     |> Enum.join("\n")
   end
-
-  defp format_value(value) when is_binary(value), do: value
-  defp format_value(value), do: inspect(value)
 
   defp fetch_field(fields, name) do
     case Map.fetch(fields, name) do

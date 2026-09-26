@@ -157,13 +157,16 @@ defmodule Imp.Adapter.Chat do
   end
 
   defp build_prediction(signature, fields) do
-    # PRESENT fields (even present-nil) are collected and coerced before the
-    # shared fallback/completeness pass. Key presence, never truthiness, decides
-    # whether a model value overrides a default.
+    # Present fields are collected and coerced before the shared
+    # fallback/completeness pass. A present value overrides a default even when
+    # it is falsey ("", [], false); a null is no value, so the field counts as
+    # absent: its default fills it, an optional field is nil, and a required
+    # one is reported missing.
     fields =
       signature.outputs
       |> Enum.filter(&field_present?(fields, &1.name))
       |> Map.new(fn field -> {field.name, fetch_field(fields, field.name)} end)
+      |> Map.reject(fn {_name, value} -> is_nil(value) end)
       |> then(&coerce_fields(signature, &1))
 
     with {:ok, completed} <- Imp.Adapter.OutputFields.complete(signature, fields),
@@ -193,8 +196,9 @@ defmodule Imp.Adapter.Chat do
   end
 
   # Dispatch order matches DSPy's `parse_value`: an enum-constrained string
-  # (DSPy's Literal) gets quote and prefix stripping, a string field gets
-  # Python `str(value)`, everything else takes the typed clauses below.
+  # (DSPy's Literal) gets quote and prefix stripping, a string field given a
+  # non-string value gets its JSON text, everything else takes the typed
+  # clauses below.
   defp coerce_field(field, value) do
     cond do
       is_nil(value) and Imp.Adapter.OutputFields.optional?(field) ->
@@ -918,6 +922,7 @@ defmodule Imp.Adapter.Chat do
   def format_value(%DateTime{} = value), do: DateTime.to_iso8601(value)
   def format_value(%NaiveDateTime{} = value), do: NaiveDateTime.to_iso8601(value)
   def format_value(%Imp.Adapter.Types.Code{} = value), do: Imp.Adapter.Types.Code.format(value)
+  def format_value(%Jason.OrderedObject{} = value), do: py_json_dumps(value)
 
   # A list or map renders as complete, compact JSON with `", "` and `": "`
   # separators. It must never be truncated: a cut structured tool result is one
@@ -954,7 +959,11 @@ defmodule Imp.Adapter.Chat do
     end
   end
 
-  defp dumps(value) when is_map(value) and not is_struct(value) do
+  defp dumps(%Jason.OrderedObject{values: pairs}), do: dumps_pairs(pairs)
+  defp dumps(value) when is_map(value) and not is_struct(value), do: dumps_pairs(value)
+  defp dumps(_value), do: :error
+
+  defp dumps_pairs(value) do
     with {:ok, pairs} <-
            value
            |> Enum.map(fn {key, item} -> {key, item} end)
@@ -969,8 +978,6 @@ defmodule Imp.Adapter.Chat do
       {:ok, ["{", pairs |> Enum.reverse() |> Enum.intersperse(", "), "}"]}
     end
   end
-
-  defp dumps(_value), do: :error
 
   defp dumps_all(items) do
     Enum.reduce_while(items, {:ok, []}, fn item, {:ok, acc} ->
