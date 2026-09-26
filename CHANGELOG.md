@@ -25,9 +25,10 @@ User-visible changes to Imp are recorded here.
 - RLM controller code cannot make a struct. A map literal that named
   `__struct__` was dispatched by every protocol as that struct: a map shaped
   like a `File.Stream` sent `Enum.join` into the `Enumerable` implementation
-  for `File.Stream`, which read the named file. A map literal, `submit/1` and the result of a library call
-  may no longer carry the key, and a library call takes no struct but a range
-  or MapSet and no Elixir module named as a value. A module is not a value at
+  for `File.Stream`, which read the named file. A map literal, `submit/1` and
+  the result of a library call may no longer carry the key, and a library call
+  takes no struct but a range or MapSet and no Elixir module named as a value.
+  A module is not a value at
   all (`m = File` fails with `{:module_value_not_allowed, "File"}`); a sorter
   is `:asc`, `:desc` or a function, since an Erlang module given as a sorter
   had its `compare/2` called, and `Map.from_struct/1` takes no module; and a
