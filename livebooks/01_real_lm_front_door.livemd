@@ -267,7 +267,7 @@ case live_lm.([]) do
 
     %{
       credential_in_artifact?: inspect(state) =~ (api_key || openrouter_key),
-      loadable?: match?({:ok, %Imp.Predict{}}, Imp.load(state))
+      loadable?: match?({:ok, %{__struct__: Imp.Predict}}, Imp.load(state))
     }
 
   :missing_key ->
