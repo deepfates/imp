@@ -2,7 +2,7 @@
 
 User-visible changes to Imp are recorded here.
 
-## 0.5.0 — not yet released
+## 0.5.0 — 2026-09-26
 
 ### Security
 
