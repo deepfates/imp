@@ -60,7 +60,7 @@ defmodule ImpDeployment.AgentOptimization do
   end
 
   defp tool(name, description, token) do
-    Imp.tool(name, description, fn %{account_id: account_id} -> "#{token}:#{account_id}" end,
+    Imp.tool(name, description, fn %{"account_id" => account_id} -> "#{token}:#{account_id}" end,
       schema: %{
         "type" => "object",
         "required" => ["account_id"],

@@ -8,9 +8,9 @@ defmodule Imp.Optimizer.Playbook.EquationSearch do
 
   @doc false
   def solve_tool(arguments) when is_map(arguments) do
-    equation = Map.get(arguments, :equation, Map.get(arguments, "equation"))
-    numbers = Map.get(arguments, :numbers, Map.get(arguments, "numbers"))
-    target = Map.get(arguments, :target, Map.get(arguments, "target"))
+    equation = arguments["equation"]
+    numbers = arguments["numbers"]
+    target = arguments["target"]
 
     result =
       cond do

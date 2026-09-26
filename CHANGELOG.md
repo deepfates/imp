@@ -285,23 +285,29 @@ User-visible changes to Imp are recorded here.
   `Imp.Prediction.complete?/1` is false exactly for `:incomplete`, and
   `Imp.Observability` reads it.
 - `ReActV2` offers `submit` only to a signature that needs it. A task
-  signature with exactly one output of type `:string` gets no `submit` tool:
+  signature with exactly one output of type `:string` and no constraints gets
+  no `submit` tool:
   a step that comes back as text with no tool call is the answer, in that
   one request, with `termination_reason: :answered`, which is how Anthropic's
   tool runner, the OpenAI Agents SDK, LangGraph's ReAct and Pydantic AI end a
   turn. Its history event carries the output, as a `submit`'s does, and the
   answer is not also emitted as a `:reasoning` event. A signature with several
-  outputs, or one non-text output, keeps DSPy's `submit` unchanged.
+  outputs, one non-text output, or one constrained text output (an `enum`, a
+  pattern, an answer shape) keeps DSPy's `submit` unchanged, so the allowed
+  values reach the model in its schema; a step of such a signature that
+  writes text instead of calling `submit` is the `:empty_tool_calls`
+  interruption, and a turn that ends without a valid `submit` is
+  `:incomplete`.
 - A step of a one-text-output signature that calls nothing and says nothing
   is an empty answer: the turn ends there with `termination_reason:
   :answered` and no further request, because saying nothing is how a model
   declines to answer.
 - An interrupted turn of a one-text-output signature (the step limit, a
-  failed request, text the output does not accept) makes one more
+  failed request) makes one more
   request with the same tools as every step and `tool_choice: "auto"`, and its
   text is the answer, with `termination_reason: :last_text`
   and `termination_cause` naming the interruption (`:max_iters`,
-  `:prediction_error`, `:parse_error`, `:invalid_answer`). A completion that says nothing is an empty answer rather
+  `:prediction_error`, `:parse_error`). A completion that says nothing is an empty answer rather
   than an error. A tool call the model makes on that request anyway is not
   run; the text is the answer and the calls are listed in
   `unexecuted_tool_calls`. If the process's `Imp.Deadline` has already
@@ -396,6 +402,10 @@ User-visible changes to Imp are recorded here.
   `:settings` or `:teacher_settings`. `Imp.configure/1`, `Imp.context/2` and an
   optimizer's `:teacher_settings` refuse either key with a message naming where
   it belongs.
+- `ReActV2`'s `submit` and a `finish_on` callback's outputs find a field by
+  the text of its name. A string signature keeps a field name as a string
+  when its atom did not exist yet, so outputs keyed by that atom were never
+  found and the turn ended `:incomplete` with `missing_output_fields`.
 - RLM controller code may call every function of `Enum`, `Keyword`, `List`,
   `Map` and `String` except `String.to_atom`, `List.to_atom`,
   `String.splitter`, `Enum.random`, `Enum.shuffle` and `Enum.take_random`, and
@@ -443,6 +453,47 @@ User-visible changes to Imp are recorded here.
   default of 1 gave `recurse/2` a child and `rlm_query` none. Both now allow
   one level by default; `max_recursion_depth: 0` makes `rlm_query*` a one-shot
   sub-LM query, as the standalone runtime's `max_depth=1` does.
+
+### Signatures
+
+- Numeric bounds are `minimum` and `maximum`, JSON Schema's names, in
+  validation, in the JSON schema and in the rendered prompt, and a validation
+  error's rule is `:minimum` or `:maximum`. `min` and `max` raise an
+  `ArgumentError` naming the key to use; before, the documented
+  `minimum`/`maximum` were ignored. Pydantic's `ge` and `le` still mean the
+  same bounds.
+- Constraint keys are read by one normalizer for validation, the JSON schema
+  and the rendered prompt, so `"min_length"`/`"max_length"` given as strings
+  now constrain validation and the schema too, as they already did the
+  prompt.
+- An `enum` constraint with atom members raises `ArgumentError` when the
+  field is built, showing the string members to write instead. An answer
+  arrives as text and a signature saves as JSON, so `enum: [:atlas]` failed
+  every parse ("must be one of [:atlas, :harbor]"), and returning the atom
+  would have made a program answer differently after `Imp.save!`/`Imp.read!`.
+- A signature refuses a repeated field name, on one side or across the arrow,
+  and names it: the string form raises a signature parse error, the map
+  form and `Imp.Signature.extend/3` raise `ArgumentError`, and `:a` and `"a"`
+  are the same name. Before, only a name on both sides of the arrow raised,
+  and `"q -> a, a"` built two fields called `a`.
+- `json_retries: n` makes up to n retries of a parse failure, each the
+  original request plus the latest failure's message, and stops at the first
+  reply that parses. Before, any n above 0 made one.
+- An arity-3 metric receives `nil` as its trace from `Imp.evaluate/4` and the
+  optimizers' validation scoring, and the program's trace while an optimizer
+  bootstraps demos, as DSPy's `trace=None` has it. Before, evaluation passed
+  the trace too, so a ported metric that scores continuously when evaluated
+  and passes or fails when compiling gave its compile-time answer.
+- `Imp.read!/2` and `Imp.load!/2` load a saved program in a VM that never
+  created the atoms it names: a demo's field names, a RAG program's `query_field` and
+  `context_field`, a memory retriever's document keys, tool names and tool
+  policies, and any atom tag in saved metadata load as strings when the atom
+  does not exist, and no atom is created. `Imp.Example`, `Imp.Prediction` and
+  the tool index look them up by text; a caller reading saved metadata
+  directly may find `metadata["my_flag"]` where it expected
+  `metadata[:my_flag]`, which is `nil` in a VM where `:my_flag` does not
+  exist yet. It raised `ArgumentError` ("not an already existing
+  atom"), so a router saved by one process failed to load in a fresh one.
 
 ### Errors and shapes
 
@@ -558,6 +609,15 @@ Every change here is breaking for code that matches on the old shape.
   come back keyed either way. Data read from JSON now keeps its string keys:
   a history turn loaded with `Imp.History.load!/1`, or a demo field a
   signature does not declare in a saved optimizer artifact.
+- A tool receives its arguments as a map with string keys, from every runtime
+  (ReActV2 and its `finish_on` callbacks, ReAct, Avatar, CodeAct, RLM) and
+  from `Imp.Tool.call/2`, which turns atom keys into strings at every depth.
+  In 0.4.0 a key became an atom when that atom already existed in the VM, so
+  the same tool could see either shape. Match on strings: `fn %{query: q}`
+  becomes `fn %{"query" => q}`. Tool policies and `unexecuted_tool_calls` see
+  the same string keys. The built-in tools follow: `Imp.ACP.Host`'s
+  `fetch` tool and `Imp.Optimizer.Playbook.EquationSearch.solve_tool/0` read
+  string keys only.
 
 ### Public surface: what is exported
 
@@ -704,6 +764,13 @@ Every change here is breaking for code that matches on the old shape.
   `Imp.Datasets.MATH.read!/1` and `Imp.Datasets.DataLoader.read!/3`.
   The `load` of `Imp.Datasets.Colors`, which builds examples from records and raises,
   is `load!/1`.
+
+### Retrieval
+
+- `Imp.Retrieve.Memory` (`Imp.memory/2`) returns only documents that share a
+  word with the query, up to `k`. It returned `k` documents whatever they
+  scored, so a document with no word in common came back with `score: 0`
+  because it came first in the list.
 
 ## 0.4.0 — 2026-09-17
 

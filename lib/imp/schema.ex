@@ -235,13 +235,13 @@ defmodule Imp.Schema do
 
   defp validate_object(errors, _field, _value, _constraints), do: errors
 
-  defp maybe_min(errors, field, value, %{min: min}) when value < min,
-    do: errors ++ [error(field, :min, "must be >= #{min}")]
+  defp maybe_min(errors, field, value, %{minimum: min}) when value < min,
+    do: errors ++ [error(field, :minimum, "must be >= #{min}")]
 
   defp maybe_min(errors, _field, _value, _constraints), do: errors
 
-  defp maybe_max(errors, field, value, %{max: max}) when value > max,
-    do: errors ++ [error(field, :max, "must be <= #{max}")]
+  defp maybe_max(errors, field, value, %{maximum: max}) when value > max,
+    do: errors ++ [error(field, :maximum, "must be <= #{max}")]
 
   defp maybe_max(errors, _field, _value, _constraints), do: errors
 
@@ -303,8 +303,8 @@ defmodule Imp.Schema do
     |> maybe_put_default(field)
     |> maybe_put("enum", fetch_meta(constraints, :enum))
     |> maybe_put("x-imp-answerShape", fetch_meta(constraints, :answer_shape))
-    |> maybe_put("minimum", fetch_meta(constraints, :min))
-    |> maybe_put("maximum", fetch_meta(constraints, :max))
+    |> maybe_put("minimum", fetch_meta(constraints, :minimum))
+    |> maybe_put("maximum", fetch_meta(constraints, :maximum))
     |> maybe_put("minLength", fetch_meta(constraints, :min_length))
     |> maybe_put("maxLength", fetch_meta(constraints, :max_length))
     |> maybe_put("pattern", fetch_meta(constraints, :pattern))
@@ -356,8 +356,8 @@ defmodule Imp.Schema do
     base_schema(nested_type(spec, :string), spec)
     |> maybe_put("enum", fetch_meta(spec, :enum))
     |> maybe_put("x-imp-answerShape", fetch_meta(spec, :answer_shape))
-    |> maybe_put("minimum", fetch_meta(spec, :min))
-    |> maybe_put("maximum", fetch_meta(spec, :max))
+    |> maybe_put("minimum", fetch_meta(spec, :minimum))
+    |> maybe_put("maximum", fetch_meta(spec, :maximum))
     |> maybe_put("minLength", fetch_meta(spec, :min_length))
     |> maybe_put("maxLength", fetch_meta(spec, :max_length))
     |> maybe_put("pattern", fetch_meta(spec, :pattern))
@@ -442,13 +442,28 @@ defmodule Imp.Schema do
   defp delete_meta(map, key) when is_atom(key),
     do: map |> Map.delete(key) |> Map.delete(Atom.to_string(key))
 
-  defp normalize_constraints(%{} = constraints) do
+  @doc false
+  # Constraint keys to their one internal spelling. The keys are JSON Schema's
+  # (`minimum`, `maximum`), because the schema a model reads is JSON Schema;
+  # `min` and `max` raise rather than being quietly ignored. The keys of
+  # `properties` are field names and are kept as given.
+  def normalize_constraints(%{} = constraints) do
     Map.new(constraints, fn {key, value} ->
-      {normalize_constraint_key(key), normalize_constraint_value(value)}
+      case normalize_constraint_key(key) do
+        :properties when is_map(value) ->
+          {:properties,
+           Map.new(value, fn {name, spec} -> {name, normalize_constraints(spec)} end)}
+
+        :enum when is_list(value) ->
+          {:enum, check_enum_members!(value)}
+
+        key ->
+          {key, normalize_constraint_value(value)}
+      end
     end)
   end
 
-  defp normalize_constraints(other), do: other
+  def normalize_constraints(other), do: other
 
   defp normalize_constraint_value(%{} = value), do: normalize_constraints(value)
 
@@ -458,28 +473,31 @@ defmodule Imp.Schema do
   defp normalize_constraint_value(value), do: value
 
   defp normalize_constraint_key(:answerShape), do: :answer_shape
-  # The pydantic spellings ge/le are Imp's inclusive :min/:max (dspy field.py
-  # PYDANTIC_CONSTRAINT_MAP; rendered by Imp.Adapter.FieldConstraints).
-  defp normalize_constraint_key(:ge), do: :min
-  defp normalize_constraint_key(:le), do: :max
+  # The pydantic spellings ge/le are the inclusive :minimum/:maximum (dspy
+  # field.py PYDANTIC_CONSTRAINT_MAP; rendered by Imp.Adapter.FieldConstraints).
+  defp normalize_constraint_key(:ge), do: :minimum
+  defp normalize_constraint_key(:le), do: :maximum
+  defp normalize_constraint_key(key) when key in [:min, :max, "min", "max"], do: refuse_key(key)
   defp normalize_constraint_key(key) when is_atom(key), do: key
   defp normalize_constraint_key("minLength"), do: :min_length
   defp normalize_constraint_key("maxLength"), do: :max_length
   defp normalize_constraint_key("answerShape"), do: :answer_shape
   defp normalize_constraint_key("anyOf"), do: :any_of
   defp normalize_constraint_key("additionalProperties"), do: :additional_properties
-  defp normalize_constraint_key("ge"), do: :min
-  defp normalize_constraint_key("le"), do: :max
+  defp normalize_constraint_key("ge"), do: :minimum
+  defp normalize_constraint_key("le"), do: :maximum
 
   defp normalize_constraint_key(key)
        when key in [
               "enum",
-              "min",
-              "max",
+              "minimum",
+              "maximum",
               "gt",
               "lt",
               "multiple_of",
               "allow_inf_nan",
+              "min_length",
+              "max_length",
               "any_of",
               "additional_properties",
               "items",
@@ -492,6 +510,30 @@ defmodule Imp.Schema do
        do: String.to_existing_atom(key)
 
   defp normalize_constraint_key(key), do: key
+
+  # An answer arrives as text and a signature saves as JSON, where an atom
+  # becomes a string, so an atom member would never match an answer, or would
+  # match before a save and not after.
+  defp check_enum_members!(members) do
+    if Enum.any?(members, &atom_member?/1) do
+      raise ArgumentError,
+            "enum members must be strings, numbers or booleans, got #{inspect(members)}; " <>
+              "write #{inspect(Enum.map(members, &member_text/1))}"
+    end
+
+    members
+  end
+
+  defp atom_member?(member), do: is_atom(member) and not is_boolean(member) and not is_nil(member)
+
+  defp member_text(member), do: if(atom_member?(member), do: Atom.to_string(member), else: member)
+
+  defp refuse_key(key) do
+    instead = if to_string(key) == "min", do: "minimum", else: "maximum"
+
+    raise ArgumentError,
+          "unknown constraint key #{inspect(key)}: use #{instead}, the JSON Schema name"
+  end
 
   defp normalize_answer_shape(shape) when is_atom(shape), do: shape
 

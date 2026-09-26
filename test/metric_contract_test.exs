@@ -38,7 +38,7 @@ defmodule MetricContractTest do
              result.rows
   end
 
-  test "Evaluate passes prediction trace to arity-3 metrics" do
+  test "Evaluate passes nil as an arity-3 metric's trace, as DSPy does" do
     trace = %{messages: [%{role: :user, content: "q"}]}
 
     program = %Program{
@@ -49,12 +49,13 @@ defmodule MetricContractTest do
     }
 
     metric = fn _example, _prediction, received_trace ->
-      %{score: 1.0, feedback: {:trace_seen, received_trace == trace}}
+      %{score: 1.0, feedback: {:trace_seen, received_trace}}
     end
 
     result = Imp.Evaluate.new([example("q", "ok")], metric) |> Imp.Evaluate.run(program)
 
-    assert [%{feedback: {:trace_seen, true}}] = result.rows
+    assert trace != nil
+    assert [%{feedback: {:trace_seen, nil}}] = result.rows
   end
 
   # The contract matches DSPy's parallelizer: reaching max_errors raises rather

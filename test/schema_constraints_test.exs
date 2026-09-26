@@ -6,7 +6,7 @@ defmodule SchemaConstraintsTest do
   test "validates enum numeric string array object optional and nested constraints" do
     fields = [
       Field.new(%{name: :status, type: :string, constraints: %{enum: ["ok", "warn"]}}, :output),
-      Field.new(%{name: :score, type: :number, constraints: %{min: 0, max: 1}}, :output),
+      Field.new(%{name: :score, type: :number, constraints: %{minimum: 0, maximum: 1}}, :output),
       Field.new(
         %{
           name: :code,
@@ -32,7 +32,7 @@ defmodule SchemaConstraintsTest do
         %{
           name: :meta,
           type: :object,
-          constraints: %{properties: %{count: %{type: :integer, min: 1}}}
+          constraints: %{properties: %{count: %{type: :integer, minimum: 1}}}
         },
         :output
       ),
@@ -67,14 +67,14 @@ defmodule SchemaConstraintsTest do
 
     assert Enum.map(errors, & &1.rule) == [
              :enum,
-             :max,
+             :maximum,
              :max_length,
              :pattern,
              :answer_shape,
              :answer_shape,
              :answer_shape,
              :enum,
-             :min
+             :minimum
            ]
   end
 
@@ -85,7 +85,7 @@ defmodule SchemaConstraintsTest do
         outputs: [
           %{name: :answer, type: :string, constraints: %{enum: ["yes", "no"]}},
           %{name: :span, type: :string, constraints: %{answerShape: "short_span"}},
-          %{name: :confidence, type: :number, constraints: %{min: 0, max: 1}},
+          %{name: :confidence, type: :number, constraints: %{minimum: 0, maximum: 1}},
           %{name: :items, type: :array, constraints: %{items: %{type: :integer}}},
           %{
             name: :meta,
@@ -133,7 +133,7 @@ defmodule SchemaConstraintsTest do
                 type: :object,
                 properties: %{
                   name: %{type: :string, min_length: 2, pattern: "^[A-Z]"},
-                  score: %{type: :number, min: 0, max: 1},
+                  score: %{type: :number, minimum: 0, maximum: 1},
                   tags: %{
                     type: :array,
                     items: %{type: :string, enum: ["clear", "novel"]}
@@ -221,11 +221,11 @@ defmodule SchemaConstraintsTest do
       Imp.Signature.new(%{
         inputs: [:question],
         outputs: [
-          %{name: :score, type: :number, constraints: %{min: 0, max: 1}},
+          %{name: :score, type: :number, constraints: %{minimum: 0, maximum: 1}},
           %{
             name: :meta,
             type: :object,
-            constraints: %{properties: %{count: %{type: :integer, min: 1}}}
+            constraints: %{properties: %{count: %{type: :integer, minimum: 1}}}
           }
         ]
       })
@@ -240,7 +240,7 @@ defmodule SchemaConstraintsTest do
     assert {:error, errors} =
              Imp.Schema.validate_fields(loaded.outputs, %{score: 2, meta: %{count: 0}})
 
-    assert Enum.map(errors, & &1.rule) == [:max, :min]
+    assert Enum.map(errors, & &1.rule) == [:maximum, :minimum]
     assert Imp.Signature.json_schema(loaded)["properties"]["score"]["maximum"] == 1
 
     assert get_in(Imp.Signature.json_schema(loaded), ["properties", "meta", "required"]) == [
@@ -268,7 +268,7 @@ defmodule SchemaConstraintsTest do
         inputs: [:question],
         outputs: [
           %{name: :answer, type: :string, constraints: %{enum: ["Paris"]}},
-          %{name: :confidence, type: :number, constraints: %{min: 0.8, max: 1.0}}
+          %{name: :confidence, type: :number, constraints: %{minimum: 0.8, maximum: 1.0}}
         ]
       })
 
@@ -294,5 +294,73 @@ defmodule SchemaConstraintsTest do
 
     assert {:error, errors} = Imp.Schema.validate_fields(fields, %{meta: %{enabled: false}})
     assert [%{field: :flag, rule: :required}] = errors
+  end
+
+  # The constraint keys are JSON Schema's, since the schema a model reads is
+  # JSON Schema; `min`/`max` are refused rather than quietly ignored.
+  test "minimum and maximum bound a number and reach the JSON schema" do
+    field =
+      Field.new(
+        %{name: :severity, type: :integer, constraints: %{minimum: 1, maximum: 4}},
+        :output
+      )
+
+    assert Imp.Schema.validate_field(field, 3) == []
+    assert [%{rule: :maximum}] = Imp.Schema.validate_field(field, 9)
+    assert [%{rule: :minimum}] = Imp.Schema.validate_field(field, 0)
+
+    assert %{"minimum" => 1, "maximum" => 4} =
+             Imp.Schema.json_schema([field])["properties"]["severity"]
+
+    nested =
+      Field.new(
+        %{
+          name: :meta,
+          type: :object,
+          constraints: %{properties: %{min: %{"maximum" => 2, type: :integer}}}
+        },
+        :output
+      )
+
+    assert [%{field: "meta.min", rule: :maximum}] = Imp.Schema.validate_field(nested, %{min: 3})
+  end
+
+  test "min and max are refused with the key to use instead" do
+    for {key, instead} <- [min: "minimum", max: "maximum"], key <- [key, Atom.to_string(key)] do
+      error =
+        assert_raise ArgumentError, fn ->
+          Field.new(%{name: :score, type: :number, constraints: %{key => 1}}, :output)
+        end
+
+      assert error.message =~ instead
+
+      assert_raise ArgumentError, ~r/#{instead}/, fn ->
+        Field.new(:score, :output)
+        |> Field.constrained(%{items: %{key => 1, type: :integer}})
+      end
+    end
+  end
+
+  # An answer arrives as text and a signature saves as JSON, where an atom
+  # becomes a string: an atom member would never match, or would match before
+  # a save and not after. So enum members are JSON values, and an atom is
+  # refused when the field is built.
+  test "an enum with atom members is refused, naming the members" do
+    error =
+      assert_raise ArgumentError, fn ->
+        Field.new(%{name: :team, constraints: %{enum: [:atlas, :harbor]}}, :output)
+      end
+
+    assert error.message =~ ~s(["atlas", "harbor"])
+
+    assert_raise ArgumentError, fn ->
+      Imp.signature(%{
+        inputs: [:q],
+        outputs: [%{name: :tags, type: "array[string]", constraints: %{items: %{enum: [:a]}}}]
+      })
+    end
+
+    assert %Field{} =
+             Field.new(%{name: :team, constraints: %{enum: ["atlas", "harbor"]}}, :output)
   end
 end

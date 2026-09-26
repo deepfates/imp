@@ -6,7 +6,7 @@ defmodule Imp.SavingReActModeTest do
 
     assert loaded.mode == :provider_native
     assert loaded.tools.submit.description == "Submit final outputs"
-    assert Imp.Tool.call(loaded.tools.submit, %{answer: "Paris"}) == %{answer: "Paris"}
+    assert Imp.Tool.call(loaded.tools.submit, %{answer: "Paris"}) == %{"answer" => "Paris"}
   end
 
   test "round-trips the DSPy ReAct mode" do

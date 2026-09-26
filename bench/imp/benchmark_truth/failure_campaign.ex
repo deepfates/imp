@@ -1011,9 +1011,7 @@ defmodule Imp.BenchmarkTruth.FailureCampaign do
           attempt = Agent.get_and_update(tool_attempts, &{&1 + 1, &1 + 1})
 
           case {attempt, args} do
-            {1, %{query: "failure-recovery"}} -> {:error, :transient_local_failure}
             {1, %{"query" => "failure-recovery"}} -> {:error, :transient_local_failure}
-            {2, %{query: "failure-recovery"}} -> "pong"
             {2, %{"query" => "failure-recovery"}} -> "pong"
             other -> {:error, {:unexpected_tool_attempt, other}}
           end

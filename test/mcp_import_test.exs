@@ -12,7 +12,7 @@ defmodule MCPImportTest do
           "name" => "lookup",
           "description" => "lookup a value",
           "inputSchema" => %{"required" => ["key"]},
-          "run" => fn %{key: key} -> %{value: "value:#{key}"} end
+          "run" => fn %{"key" => key} -> %{value: "value:#{key}"} end
         }
       ])
 

@@ -13,14 +13,14 @@ defmodule Imp.Adapter.FieldConstraints do
   # Ordering: upstream renders in Python kwarg order, which a map cannot carry;
   # we render in PYDANTIC_CONSTRAINT_MAP declaration order (gt, ge, lt, le,
   # min_length, max_length, multiple_of, allow_inf_nan) — the order both
-  # upstream fidelity tests write their kwargs in. Imp's :min/:max are the
-  # inclusive bounds, i.e. pydantic ge/le, and render with those phrases.
+  # upstream fidelity tests write their kwargs in. Imp's :minimum/:maximum are
+  # the inclusive bounds, i.e. pydantic ge/le, and render with those phrases.
 
   @phrases [
     {:gt, "greater than: "},
-    {:min, "greater than or equal to: "},
+    {:minimum, "greater than or equal to: "},
     {:lt, "less than: "},
-    {:max, "less than or equal to: "},
+    {:maximum, "less than or equal to: "},
     {:min_length, "minimum length: "},
     {:max_length, "maximum length: "},
     {:multiple_of, "a multiple of the given number: "},
@@ -65,25 +65,6 @@ defmodule Imp.Adapter.FieldConstraints do
 
   defp fetch(_map, _key), do: nil
 
-  defp normalize(%{} = constraints) do
-    Map.new(constraints, fn {key, value} -> {normalize_key(key), value} end)
-  end
-
+  defp normalize(%{} = constraints), do: Imp.Schema.normalize_constraints(constraints)
   defp normalize(_other), do: %{}
-
-  # The pydantic spellings ge/le are Imp's inclusive :min/:max; minLength /
-  # maxLength are the JSON-schema spellings Imp.Schema already accepts.
-  defp normalize_key(:ge), do: :min
-  defp normalize_key(:le), do: :max
-  defp normalize_key(key) when is_atom(key), do: key
-  defp normalize_key("ge"), do: :min
-  defp normalize_key("le"), do: :max
-  defp normalize_key("minLength"), do: :min_length
-  defp normalize_key("maxLength"), do: :max_length
-
-  defp normalize_key(key)
-       when key in ~w(gt lt min max min_length max_length multiple_of allow_inf_nan),
-       do: String.to_existing_atom(key)
-
-  defp normalize_key(key), do: key
 end
