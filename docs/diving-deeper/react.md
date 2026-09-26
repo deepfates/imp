@@ -9,8 +9,8 @@ are called natively through the provider, one step may call several tools,
 and the answer arrives directly rather than through a separate extraction
 call.
 
-This module is experimental: its options and metadata may change in a minor
-release.
+`Imp.Predict.ReActV2`, which `Imp.react/3` builds, is stable. The older
+trajectory-based `Imp.Predict.ReAct` is experimental.
 
 Read this when a task needs the model to choose actions, when you want to
 know why a turn ended the way it did, or when you are moving an agent from

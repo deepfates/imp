@@ -154,9 +154,9 @@ does this in a supervised application.
 
 ### Built-in variants
 
-Grouped by what they are for. `Imp.predict/2` and `Imp.chain_of_thought/2`
-are stable; every other module on this page is experimental, and its options
-may change in a minor release.
+Grouped by what they are for. `Imp.predict/2`, `Imp.chain_of_thought/2` and
+`Imp.react/3` are stable; every other module on this page is experimental,
+and its options may change in a minor release.
 
 #### Reason before answering
 
