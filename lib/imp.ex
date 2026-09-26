@@ -137,7 +137,13 @@ defmodule Imp do
   @doc "Disables Imp-scoped logging."
   defdelegate disable_logging(), to: Imp.Observability
 
-  @doc "Converts a prediction or example to its field map."
+  @doc """
+  Converts a prediction or example to its field map.
+
+  Keys keep the type of the signature's field names. Names written in the
+  string syntax are atoms only if that atom already exists, otherwise
+  strings, so read values with `Imp.get/2`, which matches either spelling.
+  """
   def to_map(container)
 
   def to_map(%Prediction{} = prediction), do: Prediction.to_map(prediction)

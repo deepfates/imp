@@ -1,10 +1,12 @@
 defmodule Imp.MixProject do
   use Mix.Project
 
+  @version "0.5.0"
+
   def project do
     [
       app: :imp,
-      version: "0.5.0",
+      version: @version,
       elixir: "~> 1.19",
       name: "Imp",
       source_url: "https://github.com/deepfates/imp",
@@ -12,6 +14,7 @@ defmodule Imp.MixProject do
       package: package(),
       docs: [
         main: "readme",
+        source_ref: "v" <> @version,
         assets: %{"assets" => "assets"},
         api_reference: true,
         warnings_as_errors: true,
@@ -202,7 +205,7 @@ defmodule Imp.MixProject do
     (runtime_source_files() ++
        deployment_example_files() ++
        Path.wildcard("examples/provider_free_ticket_router/**/*") ++
-       Path.wildcard("examples/workspace_agent/**/*") ++
+       workspace_agent_example_files() ++
        getting_started() ++
        product_docs() ++
        diving_deeper() ++
@@ -221,6 +224,13 @@ defmodule Imp.MixProject do
          "mix.exs"
        ])
     |> Enum.reject(&transient_package_path?/1)
+  end
+
+  # The example's own tests run in a source checkout; a package consumer
+  # reads the example, not its test suite.
+  defp workspace_agent_example_files do
+    Path.wildcard("examples/workspace_agent/**/*")
+    |> Enum.reject(&String.starts_with?(&1, "examples/workspace_agent/test"))
   end
 
   defp deployment_example_files do
@@ -400,20 +410,20 @@ defmodule Imp.MixProject do
         "compile --warnings-as-errors",
         "test --raise --exclude live --exclude integration --exclude protocol_training --exclude protocol_retriever --exclude protocol_mcp --exclude package --exclude dspy_parity"
       ],
-      # The pinned-DSPy differential suite (imp-sqkr): everything tagged
+      # The pinned-DSPy differential suite: everything tagged
       # :dspy_parity, run after scripts/setup_dspy_parity_env.sh and
       # scripts/setup_dspy_stable_source.sh have provisioned the environment.
       "differential.check": [
         "test --raise --only dspy_parity"
       ],
-      # Docs-only path for path-filtered CI (dee-4g0z): render docs + validate
+      # Docs-only path for path-filtered CI: render docs + validate
       # livebooks, without the package build / campaign / Python differentials.
       "docs.check": [
         "docs.clean",
         "docs",
         "livebook.check"
       ],
-      # Prompt-template fidelity gate (dee-3e4v): run the golden-trace differential
+      # Prompt-template fidelity gate: run the golden-trace differential
       # test (Imp vs the pinned DSPy 3.2.1 venv) so a byte-parity regression FAILS
       # the build per-PR, not only on the weekly evidence-full lane. Requires the
       # tmp/dspy-parity-venv the campaign CI job builds; runs after that setup.
@@ -453,9 +463,10 @@ defmodule Imp.MixProject do
         "test.livebooks --path livebooks"
       ],
       "livebook.execute.check": [
+        &warm_livebook_install/1,
         "test.livebooks --path livebooks --execute"
       ],
-      # Static type gate (de-xmi1). Runs in dev (PLTs are built per-env; dev
+      # Static type gate. Runs in dev (PLTs are built per-env; dev
       # matches local use). Fails on any warning not pinned with a reason in
       # .dialyzer_ignore.exs, and reports ignore entries that stopped
       # matching (list_unused_filters) so the ignore file cannot rot.
@@ -589,6 +600,27 @@ defmodule Imp.MixProject do
   end
 
   defp clean_docs(_args), do: File.rm_rf!("doc")
+
+  # Each notebook's first cell runs `Mix.install([{:imp, path: repo}],
+  # lockfile: ...)` on this checkout, and `test.livebooks --execute` gives a
+  # notebook 30 seconds. On a cold install cache the first notebook spends
+  # that compiling Imp and its dependencies and times out, so the same install
+  # runs here first, with no time limit, and the notebooks find it cached.
+  defp warm_livebook_install(_args) do
+    repo = File.cwd!()
+
+    install =
+      "Mix.install([{:imp, path: #{inspect(repo)}}], " <>
+        "lockfile: #{inspect(Path.join(repo, "mix.lock"))})"
+
+    case System.cmd("elixir", ["-e", install], stderr_to_stdout: true) do
+      {_output, 0} ->
+        :ok
+
+      {output, status} ->
+        Mix.raise("Mix.install of this checkout failed (#{status}):\n" <> output)
+    end
+  end
 
   defp clean_package(_args) do
     File.rm_rf!("tmp/package-check")

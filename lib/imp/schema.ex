@@ -430,25 +430,7 @@ defmodule Imp.Schema do
 
   defp error(field, rule, message), do: %{field: field.name, rule: rule, message: message}
 
-  defp fetch_value(values, key) do
-    case Map.fetch(values, key) do
-      {:ok, value} ->
-        value
-
-      :error ->
-        case Map.fetch(values, to_string(key)) do
-          {:ok, value} -> value
-          :error -> fetch_existing_atom(values, key)
-        end
-    end
-  end
-
-  defp fetch_existing_atom(values, key) do
-    atom = String.to_existing_atom(to_string(key))
-    Map.get(values, atom)
-  rescue
-    ArgumentError -> nil
-  end
+  defp fetch_value(values, key), do: Imp.FieldMap.get(values, key)
 
   defp fetch_meta(map, key, default \\ nil)
 
