@@ -79,7 +79,9 @@ defmodule Imp do
   Runs `fun` with temporary process-local settings.
 
   This is the preferred way to override the LM or adapter for one request,
-  test, task, or Livebook cell without mutating global defaults.
+  test, task, or Livebook cell without mutating global defaults. Keys of the
+  caller's own, such as a request id, are carried too; Imp's own settings are
+  type-checked as in `configure/1`. See `Imp.Settings.context/2`.
   """
   defdelegate context(opts, fun), to: Settings
 
@@ -419,8 +421,11 @@ defmodule Imp do
   Compiles a program with an optimizer, raising on failure.
 
   Same contract as `optimize/3`, `optimize/4`, and `optimize/5`, but returns
-  the compiled program directly and raises `ArgumentError` with a diagnostic
-  message instead of returning an error tuple.
+  the compiled program directly. A call that could never run (not an
+  optimizer, a training optimizer, a missing validation set, options the
+  optimizer refused) raises `ArgumentError`; an optimization that failed
+  raises `Imp.Error` whose `:reason` is the term `optimize` would have
+  returned.
   """
   def optimize!(program, optimizer, trainset),
     do: run_optimizer!(program, optimizer, [trainset: trainset], :program, "Imp.optimize!/3")
@@ -489,8 +494,15 @@ defmodule Imp do
 
   defp run_optimizer!(program, optimizer, opts, kind, api) do
     case run_optimizer(program, optimizer, opts, kind) do
-      {:ok, result} -> result
-      {:error, reason} -> raise ArgumentError, optimizer_error(api, optimizer, reason)
+      {:ok, result} ->
+        result
+
+      {:error, reason} ->
+        case optimizer_error(api, optimizer, reason) do
+          nil -> raise Imp.Error, message: "#{api} failed: #{inspect(reason)}", reason: reason
+          %ArgumentError{} = error -> raise error
+          message -> raise ArgumentError, message
+        end
     end
   end
 
@@ -513,8 +525,17 @@ defmodule Imp do
   defp optimizer_error(api, _optimizer, {:missing_dataset, :validation}),
     do: "#{api} requires a validation set; use Imp.optimize/4 or Imp.optimize/5"
 
-  defp optimizer_error(api, _optimizer, reason),
-    do: "#{api} failed: #{inspect(reason)}"
+  # An optimizer that refused its configuration raised `ArgumentError`; that
+  # is a call that could never run, so it is raised again as it was.
+  defp optimizer_error(_api, _optimizer, {:optimizer_failed, _module, %ArgumentError{} = error}),
+    do: error
+
+  defp optimizer_error(api, _optimizer, {:optimizer_capabilities_failed, module, reason}) do
+    "#{api} could not read the capabilities of #{inspect(module)}: " <>
+      if(is_exception(reason), do: Exception.message(reason), else: inspect(reason))
+  end
+
+  defp optimizer_error(_api, _optimizer, _reason), do: nil
 
   @doc "Returns a JSON-safe portable representation of an Imp program."
   defdelegate dump(program), to: Imp.Saving

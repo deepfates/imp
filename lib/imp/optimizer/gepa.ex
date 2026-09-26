@@ -289,6 +289,7 @@ defmodule Imp.Optimizer.GEPA do
      )}
   end
 
+  @doc false
   def compile(%__MODULE__{} = optimizer, program, trainset, devset, opts \\ []) do
     {compiled, _report} = compile_with_report(optimizer, program, trainset, devset, opts)
     compiled
@@ -841,6 +842,7 @@ defmodule Imp.Optimizer.GEPA do
           "#{name} must be a non-negative integer or :infinity, got: #{inspect(value)}"
   end
 
+  @doc false
   def validate_feedback_fn(nil), do: {:ok, nil}
   def validate_feedback_fn(feedback_fn) when is_function(feedback_fn, 1), do: {:ok, feedback_fn}
 
@@ -848,6 +850,7 @@ defmodule Imp.Optimizer.GEPA do
     {:error, "expected nil or an arity-1 function, got: #{inspect(feedback_fn)}"}
   end
 
+  @doc false
   def validate_artifact_id(value) when is_binary(value) and value != "", do: {:ok, value}
 
   def validate_artifact_id(value),
@@ -861,6 +864,7 @@ defmodule Imp.Optimizer.GEPA do
     error in ArgumentError -> {:error, Exception.message(error)}
   end
 
+  @doc false
   def validate_proposal_concurrency(:auto), do: {:ok, :auto}
 
   def validate_proposal_concurrency(value) when is_integer(value) and value > 0,

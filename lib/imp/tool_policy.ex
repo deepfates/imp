@@ -3,9 +3,11 @@ defmodule Imp.ToolPolicy do
   Internal. Validates and enforces the `:tool_policy` option accepted by
   ReAct-style programs: `:allow`, a tool name, a list of tool
   names, or an arity-2 function of tool name and args. `authorize/3` returns
-  `:ok` or a `{:tool_denied, name}` / `{:tool_policy_error, ...}` error, and a
-  crashing policy function becomes an error tuple rather than taking down the
-  tool loop.
+  `:ok`, `{:tool_authorization_denied, name, :tool_policy}` for a tool the
+  policy does not allow (the same tag a run's `:authorize` callback denies
+  with), or `{:tool_policy_error, name, reason}` for a policy function that
+  raised (the exception) or threw or exited (`{kind, value}`), so a crashing
+  policy does not take down the tool loop.
   """
 
   def validate(:allow), do: {:ok, :allow}
@@ -33,13 +35,13 @@ defmodule Imp.ToolPolicy do
       case policy.(name, args) do
         true -> :ok
         :ok -> :ok
-        false -> {:error, {:tool_denied, name}}
+        false -> {:error, denied(name)}
         {:error, reason} -> {:error, reason}
-        _other -> {:error, {:tool_denied, name}}
+        _other -> {:error, denied(name)}
       end
     rescue
       safety in Imp.OperationalSafetyError -> {:error, safety}
-      exception -> {:error, {:tool_policy_error, name, Exception.message(exception)}}
+      exception -> {:error, {:tool_policy_error, name, exception}}
     catch
       kind, reason ->
         case Imp.OperationalSafetyError.find({kind, reason}) do
@@ -52,14 +54,16 @@ defmodule Imp.ToolPolicy do
   def authorize(policy, name, _args) when is_list(policy) do
     if Enum.any?(policy, &same_tool_name?(&1, name)),
       do: :ok,
-      else: {:error, {:tool_denied, name}}
+      else: {:error, denied(name)}
   end
 
   def authorize(policy, name, _args) when is_atom(policy) or is_binary(policy) do
-    if same_tool_name?(policy, name), do: :ok, else: {:error, {:tool_denied, name}}
+    if same_tool_name?(policy, name), do: :ok, else: {:error, denied(name)}
   end
 
-  def authorize(_policy, name, _args), do: {:error, {:tool_denied, name}}
+  def authorize(_policy, name, _args), do: {:error, denied(name)}
+
+  defp denied(name), do: {:tool_authorization_denied, name, :tool_policy}
 
   defp validate_key_policy(key) do
     if valid_key?(key) do

@@ -179,7 +179,7 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamFewshotTest do
     calls = collect_calls(6, [])
 
     assert Enum.map(calls, fn {messages, _opts} -> stringify(messages) end) ==
-             upstream["prompt_messages"]
+             Imp.DSPyWording.in_imp_words(upstream["prompt_messages"])
 
     assert Enum.map(Enum.drop(calls, 2), fn {_messages, opts} -> opts[:rollout_id] end) ==
              upstream["rollout_ids"]

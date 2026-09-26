@@ -42,7 +42,7 @@ defmodule Imp.Optimizer.RandomSearch do
   ]
 
   @option_schema [
-    teacher_settings: [type: :keyword_list, default: []],
+    teacher_settings: [type: {:custom, Imp.Settings, :validate_overrides, []}, default: []],
     max_bootstrapped_demos: [type: :non_neg_integer, default: 4],
     max_labeled_demos: [type: :non_neg_integer, default: 16],
     max_rounds: [type: :non_neg_integer, default: 1],
@@ -103,10 +103,12 @@ defmodule Imp.Optimizer.RandomSearch do
     }
   end
 
+  @doc false
   def validate_optional_number(nil), do: {:ok, nil}
   def validate_optional_number(value) when is_number(value), do: {:ok, value}
   def validate_optional_number(_value), do: {:error, "expected nil, an integer, or a float"}
 
+  @doc false
   def validate_optional_non_negative(nil), do: {:ok, nil}
 
   def validate_optional_non_negative(value) when is_integer(value) and value >= 0,
@@ -115,17 +117,21 @@ defmodule Imp.Optimizer.RandomSearch do
   def validate_optional_non_negative(_value),
     do: {:error, "expected non negative integer"}
 
+  @doc false
   def validate_optional_integer(nil), do: {:ok, nil}
   def validate_optional_integer(value) when is_integer(value), do: {:ok, value}
   def validate_optional_integer(_value), do: {:error, "expected integer"}
 
+  @doc false
   def validate_optional_positive(nil), do: {:ok, nil}
   def validate_optional_positive(value) when is_integer(value) and value > 0, do: {:ok, value}
   def validate_optional_positive(_value), do: {:error, "expected nil or a positive integer"}
 
+  @doc false
   def validate_optional_max_errors(nil), do: {:ok, nil}
   def validate_optional_max_errors(value), do: Imp.Evaluate.validate_max_errors(value)
 
+  @doc false
   def validate_restrict(nil), do: {:ok, nil}
 
   def validate_restrict(values) when is_list(values) do
@@ -167,6 +173,7 @@ defmodule Imp.Optimizer.RandomSearch do
     error in ArgumentError -> {:error, Exception.message(error)}
   end
 
+  @doc false
   def compile(%__MODULE__{} = optimizer, student, trainset, valset \\ nil, opts \\ [])
       when is_list(opts) do
     opts = validate_compile_options!(opts)
@@ -213,8 +220,7 @@ defmodule Imp.Optimizer.RandomSearch do
         teacher,
         restrict,
         labeled_sample,
-        metric_identity,
-        max_errors_source
+        metric_identity
       )
 
     {state, resumed?} =
@@ -396,8 +402,7 @@ defmodule Imp.Optimizer.RandomSearch do
          teacher,
          restrict,
          labeled_sample,
-         metric_identity,
-         max_errors_source
+         metric_identity
        ) do
     payload = %{
       datasets: %{trainset: trainset, valset: valset},
@@ -406,8 +411,9 @@ defmodule Imp.Optimizer.RandomSearch do
         optimizer
         |> Map.from_struct()
         |> Map.drop([:metric, :metric_identity])
-        |> runtime_identity()
-        |> Map.put(:max_errors_source, max_errors_source),
+        # The resolved `max_errors` is in the struct; where it came from is
+        # reported but not hashed, so a nil and an explicit 10 resume alike.
+        |> runtime_identity(),
       invocation: %{
         teacher: runtime_identity(teacher),
         restrict: restrict,
@@ -664,12 +670,11 @@ defmodule Imp.Optimizer.RandomSearch do
     Enum.map(errors, &Map.merge(%{seed: seed, stage: :evaluation}, Map.new(&1)))
   end
 
-  defp resolve_max_errors!(nil), do: resolve_settings_max_errors!()
+  defp resolve_max_errors!(nil), do: default_max_errors()
   defp resolve_max_errors!(value), do: {validate_max_errors!(value), :explicit}
 
-  defp resolve_settings_max_errors! do
-    {Imp.Settings.fetch!(:max_errors) |> validate_max_errors!(), :settings}
-  end
+  defp default_max_errors,
+    do: {Imp.Evaluate.default_optimizer_max_errors(), :default}
 
   defp validate_max_errors!(value) do
     case Imp.Evaluate.validate_max_errors(value) do
@@ -677,7 +682,7 @@ defmodule Imp.Optimizer.RandomSearch do
         max_errors
 
       {:error, message} ->
-        raise ArgumentError, "invalid effective :max_errors setting: #{message}"
+        raise ArgumentError, "invalid :max_errors: #{message}"
     end
   end
 

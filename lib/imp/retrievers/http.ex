@@ -74,6 +74,7 @@ defmodule Imp.Retrievers.HTTP do
     }
   end
 
+  @doc false
   def validate_retry_statuses(statuses) when is_list(statuses) do
     if Enum.all?(statuses, &(&1 in [429, 500, 502, 503, 504])) do
       {:ok, Enum.uniq(statuses)}
@@ -85,6 +86,7 @@ defmodule Imp.Retrievers.HTTP do
   def validate_retry_statuses(_statuses),
     do: {:error, "expected a list containing only 429, 500, 502, 503, or 504"}
 
+  @doc false
   def validate_retry_backoff(value) when is_integer(value) and value >= 0, do: {:ok, value}
   def validate_retry_backoff(value) when is_function(value, 1), do: {:ok, value}
 
@@ -95,7 +97,7 @@ defmodule Imp.Retrievers.HTTP do
   def retrieve(retriever, query, opts \\ [])
 
   def retrieve(%__MODULE__{method: method}, _query, _opts) when method != :post do
-    {:error, {:unsupported_http_method, method}}
+    {:error, {:http_method_not_supported, __MODULE__, method}}
   end
 
   def retrieve(%__MODULE__{} = retriever, query, opts) do

@@ -491,9 +491,9 @@ defmodule Imp.Clients.TrainingJob do
         {:error, {invalid_operation_response(operation), other}}
     end
   rescue
-    error -> {:error, {operation_failure(operation), Exception.message(error)}}
+    error -> {:error, {operation_failure(operation), Imp.Redaction.redact(error)}}
   catch
-    kind, reason -> {:error, {operation_failure(operation), inspect({kind, reason})}}
+    kind, reason -> {:error, {operation_failure(operation), Imp.Redaction.redact({kind, reason})}}
   end
 
   defp decode_status_response(job, response, operation) do
@@ -1313,6 +1313,7 @@ defmodule Imp.Clients.Trainer do
 
   def supports_reinforcement_artifact?(_provider), do: false
 
+  @doc false
   def validate_provider(nil), do: {:ok, nil}
   def validate_provider(provider) when is_atom(provider), do: {:ok, provider}
   def validate_provider(provider) when is_function(provider, 3), do: {:ok, provider}
@@ -1756,9 +1757,9 @@ defmodule Imp.Clients.HTTPTrainer do
         {:error, {:invalid_training_transport_response, other}}
     end
   rescue
-    error -> {:error, {:training_transport_failed, Exception.message(error)}}
+    error -> {:error, {:training_transport_failed, Imp.Redaction.redact(error)}}
   catch
-    kind, reason -> {:error, {:training_transport_failed, inspect({kind, reason})}}
+    kind, reason -> {:error, {:training_transport_failed, Imp.Redaction.redact({kind, reason})}}
   end
 
   defp decode_training_response(response) do

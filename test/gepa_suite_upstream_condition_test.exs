@@ -651,7 +651,7 @@ defmodule Imp.BenchmarkTruth.GepaSuiteUpstreamConditionTest do
         end)
       end
 
-    assert actual == upstream
+    assert actual == Imp.DSPyWording.in_imp_words(upstream)
   end
 
   test "AIME live-route request bodies differ only by explicit protocol defaults" do
@@ -783,7 +783,7 @@ defmodule Imp.BenchmarkTruth.GepaSuiteUpstreamConditionTest do
              )
 
     assert_receive {:aime_wire, dspy_body, dspy_headers}
-    assert Map.drop(imp_body, ["n", "stream"]) == dspy_body
+    assert Map.drop(imp_body, ["n", "stream"]) == Imp.DSPyWording.in_imp_words(dspy_body)
     assert Map.take(imp_body, ["n", "stream"]) == %{"n" => 1, "stream" => false}
 
     for headers <- [imp_headers, dspy_headers] do

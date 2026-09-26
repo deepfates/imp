@@ -42,7 +42,7 @@ defmodule Imp.Predict.Avatar do
   def new(signature, tools, opts \\ []) do
     signature = Imp.Signature.ensure(signature)
     validate_reserved_fields!(signature)
-    opts = Imp.Options.validate!(opts, @option_schema, "Imp.Predict.Avatar.new/3")
+    opts = Imp.Predict.Options.validate!(opts, @option_schema, "Imp.Predict.Avatar.new/3")
     tools = Imp.Tool.index_tools!(tools, "Imp.Predict.Avatar.new/3")
 
     if Imp.Tool.resolve_name(tools, "Finish") do
@@ -186,7 +186,7 @@ defmodule Imp.Predict.Avatar do
         {{:error, {:tool_timeout, tool.name, timeout}}, true, :tool_timeout}
     end
   rescue
-    error -> {{:error, {:tool_task_error, tool.name, Exception.message(error)}}, true, nil}
+    error -> {{:error, {:tool_task_error, tool.name, error}}, true, nil}
   catch
     kind, reason -> {{:error, {:tool_task_error, tool.name, {kind, reason}}}, true, nil}
   end
@@ -197,7 +197,7 @@ defmodule Imp.Predict.Avatar do
       result -> {result, false}
     end
   rescue
-    error -> {{:error, {:tool_error, tool.name, Exception.message(error)}}, true}
+    error -> {{:error, {:tool_error, tool.name, error}}, true}
   catch
     kind, reason -> {{:error, {:tool_error, tool.name, {kind, reason}}}, true}
   end
@@ -205,7 +205,7 @@ defmodule Imp.Predict.Avatar do
   defp safe_authorize(policy, name, arguments) do
     Imp.ToolPolicy.authorize(policy, name, arguments)
   rescue
-    error -> {:error, {:tool_policy_error, name, Exception.message(error)}}
+    error -> {:error, {:tool_policy_error, name, error}}
   catch
     kind, reason -> {:error, {:tool_policy_error, name, {kind, reason}}}
   end

@@ -452,7 +452,8 @@ defmodule Imp.OptimizerContractTest do
 
   test "capability callback failures are normalized at the optimizer boundary" do
     assert {:error,
-            {:optimizer_capabilities_failed, RaisingCapabilities, "capability probe exploded"}} =
+            {:optimizer_capabilities_failed, RaisingCapabilities,
+             %RuntimeError{message: "capability probe exploded"}}} =
              Imp.Optimizer.capabilities(%RaisingCapabilities{})
 
     assert_raise ArgumentError, ~r/capability probe exploded/, fn ->

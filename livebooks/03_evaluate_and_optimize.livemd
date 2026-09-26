@@ -1,4 +1,4 @@
-# Imp 03: Evaluate And Optimize
+# Imp 03: Evaluate and optimize
 
 ```elixir
 imp_checkout? = fn path ->
@@ -55,7 +55,7 @@ live_lm = fn opts ->
 end
 ```
 
-## Build Train And Dev Sets
+## Build train and dev sets
 
 Livebook 02 showed what a program sends. This notebook gives a program a
 scorecard: optimizers are only useful after examples and a metric say what
@@ -76,7 +76,7 @@ devset = [
 ]
 ```
 
-## Define A Metric
+## Define a metric
 
 The metric is the telos of an optimization run. Imp can search demos,
 instructions, or artifacts, but it can only improve what the metric can see.
@@ -85,7 +85,7 @@ instructions, or artifacts, but it can only improve what the metric can see.
 metric = Imp.exact_match(:answer)
 ```
 
-## Evaluate A Baseline
+## Evaluate a baseline
 
 Start with a baseline before optimizing. A baseline tells you whether the
 metric, dev set, adapter, and LM are wired together before search adds motion.
@@ -105,7 +105,7 @@ program = Imp.predict("question -> answer", lm: lm)
 Imp.evaluate(program, devset, metric)
 ```
 
-## Labeled Few-Shot
+## Labeled few-shot
 
 The simplest improvement is to attach known-good examples as demos. This is not
 magic training; it is ordinary data being rendered by the adapter.
@@ -118,7 +118,7 @@ compiled =
 Imp.evaluate(compiled, devset, metric)
 ```
 
-## Random Search
+## Random search
 
 Random search tries several demo subsets and keeps the candidate that scores
 best. Its value is not sophistication; its value is that it creates an
@@ -136,7 +136,7 @@ compiled =
 }
 ```
 
-## Instruction Search
+## Instruction search
 
 Instruction search changes the program instructions and keeps the candidate
 that scores best against the dev set.
@@ -156,7 +156,7 @@ compiled =
 Imp.Optimizer.Report.fetch(compiled)
 ```
 
-## Optimize Anything
+## Optimize anything
 
 Use artifact optimization when the thing you want to improve is not an Imp
 program yet: a config file, policy text, rubric, template, or other named
@@ -193,7 +193,7 @@ result =
 IO.inspect(result, label: "Optimize Anything result")
 ```
 
-## Evaluate A Live Provider
+## Evaluate a live provider
 
 This cell spends a few provider calls only when `LIVE_PROVIDER=1` and provider
 credentials are present. It proves that the same `evaluate -> optimize ->
@@ -256,7 +256,7 @@ case live_lm.(max_tokens: 100) do
 end
 ```
 
-## GEPA-Style Reflection
+## GEPA-style reflection
 
 GEPA-style optimization keeps per-example diagnostics, reflects on misses, and
 uses Pareto pressure so an improvement for one case does not erase performance

@@ -1843,7 +1843,7 @@ defmodule Imp.Predict.RLM do
     Imp.Tool.call(tool, args)
   rescue
     exception ->
-      {:error, {:tool_error, tool.name, Exception.message(exception)}}
+      {:error, {:tool_error, tool.name, exception}}
   catch
     kind, reason ->
       {:error, {:tool_error, tool.name, {kind, reason}}}

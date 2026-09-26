@@ -72,9 +72,19 @@ end
 ```
 
 Saved programs and parameter artifacts never contain a key, so the same file
-can move from a laptop to CI to production. Traces, telemetry and run events
-redact common key names and key-shaped values. Treat model, retriever and
-MCP URLs as trusted configuration: Imp does not restrict where they point.
+can move from a laptop to CI to production. A saved program holds no HTTP
+header at all, credential or not: after loading one, bind its model with
+`Imp.with_lm/2` or a scoped `Imp.context/2`, or its requests go out without
+your custom headers (a routing header such as `x-tenant` included). Traces,
+telemetry and run events redact common key names and key-shaped values.
+Treat model, retriever and MCP URLs as trusted configuration: Imp does not
+restrict where they point.
+
+An MCP server's headers, static or resolved from an `"auth"` entry, live in
+the MCP client's state. That state prints every header value as
+`[REDACTED]`, so its crash report does not show a token; printing the raw
+state (`inspect(state, structs: false)`, Erlang's `~p`, or a log handler that
+formats the raw report) does.
 
 ## Concurrency
 

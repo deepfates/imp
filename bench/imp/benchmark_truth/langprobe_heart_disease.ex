@@ -274,6 +274,16 @@ defmodule Imp.BenchmarkTruth.LangProBeHeartDisease do
   end
 
   defp normalize_source_example(example, index) do
+    # `Imp.Datasets.csv/2` keeps the CSV header's string keys, and `call/2`
+    # reads the clinical fields by atom, so the known columns become atoms.
+    columns = Map.new([:target | @input_fields], &{Atom.to_string(&1), &1})
+
+    example =
+      example
+      |> Imp.Example.to_map()
+      |> Map.new(fn {key, value} -> {Map.get(columns, key, key), value} end)
+      |> Imp.Example.new()
+
     mappings = %{
       sex: %{"0" => "female", "1" => "male"},
       cp: %{

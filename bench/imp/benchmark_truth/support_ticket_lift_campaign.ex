@@ -525,10 +525,6 @@ defmodule Imp.BenchmarkTruth.SupportTicketLiftCampaign do
     }
   end
 
-  defp structured_error(%{index: index, reason: %{reason: reason}}) do
-    structured_error(index, reason)
-  end
-
   defp structured_error(%{index: index, reason: reason}) do
     structured_error(index, reason)
   end

@@ -17,6 +17,8 @@ defmodule Imp.Predict.BestOfN do
   ]
 
   def new(program, metric, opts \\ []) do
+    # Not Imp.Predict.Options.validate!/3: that refuses `:n` as a request
+    # option, and here `:n` is BestOfN's own count of attempts.
     opts = Imp.Options.validate!(opts, @option_schema, "Imp.Predict.BestOfN.new/3")
     Imp.FunctionContract.validate!(metric, 2, "Imp.Predict.BestOfN.new/3", "metric")
 
@@ -30,6 +32,7 @@ defmodule Imp.Predict.BestOfN do
     }
   end
 
+  @doc false
   def validate_feedback_fn(nil), do: {:ok, nil}
   def validate_feedback_fn(feedback_fn) when is_function(feedback_fn, 1), do: {:ok, feedback_fn}
 

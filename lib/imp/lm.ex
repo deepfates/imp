@@ -217,6 +217,7 @@ defmodule Imp.LM do
     end
   end
 
+  @doc false
   def validate_lm(nil), do: {:ok, nil}
 
   def validate_lm(module) when is_atom(module) do
@@ -356,9 +357,9 @@ defmodule Imp.LM do
     end
   rescue
     safety in Imp.OperationalSafetyError -> {:error, safety}
-    error -> {:error, {:lm_failed, lm_name(lm), error_message(error)}}
+    error -> {:error, {:lm_failed, lm_name(lm), error}}
   catch
-    kind, reason -> {:error, {:lm_failed, lm_name(lm), error_message({kind, reason})}}
+    kind, reason -> {:error, {:lm_failed, lm_name(lm), {kind, reason}}}
   end
 
   defp call_lm(fun, lm) do
@@ -374,12 +375,12 @@ defmodule Imp.LM do
     end
   rescue
     safety in Imp.OperationalSafetyError -> {:error, safety}
-    error -> {:error, {:lm_failed, lm_name(lm), error_message(error)}}
+    error -> {:error, {:lm_failed, lm_name(lm), error}}
   catch
     kind, reason ->
       case Imp.OperationalSafetyError.find({kind, reason}) do
         %Imp.OperationalSafetyError{} = safety -> {:error, safety}
-        nil -> {:error, {:lm_failed, lm_name(lm), error_message({kind, reason})}}
+        nil -> {:error, {:lm_failed, lm_name(lm), {kind, reason}}}
       end
   end
 
@@ -388,18 +389,16 @@ defmodule Imp.LM do
   defp lm_name(%module{}), do: module
   defp lm_name(other), do: other
 
-  defp error_message(%_{} = exception), do: Exception.message(exception)
-  defp error_message(error), do: inspect(error)
-
+  # Options can hold a key, so an error names their shape, never their value.
   defp validate_opts!(opts, context) when is_list(opts) do
     if Keyword.keyword?(opts) do
       opts
     else
-      raise ArgumentError, "#{context} expects keyword options, got: #{inspect(opts)}"
+      raise ArgumentError, "#{context} expects keyword options, got #{Imp.Options.shape(opts)}"
     end
   end
 
   defp validate_opts!(opts, context) do
-    raise ArgumentError, "#{context} expects keyword options, got: #{inspect(opts)}"
+    raise ArgumentError, "#{context} expects keyword options, got #{Imp.Options.shape(opts)}"
   end
 end

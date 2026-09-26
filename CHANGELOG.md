@@ -4,6 +4,25 @@ User-visible changes to Imp are recorded here.
 
 ## 0.5.0 — not yet released
 
+### Security
+
+- An LM client, the HTTP, Databricks and Weaviate retrievers and the MLflow
+  and W&B trackers print with their credentials redacted, and so does a
+  program holding one. `Imp.req_llm(model, api_key: key)` printed the key in
+  IEx, in log lines and in crash reports, and a RAG program printed its
+  retriever's bearer token. Refusing to save a retriever that is not portable
+  names its module instead of printing it.
+- A client, retriever or tracker prints every header value as `[REDACTED]`,
+  whatever the header is called (`X-Subscription-Token`, `Cookie`), and the
+  query, fragment and user info of every URL, given as a string or a `%URI{}`.
+  A saved program holds no header at all, so an LM with custom headers has to
+  be rebound after loading, and `Imp.save!` refuses an LM whose `base_url` has
+  a query, fragment or user info. Option errors, including those for the
+  options passed to a call, name a credential-bearing option without printing
+  its value. The ExMCP client's state, which a crash report prints, is redacted
+  the same way. Before, a header was hidden only when its name looked like a
+  credential, and `Imp.save!` wrote other headers' values to disk.
+
 ### Installing
 
 - Imp is a Hex package: `{:imp, "~> 0.5"}`. Every dependency comes from Hex,
@@ -190,6 +209,41 @@ User-visible changes to Imp are recorded here.
 
 ### ReActV2, adapters and models
 
+- Prompts name types in plain words instead of Python annotations, in every
+  adapter and in ReAct: `` `team` (one of: atlas, harbor, beacon, quill) ``
+  where 0.4.0 wrote `` `team` (Literal['atlas', 'harbor', 'beacon', 'quill']) ``,
+  and "string", "integer", "number", "true or false", "list of strings",
+  "object", "code in python" for `str`, `int`, `float`, `bool`, `list[str]`,
+  `dict[str, Any]` and `Code_python`. "(must be formatted as a valid Python
+  int)" is "(must be formatted as an integer)", and ReAct's `:dspy_3_2_1`
+  mode lists tool arguments as JSON. Fields, order, constraints and parsing
+  are unchanged. A saved program's prompt text changes with this, so an
+  optimized program may be worth re-evaluating.
+- Values in prompts take their JSON spelling: `null`, `true` and `false`
+  where 0.4.0 wrote `None`, `True` and `False`, in inputs, demos, ReAct
+  observations and field constraints. The structured-output schema sent to a
+  provider is named `outputs` (title `Outputs`) instead of
+  `DSPyProgramOutputs`. The MIPROv2 proposer's dataset summary shows each
+  example as `{"inputs": {...}, "outputs": {...}}` instead of
+  `Example({...}) (input_keys={...})`. GEPA's reflective dataset and SIMBA's
+  program listing use the same words, so an enum shows its allowed values.
+- A non-string answer for a string field is kept as its JSON text (`"true"`,
+  `"[\"x\", \"y\"]"`) where 0.4.0 gave Python's `"True"` and `"['x', 'y']"`;
+  a `null` is no value, so a required field reports it missing and an
+  optional one is `nil`, where 0.4.0 gave the string `"None"`.
+- A `null` answer for any output field with a declared default takes the
+  default, as an omitted one does; 0.4.0 kept the null and failed "is
+  required". A present non-null value, `""` and `[]` included, still wins
+  over the default.
+- InferRules shows the rule model each example's values as JSON text
+  (`null`, `{"k": 1}`, `1500000.0`) instead of Elixir's `inspect` output, and
+  a `Jason.OrderedObject` (a ReAct observation, for one) renders as JSON in
+  its own order instead of as the struct.
+- Each ReActV2 step lists the task's output fields with their types and
+  descriptions ("The outputs to produce are: ..."). Before, a model saw an
+  output's description only inside `submit`'s parameter schema.
+- `Imp.Adapter.SingleField` names an untyped input's type (`- ticket
+  (string)`), where it wrote empty parentheses.
 - The names follow the glossary: a step answered in text ends as `:answered`,
   the last request of an interrupted turn as `:last_text` with
   `last_request_note`, the step signature declares `metadata[:text_step]`, and
@@ -310,11 +364,189 @@ User-visible changes to Imp are recorded here.
   natively, and `Imp.Predict.ReActV2` now executes such a call instead of
   recording a malformed-call observation and spending another iteration on it.
 - `Imp.Clients.ReqLLM` returns a response whose body carries a provider error
-  as `{:error, %ReqLLM.Error.API.Request{}}`. OpenRouter relays an upstream
+  as a failed request (`Imp.LMError`, below). OpenRouter relays an upstream
   provider's refusal as a successful HTTP response with an error object and no
   choices, which ReqLLM decodes to an empty message; read as a completion, a
   refused request was a model that said nothing.
 - `Imp.Predict.ReActV2.new/3` documents its options.
+- `Imp.predict/2`, `Imp.chain_of_thought/2` and `Imp.configure/1` raise
+  `ArgumentError` for an option or setting they do not know, and document the
+  ones they take. In 0.4.0 `Imp.predict(sig, temperature: 0)` built a program
+  that ignored the temperature; a request option given at the top level (such
+  as `:temperature`, `:max_tokens` or `:n`) is now refused with a message that
+  says to put it under `config:`. Settings of a caller's own, such as a request
+  id, go through `Imp.context/2`. Both check Imp's own settings the same way,
+  so `:track_usage` and `:warn_on_type_mismatch` must now be booleans. ReAct,
+  ReActV2, Avatar, CodeAct, ProgramOfThought, MultiChainComparison and
+  `Imp.Optimizer.Avatar` give the same `config:` message.
+- `:max_errors` and `:retriever` are no longer settings. Nothing read
+  `:retriever`; give a retriever to the program (`Imp.rag/3`). `:max_errors`
+  was read only by BootstrapFewShot, RandomSearch and COPRO, as the fallback
+  for their own `:max_errors`; given none, they now use 10, the setting's old
+  default, and their reports say `max_errors_source: :default` where they said
+  `:settings` or `:teacher_settings`. `Imp.configure/1`, `Imp.context/2` and an
+  optimizer's `:teacher_settings` refuse either key with a message naming where
+  it belongs.
+
+### Errors and shapes
+
+Every change here is breaking for code that matches on the old shape.
+
+- A failed request from `Imp.Clients.ReqLLM` is
+  `{:error, %Imp.LMError{}}`, whatever failed: an HTTP error status, an error
+  relayed inside a successful response, a connection that failed, or an
+  exception raised inside ReqLLM, or a response or stream of a shape ReqLLM
+  never returns. It carries `status`, `retryable` and
+  `context_window_exceeded`, with ReqLLM's own error unchanged under
+  `reason`. `retryable` is `true` for a 408, 425, 429 or 5xx status, for a
+  request that never reached the provider (connection refused, no free
+  pooled connection, closed or timed out before sending), for any other
+  status whose ReqLLM error says `retryable: true`, and for a timeout while
+  waiting for the answer or a stream that failed after it started; those
+  last two may have run and been billed, and a retried stream repeats chunks
+  the caller already has. A 409 is never retryable. In 0.4.0 these reached
+  the caller as ReqLLM's structs, as `{:req_llm_generate_failed, text}`,
+  `{:req_llm_stream_failed, text}`, `{:invalid_req_llm_response, text}` or
+  `{:invalid_req_llm_stream, text}`, or, for a context-length refusal, as
+  `Imp.ContextWindowExceededError`, which is gone. An option the client refuses raises `ArgumentError` before the
+  request, as every other option error does.
+- `Imp.Errors.retryable?/1` reads `Imp.LMError`'s `retryable`, and the new
+  `Imp.Errors.context_window_exceeded?/1` its `context_window_exceeded`, each
+  through `{:error, _}` and `{:lm_failed, _, _}`. In 0.4.0 `retryable?/1` was
+  true only for an `Imp.LMError` that nothing built.
+- An LM client that raises is `{:lm_failed, client, exception}` with the
+  exception struct, and one that throws or exits is
+  `{:lm_failed, client, {kind, value}}`. In 0.4.0 both were the message text.
+  The same holds for `{:module_call_failed, module, reason}` from
+  `Imp.call/2`, `{:retriever_failed, _, reason}`, `{:tool_error, tool,
+  reason}`, `{:tool_policy_error, tool, reason}`, `{:parallel_program_failed,
+  reason}`, `{:ensemble_program_failed, reason}`, `{:optimizer_failed,
+  optimizer, reason}` and `{:optimizer_capabilities_failed, optimizer,
+  reason}`, the MCP import's `:mcp_connection_failed` and
+  `:mcp_tool_import_failed`, and `Imp.ACP`'s `:program_factory_failed`,
+  `:input_mapper_failed`, `:output_renderer_failed`, `:before_turn_failed`,
+  `:permission_policy_failed` and `:host_request_failed`, and for
+  `{:http_transport_failed, transport, reason}` from `Imp.HTTP` (and so the
+  training clients' `:training_transport_failed`, `:training_refresh_failed`
+  and `:training_cancel_failed`, and `Imp.Retrievers.HTTP`'s
+  `{:transport, reason}`),
+  `{:embedding_provider_failed, provider, reason}` from `Imp.Embeddings`, and
+  `Imp.Predict.Predict`'s `{:adapter_format_failed, adapter, reason}` and
+  `{:adapter_lm_opts_failed, adapter, reason}`, and
+  `{:program_runtime_error, reason}` from `Imp.Predict.ProgramOfThought` and
+  `Imp.Predict.CodeAct`, whose model still reads the exception's message.
+  Several of these carried text on one path and a term on another.
+- A completion that cannot be read as the outputs is always
+  `%Imp.AdapterParseError{}`, with a `kind`: `:malformed`, `:missing_fields`
+  (`reason` is the missing names), `:invalid_fields`, `:unsupported_output`
+  or `:other`; `kind` is required. In 0.4.0 an adapter could return the struct,
+  `{:missing_output_fields, names}` or `{:unsupported_lm_output, raw}`, and
+  `Imp.Adapter.TwoStep` `{:two_step_extraction_failed, reason, completion}`.
+  `Imp.Predict.ReAct`'s final outputs follow the same rule: in 0.4.0 a missing
+  output was `{:missing_output_fields, names}` and one of the wrong type an
+  `%Imp.AdapterParseError{}` with no `kind`.
+- `Imp.Predict.Predict` returns that struct, with `trace` (the redacted
+  messages, the raw completion, and which output fields were read) and, for
+  `n > 1`, `completion_index`. In 0.4.0 it returned
+  `%{reason: {:error, reason}, trace: trace}`, and an `n > 1` failure
+  `{:completion_parse_failed, index, reason}` inside it. Because of that map,
+  a `ReActV2` step that could not be parsed was recorded as
+  `termination_cause: :prediction_error`; it is now `:parse_error`.
+- When the chat or XML adapter's JSON fallback makes its request and that
+  request fails, `Imp.Predict.Predict` returns the LM's error. In 0.4.0 it
+  returned the original parse failure with the LM error inside it.
+  `Imp.Adapter.TwoStep`'s extraction request does the same: when it fails,
+  the call returns that `Imp.LMError` (or `{:lm_failed, _, _}`), so a 429
+  from the extraction model reads as retryable. In 0.4.0 it was
+  `{:two_step_extraction_failed, reason, completion}`.
+- A failure reason that holds a pid, port or reference, such as a
+  `GenServer.call` timeout, is written to JSON (optimizer checkpoints and
+  reports, `Imp.History.dump/1`) as its inspected text. Before, the write
+  raised `Protocol.UndefinedError`.
+- `Imp.Predict.Refine` and `Imp.Predict.Assertions` return
+  `{:error, reason}` like every `Imp.Module`: `:no_attempts` with
+  `max_attempts: 0`, `{:refine_fail_count_exceeded, reason}`, or the last
+  attempt's reason. In 0.4.0 they returned `{:error, reason, history}`, which
+  `Imp.call/2` reported as `{:invalid_module_result, module, text}`.
+- A tool a tool policy does not allow is
+  `{:tool_authorization_denied, tool, :tool_policy}`, the tag a run's
+  `:authorize` callback already denies with. In 0.4.0 it was
+  `{:tool_denied, tool}`.
+- MCP import refusals: a tool named after one in `:reserved_tool_names` is
+  `{:mcp_tool_name_reserved, tool, servers}` (it shared
+  `:mcp_tool_name_collision` with two servers offering one name); an
+  unauthorized descriptor is `{:mcp_server_not_authorized, server, answer}`,
+  where `answer` is what `:authorize` returned or `:not_trusted`; a descriptor
+  that cannot be addressed is `{:invalid_mcp_server, index, %ArgumentError{}}`
+  (it was `:mcp_connection_failed` with the message and no name); and a
+  server left out under `on_failure: :drop` carries the same reason term the
+  import would have refused with, where 0.4.0 shortened its detail to text.
+- `Imp.HTTP.request/6` and `Imp.Retrievers.HTTP` refuse a method they cannot
+  send as `{:http_method_not_supported, refuser, method}`; one of them said
+  `{:unsupported_http_method, method}`.
+- `Imp.stream/3` without `provider_stream: true` ends a failed call with
+  `%Imp.Streaming.Messages.StreamResponse{chunk: {:error, reason}, done: true}`,
+  as a provider stream does; it yielded a bare `{:error, reason}`.
+- An `Imp.Telemetry` span's `[:exception]` event carries `:kind`, `:reason`
+  and `:stacktrace`, as `:telemetry.span/3` does; it carried `:error` as text.
+  `Imp.Redaction` keeps an exception's type while redacting its fields.
+- `Imp.optimize!` raises `Imp.Error` with the reason `Imp.optimize` would
+  have returned when optimization fails, and `ArgumentError` only for a call
+  that could never run (including options the optimizer refused). In 0.4.0
+  every failure was an `ArgumentError` carrying text. `Imp.Error` is now that
+  exception; nothing raised it before.
+- `Imp.Example` and `Imp.Prediction` keep each key as the atom or string it
+  was given, and look keys up by their text. In 0.4.0 a string key became an
+  atom whenever that atom already existed in the VM, so the same data could
+  come back keyed either way. Data read from JSON now keeps its string keys:
+  a history turn loaded with `Imp.History.load/1`, or a demo field a
+  signature does not declare in a saved optimizer artifact.
+
+### Public surface: what is exported
+
+- Gone, with what to use instead:
+  - `Imp.MCP.Client`, `Imp.MCP.HTTPClient`, `Imp.MCP.StreamableHTTPClient`,
+    `Imp.MCP.StdioClient`, `Imp.MCP.Catalog` and `Imp.MCP.import_tools`:
+    `Imp.MCP.connect/2`, which returns the tools and one `cleanup`. A tool
+    schema spelled `:input_schema` is no longer accepted; MCP's
+    `"inputSchema"` is.
+  - `Imp.ACP.MCP` and `Imp.ACP.MCP.Import`: `Imp.MCP.connect/2`, and
+    `Imp.ACP.ToolKind.derive_all(import.annotations)` for `:tool_kinds`.
+  - `Imp.Core.ToolCall` and `Imp.Core.ToolResult`, which nothing built, and
+    `Imp.MCP.json_rpc_result` and `Imp.MCP.initialize_params`, which
+    nothing called.
+- No longer documented, because they are Imp's own machinery:
+  `Imp.Clients.TRLProtocol`, `Imp.Optimizer.Utils`,
+  `Imp.Telemetry.execute` and `span`, `Imp.Prediction.set_lm_usage`,
+  `Imp.MCP.Connections.import_tools` (use `Imp.MCP.connect/2`), the
+  transition functions of `Imp.Training.FastSlow.State`, and the `validate_*`
+  option validators. `compile/N` on an optimizer that `Imp.optimize/3,4,5` or
+  `Imp.train/4` runs is no longer documented either: call those, which take
+  the same datasets and invocation options with one argument order.
+  `KNNFewShot`, `Ensemble`, `Playbook` and `InstructionSearch` keep
+  `compile`, because the facade does not run constructors or workflows.
+- Now documented: `Imp.Deadline`, `Imp.Observability.Inspection` (what
+  `Imp.Observability.inspect_artifact/2` returns, with `json_safe/1`),
+  `Imp.Run.barrier/3`, `Imp.Run.new_event_id/1`,
+  `Imp.Run.register_cancellable/1` and `unregister_cancellable/1`,
+  `Imp.Tasks.async/1` and `async_nolink/1` (tasks that carry the caller's
+  settings, run and telemetry context), and the modules public
+  functions return or call: `Imp.Predict.RLM.SandboxSerializable`,
+  `Imp.Optimize.Anything.Result`, `Imp.Optimizer.Parameter.Set` and
+  `Imp.Optimizer.Parameter.Change`, and `Imp.Optimizer.GEPA.Callback`.
+- `Imp.MCP`, `Imp.MCP.Connections`, `Imp.MCP.Import`, `Imp.MCP.CallFailure`,
+  `Imp.ACP` and `Imp.ACP.ToolKind` are stable, and so are the LabeledFewShot,
+  BootstrapFewShot, random search, KNNFewShot, COPRO, MIPROv2, GEPA, SIMBA,
+  InferRules and Ensemble optimizers, `Imp.Optimizer.Artifact` and
+  `Imp.Optimizer.Report`: stable means they do not break within 0.x without a
+  deprecation. `Imp.ExternalCommand` and `Imp.Tasks` are experimental. The
+  documentation lists the MCP
+  and ACP modules in a group of their own instead of under experimental
+  optimizers.
+- An ACP agent started without `:agent_info` introduces itself as `imp` at
+  Imp's version, not as `imp-acp` `0.1.0`.
+- Plug is no longer a dependency of Imp. The demo MCP servers, its only user,
+  are not in the package.
 
 ## 0.4.0 — 2026-09-17
 

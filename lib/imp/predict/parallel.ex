@@ -44,7 +44,7 @@ defmodule Imp.Predict.Parallel do
       ...> }
       iex> program = Imp.Predict.Predict.new("question -> answer", lm: lm)
       iex> results = Imp.Predict.Parallel.map(program, [%{question: "ok"}, %{question: "bad"}])
-      iex> match?([{:ok, %Imp.Prediction{}}, {:error, {:lm_failed, Imp.LM.Static, "boom"}}], results)
+      iex> match?([{:ok, %Imp.Prediction{}}, {:error, {:lm_failed, Imp.LM.Static, %RuntimeError{}}}], results)
       true
       iex> [{:ok, prediction}, _error] = results; Imp.Prediction.get(prediction, :answer)
       "ok"
@@ -159,9 +159,9 @@ defmodule Imp.Predict.Parallel do
         {:error, {:invalid_parallel_result, inspect(other)}}
     end
   rescue
-    error -> {:error, {:parallel_program_failed, error_message(error)}}
+    error -> {:error, {:parallel_program_failed, error}}
   catch
-    kind, reason -> {:error, {:parallel_program_failed, error_message({kind, reason})}}
+    kind, reason -> {:error, {:parallel_program_failed, {kind, reason}}}
   end
 
   defp validate_inputs!(inputs) do
@@ -197,7 +197,4 @@ defmodule Imp.Predict.Parallel do
               "Imp.Predict.Parallel.run/2 expected {program, inputs} or a nested list at #{inspect(path ++ [index])}; got: #{inspect(node)}"
     end)
   end
-
-  defp error_message(%_{} = exception), do: Exception.message(exception)
-  defp error_message(error), do: inspect(error)
 end

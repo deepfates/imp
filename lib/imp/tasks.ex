@@ -175,15 +175,19 @@ end
 
 defmodule Imp.Tasks do
   @moduledoc """
-  Supervised, bounded task boundary for Imp runtime fan-out.
+  Tasks that carry the caller's Imp context.
 
-  Imp applies monitored FIFO backpressure when the effective
-  `:async_max_workers` capacity is exhausted. That bound is one machine-wide
-  pool shared by every Imp task. A host that sets its own limit on the runs it
-  starts passes `admission: {pool, limit}` to `Imp.Run.start/3`; those runs
-  hold places in the host's pool rather than this one.
+  `async/1` and `async_nolink/1` start a supervised task that runs with the
+  settings, `Imp.Run` context and telemetry context of the process that
+  started it, so a model call or tool event inside the task belongs to the
+  caller's run, and reads the caller's `Imp.configure/1` and `Imp.context/2`
+  settings. A plain `Task` does not carry them.
+
+  Every such task takes a place in one machine-wide pool bounded by the
+  `:async_max_workers` setting, and waits for a place when the pool is full. A
+  host that bounds its own runs passes `admission: {pool, limit}` to
+  `Imp.Run.start/3` instead.
   """
-
   @supervisor Imp.TaskSupervisor
   @unlinked_supervisor Imp.UnlinkedTaskSupervisor
   @admission Imp.Tasks.Admission
@@ -199,10 +203,10 @@ defmodule Imp.Tasks do
     zip_input_on_exit: [type: :boolean]
   ]
 
-  @doc "Returns the linked task supervisor name used by Imp async helpers."
+  @doc false
   def supervisor, do: @supervisor
 
-  @doc "Returns the unlinked task supervisor name used by Imp fire-and-observe helpers."
+  @doc false
   def unlinked_supervisor, do: @unlinked_supervisor
 
   @doc false
@@ -211,13 +215,14 @@ defmodule Imp.Tasks do
     @admission.status(@machine_pool)
   end
 
-  @doc "Returns whether the Imp admission boundary and both task supervisors are running."
+  @doc false
   def supervised? do
     Enum.all?([@admission, @supervisor, @unlinked_supervisor], &(Process.whereis(&1) != nil))
   end
 
   @doc """
-  Starts a linked supervised task with a submission-time settings snapshot.
+  Starts a linked supervised task that carries the caller's settings, run and
+  telemetry context.
 
       iex> task = Imp.context([task_marker: :inside], fn ->
       ...>   Imp.Tasks.async(fn -> Imp.Settings.fetch!(:task_marker) end)
@@ -226,6 +231,7 @@ defmodule Imp.Tasks do
       :inside
 
   """
+  @spec async((-> term())) :: Task.t()
   def async(fun) when is_function(fun, 0) do
     start_task(@supervisor, :linked, fun)
   end
@@ -234,7 +240,11 @@ defmodule Imp.Tasks do
     raise ArgumentError, "Imp.Tasks.async/1 expects a zero-arity function, got: #{inspect(fun)}"
   end
 
-  @doc "Starts an unlinked supervised task with a submission-time settings snapshot."
+  @doc """
+  Starts an unlinked supervised task that carries the caller's settings, run
+  and telemetry context. Await it with `Task.yield/2` or `Task.await/2`.
+  """
+  @spec async_nolink((-> term())) :: Task.t()
   def async_nolink(fun) when is_function(fun, 0) do
     start_task(@unlinked_supervisor, :nolink, fun)
   end
@@ -283,7 +293,7 @@ defmodule Imp.Tasks do
           "Imp.Tasks.async_nolink_borrowed/1 expects a zero-arity function, got: #{inspect(fun)}"
   end
 
-  @doc "Cancels a supervised task and waits up to `timeout` milliseconds for termination."
+  @doc false
   def cancel(task, timeout \\ 5_000)
 
   def cancel(%Task{} = task, timeout)
@@ -300,16 +310,14 @@ defmodule Imp.Tasks do
     raise ArgumentError, "Imp.Tasks.cancel/2 expects a Task struct, got: #{inspect(task)}"
   end
 
-  @doc """
-  Lazily runs a function through Imp's bounded, supervised task boundary.
-
-  Settings are captured when `async_stream/3` is called. Stream-local fan-out
-  is capped by the effective `:async_max_workers`; concurrent Imp work waits
-  for capacity instead of turning contention into a prediction failure. A
-  stream synchronously enumerated inside an admitted Imp task reuses that
-  task's slot serially, so nested optimizer fan-out remains bounded without
-  self-deadlocking when the limit is one.
-  """
+  @doc false
+  # Lazily runs a function through Imp's bounded, supervised task boundary.
+  # Settings are captured when `async_stream/3` is called. Stream-local fan-out
+  # is capped by the effective `:async_max_workers`; concurrent Imp work waits
+  # for capacity instead of turning contention into a prediction failure. A
+  # stream synchronously enumerated inside an admitted Imp task reuses that
+  # task's slot serially, so nested optimizer fan-out remains bounded without
+  # self-deadlocking when the limit is one.
   def async_stream(enumerable, fun, opts \\ [])
 
   def async_stream(enumerable, fun, opts) when is_function(fun, 1) do

@@ -39,8 +39,6 @@ defmodule PublicSurfaceTest do
     Imp.Core.LMResponse,
     Imp.Core.Message,
     Imp.Core.System,
-    Imp.Core.ToolCall,
-    Imp.Core.ToolResult,
     Imp.Core.User,
     Imp.Datasets,
     Imp.Datasets.Colors,
@@ -53,7 +51,6 @@ defmodule PublicSurfaceTest do
     Imp.Embeddings.BagOfWords,
     Imp.AdapterParseError,
     Imp.Assertion,
-    Imp.ContextWindowExceededError,
     Imp.Error,
     Imp.Errors,
     Imp.Execution,
@@ -73,12 +70,8 @@ defmodule PublicSurfaceTest do
     Imp.LM.Static,
     Imp.Logprobs,
     Imp.MCP,
-    Imp.MCP.Catalog,
-    Imp.MCP.HTTPClient,
     Imp.MCP.OAuth,
     Imp.MCP.OAuth.Store,
-    Imp.MCP.StdioClient,
-    Imp.MCP.StreamableHTTPClient,
     Imp.Metrics,
     Imp.Metrics.Result,
     Imp.Module,
@@ -296,7 +289,7 @@ defmodule PublicSurfaceTest do
   end
 
   setup do
-    Imp.configure(lm: nil, adapter: Imp.Adapter.Chat, retriever: nil)
+    Imp.configure(lm: nil, adapter: Imp.Adapter.Chat)
     # Restore global Imp.Settings to defaults on exit (test isolation). See dee-fqsr.
     on_exit(&Imp.Settings.reset/0)
     :ok
@@ -782,14 +775,19 @@ defmodule PublicSurfaceTest do
     assert {:ok, prediction} =
              Imp.Optimizer.Ensemble.Program.call(ensemble, %{question: "2+2?"})
 
-    assert [{:ok, %Imp.Prediction{}}, {:error, {:ensemble_program_failed, "program exploded"}}] =
+    assert [
+             {:ok, %Imp.Prediction{}},
+             {:error, {:ensemble_program_failed, %RuntimeError{message: "program exploded"}}}
+           ] =
              Imp.Prediction.get(prediction, :outputs)
 
     reducer =
       Imp.Optimizer.Ensemble.new(reduce_fn: fn _predictions -> raise "reducer exploded" end)
       |> Imp.Optimizer.Ensemble.compile([program])
 
-    assert {:error, {:ensemble_reduce_failed, "reducer exploded", [{:ok, %Imp.Prediction{}}]}} =
+    assert {:error,
+            {:ensemble_reduce_failed, %RuntimeError{message: "reducer exploded"},
+             [{:ok, %Imp.Prediction{}}]}} =
              Imp.Optimizer.Ensemble.Program.call(reducer, %{question: "2+2?"})
   end
 
@@ -1033,11 +1031,8 @@ defmodule PublicSurfaceTest do
     assert %Imp.Clients.ReqLLM{} = Imp.req_llm("openai:gpt-test")
 
     assert %Imp.Retrievers.HTTP{} = Imp.Retrievers.HTTP.new("https://retriever.example")
-    # Remote constructors now connect; avoid reaching a fictional network host.
     assert {:ok, %Imp.MCP.Import{tools: [], cleanup: cleanup}} = Imp.MCP.connect([])
     assert :ok = cleanup.()
-    assert function_exported?(Imp.MCP.HTTPClient, :new, 2)
-    assert function_exported?(Imp.MCP.StreamableHTTPClient, :new, 2)
 
     assert %Imp.Clients.HTTPTrainer{} =
              Imp.Clients.OpenAITrainer.new(training_file: "file-test")

@@ -66,7 +66,7 @@ defmodule Imp.SettingsIsolationRegressionTest do
     baseline = Imp.Optimizer.BootstrapFewShot.repeated_call_selection(demos, 0, :main)
 
     poison_global_lm()
-    Imp.configure(max_errors: 1, async_max_workers: 1)
+    Imp.configure(async_max_workers: 1, track_usage: true)
 
     assert Imp.Optimizer.BootstrapFewShot.repeated_call_selection(demos, 0, :main) == baseline
   end

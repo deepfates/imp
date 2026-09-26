@@ -31,7 +31,7 @@ defmodule CompletionSurfaceTest do
   end
 
   setup do
-    Imp.configure(lm: nil, adapter: Imp.Adapter.Chat, retriever: nil)
+    Imp.configure(lm: nil, adapter: Imp.Adapter.Chat)
     # Restore global Imp.Settings to defaults on exit so this module never
     # leaves non-default settings for a later module. See dee-fqsr.
     on_exit(&Imp.Settings.reset/0)
@@ -220,8 +220,13 @@ defmodule CompletionSurfaceTest do
       )
 
     assert {:error,
-            {:code_act_tool_error, {:tool_denied, :lookup},
-             [%{action: :tool, output: {:error, {:tool_denied, :lookup}}}]}} =
+            {:code_act_tool_error, {:tool_authorization_denied, :lookup, :tool_policy},
+             [
+               %{
+                 action: :tool,
+                 output: {:error, {:tool_authorization_denied, :lookup, :tool_policy}}
+               }
+             ]}} =
              Imp.Predict.CodeAct.call(denied, %{question: "q"})
 
     boom = Imp.Tool.new(:boom, "boom", fn _args -> raise "tool exploded" end)
@@ -229,8 +234,13 @@ defmodule CompletionSurfaceTest do
     crashing = Imp.Predict.CodeAct.new("question -> answer", [boom], lm: lm, max_iters: 2)
 
     assert {:error,
-            {:code_act_tool_error, {:tool_error, :boom, "tool exploded"},
-             [%{action: :tool, output: {:error, {:tool_error, :boom, "tool exploded"}}}]}} =
+            {:code_act_tool_error, {:tool_error, :boom, %RuntimeError{message: "tool exploded"}},
+             [
+               %{
+                 action: :tool,
+                 output: {:error, {:tool_error, :boom, %RuntimeError{message: "tool exploded"}}}
+               }
+             ]}} =
              Imp.Predict.CodeAct.call(crashing, %{question: "q"})
   after
     Process.delete(:code_act_failure_actions)
@@ -437,7 +447,7 @@ defmodule CompletionSurfaceTest do
 
     assert [
              %Imp.Streaming.Messages.StreamResponse{
-               chunk: {:error, {:lm_failed, Imp.LM.Static, message}},
+               chunk: {:error, {:lm_failed, Imp.LM.Static, %ArgumentError{message: message}}},
                done: true
              }
            ] =
@@ -460,7 +470,8 @@ defmodule CompletionSurfaceTest do
              %Imp.Streaming.Messages.StreamResponse{
                chunk:
                  {:error,
-                  {:adapter_format_failed, StreamingRaisingAdapter, "streaming format exploded"}},
+                  {:adapter_format_failed, StreamingRaisingAdapter,
+                   %RuntimeError{message: "streaming format exploded"}}},
                done: true
              }
            ] =
@@ -703,7 +714,7 @@ defmodule CompletionSurfaceTest do
     messages = Imp.Adapter.TwoStep.format(signature, %{question: "capital of France?"}, [])
     assert [%{role: :system, content: system}, %{role: :user, content: user}] = messages
     assert String.starts_with?(system, "You are a helpful assistant")
-    assert system =~ "As input, you will be provided with:\n1. `question` (str):"
+    assert system =~ "As input, you will be provided with:\n1. `question` (string):"
     assert system =~ "Specific instructions: Answer the question."
     assert user == "question: capital of France?"
     refute Enum.any?(messages, &String.contains?(&1.content, "[[ ##"))
@@ -736,7 +747,7 @@ defmodule CompletionSurfaceTest do
            ] =
              Agent.get(calls, & &1)
 
-    assert extractor_system =~ "Your input fields are:\n1. `text` (str):"
+    assert extractor_system =~ "Your input fields are:\n1. `text` (string):"
 
     assert extractor_system =~
              "The input is a text that should contain all the necessary information to produce the fields `answer`."
@@ -758,7 +769,10 @@ defmodule CompletionSurfaceTest do
 
     assert {:error,
             {:embedding_provider_failed, Imp.Embeddings.BagOfWords,
-             "Imp.Embeddings.BagOfWords.embed/2: invalid value for :dims option: expected positive integer, got: 0"}} =
+             %ArgumentError{
+               message:
+                 "Imp.Embeddings.BagOfWords.embed/2: invalid value for :dims option: expected positive integer, got: 0"
+             }}} =
              Imp.Embeddings.embed(Imp.Embeddings.BagOfWords, ["beam"], dims: 0)
 
     assert {:error, {:not_embedding_provider, :not_an_embedder}} =
@@ -784,10 +798,14 @@ defmodule CompletionSurfaceTest do
                []
              )
 
-    assert {:error, {:embedding_provider_failed, :anonymous_embedder, "embed exploded"}} =
+    assert {:error,
+            {:embedding_provider_failed, :anonymous_embedder,
+             %RuntimeError{message: "embed exploded"}}} =
              Imp.Embeddings.embed(fn _texts, _opts -> raise "embed exploded" end, ["beam"], [])
 
-    assert {:error, {:embedding_provider_failed, RaisingEmbedder, "embed exploded"}} =
+    assert {:error,
+            {:embedding_provider_failed, RaisingEmbedder,
+             %RuntimeError{message: "embed exploded"}}} =
              Imp.Embeddings.embed(RaisingEmbedder, ["beam"], [])
   end
 end

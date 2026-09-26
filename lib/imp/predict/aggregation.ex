@@ -69,6 +69,7 @@ defmodule Imp.Predict.Aggregation do
     |> List.first()
   end
 
+  @doc false
   def validate_normalize(normalize) when is_function(normalize, 1), do: {:ok, normalize}
 
   def validate_normalize(normalize) do
