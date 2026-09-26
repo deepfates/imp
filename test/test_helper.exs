@@ -78,4 +78,5 @@ external_excludes =
 
 ExUnit.configure(exclude: external_excludes)
 
+Imp.Test.OwnLog.install()
 ExUnit.start()
