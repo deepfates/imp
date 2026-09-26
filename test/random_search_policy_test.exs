@@ -19,10 +19,7 @@ defmodule RandomSearchPolicyTest do
 
   defp program do
     Imp.predict("question -> answer",
-      lm: %{
-        module: Imp.LM.Static,
-        opts: [handler: fn _messages, _opts -> %{answer: "constant"} end]
-      }
+      lm: Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "constant"} end)
     )
   end
 
@@ -205,10 +202,7 @@ defmodule RandomSearchPolicyTest do
 
     failing =
       Imp.predict("question -> answer",
-        lm: %{
-          module: Imp.LM.Static,
-          opts: [handler: fn _messages, _opts -> raise "provider failed" end]
-        }
+        lm: Imp.LM.Static.new(handler: fn _messages, _opts -> raise "provider failed" end)
       )
 
     assert_raise RuntimeError, ~r/error budget exhausted: 1 errors \(maximum 1\)/, fn ->
@@ -259,7 +253,7 @@ defmodule RandomSearchGlobalSettingsTest do
   end
 
   test "nil max_errors is ten while an explicit value wins" do
-    lm = %{module: Imp.LM.Static, opts: [handler: fn _, _ -> %{answer: "a"} end]}
+    lm = Imp.LM.Static.new(handler: fn _, _ -> %{answer: "a"} end)
     program = Imp.predict("question -> answer", lm: lm)
     rows = [Imp.example(question: "q", answer: "a") |> Imp.with_inputs(:question)]
     metric = Imp.Metrics.exact_match(:answer)

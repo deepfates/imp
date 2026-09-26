@@ -852,9 +852,8 @@ defmodule GepaMetricsTest do
   test "Papillon metric uses Imp judges for quality and leakage arithmetic" do
     {:ok, calls} = Agent.start_link(fn -> [] end)
 
-    judge_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    judge_lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", &Map.get(&1, :content, ""))
           Agent.update(calls, &[prompt | &1])
@@ -872,8 +871,7 @@ defmodule GepaMetricsTest do
               %{reasoning: "Pairwise quality comparison.", judgment: quality_call_count == 1}
           end
         end
-      ]
-    }
+      )
 
     metric =
       Imp.BenchmarkTruth.GepaMetrics.metric(

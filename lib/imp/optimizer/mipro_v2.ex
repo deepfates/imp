@@ -1218,7 +1218,7 @@ defmodule Imp.Optimizer.MIPROv2 do
   defp maybe_rebind_task_lm(program, predictors, task_lm) do
     Enum.reduce(predictors, program, fn %{name: name}, program ->
       Imp.ProgramParameters.update_predictor(program, name, fn predictor ->
-        Imp.Predict.Predict.with_lm(predictor, task_lm)
+        Imp.Predict.with_lm(predictor, task_lm)
       end)
     end)
   end

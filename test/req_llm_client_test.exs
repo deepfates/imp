@@ -462,7 +462,11 @@ defmodule ReqLLMClientTest do
                  end
 
     assert {:error, :req_llm_model_required} =
-             Imp.Clients.ReqLLM.generate([%{role: :user, content: "hello"}], [])
+             Imp.Clients.ReqLLM.generate(
+               Imp.Clients.ReqLLM,
+               [%{role: :user, content: "hello"}],
+               []
+             )
   end
 
   test "ReqLLM client drives Imp prediction and translates JSON/schema options" do
@@ -476,7 +480,7 @@ defmodule ReqLLMClientTest do
       )
 
     assert {:ok, prediction} =
-             Imp.Predict.Predict.call(program, %{question: "reply with pong and score 7"})
+             Imp.Predict.call(program, %{question: "reply with pong and score 7"})
 
     assert Imp.Prediction.get(prediction, :answer) == "pong"
     assert Imp.Prediction.get(prediction, :score) == 7
@@ -594,7 +598,7 @@ defmodule ReqLLMClientTest do
         config: [native_json_schema: true]
       )
 
-    assert {:ok, prediction} = Imp.Predict.Predict.call(program, %{question: "classify"})
+    assert {:ok, prediction} = Imp.Predict.call(program, %{question: "classify"})
     assert [%{"answer" => "yes", "confidence" => 0.9}] = Imp.get(prediction, :items)
 
     assert_received {:req_llm_generate, "openai:gpt-test", _messages, opts}
@@ -1471,7 +1475,7 @@ defmodule ReqLLMClientTest do
         }
       )
 
-    program = Imp.react("question -> answer", [tool], lm: lm, max_iters: 1)
+    program = Imp.Predict.ReAct.new("question -> answer", [tool], lm: lm, max_iters: 1)
 
     assert {:error, {:react_max_iters, history}} =
              Imp.Predict.ReAct.call(program, %{question: "lookup beam"})
@@ -1830,7 +1834,7 @@ defmodule ReqLLMClientTest do
 
     refute dumped["lm"][:opts] |> List.flatten() |> Enum.member?("not-persisted")
 
-    loaded = Imp.Saving.load(dumped)
+    loaded = Imp.Saving.load!(dumped)
 
     assert %Imp.Clients.ReqLLM{model: "openai:gpt-test", opts: [temperature: 0]} = loaded.lm
   end
@@ -1900,7 +1904,7 @@ defmodule ReqLLMClientTest do
     assert :ok = Imp.Saving.save!(program, path)
     refute_credential_canaries(File.read!(path))
 
-    loaded = Imp.Saving.load!(path)
+    loaded = Imp.Saving.read!(path)
     refute_credential_canaries(loaded)
     assert loaded.lm.model["id"] == model_id
     assert loaded.lm.model["model"] == model_path
@@ -1923,7 +1927,7 @@ defmodule ReqLLMClientTest do
           ]
     }
 
-    loaded_poisoned = dumped |> put_in(["lm"], poisoned_lm) |> Imp.Saving.load()
+    loaded_poisoned = dumped |> put_in(["lm"], poisoned_lm) |> Imp.Saving.load!()
 
     refute_credential_canaries(loaded_poisoned)
     assert loaded_poisoned.lm.model.id == model_id

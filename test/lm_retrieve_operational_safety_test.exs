@@ -5,10 +5,14 @@ defmodule Imp.LMRetrieveOperationalSafetyTest do
     safety = Imp.OperationalSafetyError.exception(kind: :budget, reason: :task_limit)
 
     assert {:error, ^safety} =
-             Imp.LM.generate(fn _messages, _opts -> raise safety end, [], [])
+             Imp.LM.generate(Imp.Test.FunLM.new(fn _messages, _opts -> raise safety end), [], [])
 
-    assert {:error, {:lm_failed, :anonymous_lm, %RuntimeError{message: "ordinary LM crash"}}} =
-             Imp.LM.generate(fn _messages, _opts -> raise "ordinary LM crash" end, [], [])
+    assert {:error, {:lm_failed, Imp.Test.FunLM, %RuntimeError{message: "ordinary LM crash"}}} =
+             Imp.LM.generate(
+               Imp.Test.FunLM.new(fn _messages, _opts -> raise "ordinary LM crash" end),
+               [],
+               []
+             )
   end
 
   test "raised retriever guards remain typed errors while ordinary crashes stay normalized" do

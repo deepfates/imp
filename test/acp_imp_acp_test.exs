@@ -1565,7 +1565,7 @@ defmodule Imp.ACPTest do
 
     {client, _agent} =
       start_pair(fn _session ->
-        Imp.react_v2("question -> answer", [], lm: lm, max_iters: 1)
+        Imp.react("question -> answer", [], lm: lm, max_iters: 1)
       end)
 
     {:ok, %{"sessionId" => session_id}} = Client.new_session(client, "/tmp/project")
@@ -1598,7 +1598,7 @@ defmodule Imp.ACPTest do
         end
       )
 
-    factory = fn _session -> Imp.react_v2("question -> answer", [], lm: lm, max_iters: 1) end
+    factory = fn _session -> Imp.react("question -> answer", [], lm: lm, max_iters: 1) end
 
     {first_client, first_agent} =
       start_pair(factory,
@@ -1673,7 +1673,7 @@ defmodule Imp.ACPTest do
 
     {client, _agent} =
       start_pair(
-        fn _session -> Imp.react_v2("question -> answer", [lookup], lm: lm) end,
+        fn _session -> Imp.react("question -> answer", [lookup], lm: lm) end,
         client_handler_opts: [auto_approve_permissions: true]
       )
 
@@ -1729,7 +1729,7 @@ defmodule Imp.ACPTest do
 
     {client, _agent} =
       start_pair(
-        fn _session -> Imp.react_v2("question -> answer", [lookup], lm: lm) end,
+        fn _session -> Imp.react("question -> answer", [lookup], lm: lm) end,
         client_handler_opts: [auto_approve_permissions: true]
       )
 
@@ -2107,7 +2107,7 @@ submit(%{answer: observed <> ":" <> scratch})|
         end
       )
 
-    Imp.react_v2("question -> answer", [tool], lm: lm, max_iters: 2)
+    Imp.react("question -> answer", [tool], lm: lm, max_iters: 2)
   end
 
   defp mcp_program(tools) do
@@ -2129,7 +2129,7 @@ submit(%{answer: observed <> ":" <> scratch})|
         end
       )
 
-    Imp.react_v2("question -> answer", tools, lm: lm, max_iters: 2)
+    Imp.react("question -> answer", tools, lm: lm, max_iters: 2)
   end
 
   defp host_program(host) do
@@ -2165,7 +2165,7 @@ submit(%{answer: observed <> ":" <> scratch})|
       )
 
     program =
-      Imp.react_v2("question -> answer", Imp.ACP.Host.tools(host), lm: lm, max_iters: 4)
+      Imp.react("question -> answer", Imp.ACP.Host.tools(host), lm: lm, max_iters: 4)
 
     {:ok, program, fn -> if Process.alive?(step), do: Agent.stop(step) end}
   end

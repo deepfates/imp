@@ -240,7 +240,16 @@ defmodule Imp.Adapter.Types do
     end
   end
 
-  defmodule Document, do: defstruct([:text, metadata: %{}])
+  defmodule Document do
+    @moduledoc """
+    A text document given to the model as its own content part.
+
+    `metadata`, when not empty, renders as a prefix before `text`.
+    """
+
+    defstruct [:text, metadata: %{}]
+    @type t :: %__MODULE__{text: String.t(), metadata: map()}
+  end
 
   defmodule Code do
     @moduledoc """
@@ -348,8 +357,27 @@ defmodule Imp.Adapter.Types do
         raise(ArgumentError, "Reasoning requires a string or content map, got: #{inspect(value)}")
   end
 
-  defmodule History, do: defstruct(messages: [])
-  defmodule Citation, do: defstruct([:text, :source, metadata: %{}])
+  defmodule History do
+    @moduledoc """
+    Provider chat messages placed in a request as they are.
+
+    Each message is a map with `:role` and `:content`. `Imp.History` is the
+    other history: signature-shaped turns of a program's inputs and outputs.
+    """
+
+    defstruct messages: []
+    @type t :: %__MODULE__{messages: [map()]}
+  end
+
+  defmodule Citation do
+    @moduledoc """
+    A quoted passage with its source, rendered as the text followed by a
+    `Source:` line.
+    """
+
+    defstruct [:text, :source, metadata: %{}]
+    @type t :: %__MODULE__{text: String.t(), source: String.t(), metadata: map()}
+  end
 
   defmodule ToolCall do
     @moduledoc """
@@ -474,7 +502,15 @@ defmodule Imp.Adapter.Types do
     defp maybe_put(map, key, value), do: Map.put(map, key, value)
   end
 
-  defmodule Type, do: defstruct([:value, metadata: %{}])
+  defmodule Type do
+    @moduledoc """
+    A wrapper that renders as the value it holds: `to_openai/1` of a `Type`
+    is `to_openai/1` of its `value`.
+    """
+
+    defstruct [:value, metadata: %{}]
+    @type t :: %__MODULE__{value: term(), metadata: map()}
+  end
 
   defmodule ToolCalls do
     @moduledoc "Collection of provider-native tool calls."

@@ -360,7 +360,7 @@ defmodule Imp.Clients.MLXLMTrainerTest do
 
     code = """
     job = Imp.Clients.TrainingJob.load!(#{inspect(job_path)})
-    loaded = Imp.load!(#{inspect(program_path)})
+    loaded = Imp.read!(#{inspect(program_path)})
     {:ok, rebound} = Imp.Clients.TrainingJob.rebind(job, loaded)
     {:ok, prediction} = Imp.call(rebound, %{question: "frozen probe"})
     lm = Imp.ProgramAccess.lm(rebound)
@@ -477,7 +477,7 @@ defmodule Imp.Clients.MLXLMTrainerTest do
     code = """
     job = Imp.Clients.TrainingJob.load!(#{inspect(job_path)})
     try do
-      source = Imp.load!(#{inspect(program_path)})
+      source = Imp.read!(#{inspect(program_path)})
       {:ok, rebound} = Imp.Clients.TrainingJob.rebind(job, source)
       {:ok, first} = Imp.call(rebound, %{question: "same frozen probe"})
       {:ok, second} = Imp.call(rebound, %{question: "same frozen probe"})
@@ -633,7 +633,7 @@ defmodule Imp.Clients.MLXLMTrainerTest do
     code = """
     job = Imp.Clients.TrainingJob.load!(#{inspect(job_path)})
     try do
-      program = Imp.load!(#{inspect(program_path)})
+      program = Imp.read!(#{inspect(program_path)})
       {:ok, rebound} = Imp.Clients.TrainingJob.rebind(job, program)
       {:ok, _prediction} = Imp.call(rebound, %{question: "cleanup probe"})
       raise "forced recorder failure"

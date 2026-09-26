@@ -392,7 +392,7 @@ defmodule LocalSIMBABanking77.Runner do
       )
 
     {:ok, rebound} = TrainingJob.rebind(job, source)
-    Imp.Predict.Predict.with_lm(rebound, observed(Imp.ProgramAccess.lm(rebound), observer, :task))
+    Imp.Predict.with_lm(rebound, observed(Imp.ProgramAccess.lm(rebound), observer, :task))
   end
 
   defp ollama_lm do

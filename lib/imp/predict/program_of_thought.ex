@@ -11,7 +11,7 @@ defmodule Imp.Predict.ProgramOfThought do
 
   @behaviour Imp.Module
 
-  alias Imp.Predict.Predict
+  alias Imp.Predict
   alias Imp.{Prediction, Signature}
 
   @max_iters_metadata_key :program_of_thought_max_iters

@@ -23,7 +23,7 @@ defmodule SilentFailureRegressionsTest do
   end
 
   defp static_lm(reply) do
-    %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> reply end]}
+    Imp.LM.Static.new(handler: fn _messages, _opts -> reply end)
   end
 
   defp example(question, answer) do
@@ -81,7 +81,7 @@ defmodule SilentFailureRegressionsTest do
     lm = %Imp.Clients.ReqLLM{model: "openai:gpt-test", opts: []}
     program = Imp.predict("question -> answer", lm: lm)
 
-    loaded = program |> Imp.dump() |> Imp.load()
+    loaded = program |> Imp.dump() |> Imp.load!()
 
     assert loaded.dynamic_lm? == false
     assert loaded.lm == lm
@@ -95,7 +95,7 @@ defmodule SilentFailureRegressionsTest do
     assert dumped["dynamic_lm"] == true
     assert dumped["lm"] == nil
 
-    loaded = Imp.load(dumped)
+    loaded = Imp.load!(dumped)
     assert loaded.dynamic_lm?
     assert loaded.lm == nil
 

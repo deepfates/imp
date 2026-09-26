@@ -60,10 +60,7 @@ defmodule UpstreamExam.StreamingTest do
   test "streamify: stream yields chunks that assemble the full answer" do
     program =
       Imp.predict("question -> answer",
-        lm: %{
-          module: Imp.LM.Static,
-          opts: [handler: fn _messages, _opts -> %{answer: "How are you doing?"} end]
-        }
+        lm: Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "How are you doing?"} end)
       )
 
     chunks = Imp.Streaming.stream(program, %{question: "why did a chicken cross the kitchen?"})

@@ -8,13 +8,11 @@ defmodule Imp.SingleFieldAdapterTest do
     def response_format_capability(%__MODULE__{}),
       do: %Imp.LM.Capability{choice_values: true}
 
+    @impl true
     def generate(%__MODULE__{owner: owner}, messages, opts) do
       send(owner, {:choice_request, messages, opts})
       {:ok, opts |> Keyword.fetch!(:allowed_values) |> hd()}
     end
-
-    @impl true
-    def generate(_messages, _opts), do: {:error, :instance_required}
   end
 
   defmodule SchemaLM do
@@ -24,13 +22,11 @@ defmodule Imp.SingleFieldAdapterTest do
     def response_format_capability(%__MODULE__{}),
       do: Imp.LM.Capability.json_schema()
 
+    @impl true
     def generate(%__MODULE__{owner: owner}, messages, opts) do
       send(owner, {:schema_request, messages, opts})
       {:ok, %{"sentiment" => "positive"}}
     end
-
-    @impl true
-    def generate(_messages, _opts), do: {:error, :instance_required}
   end
 
   test "ordinary enum classifier renders a concise contract and parses only an exact value" do
@@ -163,7 +159,7 @@ defmodule Imp.SingleFieldAdapterTest do
     on_exit(fn -> File.rm(path) end)
 
     assert :ok = Imp.save!(program, path)
-    loaded = Imp.load!(path)
+    loaded = Imp.read!(path)
     assert loaded.adapter == Imp.Adapter.SingleField
 
     assert [_, %{role: :user, content: "utterance: pending"}] =

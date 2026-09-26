@@ -482,7 +482,7 @@ defmodule Imp.Optimizer.BootstrapFewShot do
     Enum.reduce(Imp.ProgramParameters.predictors(program), program, fn %{name: name}, acc ->
       Imp.ProgramParameters.update_predictor(acc, name, fn predictor ->
         predictor
-        |> Imp.Predict.Predict.with_demos([])
+        |> Imp.Predict.with_demos([])
         |> then(&%{&1 | metadata: Map.delete(&1.metadata, :optimizer_report)})
       end)
     end)
@@ -506,11 +506,7 @@ defmodule Imp.Optimizer.BootstrapFewShot do
       if round > 0 do
         lm = Imp.Settings.fetch!(:lm)
 
-        rollout_lm = fn messages, opts ->
-          Imp.LM.generate(lm, messages, Keyword.merge(opts, rollout_id: round, temperature: 1.0))
-        end
-
-        Imp.Settings.context([lm: rollout_lm], fun)
+        Imp.Settings.context([lm: struct(__MODULE__.RolloutLM, lm: lm, round: round)], fun)
       else
         fun.()
       end
@@ -567,5 +563,20 @@ defmodule Imp.Optimizer.BootstrapFewShot do
       _predictor ->
         Imp.Optimizer.Report.attach(program, report)
     end
+  end
+
+  defmodule RolloutLM do
+    @moduledoc false
+
+    # The teacher's LM for a retry round: each call is a fresh rollout at
+    # temperature 1.0, as DSPy's `lm.copy(rollout_id=round, temperature=1.0)`.
+
+    @behaviour Imp.LM
+
+    defstruct [:lm, :round]
+
+    @impl true
+    def generate(%__MODULE__{lm: lm, round: round}, messages, opts),
+      do: Imp.LM.generate(lm, messages, Keyword.merge(opts, rollout_id: round, temperature: 1.0))
   end
 end

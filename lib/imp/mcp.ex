@@ -31,7 +31,7 @@ defmodule Imp.MCP do
 
       server = %{"name" => "files", "command" => "my-mcp-server", "args" => ["--stdio"]}
       {:ok, import} = Imp.MCP.connect([server], trusted_servers: [server])
-      agent = Imp.react_v2("question -> answer", import.tools, lm: lm)
+      agent = Imp.react("question -> answer", import.tools, lm: lm)
   """
   @spec connect([Imp.MCP.Connections.server()], keyword()) ::
           {:ok, Imp.MCP.Import.t()} | {:error, term()}

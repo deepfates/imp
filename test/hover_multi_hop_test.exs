@@ -14,9 +14,8 @@ defmodule Imp.BenchmarkTruth.HoverMultiHopTest do
       {:ok, [%{title: "#{query} title", text: "evidence"}]}
     end
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
 
@@ -27,8 +26,7 @@ defmodule Imp.BenchmarkTruth.HoverMultiHopTest do
             true -> %{reasoning: "first", summary: "first summary"}
           end
         end
-      ]
-    }
+      )
 
     program = HoverMultiHop.from_retriever(lm, retriever)
     :ok = Trace.start()
@@ -55,7 +53,7 @@ defmodule Imp.BenchmarkTruth.HoverMultiHopTest do
   end
 
   test "exposes four independently optimizable ChainOfThought predictors" do
-    lm = %{module: Imp.LM.Static, opts: [handler: fn _, _ -> %{} end]}
+    lm = Imp.LM.Static.new(handler: fn _, _ -> %{} end)
     program = HoverMultiHop.from_retriever(lm, fn _, _ -> {:ok, []} end)
 
     assert Enum.map(Imp.ProgramParameters.predictors(program), & &1.name) == [
@@ -71,7 +69,7 @@ defmodule Imp.BenchmarkTruth.HoverMultiHopTest do
   end
 
   test "returns a structured stage error for malformed retrieval passages" do
-    lm = %{module: Imp.LM.Static, opts: [handler: fn _, _ -> %{} end]}
+    lm = Imp.LM.Static.new(handler: fn _, _ -> %{} end)
     program = HoverMultiHop.from_retriever(lm, fn _, _ -> {:ok, [%{rank: 1}]} end)
 
     assert {:error, {:hover_multi_hop_failed, :hop1, {:invalid_hover_passage, %{rank: 1}}}} =

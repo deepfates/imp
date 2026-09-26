@@ -536,8 +536,6 @@ defmodule Imp.BenchmarkTruth.GepaCampaignBudgetedLM do
   def new(inner, budget, shard), do: %__MODULE__{inner: inner, budget: budget, shard: shard}
 
   @impl true
-  def generate(_messages, _opts), do: {:error, :budgeted_lm_instance_required}
-
   def generate(%__MODULE__{} = lm, messages, opts) do
     case Imp.BenchmarkTruth.GepaCampaignBudget.reserve(lm.budget, lm.shard, messages, opts) do
       {:ok, reservation} ->

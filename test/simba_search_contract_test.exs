@@ -10,9 +10,8 @@ defmodule Imp.Optimizer.SIMBA.SearchContractTest do
   test "samples variable trajectories, registers all candidates, and validates finalists" do
     parent = self()
 
-    task_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    task_lm =
+      Imp.LM.Static.new(
         handler: fn messages, opts ->
           send(parent, {:simba_task, messages})
           prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -22,12 +21,10 @@ defmodule Imp.Optimizer.SIMBA.SearchContractTest do
             do: %{answer: "Paris"},
             else: %{answer: "unknown"}
         end
-      ]
-    }
+      )
 
-    prompt_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    prompt_lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           send(parent, {:simba_reflection, messages})
 
@@ -36,8 +33,7 @@ defmodule Imp.Optimizer.SIMBA.SearchContractTest do
             module_advice: %{main: "Always answer Paris for questions about France."}
           }
         end
-      ]
-    }
+      )
 
     program = Imp.predict("question -> answer: enum[Paris,unknown]", lm: task_lm)
 
@@ -81,8 +77,8 @@ defmodule Imp.Optimizer.SIMBA.SearchContractTest do
 
     assert_received {:simba_reflection, reflection_messages}
     reflection_prompt = Enum.map_join(reflection_messages, "\n", & &1.content)
-    assert reflection_prompt =~ "Program module: Imp.Predict.Predict"
-    refute reflection_prompt =~ "defmodule Imp.Predict.Predict"
+    assert reflection_prompt =~ "Program module: Imp.Predict"
+    refute reflection_prompt =~ "defmodule Imp.Predict"
     assert reflection_prompt =~ "Module main"
     assert reflection_prompt =~ "Input Fields"
     # The program listing names each field's type in words, so an enum shows
@@ -210,7 +206,7 @@ defmodule Imp.Optimizer.SIMBA.SearchContractTest do
 
     assert_received {:source_grounded_reflection, messages}
     prompt = Enum.map_join(messages, "\n", & &1.content)
-    assert prompt =~ "defmodule Imp.Predict.Predict"
+    assert prompt =~ "defmodule Imp.Predict"
   end
 
   test "explicit reflection context is bounded and validated at construction" do
@@ -259,25 +255,21 @@ defmodule Imp.Optimizer.SIMBA.SearchContractTest do
   end
 
   test "does not admit blank reflection advice as an instruction mutation" do
-    task_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    task_lm =
+      Imp.LM.Static.new(
         handler: fn _messages, opts ->
           if rem(Keyword.get(opts, :rollout_id, 0), 2) == 0,
             do: %{answer: "correct"},
             else: %{answer: "wrong"}
         end
-      ]
-    }
+      )
 
-    prompt_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    prompt_lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           %{discussion: "No actionable advice.", module_advice: %{main: "   \n"}}
         end
-      ]
-    }
+      )
 
     program = Imp.predict("question -> answer", lm: task_lm)
     example = Imp.example(question: "q", answer: "correct") |> Imp.with_inputs(:question)
@@ -303,33 +295,27 @@ defmodule Imp.Optimizer.SIMBA.SearchContractTest do
   test "prepares teacher-first rollout models from the baseline rollout id" do
     parent = self()
 
-    base_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    base_lm =
+      Imp.LM.Static.new(
         rollout_id: 17,
         temperature: 0.25,
         handler: fn _, opts ->
           send(parent, {:base_rollout, opts})
           %{answer: "yes"}
         end
-      ]
-    }
+      )
 
-    teacher_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    teacher_lm =
+      Imp.LM.Static.new(
         temperature: 0.7,
         handler: fn _, opts ->
           send(parent, {:teacher_rollout, opts})
           %{answer: "yes"}
         end
-      ]
-    }
+      )
 
-    prompt_lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _, _ -> %{discussion: "unused", module_advice: %{}} end]
-    }
+    prompt_lm =
+      Imp.LM.Static.new(handler: fn _, _ -> %{discussion: "unused", module_advice: %{}} end)
 
     program = Imp.predict("question -> answer", lm: base_lm)
 
@@ -359,9 +345,8 @@ defmodule Imp.Optimizer.SIMBA.SearchContractTest do
   test "suppresses one side of tied eligible rule trajectories with upstream N/A values" do
     parent = self()
 
-    task_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    task_lm =
+      Imp.LM.Static.new(
         handler: fn messages, opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
           rollout_id = Keyword.get(opts, :rollout_id, 0)
@@ -370,18 +355,15 @@ defmodule Imp.Optimizer.SIMBA.SearchContractTest do
             do: %{answer: "tie"},
             else: %{answer: Integer.to_string(rollout_id)}
         end
-      ]
-    }
+      )
 
-    prompt_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    prompt_lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           send(parent, {:reflection_payload, messages})
           %{discussion: "contrast", module_advice: %{main: "Keep the successful behavior."}}
         end
-      ]
-    }
+      )
 
     metric = fn example, prediction ->
       case Imp.Example.to_map(example).question do
@@ -420,26 +402,22 @@ defmodule Imp.Optimizer.SIMBA.SearchContractTest do
   test "passes normalized metric feedback and metadata into rule reflection" do
     parent = self()
 
-    task_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    task_lm =
+      Imp.LM.Static.new(
         handler: fn _messages, opts ->
           if rem(Keyword.get(opts, :rollout_id, 0), 2) == 0,
             do: %{answer: "correct"},
             else: %{answer: "wrong"}
         end
-      ]
-    }
+      )
 
-    prompt_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    prompt_lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           send(parent, {:reflection_with_reward_info, messages})
           %{discussion: "use the metric guidance", module_advice: %{main: "Answer correctly."}}
         end
-      ]
-    }
+      )
 
     metric = fn _example, prediction ->
       answer = Imp.get(prediction, :answer)
@@ -477,9 +455,8 @@ defmodule Imp.Optimizer.SIMBA.SearchContractTest do
   test "truncates demo input representations by Unicode characters with the upstream marker" do
     parent = self()
 
-    task_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    task_lm =
+      Imp.LM.Static.new(
         handler: fn messages, opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
           if prompt =~ "TRUNCATED FOR BREVITY", do: send(parent, {:truncated_demo, prompt})
@@ -488,13 +465,10 @@ defmodule Imp.Optimizer.SIMBA.SearchContractTest do
             do: %{answer: "yes"},
             else: %{answer: "no"}
         end
-      ]
-    }
+      )
 
-    prompt_lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _, _ -> %{discussion: "unused", module_advice: %{}} end]
-    }
+    prompt_lm =
+      Imp.LM.Static.new(handler: fn _, _ -> %{discussion: "unused", module_advice: %{}} end)
 
     program = Imp.predict("text, context -> answer", lm: task_lm)
 
@@ -520,23 +494,19 @@ defmodule Imp.Optimizer.SIMBA.SearchContractTest do
   end
 
   test "same seed reproduces batches and candidate state" do
-    task_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    task_lm =
+      Imp.LM.Static.new(
         handler: fn _, opts ->
           %{answer: if(rem(Keyword.get(opts, :rollout_id, 0), 2) == 0, do: "yes", else: "no")}
         end
-      ]
-    }
+      )
 
-    prompt_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    prompt_lm =
+      Imp.LM.Static.new(
         handler: fn _, _ ->
           %{discussion: "Prefer the successful answer.", module_advice: %{main: "Answer yes."}}
         end
-      ]
-    }
+      )
 
     program = Imp.predict("question -> answer", lm: task_lm)
 

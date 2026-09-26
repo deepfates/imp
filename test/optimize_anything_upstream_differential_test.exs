@@ -6,8 +6,6 @@ defmodule Imp.BenchmarkTruth.OptimizeAnythingUpstreamDifferentialReadinessTest d
   defmodule SequencedLM do
     defstruct [:responses]
 
-    def generate(_messages, _opts), do: {:error, :instance_required}
-
     def generate(%__MODULE__{responses: responses}, _messages, _opts) do
       Agent.get_and_update(responses, fn [response | rest] -> {response, rest} end)
     end

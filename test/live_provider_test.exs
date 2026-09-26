@@ -7,7 +7,7 @@ defmodule LiveProviderTest do
     program = Imp.predict("question -> answer", lm: lm)
 
     assert {:ok, prediction} =
-             Imp.Predict.Predict.call(program, %{
+             Imp.Predict.call(program, %{
                question: "Reply with exactly this single word and no punctuation: pong"
              })
 
@@ -28,7 +28,7 @@ defmodule LiveProviderTest do
       Imp.predict("question -> answer, score: int", lm: lm, adapter: Imp.Adapter.JSON)
 
     assert {:ok, prediction} =
-             Imp.Predict.Predict.call(program, %{
+             Imp.Predict.call(program, %{
                question: "Return only a JSON object. The answer must be pong and score must be 7."
              })
 
@@ -48,7 +48,7 @@ defmodule LiveProviderTest do
       )
 
     assert {:ok, prediction} =
-             Imp.Predict.Predict.call(program, %{
+             Imp.Predict.call(program, %{
                question: "Set answer to pong and score to 7."
              })
 

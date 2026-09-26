@@ -18,7 +18,7 @@ defmodule Mix.Tasks.ImpAcp.McpDemo do
              trusted_servers: [demo_server()],
              result_mode: :text
            ) do
-      {:ok, Imp.react_v2("question -> answer", import.tools, lm: lm(), max_iters: 2),
+      {:ok, Imp.react("question -> answer", import.tools, lm: lm(), max_iters: 2),
        %{cleanup: import.cleanup, tool_kinds: Imp.ACP.ToolKind.derive_all(import.annotations)}}
     end
   end

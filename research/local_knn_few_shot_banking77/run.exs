@@ -159,7 +159,7 @@ defmodule LocalKNNFewShotBanking77.Runner do
   defp fresh do
     paths = paths!()
     {job, rows} = preflight!(paths, false)
-    selected = Imp.load!(paths.saved_program, registry: registry())
+    selected = Imp.read!(paths.saved_program, registry: registry())
     {:ok, rebound} = TrainingJob.rebind(job, selected)
     observer = observer!()
 

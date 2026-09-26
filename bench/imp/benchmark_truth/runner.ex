@@ -829,27 +829,24 @@ defmodule Imp.BenchmarkTruth.Runner do
         {fixture_lookup_key(task, example), fixture_fields(task, example)}
       end)
 
-    %{
-      module: Imp.LM.Static,
-      opts: [
-        handler: fn messages, _opts ->
-          text = Enum.map_join(messages, "\n", &Map.get(&1, :content, ""))
-          lookup_text = fixture_lookup_text(task, text)
+    Imp.LM.Static.new(
+      handler: fn messages, _opts ->
+        text = Enum.map_join(messages, "\n", &Map.get(&1, :content, ""))
+        lookup_text = fixture_lookup_text(task, text)
 
-          key =
-            lookup
-            |> Map.keys()
-            |> Enum.map(&{&1, fixture_key_last_position(lookup_text, &1)})
-            |> Enum.reject(fn {_key, position} -> is_nil(position) end)
-            |> Enum.max_by(fn {key, position} -> {position, String.length(key)} end, fn ->
-              {nil, nil}
-            end)
-            |> elem(0)
+        key =
+          lookup
+          |> Map.keys()
+          |> Enum.map(&{&1, fixture_key_last_position(lookup_text, &1)})
+          |> Enum.reject(fn {_key, position} -> is_nil(position) end)
+          |> Enum.max_by(fn {key, position} -> {position, String.length(key)} end, fn ->
+            {nil, nil}
+          end)
+          |> elem(0)
 
-          Map.get(lookup, key, fixture_empty_fields(task))
-        end
-      ]
-    }
+        Map.get(lookup, key, fixture_empty_fields(task))
+      end
+    )
   end
 
   defp fixture_lookup_text(task, text) do

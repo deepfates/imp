@@ -211,7 +211,7 @@ defmodule ReasoningContinuityTest do
     {lm, counter} = scripted_lm(provider, field, value, [:lookup, :text, :text])
 
     lookup = lookup_tool()
-    program = Imp.react_v2("question -> answer", [lookup], lm: lm, max_iters: 4)
+    program = Imp.react("question -> answer", [lookup], lm: lm, max_iters: 4)
 
     assert {:ok, run} =
              Imp.Run.start(program, %{question: "Look up the fixture. #{@input_token}"})
@@ -227,7 +227,7 @@ defmodule ReasoningContinuityTest do
     history = first.metadata[:history]
     refute inspect(history, limit: :infinity) =~ @input_token
 
-    restarted = Imp.react_v2("question -> answer", [lookup], lm: lm, max_iters: 4)
+    restarted = Imp.react("question -> answer", [lookup], lm: lm, max_iters: 4)
 
     assert {:ok, resumed} =
              Imp.call(restarted, %{question: "Continue.", history: reload(history)})
@@ -257,7 +257,7 @@ defmodule ReasoningContinuityTest do
     {lm, _counter} = scripted_lm(provider, field, value, [:lookup, submit, :text])
 
     lookup = lookup_tool()
-    program = Imp.react_v2("question -> answer, source", [lookup], lm: lm, max_iters: 4)
+    program = Imp.react("question -> answer, source", [lookup], lm: lm, max_iters: 4)
 
     assert {:ok, first} = Imp.call(program, %{question: "Look up the fixture."})
     assert first.metadata[:termination_reason] == :submit
@@ -266,7 +266,7 @@ defmodule ReasoningContinuityTest do
     assert_received {:wire_request, 2, continuation}
     assert_replayed(continuation, "original-call-1", field, value)
 
-    restarted = Imp.react_v2("question -> answer", [lookup], lm: lm, max_iters: 4)
+    restarted = Imp.react("question -> answer", [lookup], lm: lm, max_iters: 4)
 
     assert {:ok, _resumed} =
              Imp.call(restarted, %{

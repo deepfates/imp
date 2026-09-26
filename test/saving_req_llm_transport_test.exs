@@ -27,7 +27,7 @@ defmodule Imp.SavingReqLLMTransportTest do
              ["req_http_options", [["retry", false], ["max_retries", 0]]]
            ]
 
-    loaded = Imp.load(dumped)
+    loaded = Imp.load!(dumped)
 
     assert loaded.config == [json_fallback: false]
     assert loaded.lm.opts == @transport_opts
@@ -42,7 +42,7 @@ defmodule Imp.SavingReqLLMTransportTest do
     :ok = Imp.save!(stopped_program_shape(), artifact)
 
     code = """
-    loaded = Imp.load!(#{inspect(artifact)})
+    loaded = Imp.read!(#{inspect(artifact)})
     lm = Imp.ProgramAccess.lm(loaded)
     File.write!(#{inspect(receipt)}, :erlang.term_to_binary({lm.model, lm.opts, loaded.config}, [:deterministic]))
     """
@@ -73,7 +73,7 @@ defmodule Imp.SavingReqLLMTransportTest do
       )
 
     dumped = program |> Imp.dump() |> json_round_trip()
-    loaded = Imp.load(dumped)
+    loaded = Imp.load!(dumped)
 
     assert loaded.lm.opts[:input_envelope] == [max_bytes: 8_192, reservation_tokens: 4_096]
 
@@ -88,7 +88,7 @@ defmodule Imp.SavingReqLLMTransportTest do
           ["tokenizer", "untrusted"]
         ])
       )
-      |> Imp.load()
+      |> Imp.load!()
     end
   end
 
@@ -103,7 +103,7 @@ defmodule Imp.SavingReqLLMTransportTest do
       )
 
     dumped = program |> Imp.dump() |> json_round_trip()
-    loaded = Imp.load(dumped)
+    loaded = Imp.load!(dumped)
     assert loaded.lm.opts[:reasoning_effort] == "high"
     assert loaded.lm.opts[:openrouter_reasoning_wire] == :nested
 
@@ -113,7 +113,7 @@ defmodule Imp.SavingReqLLMTransportTest do
     :ok = Imp.save!(program, artifact)
 
     code = """
-    loaded = Imp.load!(#{inspect(artifact)})
+    loaded = Imp.read!(#{inspect(artifact)})
     File.write!(#{inspect(receipt)}, :erlang.term_to_binary(Imp.ProgramAccess.lm(loaded).opts, [:deterministic]))
     """
 
@@ -135,7 +135,7 @@ defmodule Imp.SavingReqLLMTransportTest do
       assert_raise ArgumentError, ~r/reasoning_effort/, fn ->
         dumped
         |> put_in(["lm", "opts"], replace_option(opts, "reasoning_effort", invalid))
-        |> Imp.load()
+        |> Imp.load!()
       end
     end
 
@@ -143,7 +143,7 @@ defmodule Imp.SavingReqLLMTransportTest do
       assert_raise ArgumentError, ~r/openrouter_reasoning_wire/, fn ->
         dumped
         |> put_in(["lm", "opts"], replace_option(opts, "openrouter_reasoning_wire", invalid))
-        |> Imp.load()
+        |> Imp.load!()
       end
     end
   end
@@ -158,7 +158,7 @@ defmodule Imp.SavingReqLLMTransportTest do
     assert_raise ArgumentError, ~r/unknown saved ReqLLM options key/, fn ->
       dumped
       |> put_in(["lm", "opts"], opts ++ [[unknown_key, true]])
-      |> Imp.load()
+      |> Imp.load!()
     end
 
     assert_raise ArgumentError, fn -> String.to_existing_atom(unknown_key) end
@@ -166,13 +166,13 @@ defmodule Imp.SavingReqLLMTransportTest do
     assert_raise ArgumentError, ~r/saved ReqLLM max_retries must be a non-negative integer/, fn ->
       dumped
       |> put_in(["lm", "opts"], replace_option(opts, "max_retries", "0"))
-      |> Imp.load()
+      |> Imp.load!()
     end
 
     assert_raise ArgumentError, ~r/saved ReqLLM seed must be a positive integer/, fn ->
       dumped
       |> put_in(["lm", "opts"], replace_option(opts, "seed", 0))
-      |> Imp.load()
+      |> Imp.load!()
     end
 
     assert_raise ArgumentError,
@@ -180,7 +180,7 @@ defmodule Imp.SavingReqLLMTransportTest do
                  fn ->
                    dumped
                    |> put_req_http_options([["retry", false], ["adapter", "unsafe"]])
-                   |> Imp.load()
+                   |> Imp.load!()
                  end
 
     assert_raise ArgumentError,
@@ -188,19 +188,19 @@ defmodule Imp.SavingReqLLMTransportTest do
                  fn ->
                    dumped
                    |> put_req_http_options([["retry", "false"], ["max_retries", 0]])
-                   |> Imp.load()
+                   |> Imp.load!()
                  end
 
     assert_raise ArgumentError, ~r/duplicate saved ReqLLM req_http_options key/, fn ->
       dumped
       |> put_req_http_options([["retry", false], ["retry", false], ["max_retries", 0]])
-      |> Imp.load()
+      |> Imp.load!()
     end
 
     assert_raise ArgumentError, ~r/saved ReqLLM req_http_options must be a list/, fn ->
       dumped
       |> put_in(["lm", "opts"], replace_option(opts, "req_http_options", %{"retry" => false}))
-      |> Imp.load()
+      |> Imp.load!()
     end
   end
 
@@ -214,7 +214,7 @@ defmodule Imp.SavingReqLLMTransportTest do
         entries ++ [[%{"__imp_type__" => "atom", "value" => unknown}, "unsafe"]]
       end)
 
-    assert_raise ArgumentError, fn -> Imp.load(poisoned) end
+    assert_raise ArgumentError, fn -> Imp.load!(poisoned) end
     assert_raise ArgumentError, fn -> String.to_existing_atom(unknown) end
   end
 

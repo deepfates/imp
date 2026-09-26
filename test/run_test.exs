@@ -52,7 +52,7 @@ defmodule Imp.RunTest do
         end
       )
 
-    program = Imp.react_v2("question -> answer, confidence: float", [lookup], lm: lm)
+    program = Imp.react("question -> answer, confidence: float", [lookup], lm: lm)
 
     assert {:ok, run} =
              Imp.start_run(program, %{question: "runtime?"},
@@ -315,7 +315,7 @@ defmodule Imp.RunTest do
       )
 
     program =
-      Imp.react_v2("question -> answer, confidence: float", [lookup], lm: lm, max_iters: 2)
+      Imp.react("question -> answer, confidence: float", [lookup], lm: lm, max_iters: 2)
 
     assert {:ok, run} =
              Imp.start_run(program, %{question: "lookup"},
@@ -365,7 +365,7 @@ defmodule Imp.RunTest do
       )
 
     tool = Imp.tool(:external, "external write", fn args -> send(owner, {:effect, args}) end)
-    program = Imp.react_v2("question -> answer", [tool], lm: lm)
+    program = Imp.react("question -> answer", [tool], lm: lm)
 
     assert {:ok, run} =
              Imp.start_run(program, %{question: "write"},
@@ -396,7 +396,7 @@ defmodule Imp.RunTest do
       )
 
     tool = Imp.tool(:external, "external write", fn _args -> send(owner, :effect_executed) end)
-    program = Imp.react_v2("question -> answer", [tool], lm: lm)
+    program = Imp.react("question -> answer", [tool], lm: lm)
 
     assert {:ok, run} =
              Imp.start_run(program, %{question: "write"},
@@ -434,7 +434,7 @@ defmodule Imp.RunTest do
         tool =
           Imp.tool(:external, "external write", fn _args -> send(test_pid, :effect_executed) end)
 
-        program = Imp.react_v2("question -> answer", [tool], lm: lm)
+        program = Imp.react("question -> answer", [tool], lm: lm)
 
         {:ok, run} =
           Imp.start_run(program, %{question: "write"},

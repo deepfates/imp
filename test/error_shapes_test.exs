@@ -254,7 +254,7 @@ defmodule Imp.ErrorShapesTest do
         )
 
       look = Imp.tool(:look, "Look", fn _ -> "seen" end)
-      program = Imp.react_v2("intent -> answer", [look], lm: lm)
+      program = Imp.react("intent -> answer", [look], lm: lm)
 
       assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
       assert prediction.metadata[:termination_cause] == :parse_error
@@ -297,7 +297,7 @@ defmodule Imp.ErrorShapesTest do
           end
         )
 
-      program = Imp.react_v2("intent -> answer", [broken], lm: lm)
+      program = Imp.react("intent -> answer", [broken], lm: lm)
       assert {:ok, prediction} = Imp.call(program, %{intent: "go"})
 
       results =

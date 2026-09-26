@@ -8,8 +8,11 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerCampaignTest do
   defmodule CrashableLM do
     @behaviour Imp.LM
 
+    defstruct opts: []
+
     @impl true
-    def generate(_messages, opts) do
+    def generate(%__MODULE__{opts: configured}, _messages, opts) do
+      opts = Keyword.merge(configured, opts)
       owner = Keyword.fetch!(opts, :owner)
       calls = Keyword.fetch!(opts, :calls)
       count = Agent.get_and_update(calls, &{&1 + 1, &1 + 1})
@@ -36,15 +39,13 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerCampaignTest do
     dataset = write_aime_dataset!(root)
     {:ok, calls} = Agent.start_link(fn -> 0 end)
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           Agent.update(calls, &(&1 + 1))
           %{reasoning: "computed", answer: "1"}
         end
-      ]
-    }
+      )
 
     opts = campaign_opts(root, dataset, lm, arms: [:baseline])
     first = InstructionOptimizerCampaign.run(opts)
@@ -104,10 +105,7 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerCampaignTest do
     root = tmp_dir("row-errors")
     dataset = write_aime_dataset!(root)
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> {:error, :provider_unavailable} end]
-    }
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> {:error, :provider_unavailable} end)
 
     result =
       root
@@ -233,9 +231,8 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerCampaignTest do
     {:ok, captured} = Agent.start_link(fn -> nil end)
     {:ok, calls} = Agent.start_link(fn -> 0 end)
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           Agent.update(calls, &(&1 + 1))
 
@@ -245,8 +242,7 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerCampaignTest do
 
           %{reasoning: "computed", answer: "1"}
         end
-      ]
-    }
+      )
 
     opts = campaign_opts(root, dataset, lm, arms: [:baseline])
     InstructionOptimizerCampaign.run(opts)
@@ -265,8 +261,7 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerCampaignTest do
     dataset = write_aime_dataset!(root)
     {:ok, calls} = Agent.start_link(fn -> 0 end)
 
-    crashing_lm = %{
-      module: CrashableLM,
+    crashing_lm = %CrashableLM{
       opts: [owner: self(), calls: calls, crash_at: 1, emit_usage: true]
     }
 
@@ -331,10 +326,7 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerCampaignTest do
     dataset = write_aime_dataset!(root)
     {:ok, calls} = Agent.start_link(fn -> 0 end)
 
-    lm = %{
-      module: CrashableLM,
-      opts: [owner: self(), calls: calls, emit_usage: true]
-    }
+    lm = %CrashableLM{opts: [owner: self(), calls: calls, emit_usage: true]}
 
     opts =
       campaign_opts(root, dataset, lm, arms: [:baseline])
@@ -370,7 +362,7 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerCampaignTest do
       |> Imp.Saving.dump()
       |> Jason.encode!()
       |> Jason.decode!()
-      |> Imp.Saving.load()
+      |> Imp.Saving.load!()
 
     [predictor] = Imp.ProgramParameters.predictors(program)
     assert predictor.predictor.config == [cache: false, rollout_id: 7]
@@ -403,7 +395,7 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerCampaignTest do
   end
 
   defp static_lm do
-    %{module: Imp.LM.Static, opts: [handler: fn _, _ -> %{reasoning: "ok", answer: "1"} end]}
+    Imp.LM.Static.new(handler: fn _, _ -> %{reasoning: "ok", answer: "1"} end)
   end
 
   defp write_aime_dataset!(root) do

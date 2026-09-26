@@ -101,7 +101,7 @@ defmodule GRPOContractTest do
   defp trainer(mode \\ :ok), do: %SessionTrainer{owner: self(), mode: mode}
 
   defp program(handler) do
-    lm = %{module: Imp.LM.Static, opts: [handler: handler], model: "base-model"}
+    lm = Imp.LM.Static.new(model: "base-model", handler: handler)
     Imp.predict("question -> answer", lm: lm)
   end
 
@@ -295,10 +295,9 @@ defmodule GRPOContractTest do
   end
 
   test "keeps predictor identity and predictor-major source ordering" do
-    lm = %{
-      module: Imp.LM.Static,
-      model: "base-model",
-      opts: [
+    lm =
+      Imp.LM.Static.new(
+        model: "base-model",
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", &Map.get(&1, :content, ""))
 
@@ -306,8 +305,7 @@ defmodule GRPOContractTest do
             do: %{first_answer: "one"},
             else: %{second_answer: "two"}
         end
-      ]
-    }
+      )
 
     program = %TwoPredictorProgram{
       first: Imp.predict("question -> first_answer", lm: lm),
@@ -386,11 +384,11 @@ defmodule GRPOContractTest do
   test "partially decoded multi-output failures receive structural format credit" do
     partial_failure =
       Imp.predict("question -> answer, confidence",
-        lm: %{
-          module: Imp.LM.Static,
-          model: "base-model",
-          opts: [handler: fn _messages, _opts -> %{answer: "present"} end]
-        },
+        lm:
+          Imp.LM.Static.new(
+            model: "base-model",
+            handler: fn _messages, _opts -> %{answer: "present"} end
+          ),
         config: [json_fallback: false]
       )
 

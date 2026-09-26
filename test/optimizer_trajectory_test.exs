@@ -13,11 +13,11 @@ defmodule Imp.Optimizer.TrajectoryTest do
       do: %{program | second: update.(program.second)}
 
     def call(program, inputs) do
-      with {:ok, hint} <- Imp.Predict.Predict.call(program.first, inputs) do
+      with {:ok, hint} <- Imp.Predict.call(program.first, inputs) do
         if program.fail_after_first do
           {:error, :forced_second_stage_failure}
         else
-          Imp.Predict.Predict.call(program.second, %{
+          Imp.Predict.call(program.second, %{
             question: Map.fetch!(inputs, :question),
             hint: Imp.get(hint, :hint)
           })
@@ -244,15 +244,9 @@ defmodule Imp.Optimizer.TrajectoryTest do
   end
 
   defp program(fail_after_first) do
-    hint_lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{hint: "capital clue"} end]
-    }
+    hint_lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{hint: "capital clue"} end)
 
-    answer_lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-    }
+    answer_lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "Paris"} end)
 
     %TwoStage{
       first: Imp.predict("question -> hint", lm: hint_lm),

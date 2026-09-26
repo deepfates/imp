@@ -80,7 +80,7 @@ defmodule Imp.LocalSIMBABanking77ExampleTest do
       Imp.example(question: "Capital of France?", answer: "Paris")
       |> Imp.with_inputs(:question)
 
-    selected = Imp.Predict.Predict.with_demos(baseline, [demo])
+    selected = Imp.Predict.with_demos(baseline, [demo])
 
     selected_parameters =
       apply(LocalSIMBABanking77.Audit, :parameter_snapshot, [selected])

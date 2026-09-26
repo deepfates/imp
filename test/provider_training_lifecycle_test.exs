@@ -341,7 +341,7 @@ defmodule ProviderTrainingLifecycleTest do
              result_model: "ft:gpt-test:org:abc"
            }
 
-    loaded = Imp.load!(path)
+    loaded = Imp.read!(path)
 
     assert %Imp.Clients.ReqLLM{model: "openai:ft:gpt-test:org:abc"} =
              Imp.ProgramAccess.lm(loaded)
@@ -428,7 +428,7 @@ defmodule ProviderTrainingLifecycleTest do
              model: "openai:local-fused-model",
              opts: [base_url: "http://127.0.0.1:8189/v1"]
            } =
-             Imp.load!(path)
+             Imp.read!(path)
              |> Imp.ProgramAccess.lm()
   end
 
@@ -1027,11 +1027,7 @@ defmodule ProviderTrainingLifecycleTest do
   end
 
   test "BootstrapFinetune accepts provider trainer structs" do
-    lm = %{
-      module: Imp.LM.Static,
-      model: "gpt-test",
-      opts: [handler: fn _messages, _opts -> %{answer: "4"} end]
-    }
+    lm = Imp.LM.Static.new(model: "gpt-test", handler: fn _messages, _opts -> %{answer: "4"} end)
 
     program = Imp.predict("question -> answer", lm: lm)
     metric = Imp.Metrics.exact_match(:answer)
@@ -1049,7 +1045,7 @@ defmodule ProviderTrainingLifecycleTest do
       |> Imp.Optimizer.BootstrapFinetune.compile(program, examples())
 
     assert %{
-             program: %Imp.Predict.Predict{},
+             program: %Imp.Predict{},
              job: %Imp.Clients.TrainingJob{provider: :openai}
            } =
              result
@@ -1091,11 +1087,7 @@ defmodule ProviderTrainingLifecycleTest do
   end
 
   test "BootstrapFinetune forwards a caller OpenAI example encoder unchanged" do
-    lm = %{
-      module: Imp.LM.Static,
-      model: "gpt-test",
-      opts: [handler: fn _messages, _opts -> %{answer: "4"} end]
-    }
+    lm = Imp.LM.Static.new(model: "gpt-test", handler: fn _messages, _opts -> %{answer: "4"} end)
 
     program = Imp.predict("question -> answer", lm: lm)
     owner = self()
@@ -1203,7 +1195,7 @@ defmodule ProviderTrainingLifecycleTest do
       |> Imp.Optimizer.BootstrapFinetune.new(trainer: trainer, max_demos: 0)
       |> Imp.Optimizer.BootstrapFinetune.compile(program, examples())
 
-    assert %{program: %Imp.Predict.Predict{}, job: %Imp.Clients.TrainingJob{}} = result
+    assert %{program: %Imp.Predict{}, job: %Imp.Clients.TrainingJob{}} = result
     assert_received {:finetune_demos, []}
 
     assert_raise ArgumentError,
@@ -1214,10 +1206,7 @@ defmodule ProviderTrainingLifecycleTest do
   end
 
   test "BootstrapFinetune extracts trace rows and LM through composed program wrappers" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{program: "x * 2"} end]
-    }
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{program: "x * 2"} end)
 
     retriever = Imp.Retrieve.Memory.new([%{text: "multiplication by two"}], k: 1)
 
@@ -1255,10 +1244,7 @@ defmodule ProviderTrainingLifecycleTest do
   end
 
   test "GRPO extracts the provider LM through CodeAct and ProgramOfThought wrappers" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{program: "42"} end]
-    }
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{program: "42"} end)
 
     program = Imp.code_act("question -> answer", [], lm: lm)
     trainset = [Imp.example(question: "life?", answer: "42") |> Imp.with_inputs(:question)]

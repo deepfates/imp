@@ -10,7 +10,7 @@ defmodule Imp.Playbook.WithContext do
   @behaviour Imp.Module
 
   alias Imp.{Playbook, ProgramParameters}
-  alias Imp.Predict.Predict
+  alias Imp.Predict
 
   @enforce_keys [:program, :playbook]
   defstruct [:program, :playbook]

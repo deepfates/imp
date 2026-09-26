@@ -15,6 +15,24 @@ defmodule PublicAPIManifestTest do
     assert actual["excluded_modules"] != []
   end
 
+  test "every packaged module is in the manifest, public or excluded" do
+    manifest = Mix.Tasks.Imp.PublicApi.manifest()
+    package_files = MapSet.new(Mix.Project.config()[:package][:files])
+
+    recorded =
+      MapSet.new(manifest["modules"] ++ manifest["excluded_modules"], & &1["module"])
+
+    packaged =
+      for module <- Application.spec(:imp, :modules),
+          source = module.module_info(:compile)[:source] |> to_string() |> Path.relative_to_cwd(),
+          MapSet.member?(package_files, source),
+          do: inspect(module)
+
+    assert packaged != []
+    assert Enum.reject(packaged, &MapSet.member?(recorded, &1)) == []
+    assert "Imp.MCP.ToolSchemas" in Enum.map(manifest["excluded_modules"], & &1["module"])
+  end
+
   test "manifest is deterministic and contains no machine-local paths or timestamps" do
     first = Mix.Tasks.Imp.PublicApi.manifest()
     second = Mix.Tasks.Imp.PublicApi.manifest()
@@ -66,7 +84,7 @@ defmodule PublicAPIManifestTest do
              "callbacks"
            ]
 
-    assert %{"name" => "generate/2", "optional" => false} in modules["Imp.LM"]["callbacks"]
+    assert %{"name" => "generate/3", "optional" => false} in modules["Imp.LM"]["callbacks"]
     assert %{"name" => "request/5", "optional" => true} in modules["Imp.HTTP"]["callbacks"]
     assert modules["Imp.Example"]["callbacks"] == []
   end

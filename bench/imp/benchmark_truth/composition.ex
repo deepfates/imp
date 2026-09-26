@@ -127,14 +127,12 @@ defmodule Imp.BenchmarkTruth.Composition do
   end
 
   defp multi_chain_comparison([example | _examples]) do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           %{rationale: "the grounded attempt matches the question", answer: example["answer"]}
         end
-      ]
-    }
+      )
 
     program = Imp.Predict.MultiChainComparison.new("question -> answer", lm: lm, m: 2)
 

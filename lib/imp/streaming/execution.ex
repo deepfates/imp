@@ -22,14 +22,14 @@ defmodule Imp.Streaming.Execution do
     end
   end
 
-  def generate(%Imp.Predict.Predict{} = predict, lm, messages, opts) do
+  def generate(%Imp.Predict{} = predict, lm, messages, opts) do
     case stream_target(predict) do
       {:ok, name, context} -> stream_generate(context, name, lm, messages, opts)
       :ordinary -> Imp.LM.generate(lm, messages, opts)
     end
   end
 
-  defp stream_target(%Imp.Predict.Predict{metadata: metadata}) do
+  defp stream_target(%Imp.Predict{metadata: metadata}) do
     with %{targets: targets} = context when is_map(targets) <- context(),
          name when not is_nil(name) <-
            Map.get(metadata, :stream_predict_name) ||
@@ -58,17 +58,6 @@ defmodule Imp.Streaming.Execution do
       |> consume_stream(context, name, module)
     else
       Imp.LM.generate(module, messages, opts)
-    end
-  end
-
-  defp stream_generate(context, name, %{module: module, opts: client_opts} = lm, messages, opts) do
-    merged = Keyword.merge(client_opts, opts)
-
-    if Code.ensure_loaded?(module) and function_exported?(module, :stream, 3) do
-      module.stream(lm, messages, unrecorded(merged))
-      |> consume_stream(context, name, lm)
-    else
-      Imp.LM.generate(lm, messages, opts)
     end
   end
 

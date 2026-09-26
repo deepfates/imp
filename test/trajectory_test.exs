@@ -19,7 +19,7 @@ defmodule Imp.TrajectoryTest do
       )
 
     {:ok, run} =
-      Imp.Run.start(Imp.react_v2("question -> answer, confidence: float", [lookup], lm: lm), %{
+      Imp.Run.start(Imp.react("question -> answer, confidence: float", [lookup], lm: lm), %{
         question: "runtime?",
         api_key: secret
       })

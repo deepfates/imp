@@ -357,7 +357,7 @@ defmodule LocalGRPOOpaqueBanking77.Runner do
     paths = paths!()
     rows = preflight!(paths, :verify)
     job = TrainingJob.load!(paths.job)
-    portable = Imp.load!(paths.program)
+    portable = Imp.read!(paths.program)
     trainer = trainer(paths, {:local_grpo_opaque_banking77_fresh, seed()})
     selection = read_json!(Path.join(paths.output, "04-selection.json"))
     selected_arm = selection["selected_arm"]

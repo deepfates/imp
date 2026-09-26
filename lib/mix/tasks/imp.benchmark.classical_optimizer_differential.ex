@@ -234,10 +234,7 @@ defmodule Mix.Tasks.Imp.Benchmark.ClassicalOptimizerDifferential do
 
     student =
       Imp.predict("question -> answer",
-        lm: %{
-          module: Imp.LM.Static,
-          opts: [handler: fn _messages, _opts -> %{answer: "generated"} end]
-        }
+        lm: Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "generated"} end)
       )
 
     metric = fn example, prediction ->
