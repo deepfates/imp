@@ -299,9 +299,8 @@ defmodule Imp.Optimize.Anything.RunnerTest do
   test "seedless mode generates one fenced seed from the objective and at most three samples" do
     receiver = self()
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           send(receiver, {:seed_prompt, messages})
 
@@ -310,8 +309,7 @@ defmodule Imp.Optimize.Anything.RunnerTest do
             __imp_lm_metadata__: %{provider: "test"}
           }
         end
-      ]
-    }
+      )
 
     dataset = Enum.map(1..4, &%{sample: &1})
 
@@ -341,15 +339,13 @@ defmodule Imp.Optimize.Anything.RunnerTest do
   test "seedless resume reuses the sealed seed without another LM call" do
     receiver = self()
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           send(receiver, :generated_seed)
           "```text\ngenerated seed\n```"
         end
-      ]
-    }
+      )
 
     evaluator = fn _candidate -> 1.0 end
 
@@ -392,15 +388,13 @@ defmodule Imp.Optimize.Anything.RunnerTest do
     first = %Image{url: "https://example.test/first.png"}
     second = %Image{data: "c2Vjb25k", mime_type: "image/png"}
 
-    reflection_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    reflection_lm =
+      Imp.LM.Static.new(
         handler: fn [%{content: content}], _opts ->
           send(receiver, {:reflection_content, content})
           "```text\nbase\n```"
         end
-      ]
-    }
+      )
 
     result =
       Anything.run(
@@ -442,10 +436,8 @@ defmodule Imp.Optimize.Anything.RunnerTest do
   end
 
   test "refiner boosts evaluation and exposes co-evolved prompt history" do
-    refiner_lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> ~s({"current_candidate":"better"}) end]
-    }
+    refiner_lm =
+      Imp.LM.Static.new(handler: fn _messages, _opts -> ~s({"current_candidate":"better"}) end)
 
     result =
       Anything.run(

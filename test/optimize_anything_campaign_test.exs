@@ -34,26 +34,27 @@ defmodule OptimizeAnythingCampaignTest do
 
     {:ok, queue} = Agent.start_link(fn -> responses end)
 
-    lm = fn _messages, _opts ->
-      response = Agent.get_and_update(queue, fn [next | rest] -> {next, rest} end)
+    lm =
+      Imp.Test.FunLM.new(fn _messages, _opts ->
+        response = Agent.get_and_update(queue, fn [next | rest] -> {next, rest} end)
 
-      Task.async(fn ->
+        Task.async(fn ->
+          :telemetry.execute(
+            [:req_llm, :token_usage],
+            %{total_cost: 10.0, tokens: %{input_tokens: 50_000, output_tokens: 50_000}},
+            %{}
+          )
+        end)
+        |> Task.await()
+
         :telemetry.execute(
           [:req_llm, :token_usage],
-          %{total_cost: 10.0, tokens: %{input_tokens: 50_000, output_tokens: 50_000}},
+          %{total_cost: 0.002, tokens: %{input_tokens: 120, output_tokens: 40}},
           %{}
         )
+
+        {:ok, "```text\n#{response}\n```"}
       end)
-      |> Task.await()
-
-      :telemetry.execute(
-        [:req_llm, :token_usage],
-        %{total_cost: 0.002, tokens: %{input_tokens: 120, output_tokens: 40}},
-        %{}
-      )
-
-      {:ok, "```text\n#{response}\n```"}
-    end
 
     out_dir = tmp_dir("optimize-anything-campaign")
     checkpoint_dir = Path.join(out_dir, "checkpoints")
@@ -129,7 +130,7 @@ defmodule OptimizeAnythingCampaignTest do
 
     assert_raise ArgumentError, ~r/already has checkpoint state/, fn ->
       Campaign.run(
-        lm: fn _, _ -> {:ok, "must not run"} end,
+        lm: Imp.Test.FunLM.new(fn _, _ -> {:ok, "must not run"} end),
         provider: "openai",
         model: "gpt-5.4-mini-2026-03-17",
         seeds: [17, 23, 31],
@@ -149,7 +150,7 @@ defmodule OptimizeAnythingCampaignTest do
   test "campaign requires distinct reproducibility seeds" do
     assert_raise ArgumentError, ~r/at least three distinct integers/, fn ->
       Campaign.run(
-        lm: fn _, _ -> {:ok, "unused"} end,
+        lm: Imp.Test.FunLM.new(fn _, _ -> {:ok, "unused"} end),
         provider: "test",
         model: "test",
         seeds: [1],
@@ -165,10 +166,11 @@ defmodule OptimizeAnythingCampaignTest do
     root = tmp_dir("optimize-anything-request-opportunity")
     {:ok, calls} = Agent.start_link(fn -> 0 end)
 
-    lm = fn _, _ ->
-      Agent.update(calls, &(&1 + 1))
-      {:ok, "must not execute"}
-    end
+    lm =
+      Imp.Test.FunLM.new(fn _, _ ->
+        Agent.update(calls, &(&1 + 1))
+        {:ok, "must not execute"}
+      end)
 
     assert_raise ArgumentError, ~r/requires at least 45 requests/, fn ->
       Campaign.run(
@@ -206,17 +208,18 @@ defmodule OptimizeAnythingCampaignTest do
     {:ok, calls} = Agent.start_link(fn -> 0 end)
     checkpoint_dir = tmp_dir("optimize-anything-budget-rejection")
 
-    lm = fn _messages, _opts ->
-      Agent.update(calls, &(&1 + 1))
+    lm =
+      Imp.Test.FunLM.new(fn _messages, _opts ->
+        Agent.update(calls, &(&1 + 1))
 
-      :telemetry.execute(
-        [:req_llm, :token_usage],
-        %{total_cost: 0.02, tokens: %{input_tokens: 1_000, output_tokens: 1_000}},
-        %{}
-      )
+        :telemetry.execute(
+          [:req_llm, :token_usage],
+          %{total_cost: 0.02, tokens: %{input_tokens: 1_000, output_tokens: 1_000}},
+          %{}
+        )
 
-      {:ok, "```text\n#{CodeArtifact.comparator()}\n```"}
-    end
+        {:ok, "```text\n#{CodeArtifact.comparator()}\n```"}
+      end)
 
     assert_raise RuntimeError, ~r/campaign_budget_exhausted.*usd/, fn ->
       Campaign.run(
@@ -254,17 +257,18 @@ defmodule OptimizeAnythingCampaignTest do
     {:ok, queue} = Agent.start_link(fn -> responses end)
     out_dir = tmp_dir("optimize-anything-zero-cost")
 
-    lm = fn _messages, _opts ->
-      response = Agent.get_and_update(queue, fn [next | rest] -> {next, rest} end)
+    lm =
+      Imp.Test.FunLM.new(fn _messages, _opts ->
+        response = Agent.get_and_update(queue, fn [next | rest] -> {next, rest} end)
 
-      :telemetry.execute(
-        [:req_llm, :token_usage],
-        %{tokens: %{input_tokens: 120, output_tokens: 40}},
-        %{}
-      )
+        :telemetry.execute(
+          [:req_llm, :token_usage],
+          %{tokens: %{input_tokens: 120, output_tokens: 40}},
+          %{}
+        )
 
-      {:ok, "```text\n#{response}\n```"}
-    end
+        {:ok, "```text\n#{response}\n```"}
+      end)
 
     assert_raise RuntimeError, ~r/missing, zero, or non-finite cost/, fn ->
       Campaign.run(
@@ -295,19 +299,20 @@ defmodule OptimizeAnythingCampaignTest do
     out_dir = tmp_dir("optimize-anything-final-overrun")
     checkpoint_dir = Path.join(out_dir, "checkpoints")
 
-    lm = fn _messages, _opts ->
-      response = Agent.get_and_update(queue, fn [next | rest] -> {next, rest} end)
-      call = Agent.get_and_update(calls, fn count -> {count + 1, count + 1} end)
-      cost = if call == 9, do: 0.60, else: 0.002
+    lm =
+      Imp.Test.FunLM.new(fn _messages, _opts ->
+        response = Agent.get_and_update(queue, fn [next | rest] -> {next, rest} end)
+        call = Agent.get_and_update(calls, fn count -> {count + 1, count + 1} end)
+        cost = if call == 9, do: 0.60, else: 0.002
 
-      :telemetry.execute(
-        [:req_llm, :token_usage],
-        %{total_cost: cost, tokens: %{input_tokens: 120, output_tokens: 40}},
-        %{}
-      )
+        :telemetry.execute(
+          [:req_llm, :token_usage],
+          %{total_cost: cost, tokens: %{input_tokens: 120, output_tokens: 40}},
+          %{}
+        )
 
-      {:ok, "```text\n#{response}\n```"}
-    end
+        {:ok, "```text\n#{response}\n```"}
+      end)
 
     assert_raise RuntimeError, ~r/exceeded its declared usd ceiling/, fn ->
       Campaign.run(
@@ -346,10 +351,11 @@ defmodule OptimizeAnythingCampaignTest do
     checkpoint_dir = Path.join(root, "checkpoints")
     {:ok, calls} = Agent.start_link(fn -> 0 end)
 
-    lm = fn _messages, _opts ->
-      Agent.update(calls, &(&1 + 1))
-      {:ok, "must not execute"}
-    end
+    lm =
+      Imp.Test.FunLM.new(fn _messages, _opts ->
+        Agent.update(calls, &(&1 + 1))
+        {:ok, "must not execute"}
+      end)
 
     assert_raise ArgumentError, ~r/ordinary credential-free HTTP\(S\) documentation URL/, fn ->
       Campaign.run(
@@ -442,10 +448,11 @@ defmodule OptimizeAnythingCampaignTest do
 
     owner = self()
 
-    inner = fn _messages, opts ->
-      send(owner, {:provider_called, opts})
-      {:ok, "bounded"}
-    end
+    inner =
+      Imp.Test.FunLM.new(fn _messages, opts ->
+        send(owner, {:provider_called, opts})
+        {:ok, "bounded"}
+      end)
 
     lm = %BudgetedLM{inner: inner, budget: budget, max_output_tokens: 64}
 

@@ -13,7 +13,7 @@ defmodule Imp.NormalizedLMRuntimeTest do
     end
 
     @impl true
-    def generate(_messages, _opts), do: raise("normalized request callback was bypassed")
+    def generate(_lm, _messages, _opts), do: raise("normalized request callback was bypassed")
   end
 
   defmodule ReqStub do

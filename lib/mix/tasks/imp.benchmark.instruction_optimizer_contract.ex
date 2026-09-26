@@ -531,19 +531,16 @@ defmodule Mix.Tasks.Imp.Benchmark.InstructionOptimizerContract do
         {call["inputs"]["question"], call["outputs"]["hint"]}
       end)
 
-    %{
-      module: Imp.LM.Static,
-      opts: [
-        handler: fn messages, _opts ->
-          prompt = inspect(messages, limit: :infinity)
+    Imp.LM.Static.new(
+      handler: fn messages, _opts ->
+        prompt = inspect(messages, limit: :infinity)
 
-          case Enum.find(responses, fn {question, _hint} -> String.contains?(prompt, question) end) do
-            {_question, hint} -> %{hint: hint}
-            nil -> {:error, :fixture_question_not_found}
-          end
+        case Enum.find(responses, fn {question, _hint} -> String.contains?(prompt, question) end) do
+          {_question, hint} -> %{hint: hint}
+          nil -> {:error, :fixture_question_not_found}
         end
-      ]
-    }
+      end
+    )
   end
 
   defp mipro_rotation_rows(mipro) do

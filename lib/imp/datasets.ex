@@ -9,6 +9,12 @@ defmodule Imp.Datasets do
   """
 
   defmodule Error do
+    @moduledoc """
+    Raised by a file loader for a file it cannot read or a record it cannot
+    parse: `path` is the file, `line` the line number when there is one, and
+    `record` the value that could not be read.
+    """
+
     defexception [:message, :path, :line, :record]
   end
 
@@ -331,7 +337,10 @@ end
 
 defmodule Imp.Datasets.GSM8K do
   @moduledoc "GSM8K-style JSONL dataset loader."
-  defmodule Record, do: defstruct([:question, :answer, :canonical_answer, :source_task])
+  defmodule Record do
+    @moduledoc false
+    defstruct [:question, :answer, :canonical_answer, :source_task]
+  end
 
   def load(path), do: Imp.Datasets.gsm8k(path)
 
@@ -396,22 +405,30 @@ end
 
 defmodule Imp.Datasets.HotPotQA do
   @moduledoc "HotPotQA-style JSONL dataset loader."
-  defmodule Record,
-    do: defstruct([:id, :question, :context, :answer, :supporting_facts, :source_task])
+  defmodule Record do
+    @moduledoc false
+    defstruct [:id, :question, :context, :answer, :supporting_facts, :source_task]
+  end
 
   def load(path), do: Imp.Datasets.hotpotqa(path)
 end
 
 defmodule Imp.Datasets.MATH do
   @moduledoc "MATH-style JSONL dataset loader."
-  defmodule Record, do: defstruct([:problem, :solution, :answer])
+  defmodule Record do
+    @moduledoc false
+    defstruct [:problem, :solution, :answer]
+  end
 
   def load(path), do: Imp.Datasets.jsonl(path, [:problem], record: __MODULE__.Record)
 end
 
 defmodule Imp.Datasets.Colors do
   @moduledoc "Simple color dataset helper."
-  defmodule Record, do: defstruct([:input, :label])
+  defmodule Record do
+    @moduledoc false
+    defstruct [:input, :label]
+  end
 
   def load(records),
     do: Imp.Datasets.from_records(records, [:input], record: __MODULE__.Record)

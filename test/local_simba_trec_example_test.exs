@@ -62,7 +62,7 @@ defmodule Imp.LocalSIMBATRECExampleTest do
     refute source =~ "SIMBA.compile(baseline, examples(rows.held_out)"
     assert source =~ "Artifact.from_optimized_program"
     assert source =~ "Imp.save!(source, paths.program)"
-    assert source =~ "source = Imp.load!(paths.program)"
+    assert source =~ "source = Imp.read!(paths.program)"
     assert source =~ "IMP_SIMBA_TREC_FRESH"
   end
 
@@ -85,7 +85,7 @@ defmodule Imp.LocalSIMBATRECExampleTest do
     path = Path.join(tmp_dir, "program.json")
     source = apply(LocalSIMBATREC.Runner, :source_program, [])
     assert :ok = Imp.save!(source, path)
-    loaded = Imp.load!(path)
+    loaded = Imp.read!(path)
     lm = Imp.ProgramAccess.lm(loaded)
 
     assert lm.model == "ollama:llama3.2:3b"
@@ -110,7 +110,7 @@ defmodule Imp.LocalSIMBATRECExampleTest do
     assert source.adapter == Imp.Adapter.JSON
     assert source.signature.instructions =~ "opaque internal answer service"
     assert :ok = Imp.save!(source, Path.join(tmp_dir, "json-program.json"))
-    assert Imp.load!(Path.join(tmp_dir, "json-program.json")).adapter == Imp.Adapter.JSON
+    assert Imp.read!(Path.join(tmp_dir, "json-program.json")).adapter == Imp.Adapter.JSON
   end
 
   test "unknown adapter conditions fail before model activity" do

@@ -246,7 +246,7 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerCampaign do
         {compiled, progress}
 
       state ->
-        loaded = state |> Imp.Saving.load() |> rebind_lm(budgeted_lm)
+        loaded = state |> Imp.Saving.load!() |> rebind_lm(budgeted_lm)
         {loaded, progress}
     end
   end
@@ -388,7 +388,7 @@ defmodule Imp.BenchmarkTruth.InstructionOptimizerCampaign do
 
   defp rebind_lm(program, lm) do
     Enum.reduce(Imp.ProgramParameters.predictors(program), program, fn %{name: name}, acc ->
-      Imp.ProgramParameters.update_predictor(acc, name, &Imp.Predict.Predict.with_lm(&1, lm))
+      Imp.ProgramParameters.update_predictor(acc, name, &Imp.Predict.with_lm(&1, lm))
     end)
   end
 

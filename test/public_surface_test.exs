@@ -186,7 +186,7 @@ defmodule PublicSurfaceTest do
     Imp.Predict.KNN,
     Imp.Predict.MultiChainComparison,
     Imp.Predict.Parallel,
-    Imp.Predict.Predict,
+    Imp.Predict,
     Imp.Predict.ProgramOfThought,
     Imp.Predict.RAG,
     Imp.Predict.RLM,
@@ -204,7 +204,6 @@ defmodule PublicSurfaceTest do
     Imp.Retrieve.Memory,
     Imp.Retrievers.Databricks,
     Imp.Retrievers.HTTP,
-    Imp.Retrievers.KNN,
     Imp.Retrievers.Weaviate,
     Imp.Sandbox,
     Imp.Saving,
@@ -296,10 +295,7 @@ defmodule PublicSurfaceTest do
   end
 
   test "prediction public surface has executable equivalents" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "4", rationale: "math"} end]
-    }
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "4", rationale: "math"} end)
 
     program = Imp.predict("question -> answer", lm: lm)
 
@@ -427,10 +423,8 @@ defmodule PublicSurfaceTest do
       Imp.nearest(program, %{question: "France"})
     end
 
-    rlm_lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{code: ~S|submit(%{answer: "4"})|} end]
-    }
+    rlm_lm =
+      Imp.LM.Static.new(handler: fn _messages, _opts -> %{code: ~S|submit(%{answer: "4"})|} end)
 
     rlm = Imp.rlm("question, logs -> answer", lm: rlm_lm, max_iterations: 2)
 
@@ -442,9 +436,8 @@ defmodule PublicSurfaceTest do
   end
 
   test "rag wraps a program with retrieved context and metadata" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
 
@@ -452,8 +445,7 @@ defmodule PublicSurfaceTest do
             do: %{answer: "Paris"},
             else: %{answer: "unknown"}
         end
-      ]
-    }
+      )
 
     base = Imp.predict("question, context -> answer", lm: lm)
     retriever = Imp.Retrieve.Memory.new([%{text: "France has capital Paris"}])
@@ -466,7 +458,7 @@ defmodule PublicSurfaceTest do
   end
 
   test "rag query selectors resolve equivalent atom and string input keys" do
-    lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "ok"} end]}
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "ok"} end)
     base = Imp.predict("question, context -> answer", lm: lm)
 
     parent = self()
@@ -499,10 +491,7 @@ defmodule PublicSurfaceTest do
   end
 
   test "rag treats zero k as explicit no documents and rejects negative k" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "unknown"} end]
-    }
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "unknown"} end)
 
     base = Imp.predict("question, context -> answer", lm: lm)
     retriever = Imp.Retrieve.Memory.new([%{text: "France has capital Paris"}], k: 1)
@@ -533,9 +522,8 @@ defmodule PublicSurfaceTest do
   end
 
   test "rag can perform multi-hop retrieval by expanding the query with prior passages" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
 
@@ -544,8 +532,7 @@ defmodule PublicSurfaceTest do
              do: %{answer: "France"},
              else: %{answer: "unknown"}
         end
-      ]
-    }
+      )
 
     base = Imp.predict("question, context -> answer", lm: lm)
     parent = self()
@@ -600,7 +587,7 @@ defmodule PublicSurfaceTest do
   end
 
   test "rag reports invalid options inputs and retrieved docs clearly" do
-    base = Imp.predict("question, context -> answer", lm: %{module: Imp.LM.Static, opts: []})
+    base = Imp.predict("question, context -> answer", lm: Imp.LM.Static.new())
     retriever = Imp.Retrieve.Memory.new([%{text: "France has capital Paris"}])
 
     assert_raise ArgumentError, ~r/Imp\.Predict\.RAG\.new\/3: expected keyword options/, fn ->
@@ -633,23 +620,18 @@ defmodule PublicSurfaceTest do
   end
 
   test "react and code act execute operational loops" do
-    react_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    react_lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           %{tool_calls: [%{name: :submit, arguments: %{answer: "pong"}}]}
         end
-      ]
-    }
+      )
 
-    agent = Imp.react("question -> answer", [], lm: react_lm, max_iters: 2)
+    agent = Imp.Predict.ReAct.new("question -> answer", [], lm: react_lm, max_iters: 2)
     assert {:ok, pred} = Imp.Predict.ReAct.call(agent, %{question: "ping"})
     assert Imp.Prediction.get(pred, :answer) == "pong"
 
-    pot_lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{program: "n * n"} end]
-    }
+    pot_lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{program: "n * n"} end)
 
     code_act = Imp.code_act("n -> answer", [], lm: pot_lm)
     assert {:ok, code_pred} = Imp.Predict.CodeAct.call(code_act, %{n: 5})
@@ -657,10 +639,7 @@ defmodule PublicSurfaceTest do
   end
 
   test "program of thought and code act default computed values to the task output field" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{program: "n * 2"} end]
-    }
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{program: "n * 2"} end)
 
     pot = Imp.program_of_thought("n -> doubled", lm: lm)
     assert {:ok, pot_pred} = Imp.call(pot, %{n: 3})
@@ -679,7 +658,7 @@ defmodule PublicSurfaceTest do
 
   test "optimizer public surface composes programs" do
     metric = Imp.Metrics.exact_match(:answer)
-    lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "4"} end)
     program = Imp.predict("question -> answer", lm: lm)
 
     trainset = [
@@ -719,11 +698,11 @@ defmodule PublicSurfaceTest do
     compiled =
       Imp.Optimizer.BetterTogether.compile(better, program, trainset, trainset, strategy: "p")
 
-    assert {:ok, _} = Imp.Predict.Predict.call(compiled, %{question: "2+2?"})
+    assert {:ok, _} = Imp.Predict.call(compiled, %{question: "2+2?"})
   end
 
   test "knn few-shot reports retrieval failures and rejects negative k" do
-    lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "4"} end)
     program = Imp.predict("question -> answer", lm: lm)
 
     assert_raise ArgumentError,
@@ -765,7 +744,7 @@ defmodule PublicSurfaceTest do
   end
 
   test "ensemble captures child failures and reducer failures as structured results" do
-    lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "4"} end)
     program = Imp.predict("question -> answer", lm: lm)
 
     ensemble =
@@ -875,10 +854,7 @@ defmodule PublicSurfaceTest do
     assert_raise ArgumentError,
                  ~r/Imp\.Optimizer\.BetterTogether\.compile\/5: expected keyword options/,
                  fn ->
-                   lm = %{
-                     module: Imp.LM.Static,
-                     opts: [handler: fn _messages, _opts -> %{answer: "4"} end]
-                   }
+                   lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "4"} end)
 
                    program = Imp.predict("question -> answer", lm: lm)
 
@@ -889,7 +865,7 @@ defmodule PublicSurfaceTest do
   end
 
   test "ensemble reducer can return plain prediction fields" do
-    lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "4"} end)
     program = Imp.predict("question -> answer", lm: lm)
 
     ensemble =
@@ -906,14 +882,12 @@ defmodule PublicSurfaceTest do
     assert Imp.Metrics.em("The Answer!", ["answer"])
     assert Imp.Metrics.f1("red blue", "red green") > 0
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           %{reasoning: "judge", precision: 1, recall: 1, f1: 1, completeness: 1, groundedness: 1}
         end
-      ]
-    }
+      )
 
     assert {:ok, sem} =
              Imp.Evaluate.SemanticF1.new(lm: lm)

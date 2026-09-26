@@ -14,8 +14,6 @@ defmodule Imp.BenchmarkTruth.SupportTicketLiftCampaignTest do
     defstruct [:budget, output_tokens: 64]
 
     @impl true
-    def generate(_messages, _opts), do: {:error, :length_limited_fixture_instance_required}
-
     def generate(%__MODULE__{budget: budget, output_tokens: output_tokens}, _messages, _opts) do
       :ok = CampaignBudget.authorize_transport_attempt(budget)
 

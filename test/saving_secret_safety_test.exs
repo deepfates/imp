@@ -41,7 +41,7 @@ defmodule Imp.SavingSecretSafetyTest do
     refute encoded =~ session
     refute encoded =~ image_secret
 
-    loaded = Imp.load(state)
+    loaded = Imp.load!(state)
     assert loaded.metadata.deployment_secret == "[REDACTED]"
     assert loaded.metadata.token_count == 7
     assert loaded.metadata.basic_header == "[REDACTED]"
@@ -72,7 +72,7 @@ defmodule Imp.SavingSecretSafetyTest do
         }
       )
 
-    program = Imp.react("question -> answer", [tool], max_iters: 0)
+    program = Imp.Predict.ReAct.new("question -> answer", [tool], max_iters: 0)
 
     path =
       Path.join(System.tmp_dir!(), "imp-secret-safe-#{System.unique_integer([:positive])}.json")
@@ -87,7 +87,7 @@ defmodule Imp.SavingSecretSafetyTest do
     refute artifact =~ secret
     refute artifact =~ "Bearer abcdefghijklmnop"
 
-    loaded = Imp.load!(path, registry: registry)
+    loaded = Imp.read!(path, registry: registry)
     assert loaded.tools.lookup.description == "[REDACTED]"
     assert loaded.tools.lookup.schema.note == "[REDACTED]"
     assert loaded.tools.lookup.schema.token == :string
@@ -111,7 +111,7 @@ defmodule Imp.SavingSecretSafetyTest do
 
   test "tool closures fail with an actionable registry requirement" do
     tool = Imp.tool(:lookup, "lookup", fn args -> args end)
-    program = Imp.react("question -> answer", [tool])
+    program = Imp.Predict.ReAct.new("question -> answer", [tool])
 
     assert_raise ArgumentError,
                  ~r/ReAct tool lookup is not present in the supplied saving registry/,

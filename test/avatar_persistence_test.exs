@@ -46,7 +46,7 @@ defmodule AvatarPersistenceTest do
     refute encoded =~ "Bearer abcdefghijklmnop"
     refute encoded =~ "#Function<"
 
-    restored = encoded |> Jason.decode!(keys: :strings) |> Imp.load(registry: registry)
+    restored = encoded |> Jason.decode!(keys: :strings) |> Imp.load!(registry: registry)
 
     assert %Imp.Predict.Avatar{max_iters: 4, tool_timeout_ms: 1_234} = restored
     assert restored.actor.lm == %Imp.Clients.ReqLLM{model: "openai:gpt-avatar", opts: []}
@@ -77,19 +77,19 @@ defmodule AvatarPersistenceTest do
     unrelated = Imp.predict("question -> answer") |> Imp.dump()
 
     assert_raise ArgumentError, ~r/Avatar actor signature does not match/, fn ->
-      state |> Map.put("actor", unrelated) |> Imp.load()
+      state |> Map.put("actor", unrelated) |> Imp.load!()
     end
 
     assert_raise ArgumentError, ~r/Avatar finisher signature does not match/, fn ->
-      state |> Map.put("finisher", unrelated) |> Imp.load()
+      state |> Map.put("finisher", unrelated) |> Imp.load!()
     end
 
     assert_raise ArgumentError, ~r/Avatar max_iters must be a non-negative integer/, fn ->
-      state |> Map.put("max_iters", -1) |> Imp.load()
+      state |> Map.put("max_iters", -1) |> Imp.load!()
     end
 
     assert_raise ArgumentError, ~r/Avatar tool_timeout_ms must be a non-negative integer/, fn ->
-      state |> Map.put("tool_timeout_ms", -1) |> Imp.load()
+      state |> Map.put("tool_timeout_ms", -1) |> Imp.load!()
     end
   end
 
@@ -98,7 +98,7 @@ defmodule AvatarPersistenceTest do
       Imp.avatar("question -> answer", [])
       |> Imp.dump()
       |> Map.delete("metadata")
-      |> Imp.load()
+      |> Imp.load!()
 
     assert restored.metadata == %{}
   end
@@ -108,7 +108,7 @@ defmodule AvatarPersistenceTest do
       Imp.avatar("question -> answer", [])
       |> Imp.dump()
       |> Map.delete("tool_timeout_ms")
-      |> Imp.load()
+      |> Imp.load!()
 
     assert restored.tool_timeout_ms == 30_000
   end

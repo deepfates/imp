@@ -8,14 +8,12 @@ defmodule Imp.BenchmarkTruth.GepaStudyConditionTest do
   defmodule NeverLM do
     defstruct []
 
-    def generate(_messages, _opts), do: raise("provider call was not expected")
     def generate(_lm, _messages, _opts), do: raise("provider call was not expected")
   end
 
   defmodule SafetyLM do
     defstruct []
 
-    def generate(_messages, _opts), do: raise(safety_error())
     def generate(_lm, _messages, _opts), do: raise(safety_error())
 
     defp safety_error do

@@ -10,7 +10,7 @@ defmodule Imp.ConstructorOptionsTest do
       error =
         assert_raise ArgumentError, fn -> Imp.predict("question -> answer", adaptor: :chat) end
 
-      assert Exception.message(error) =~ "Imp.Predict.Predict.new/2"
+      assert Exception.message(error) =~ "Imp.Predict.new/2"
       assert Exception.message(error) =~ "unknown options [:adaptor]"
     end
 

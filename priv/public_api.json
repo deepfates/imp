@@ -35,13 +35,148 @@
   "excluded_modules": [
     {
       "category": "internal",
+      "module": "Imp.ACP.DemoMessages",
+      "source": "lib/imp/acp/demo_messages.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.ACP.Handler",
+      "source": "lib/imp/acp/handler.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.ACP.Options",
+      "source": "lib/imp/acp/options.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.ACP.Prompt",
+      "source": "lib/imp/acp/prompt.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.ACP.Session",
+      "source": "lib/imp/acp/session.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.ACP.SessionStore",
+      "source": "lib/imp/acp/session_store.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.ACP.TurnProgram",
+      "source": "lib/imp/acp/turn_program.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Adapter.FieldConstraints",
+      "source": "lib/imp/adapter/field_constraints.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Adapter.FieldType",
+      "source": "lib/imp/adapter/field_type.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Adapter.Instructions",
+      "source": "lib/imp/adapter/instructions.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Adapter.JSONRepair",
+      "source": "lib/imp/adapter/json_repair.ex"
+    },
+    {
+      "category": "internal",
       "module": "Imp.Adapter.OutputFields",
       "source": "lib/imp/adapter/output_fields.ex"
     },
     {
       "category": "internal",
+      "module": "Imp.Adapter.Types.ResourceLoader",
+      "source": "lib/imp/adapter/types.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Application",
+      "source": "lib/imp/application.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Clients.MLXLMArtifact",
+      "source": "lib/imp/clients/mlx_lm_artifact.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Clients.MLXLMDeployment.Worker",
+      "source": "lib/imp/clients/mlx_lm_deployment.ex"
+    },
+    {
+      "category": "internal",
       "module": "Imp.Clients.TRLProtocol",
       "source": "lib/imp/clients/trl_protocol.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Clients.TRLWorker",
+      "source": "lib/imp/clients/trl_worker.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Clients.TrainingDispatch",
+      "source": "lib/imp/clients/training_dispatch.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Clients.TrainingHTTP",
+      "source": "lib/imp/clients/training.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Confidence.Calibration.Histogram",
+      "source": "lib/imp/confidence/calibration.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Datasets.Colors.Record",
+      "source": "lib/imp/datasets.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Datasets.GSM8K.Record",
+      "source": "lib/imp/datasets.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Datasets.HotPotQA.Record",
+      "source": "lib/imp/datasets.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Datasets.MATH.Record",
+      "source": "lib/imp/datasets.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Experiment.Result.SortedKeys",
+      "source": "lib/imp/experiment/result.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Experiment.StageError",
+      "source": "lib/imp/experiment/stage_error.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.ExternalCommand.Lifecycle",
+      "source": "lib/imp/external_command.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.ExternalCommand.Lifecycle.Capture",
+      "source": "lib/imp/external_command.ex"
     },
     {
       "category": "internal",
@@ -60,6 +195,71 @@
     },
     {
       "category": "internal",
+      "module": "Imp.GitIdentity",
+      "source": "lib/imp/git_identity.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.HTTP.Hackneyless",
+      "source": "lib/imp/http.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.LM.Capability",
+      "source": "lib/imp/lm/capability.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.MCP.Clients",
+      "source": "lib/imp/mcp/clients.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.MCP.OAuth.Flow",
+      "source": "lib/imp/mcp/oauth/flow.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.MCP.OwnedStdio",
+      "source": "lib/imp/mcp/owned_stdio.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.MCP.ToolSchemas",
+      "source": "lib/imp/mcp/tool_schemas.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.MCP.Trust",
+      "source": "lib/imp/mcp/trust.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Observability.StageRecorder",
+      "source": "lib/imp/observability/stage_recorder.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimize.Anything.Adapter",
+      "source": "lib/imp/optimize/anything/adapter.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimize.Anything.Adapter.OptimizationState",
+      "source": "lib/imp/optimize/anything/adapter.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimize.Anything.Artifact",
+      "source": "lib/imp/optimize/anything.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimize.Anything.BestOutputWriter",
+      "source": "lib/imp/optimize/anything/best_output_writer.ex"
+    },
+    {
+      "category": "internal",
       "module": "Imp.Optimize.Anything.Config",
       "source": "lib/imp/optimize/anything/config.ex"
     },
@@ -71,6 +271,11 @@
     {
       "category": "internal",
       "module": "Imp.Optimize.Anything.Config.Merge",
+      "source": "lib/imp/optimize/anything/config.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimize.Anything.Config.Persistence",
       "source": "lib/imp/optimize/anything/config.ex"
     },
     {
@@ -90,8 +295,93 @@
     },
     {
       "category": "internal",
+      "module": "Imp.Optimize.Anything.Evaluation",
+      "source": "lib/imp/optimize/anything.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimize.Anything.Multimodal",
+      "source": "lib/imp/optimize/anything/multimodal.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimize.Anything.Progress",
+      "source": "lib/imp/optimize/anything/progress.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimize.Anything.Refiner",
+      "source": "lib/imp/optimize/anything/refiner.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimize.Anything.Refiner.Result",
+      "source": "lib/imp/optimize/anything/refiner.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimize.Anything.Runner",
+      "source": "lib/imp/optimize/anything/runner.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimize.Anything.StdioCapture",
+      "source": "lib/imp/optimize/anything/stdio_capture.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimize.Anything.StructuredCandidate",
+      "source": "lib/imp/optimize/anything/structured_candidate.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimize.Anything.StructuredStrategy.Bridge",
+      "source": "lib/imp/optimize/anything/structured_strategy.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimize.Anything.Tracking",
+      "source": "lib/imp/optimize/anything/tracking.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.Artifact.ParameterSnapshot",
+      "source": "lib/imp/optimizer/artifact/parameter_snapshot.ex"
+    },
+    {
+      "category": "internal",
       "module": "Imp.Optimizer.Avatar.EvalResult",
       "source": "lib/imp/optimizer/avatar_models.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.BootstrapFewShot.RolloutLM",
+      "source": "lib/imp/optimizer/bootstrap_few_shot.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.BootstrapFinetune.TrainingPlan",
+      "source": "lib/imp/optimizer/bootstrap_finetune.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.CategoricalTPE",
+      "source": "lib/imp/optimizer/categorical_tpe.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.DemoCandidates",
+      "source": "lib/imp/optimizer/demo_candidates.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.DurableCallbackIdentity",
+      "source": "lib/imp/optimizer/durable_callback_identity.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.Ensemble.Program",
+      "source": "lib/imp/optimizer/ensemble.ex"
     },
     {
       "category": "internal",
@@ -105,12 +395,42 @@
     },
     {
       "category": "internal",
+      "module": "Imp.Optimizer.GEPA.Budget",
+      "source": "lib/imp/optimizer/gepa/budget.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.BudgetLedger",
+      "source": "lib/imp/optimizer/gepa/budget_ledger.ex"
+    },
+    {
+      "category": "internal",
       "module": "Imp.Optimizer.GEPA.Candidate",
       "source": "lib/imp/optimizer/gepa/candidate.ex"
     },
     {
       "category": "internal",
       "module": "Imp.Optimizer.GEPA.CandidateSelector",
+      "source": "lib/imp/optimizer/gepa/candidate_selector.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.CandidateSelector.CurrentBest",
+      "source": "lib/imp/optimizer/gepa/candidate_selector.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.CandidateSelector.EpsilonGreedy",
+      "source": "lib/imp/optimizer/gepa/candidate_selector.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.CandidateSelector.Pareto",
+      "source": "lib/imp/optimizer/gepa/candidate_selector.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.CandidateSelector.TopKPareto",
       "source": "lib/imp/optimizer/gepa/candidate_selector.ex"
     },
     {
@@ -170,6 +490,26 @@
     },
     {
       "category": "internal",
+      "module": "Imp.Optimizer.GEPA.Coordinator",
+      "source": "lib/imp/optimizer/gepa/coordinator.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.Engine",
+      "source": "lib/imp/optimizer/gepa/engine.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.Engine.Entry",
+      "source": "lib/imp/optimizer/gepa/engine.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.Engine.State",
+      "source": "lib/imp/optimizer/gepa/engine.ex"
+    },
+    {
+      "category": "internal",
       "module": "Imp.Optimizer.GEPA.Evaluation",
       "source": "lib/imp/optimizer/gepa/evaluation.ex"
     },
@@ -182,6 +522,11 @@
       "category": "internal",
       "module": "Imp.Optimizer.GEPA.EvaluationCache.Backend",
       "source": "lib/imp/optimizer/gepa/evaluation_cache/backend.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.EvaluationCache.Codec",
+      "source": "lib/imp/optimizer/gepa/evaluation_cache/codec.ex"
     },
     {
       "category": "internal",
@@ -205,8 +550,18 @@
     },
     {
       "category": "internal",
+      "module": "Imp.Optimizer.GEPA.EvaluationPolicy.Full",
+      "source": "lib/imp/optimizer/gepa/evaluation_policy.ex"
+    },
+    {
+      "category": "internal",
       "module": "Imp.Optimizer.GEPA.Frontier",
       "source": "lib/imp/optimizer/gepa/frontier.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.InstructionProposal",
+      "source": "lib/imp/optimizer/gepa/instruction_proposal.ex"
     },
     {
       "category": "internal",
@@ -220,8 +575,53 @@
     },
     {
       "category": "internal",
+      "module": "Imp.Optimizer.GEPA.ModuleSelector.OrderedRoundRobin",
+      "source": "lib/imp/optimizer/gepa/module_selector.ex"
+    },
+    {
+      "category": "internal",
       "module": "Imp.Optimizer.GEPA.Pareto",
       "source": "lib/imp/optimizer/gepa/pareto.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.ProgramAdapter",
+      "source": "lib/imp/optimizer/gepa/program_adapter.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.Proposal",
+      "source": "lib/imp/optimizer/gepa/proposal.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.Proposal.Batch",
+      "source": "lib/imp/optimizer/gepa/proposal.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.Proposal.Context",
+      "source": "lib/imp/optimizer/gepa/proposal.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.ProposalSelection",
+      "source": "lib/imp/optimizer/gepa/proposal_selection.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.Random",
+      "source": "lib/imp/optimizer/gepa/random.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.Reflection",
+      "source": "lib/imp/optimizer/gepa/reflection.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.GEPA.ReflectionStrategy",
+      "source": "lib/imp/optimizer/gepa/reflection_strategy.ex"
     },
     {
       "category": "internal",
@@ -240,6 +640,61 @@
     },
     {
       "category": "internal",
+      "module": "Imp.Optimizer.GRPO.Checkpoint",
+      "source": "lib/imp/optimizer/grpo/checkpoint.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.InferRules.Checkpoint",
+      "source": "lib/imp/optimizer/infer_rules/checkpoint.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.KNNFewShot.Program",
+      "source": "lib/imp/optimizer/knn_few_shot.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.MIPROv2.Checkpoint",
+      "source": "lib/imp/optimizer/mipro_v2/checkpoint.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.MIPROv2.Config",
+      "source": "lib/imp/optimizer/mipro_v2/config.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.MIPROv2.NumpyRandomState",
+      "source": "lib/imp/optimizer/mipro_v2/numpy_random_state.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.MIPROv2.OptunaStartupPolicy",
+      "source": "lib/imp/optimizer/mipro_v2/optuna_startup_policy.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.MIPROv2.OptunaTPEPolicy",
+      "source": "lib/imp/optimizer/mipro_v2/optuna_tpe_policy.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.MIPROv2.PythonRandom",
+      "source": "lib/imp/optimizer/mipro_v2/python_random.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.MIPROv2.UpstreamBootstrap",
+      "source": "lib/imp/optimizer/mipro_v2/upstream_bootstrap.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.MIPROv2.UpstreamProposer",
+      "source": "lib/imp/optimizer/mipro_v2/upstream_proposer.ex"
+    },
+    {
+      "category": "internal",
       "module": "Imp.Optimizer.Playbook.Result",
       "source": "lib/imp/optimizer/playbook.ex"
     },
@@ -247,6 +702,51 @@
       "category": "internal",
       "module": "Imp.Optimizer.Playbook.Usage",
       "source": "lib/imp/optimizer/playbook.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.RandomSearch.Checkpoint",
+      "source": "lib/imp/optimizer/random_search/checkpoint.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.SIMBA.Buckets",
+      "source": "lib/imp/optimizer/simba/buckets.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.SIMBA.Checkpoint",
+      "source": "lib/imp/optimizer/simba/checkpoint.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.SIMBA.Population",
+      "source": "lib/imp/optimizer/simba/population.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.SIMBA.Reflection",
+      "source": "lib/imp/optimizer/simba/reflection.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.SearchPolicy",
+      "source": "lib/imp/optimizer/search_policy.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.SearchPolicy.CategoricalTPE",
+      "source": "lib/imp/optimizer/search_policy/categorical_tpe.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.SearchPolicy.Sampling",
+      "source": "lib/imp/optimizer/search_policy/sampling.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Optimizer.Trace",
+      "source": "lib/imp/optimizer/trace.ex"
     },
     {
       "category": "internal",
@@ -295,6 +795,16 @@
     },
     {
       "category": "internal",
+      "module": "Imp.Playbook.Canonical",
+      "source": "lib/imp/playbook/canonical.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Predict.Attempt",
+      "source": "lib/imp/predict/attempt.ex"
+    },
+    {
+      "category": "internal",
       "module": "Imp.Predict.Avatar.Action",
       "source": "lib/imp/predict/avatar_models.ex"
     },
@@ -302,6 +812,61 @@
       "category": "internal",
       "module": "Imp.Predict.Avatar.ActionOutput",
       "source": "lib/imp/predict/avatar_models.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Predict.Options",
+      "source": "lib/imp/predict/options.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Predict.RLM.Action",
+      "source": "lib/imp/predict/rlm/action.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Predict.RLM.Budget",
+      "source": "lib/imp/predict/rlm/budget.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Predict.RLM.Compaction",
+      "source": "lib/imp/predict/rlm/compaction.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Predict.RLM.Interpreter",
+      "source": "lib/imp/predict/rlm/interpreter.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Predict.RLM.Interpreter.Continuation",
+      "source": "lib/imp/predict/rlm/interpreter.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Predict.RLM.Interpreter.Effect",
+      "source": "lib/imp/predict/rlm/interpreter.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Predict.RLM.Interpreter.Fn",
+      "source": "lib/imp/predict/rlm/interpreter.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Predict.RLM.Runtime",
+      "source": "lib/imp/predict/rlm/runtime.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Predict.RLM.Session",
+      "source": "lib/imp/predict/rlm/session.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Predict.RLM.Trace",
+      "source": "lib/imp/predict/rlm/trace.ex"
     },
     {
       "category": "internal",
@@ -320,6 +885,41 @@
     },
     {
       "category": "internal",
+      "module": "Imp.PyFloat",
+      "source": "lib/imp/py_float.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Retrievers.Limit",
+      "source": "lib/imp/retrievers/http.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Run.Control",
+      "source": "lib/imp/run.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Run.EventDelivery",
+      "source": "lib/imp/run.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Signature.Parser",
+      "source": "lib/imp/signature/parser.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Streaming.Execution",
+      "source": "lib/imp/streaming/execution.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Tasks.Admission",
+      "source": "lib/imp/tasks.ex"
+    },
+    {
+      "category": "internal",
       "module": "Imp.ToolPolicy",
       "source": "lib/imp/tool_policy.ex"
     },
@@ -332,6 +932,81 @@
       "category": "internal",
       "module": "Imp.Tracking.WandB.Transport",
       "source": "lib/imp/tracking/wandb/transport.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Imp.Tracking.WandB.V0_21_3",
+      "source": "lib/imp/tracking/wandb/v0_21_3.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Inspect.ExMCP.Client",
+      "source": "lib/imp/mcp/redacted_inspect.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Inspect.ExMCP.Transport.HTTP",
+      "source": "lib/imp/mcp/redacted_inspect.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Inspect.Imp.Clients.HTTPTrainer",
+      "source": "lib/imp/clients/training.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Inspect.Imp.Clients.ReqLLM",
+      "source": "lib/imp/redaction.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Inspect.Imp.Clients.TrainingJob",
+      "source": "lib/imp/clients/training.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Inspect.Imp.MCP.OAuth.Flow",
+      "source": "lib/imp/mcp/oauth/flow.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Inspect.Imp.MCP.OAuth.Pending",
+      "source": "lib/imp/mcp/oauth.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Inspect.Imp.MCP.OAuth.Store",
+      "source": "lib/imp/mcp/oauth.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Inspect.Imp.Optimize.Anything.Config.Tracking",
+      "source": "lib/imp/redaction.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Inspect.Imp.Retrievers.HTTP",
+      "source": "lib/imp/redaction.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Inspect.Imp.Tracking.MLflow",
+      "source": "lib/imp/redaction.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Inspect.Imp.Tracking.WandB",
+      "source": "lib/imp/redaction.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Jason.Encoder.Imp.Adapter.Types.Reasoning",
+      "source": "lib/imp/adapter/types.ex"
+    },
+    {
+      "category": "internal",
+      "module": "String.Chars.Imp.Adapter.Types.Reasoning",
+      "source": "lib/imp/adapter/types.ex"
     }
   ],
   "modules": [
@@ -368,9 +1043,7 @@
         "inspect_history/2",
         "knn/3",
         "labels/1",
-        "load!/1",
         "load!/2",
-        "load/1",
         "load/2",
         "majority/2",
         "memory/2",
@@ -391,7 +1064,7 @@
         "program_of_thought/2",
         "rag/3",
         "react/3",
-        "react_v2/3",
+        "read!/2",
         "refine/3",
         "req_llm/2",
         "retrieve/3",
@@ -507,17 +1180,11 @@
           "labels/1": [
             "labels(example)"
           ],
-          "load!/1": [
-            "load!(path)"
-          ],
           "load!/2": [
-            "load!(path, opts)"
-          ],
-          "load/1": [
-            "load(state)"
+            "load!(state, opts \\\\ [])"
           ],
           "load/2": [
-            "load(state, opts)"
+            "load(state, opts \\\\ [])"
           ],
           "majority/2": [
             "majority(predictions, opts \\\\ [])"
@@ -576,8 +1243,8 @@
           "react/3": [
             "react(signature, tools, opts \\\\ [])"
           ],
-          "react_v2/3": [
-            "react_v2(signature, tools, opts \\\\ [])"
+          "read!/2": [
+            "read!(path, opts \\\\ [])"
           ],
           "refine/3": [
             "refine(program, metric, opts \\\\ [])"
@@ -1015,6 +1682,31 @@
     {
       "callbacks": [],
       "category": "stable",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Adapter.Types.Citation",
+      "signatures": {
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/adapter/types.ex",
+      "struct_fields": [
+        "metadata",
+        "source",
+        "text"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
       "functions": [
         "description/1",
         "format/1",
@@ -1043,6 +1735,30 @@
       "struct_fields": [
         "code",
         "language"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Adapter.Types.Document",
+      "signatures": {
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/adapter/types.ex",
+      "struct_fields": [
+        "metadata",
+        "text"
       ],
       "types": [
         {
@@ -1087,6 +1803,29 @@
         "mime_type",
         "path",
         "url"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Adapter.Types.History",
+      "signatures": {
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/adapter/types.ex",
+      "struct_fields": [
+        "messages"
       ],
       "types": [
         {
@@ -1270,6 +2009,30 @@
         "result"
       ],
       "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Adapter.Types.Type",
+      "signatures": {
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/adapter/types.ex",
+      "struct_fields": [
+        "metadata",
+        "value"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
     },
     {
       "callbacks": [],
@@ -1673,7 +2436,6 @@
       "functions": [
         "cache_key/3",
         "dump/1",
-        "generate/3",
         "generate_async/3",
         "new/2"
       ],
@@ -1687,9 +2449,6 @@
           ],
           "dump/1": [
             "dump(lm)"
-          ],
-          "generate/3": [
-            "generate(lm, messages, opts)"
           ],
           "generate_async/3": [
             "generate_async(lm, messages, opts \\\\ [])"
@@ -1841,18 +2600,11 @@
     {
       "callbacks": [],
       "category": "experimental",
-      "functions": [
-        "generate/3"
-      ],
+      "functions": [],
       "kind": "struct",
       "macros": [],
       "module": "Imp.Clients.TRLLM",
       "signatures": {
-        "functions": {
-          "generate/3": [
-            "generate(lm, messages, opts)"
-          ]
-        },
         "types": {
           "t/0": []
         }
@@ -2659,6 +3411,24 @@
         "metadata",
         "test",
         "train"
+      ],
+      "types": []
+    },
+    {
+      "callbacks": [],
+      "category": "experimental",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Datasets.Error",
+      "signatures": {},
+      "source": "lib/imp/datasets.ex",
+      "struct_fields": [
+        "__exception__",
+        "line",
+        "message",
+        "path",
+        "record"
       ],
       "types": []
     },
@@ -3592,7 +4362,7 @@
     {
       "callbacks": [
         {
-          "name": "generate/2",
+          "name": "generate/3",
           "optional": false
         },
         {
@@ -3614,7 +4384,7 @@
       "module": "Imp.LM",
       "signatures": {
         "callbacks": {
-          "generate/2": [],
+          "generate/3": [],
           "request/2": [],
           "stream/3": []
         },
@@ -3625,17 +4395,24 @@
           "request/2": [
             "request(lm, request)"
           ]
+        },
+        "types": {
+          "t/0": []
         }
       },
       "source": "lib/imp/lm.ex",
       "struct_fields": [],
-      "types": []
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
     },
     {
       "callbacks": [],
       "category": "experimental",
       "functions": [
-        "generate/3",
         "response_format_capability/1"
       ],
       "kind": "struct",
@@ -3643,9 +4420,6 @@
       "module": "Imp.LM.Budgeted",
       "signatures": {
         "functions": {
-          "generate/3": [
-            "generate(lm, messages, opts)"
-          ],
           "response_format_capability/1": [
             "response_format_capability(budgeted)"
           ]
@@ -3718,7 +4492,7 @@
       "signatures": {
         "functions": {
           "generate/3": [
-            "generate(static, messages, opts)"
+            "generate(arg1, messages, opts)"
           ],
           "new/1": [
             "new(opts \\\\ [])"
@@ -3727,6 +4501,7 @@
       },
       "source": "lib/imp/lm/static.ex",
       "struct_fields": [
+        "model",
         "opts"
       ],
       "types": []
@@ -4808,7 +5583,6 @@
       "callbacks": [],
       "category": "stable",
       "functions": [
-        "compile/5",
         "new/2"
       ],
       "kind": "module",
@@ -4816,9 +5590,6 @@
       "module": "Imp.Optimizer.BootstrapFewShotWithRandomSearch",
       "signatures": {
         "functions": {
-          "compile/5": [
-            "compile(optimizer, program, trainset, devset \\\\ nil, opts \\\\ [])"
-          ],
           "new/2": [
             "new(metric, opts \\\\ [])"
           ]
@@ -4866,7 +5637,6 @@
       "callbacks": [],
       "category": "stable",
       "functions": [
-        "compile/5",
         "new/2"
       ],
       "kind": "module",
@@ -4874,9 +5644,6 @@
       "module": "Imp.Optimizer.BootstrapRS",
       "signatures": {
         "functions": {
-          "compile/5": [
-            "compile(optimizer, program, trainset, devset \\\\ nil, opts \\\\ [])"
-          ],
           "new/2": [
             "new(metric, opts \\\\ [])"
           ]
@@ -6879,6 +7646,61 @@
     },
     {
       "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "call/2",
+        "call/3",
+        "dump/1",
+        "new/2",
+        "with_demos/2",
+        "with_lm/2",
+        "with_signature/2"
+      ],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Predict",
+      "signatures": {
+        "functions": {
+          "call/2": [
+            "call(predict, inputs)"
+          ],
+          "call/3": [
+            "call(predict, inputs, config)"
+          ],
+          "dump/1": [
+            "dump(predict)"
+          ],
+          "new/2": [
+            "new(signature, opts \\\\ [])"
+          ],
+          "with_demos/2": [
+            "with_demos(predict, demos)"
+          ],
+          "with_lm/2": [
+            "with_lm(predict, lm)"
+          ],
+          "with_signature/2": [
+            "with_signature(predict, signature)"
+          ]
+        }
+      },
+      "source": "lib/imp/predict.ex",
+      "struct_fields": [
+        "adapter",
+        "adapter_opts",
+        "config",
+        "demos",
+        "dynamic_adapter?",
+        "dynamic_lm?",
+        "lm",
+        "metadata",
+        "signature",
+        "traces"
+      ],
+      "types": []
+    },
+    {
+      "callbacks": [],
       "category": "experimental",
       "functions": [
         "default_normalize/1",
@@ -7004,7 +7826,7 @@
     },
     {
       "callbacks": [],
-      "category": "experimental",
+      "category": "stable",
       "functions": [
         "new/2"
       ],
@@ -7136,61 +7958,6 @@
       },
       "source": "lib/imp/predict/parallel.ex",
       "struct_fields": [],
-      "types": []
-    },
-    {
-      "callbacks": [],
-      "category": "experimental",
-      "functions": [
-        "call/2",
-        "call/3",
-        "dump/1",
-        "new/2",
-        "with_demos/2",
-        "with_lm/2",
-        "with_signature/2"
-      ],
-      "kind": "struct",
-      "macros": [],
-      "module": "Imp.Predict.Predict",
-      "signatures": {
-        "functions": {
-          "call/2": [
-            "call(predict, inputs)"
-          ],
-          "call/3": [
-            "call(predict, inputs, config)"
-          ],
-          "dump/1": [
-            "dump(predict)"
-          ],
-          "new/2": [
-            "new(signature, opts \\\\ [])"
-          ],
-          "with_demos/2": [
-            "with_demos(predict, demos)"
-          ],
-          "with_lm/2": [
-            "with_lm(predict, lm)"
-          ],
-          "with_signature/2": [
-            "with_signature(predict, signature)"
-          ]
-        }
-      },
-      "source": "lib/imp/predict/predict.ex",
-      "struct_fields": [
-        "adapter",
-        "adapter_opts",
-        "config",
-        "demos",
-        "dynamic_adapter?",
-        "dynamic_lm?",
-        "lm",
-        "metadata",
-        "signature",
-        "traces"
-      ],
       "types": []
     },
     {
@@ -7687,7 +8454,7 @@
     {
       "callbacks": [
         {
-          "name": "retrieve/2",
+          "name": "retrieve/3",
           "optional": false
         }
       ],
@@ -7700,17 +8467,25 @@
       "module": "Imp.Retrieve",
       "signatures": {
         "callbacks": {
-          "retrieve/2": []
+          "retrieve/3": []
         },
         "functions": {
           "retrieve/3": [
             "retrieve(retriever, query, opts \\\\ [])"
           ]
+        },
+        "types": {
+          "t/0": []
         }
       },
       "source": "lib/imp/retrieve.ex",
       "struct_fields": [],
-      "types": []
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
     },
     {
       "callbacks": [],
@@ -7790,34 +8565,6 @@
         "total_timeout",
         "transport",
         "url"
-      ],
-      "types": []
-    },
-    {
-      "callbacks": [],
-      "category": "stable",
-      "functions": [
-        "call/2",
-        "new/2"
-      ],
-      "kind": "struct",
-      "macros": [],
-      "module": "Imp.Retrievers.KNN",
-      "signatures": {
-        "functions": {
-          "call/2": [
-            "call(knn, query)"
-          ],
-          "new/2": [
-            "new(examples, opts \\\\ [])"
-          ]
-        }
-      },
-      "source": "lib/imp/retrievers/knn.ex",
-      "struct_fields": [
-        "examples",
-        "field",
-        "k"
       ],
       "types": []
     },
@@ -7986,8 +8733,8 @@
         "dump/1",
         "dump/2",
         "load!/2",
-        "load/1",
         "load/2",
+        "read!/2",
         "save!/3"
       ],
       "kind": "module",
@@ -8002,13 +8749,13 @@
             "dump(program, opts)"
           ],
           "load!/2": [
-            "load!(path, opts \\\\ [])"
-          ],
-          "load/1": [
-            "load(state)"
+            "load!(state, opts \\\\ [])"
           ],
           "load/2": [
-            "load(state, opts)"
+            "load(state, opts \\\\ [])"
+          ],
+          "read!/2": [
+            "read!(path, opts \\\\ [])"
           ],
           "save!/3": [
             "save!(program, path, opts \\\\ [])"
@@ -8232,6 +8979,32 @@
         "name",
         "prefix",
         "type"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Signature.ParseError",
+      "signatures": {
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/signature/parser.ex",
+      "struct_fields": [
+        "__exception__",
+        "input",
+        "message",
+        "position"
       ],
       "types": [
         {

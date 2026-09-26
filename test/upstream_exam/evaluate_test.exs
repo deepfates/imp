@@ -13,7 +13,7 @@ defmodule UpstreamExam.EvaluateTest do
 
   alias Imp.Evaluate.{CompleteAndGrounded, SemanticF1}
 
-  defp static_lm(handler), do: %{module: Imp.LM.Static, opts: [handler: handler]}
+  defp static_lm(handler), do: Imp.LM.Static.new(handler: handler)
 
   defp new_example(question, answer) do
     Imp.example(question: question, answer: answer) |> Imp.with_inputs(:question)

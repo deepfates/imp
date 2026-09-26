@@ -179,10 +179,7 @@ defmodule Imp.Evaluate do
 
   ## Example
 
-      iex> lm = %{
-      ...>   module: Imp.LM.Static,
-      ...>   opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-      ...> }
+      iex> lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "Paris"} end)
       iex> program = Imp.predict("question -> answer", lm: lm)
       iex> devset = [
       ...>   Imp.example(question: "Capital of France?", answer: "Paris")

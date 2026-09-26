@@ -657,10 +657,7 @@ defmodule BenchmarkTruthTest do
         tasks: [hotpotqa: Path.join(@fixtures, "hotpotqa-small.jsonl")],
         out_dir: out_dir,
         max_examples: 1,
-        lm: %{
-          module: Imp.LM.Static,
-          opts: [handler: fn _messages, _opts -> %{answer: "wrong answer"} end]
-        },
+        lm: Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "wrong answer"} end),
         optimizer_comparisons: false
       )
 
@@ -695,10 +692,7 @@ defmodule BenchmarkTruthTest do
         tasks: [hotpotqa: Path.join(@fixtures, "hotpotqa-small.jsonl")],
         out_dir: out_dir,
         max_examples: 1,
-        lm: %{
-          module: Imp.LM.Static,
-          opts: [handler: fn _messages, _opts -> %{answer: verbose_answer} end]
-        },
+        lm: Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: verbose_answer} end),
         optimizer_comparisons: false
       )
 
@@ -721,14 +715,12 @@ defmodule BenchmarkTruthTest do
         tasks: [gsm8k: Path.join(@fixtures, "gsm8k-small.jsonl")],
         out_dir: out_dir,
         max_examples: 1,
-        lm: %{
-          module: Imp.LM.Static,
-          opts: [
+        lm:
+          Imp.LM.Static.new(
             handler: fn _messages, _opts ->
               "[[ ## reasoning ## ]]\nI forgot the answer field.\n[[ ## completed ## ]]"
             end
-          ]
-        },
+          ),
         optimizer_comparisons: false
       )
 
@@ -751,7 +743,7 @@ defmodule BenchmarkTruthTest do
         tasks: [gsm8k: Path.join(@fixtures, "gsm8k-small.jsonl")],
         out_dir: out_dir,
         max_examples: 1,
-        lm: fn _messages, _opts -> {:error, improper_reason} end,
+        lm: Imp.Test.FunLM.new(fn _messages, _opts -> {:error, improper_reason} end),
         optimizer_comparisons: false
       )
 
@@ -807,17 +799,15 @@ defmodule BenchmarkTruthTest do
         tasks: [gsm8k: path],
         out_dir: out_dir,
         max_examples: 1,
-        lm: %{
-          module: Imp.LM.Static,
-          opts: [
+        lm:
+          Imp.LM.Static.new(
             handler: fn _messages, _opts ->
               # DSPy field headers must start their own line (ChatAdapter.parse
               # matches per-line; dee-coia), so the fixture completion uses the
               # real multi-line marker dialect.
               "[[ ## reasoning ## ]]\nsubtotal plus fees\n\n[[ ## answer ## ]]\n29.00\n\n[[ ## completed ## ]]"
             end
-          ]
-        },
+          ),
         optimizer_comparisons: false
       )
 

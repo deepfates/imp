@@ -163,7 +163,7 @@ defmodule Imp.Predict.ReActV2 do
     demos: [
       type: {:list, :any},
       default: [],
-      doc: "Worked examples for the step predictor, as for `Imp.Predict.Predict`."
+      doc: "Worked examples for the step predictor, as for `Imp.Predict`."
     ],
     config: [
       type: :keyword_list,
@@ -280,7 +280,7 @@ defmodule Imp.Predict.ReActV2 do
     %__MODULE__{
       signature: signature,
       react:
-        Imp.Predict.Predict.new(
+        Imp.Predict.new(
           react_signature,
           opts
           |> Imp.Predict.Options.take()
@@ -396,8 +396,8 @@ defmodule Imp.Predict.ReActV2 do
          {:ok, history} <- coerce_history(Map.get(inputs, :history, Map.get(inputs, "history"))) do
       # ReActV2 filters inputs down to signature names before any Predict call,
       # so extra keys would vanish silently here; warn at this boundary the same
-      # way Imp.Predict.Predict does (:history is a documented call-time key).
-      :ok = Imp.Predict.Predict.warn_extra_inputs(react.signature, inputs, [:history])
+      # way Imp.Predict does (:history is a documented call-time key).
+      :ok = Imp.Predict.warn_extra_inputs(react.signature, inputs, [:history])
 
       pending =
         react.signature
@@ -856,7 +856,7 @@ defmodule Imp.Predict.ReActV2 do
 
   defp predict(program, _react, history, pending) do
     context_call(history, fn projected ->
-      Imp.Predict.Predict.call(program, Map.put(pending, :history, projected))
+      Imp.Predict.call(program, Map.put(pending, :history, projected))
     end)
   end
 

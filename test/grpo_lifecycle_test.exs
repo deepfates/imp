@@ -480,36 +480,31 @@ defmodule GRPOLifecycleTest do
   end
 
   defp program do
-    lm = %{
-      module: Imp.LM.Static,
-      model: "base-model",
-      opts: [handler: fn _messages, _opts -> %{answer: "ok"} end]
-    }
+    lm =
+      Imp.LM.Static.new(model: "base-model", handler: fn _messages, _opts -> %{answer: "ok"} end)
 
     Imp.predict("question -> answer", lm: lm)
   end
 
   defp slow_program(sleep_ms) do
-    lm = %{
-      module: Imp.LM.Static,
-      model: "base-model",
-      opts: [
+    lm =
+      Imp.LM.Static.new(
+        model: "base-model",
         handler: fn _messages, _opts ->
           Process.sleep(sleep_ms)
           %{answer: "ok"}
         end
-      ]
-    }
+      )
 
     Imp.predict("question -> answer", lm: lm)
   end
 
   defp two_predictor_program do
-    lm = %{
-      module: Imp.LM.Static,
-      model: "base-model",
-      opts: [handler: fn _messages, _opts -> %{first_answer: "one", second_answer: "two"} end]
-    }
+    lm =
+      Imp.LM.Static.new(
+        model: "base-model",
+        handler: fn _messages, _opts -> %{first_answer: "one", second_answer: "two"} end
+      )
 
     %TwoPredictorProgram{
       first: Imp.predict("question -> first_answer", lm: lm),

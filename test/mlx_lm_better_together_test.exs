@@ -128,7 +128,7 @@ defmodule Imp.Clients.MLXLMBetterTogetherTest do
 
     saved_path = Path.join(context.root, "better-together-program.json")
     :ok = Imp.save!(compiled, saved_path)
-    loaded = Imp.load!(saved_path)
+    loaded = Imp.read!(saved_path)
     assert model_id(Imp.ProgramAccess.lm(loaded)) == fused_path
 
     stop_job = %Imp.Clients.TrainingJob{result_model: fused_path}
@@ -182,7 +182,7 @@ defmodule Imp.Clients.MLXLMBetterTogetherTest do
 
     script = """
     job = Imp.Clients.TrainingJob.load!(#{inspect(job_path)})
-    program = Imp.load!(#{inspect(program_path)})
+    program = Imp.read!(#{inspect(program_path)})
     {:ok, rebound} = Imp.Clients.TrainingJob.rebind(job, program)
     {:ok, prediction} = Imp.call(rebound, %{question: "frozen probe"})
     lm = Imp.ProgramAccess.lm(rebound)

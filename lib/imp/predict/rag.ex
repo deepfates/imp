@@ -48,14 +48,11 @@ defmodule Imp.Predict.RAG do
   @doc """
   Runs retrieval, injects context, calls the wrapped program, and records metadata.
 
-      iex> lm = %{
-      ...>   module: Imp.LM.Static,
-      ...>   opts: [handler: fn messages, _opts ->
-      ...>     prompt = Enum.map_join(messages, " ", & &1.content)
-      ...>     if prompt =~ "France has capital Paris", do: %{answer: "Paris"}, else: %{answer: "unknown"}
-      ...>   end]
-      ...> }
-      iex> base = Imp.Predict.Predict.new("question, context -> answer", lm: lm)
+      iex> lm = Imp.LM.Static.new(handler: fn messages, _opts ->
+      ...>   prompt = Enum.map_join(messages, " ", & &1.content)
+      ...>   if prompt =~ "France has capital Paris", do: %{answer: "Paris"}, else: %{answer: "unknown"}
+      ...> end)
+      iex> base = Imp.Predict.new("question, context -> answer", lm: lm)
       iex> retriever = Imp.Retrieve.Memory.new([%{text: "France has capital Paris"}], k: 1)
       iex> rag = Imp.Predict.RAG.new(base, retriever, k: 1)
       iex> {:ok, prediction} = Imp.Predict.RAG.call(rag, %{question: "capital France"})

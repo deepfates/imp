@@ -34,7 +34,7 @@ defmodule Mix.Tasks.ImpAcp.HostTerminalCancelDemo do
         end
       )
 
-    Imp.react_v2("question -> answer", [run_command], lm: lm, max_iters: 2)
+    Imp.react("question -> answer", [run_command], lm: lm, max_iters: 2)
   end
 
   defp tool_turn(thought, name, id, arguments) do

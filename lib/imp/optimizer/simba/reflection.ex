@@ -43,14 +43,14 @@ defmodule Imp.Optimizer.SIMBA.Reflection do
       |> Map.put(:instructions, @instructions)
 
     program =
-      Imp.Predict.Predict.new(signature,
+      Imp.Predict.new(signature,
         lm: prompt_lm,
         adapter: Imp.Adapter.JSON,
         config: [response_format: response_format(module_names)]
       )
 
     with {:ok, prediction} <-
-           Imp.Predict.Predict.call(program, reflection_inputs(payload)),
+           Imp.Predict.call(program, reflection_inputs(payload)),
          advice when is_map(advice) <- Imp.get(prediction, :module_advice),
          :ok <- validate_advice(advice, module_names) do
       {:ok, advice, Imp.get(prediction, :discussion)}

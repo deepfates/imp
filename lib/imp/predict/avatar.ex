@@ -53,8 +53,8 @@ defmodule Imp.Predict.Avatar do
 
     %__MODULE__{
       signature: signature,
-      actor: Imp.Predict.Predict.new(actor_signature(signature), predict_opts),
-      finisher: Imp.Predict.Predict.new(finisher_signature(signature), predict_opts),
+      actor: Imp.Predict.new(actor_signature(signature), predict_opts),
+      finisher: Imp.Predict.new(finisher_signature(signature), predict_opts),
       tools: tools,
       max_iters: opts[:max_iters],
       tool_timeout_ms: opts[:tool_timeout_ms],
@@ -78,7 +78,7 @@ defmodule Imp.Predict.Avatar do
   def put_instruction(%__MODULE__{actor: actor} = avatar, instruction)
       when is_binary(instruction) do
     signature = %{actor.signature | instructions: instruction}
-    %{avatar | actor: Imp.Predict.Predict.with_signature(actor, signature)}
+    %{avatar | actor: Imp.Predict.with_signature(actor, signature)}
   end
 
   def current_instruction(%__MODULE__{actor: actor}), do: actor.signature.instructions
@@ -86,8 +86,8 @@ defmodule Imp.Predict.Avatar do
   def with_lm(%__MODULE__{} = avatar, lm) do
     %{
       avatar
-      | actor: Imp.Predict.Predict.with_lm(avatar.actor, lm),
-        finisher: Imp.Predict.Predict.with_lm(avatar.finisher, lm)
+      | actor: Imp.Predict.with_lm(avatar.actor, lm),
+        finisher: Imp.Predict.with_lm(avatar.finisher, lm)
     }
   end
 
@@ -102,7 +102,7 @@ defmodule Imp.Predict.Avatar do
         avatar_history: history
       })
 
-    with {:ok, prediction} <- Imp.Predict.Predict.call(avatar.actor, actor_inputs),
+    with {:ok, prediction} <- Imp.Predict.call(avatar.actor, actor_inputs),
          {:ok, action} <- normalize_action(Imp.Prediction.get(prediction, :action)) do
       if finish_action?(action) do
         finish(avatar, inputs, history, :finish)
@@ -121,7 +121,7 @@ defmodule Imp.Predict.Avatar do
   defp finish(avatar, inputs, history, reason) do
     final_inputs = Map.put(inputs, :avatar_history, history)
 
-    with {:ok, prediction} <- Imp.Predict.Predict.call(avatar.finisher, final_inputs) do
+    with {:ok, prediction} <- Imp.Predict.call(avatar.finisher, final_inputs) do
       prediction =
         prediction
         |> Imp.Prediction.put(:actions, history)

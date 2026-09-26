@@ -178,7 +178,7 @@ defmodule Imp.Adapter.TwoStep do
     extractor_signature = extractor_signature(signature)
     messages = Imp.Adapter.Chat.format(extractor_signature, %{text: completion}, demos: [])
 
-    # The extraction LM's own failure is returned as it is, as `Imp.Predict.Predict`
+    # The extraction LM's own failure is returned as it is, as `Imp.Predict`
     # returns its LM's: it is not a parse failure, and whether it may be retried
     # is the caller's to read. DSPy wraps it in the same ValueError as a parse
     # failure, which would hide a 429 behind a parse error.

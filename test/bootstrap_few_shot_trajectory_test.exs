@@ -87,7 +87,7 @@ defmodule Imp.Optimizer.BootstrapFewShotTrajectoryTest do
   test "uses generated outputs rather than labeled outputs as demos" do
     # The compiled program is round-tripped through Saving below, so the LM
     # comes from context: dumping refuses a Static-pinned program.
-    lm = %{module: Imp.LM.Static, opts: [handler: fn _, _ -> %{answer: "generated"} end]}
+    lm = Imp.LM.Static.new(handler: fn _, _ -> %{answer: "generated"} end)
     program = Imp.predict("question -> answer")
     example = Imp.example(question: "q", answer: "gold") |> Imp.with_inputs(:question)
     metric = fn _example, prediction -> Imp.get(prediction, :answer) == "generated" end
@@ -112,7 +112,7 @@ defmodule Imp.Optimizer.BootstrapFewShotTrajectoryTest do
 
     refute rendered =~ "augmented"
 
-    restored = compiled |> Imp.Saving.dump() |> Imp.Saving.load()
+    restored = compiled |> Imp.Saving.dump() |> Imp.Saving.load!()
     assert Imp.Example.get(hd(restored.demos), :augmented) == true
   end
 
@@ -186,10 +186,7 @@ defmodule Imp.Optimizer.BootstrapFewShotTrajectoryTest do
         program = %RepeatedCallProgram{
           main:
             Imp.predict("question -> hint",
-              lm: %{
-                module: Imp.LM.Static,
-                opts: [handler: fn _messages, _opts -> %{hint: "fixture-hint"} end]
-              }
+              lm: Imp.LM.Static.new(handler: fn _messages, _opts -> %{hint: "fixture-hint"} end)
             )
         }
 
@@ -248,13 +245,13 @@ defmodule Imp.Optimizer.BootstrapFewShotTrajectoryTest do
   test "keeps teacher and student distinct, excludes self demos, and fills only unbootstrapped labels" do
     student =
       Imp.predict("question -> answer",
-        lm: %{module: Imp.LM.Static, opts: [handler: fn _, _ -> %{answer: "student"} end]},
+        lm: Imp.LM.Static.new(handler: fn _, _ -> %{answer: "student"} end),
         demos: [Imp.example(question: "stale", answer: "stale") |> Imp.with_inputs(:question)]
       )
 
     teacher =
       Imp.predict("question -> answer",
-        lm: %{module: Imp.LM.Static, opts: [handler: fn _, _ -> %{answer: "teacher"} end]}
+        lm: Imp.LM.Static.new(handler: fn _, _ -> %{answer: "teacher"} end)
       )
 
     trainset = [
@@ -325,10 +322,7 @@ defmodule Imp.Optimizer.BootstrapFewShotTrajectoryTest do
 
     failing =
       Imp.predict("question -> answer",
-        lm: %{
-          module: Imp.LM.Static,
-          opts: [handler: fn _messages, _opts -> raise "teacher failed" end]
-        }
+        lm: Imp.LM.Static.new(handler: fn _messages, _opts -> raise "teacher failed" end)
       )
 
     metric = fn _example, _prediction ->
@@ -356,7 +350,7 @@ defmodule Imp.Optimizer.BootstrapFewShotTrajectoryTest do
   test "an explicit nil teacher uses the student as the default teacher" do
     program =
       Imp.predict("question -> answer",
-        lm: %{module: Imp.LM.Static, opts: [handler: fn _, _ -> %{answer: "generated"} end]}
+        lm: Imp.LM.Static.new(handler: fn _, _ -> %{answer: "generated"} end)
       )
 
     example = Imp.example(question: "q", answer: "gold") |> Imp.with_inputs(:question)
@@ -377,9 +371,8 @@ defmodule Imp.Optimizer.BootstrapFewShotTrajectoryTest do
     parent = self()
     cache = start_supervised!({Agent, fn -> %{} end})
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, opts ->
           rollout_id = opts[:rollout_id]
           cache_key = {messages, rollout_id}
@@ -403,8 +396,7 @@ defmodule Imp.Optimizer.BootstrapFewShotTrajectoryTest do
 
           %{answer: answer}
         end
-      ]
-    }
+      )
 
     example = Imp.example(question: "q", answer: "pass") |> Imp.with_inputs(:question)
 
@@ -433,10 +425,7 @@ defmodule Imp.Optimizer.BootstrapFewShotTrajectoryTest do
   test "zero max_errors raises on the first failure while infinity records it" do
     failing =
       Imp.predict("question -> answer",
-        lm: %{
-          module: Imp.LM.Static,
-          opts: [handler: fn _messages, _opts -> raise "provider failed" end]
-        }
+        lm: Imp.LM.Static.new(handler: fn _messages, _opts -> raise "provider failed" end)
       )
 
     example = Imp.example(question: "q", answer: "a") |> Imp.with_inputs(:question)
@@ -476,7 +465,7 @@ defmodule Imp.Optimizer.BootstrapFewShotTrajectoryTest do
 
     program =
       Imp.predict("question -> answer",
-        lm: %{module: Imp.LM.Static, opts: [handler: fn _, _ -> %{answer: "generated"} end]}
+        lm: Imp.LM.Static.new(handler: fn _, _ -> %{answer: "generated"} end)
       )
 
     example = Imp.example(question: "q", answer: "gold") |> Imp.with_inputs(:question)
@@ -500,16 +489,14 @@ defmodule Imp.Optimizer.BootstrapFewShotTrajectoryTest do
     compiled_input =
       Imp.predict("question -> answer",
         demos: [old_demo],
-        lm: %{
-          module: Imp.LM.Static,
-          opts: [
+        lm:
+          Imp.LM.Static.new(
             handler: fn messages, _opts ->
               prompt = Enum.map_join(messages, "\n", & &1.content)
               send(parent, {:compiled_teacher_prompt, prompt})
               %{answer: "fresh"}
             end
-          ]
-        }
+          )
       )
       |> Imp.Optimizer.Report.attach(old_report)
 
@@ -536,19 +523,16 @@ defmodule Imp.Optimizer.BootstrapFewShotTrajectoryTest do
   test "applies teacher settings as inherited task context without changing predictor config" do
     parent = self()
 
-    fallback_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    fallback_lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           send(parent, :fallback_lm_called)
           %{answer: "wrong"}
         end
-      ]
-    }
+      )
 
-    teacher_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    teacher_lm =
+      Imp.LM.Static.new(
         handler: fn _messages, opts ->
           settings = Imp.Settings.get()
 
@@ -560,8 +544,7 @@ defmodule Imp.Optimizer.BootstrapFewShotTrajectoryTest do
 
           %{answer: "teacher"}
         end
-      ]
-    }
+      )
 
     program = Imp.predict("question -> answer", config: [top_p: 0.2])
     example = Imp.example(question: "q", answer: "teacher") |> Imp.with_inputs(:question)
@@ -621,7 +604,7 @@ defmodule Imp.Optimizer.BootstrapFewShotTrajectoryTest do
   test "a zero-valued threshold uses metric truthiness, including 0.0" do
     program =
       Imp.predict("question -> answer",
-        lm: %{module: Imp.LM.Static, opts: [handler: fn _, _ -> %{answer: "generated"} end]}
+        lm: Imp.LM.Static.new(handler: fn _, _ -> %{answer: "generated"} end)
       )
 
     example = Imp.example(question: "q", answer: "gold") |> Imp.with_inputs(:question)
@@ -646,15 +629,13 @@ defmodule Imp.Optimizer.BootstrapFewShotTrajectoryTest do
     teacher = fn tag ->
       Imp.predict("question -> answer",
         demos: [manual],
-        lm: %{
-          module: Imp.LM.Static,
-          opts: [
+        lm:
+          Imp.LM.Static.new(
             handler: fn messages, _opts ->
               send(parent, {tag, Enum.map_join(messages, "\n", & &1.content)})
               %{answer: "teacher"}
             end
-          ]
-        }
+          )
       )
     end
 
@@ -692,9 +673,8 @@ defmodule Imp.Optimizer.BootstrapFewShotTrajectoryTest do
 
     teacher =
       Imp.predict("question -> answer",
-        lm: %{
-          module: Imp.LM.Static,
-          opts: [
+        lm:
+          Imp.LM.Static.new(
             handler: fn messages, _opts ->
               call = Agent.get_and_update(calls, fn count -> {count + 1, count + 1} end)
               prompt = Enum.map_join(messages, "\n", & &1.content)
@@ -706,8 +686,7 @@ defmodule Imp.Optimizer.BootstrapFewShotTrajectoryTest do
                 %{answer: "accepted"}
               end
             end
-          ]
-        }
+          )
       )
 
     trainset = [

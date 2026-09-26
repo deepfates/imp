@@ -3,7 +3,8 @@ defmodule Imp.BenchmarkTruth.Papillon do
 
   @behaviour Imp.Module
 
-  alias Imp.Predict.{ChainOfThought, Predict}
+  alias Imp.Predict
+  alias Imp.Predict.ChainOfThought
 
   @craft_instructions """
   Given a private user query, create a privacy-preserving request for a powerful external LLM.

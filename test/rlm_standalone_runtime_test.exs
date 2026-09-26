@@ -45,9 +45,8 @@ missing()|},
         ]
       end)
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           Agent.get_and_update(actions, fn [action | rest] ->
             if rest == [] do
@@ -60,8 +59,7 @@ missing()|},
             {action, rest}
           end)
         end
-      ]
-    }
+      )
 
     rlm =
       RLM.new("context -> answer",
@@ -120,9 +118,8 @@ print(context)|},
   test "a completed controller effect is rejected when the shared deadline expires" do
     parent = self()
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           send(parent, {:controller_effect_started, self()})
 
@@ -135,8 +132,7 @@ print(context)|},
 
           %{code: ~S|submit(%{answer: "late"})|}
         end
-      ]
-    }
+      )
 
     rlm = RLM.new("context -> answer", lm: lm, max_time_ms: 60_000)
     call_task = Task.async(fn -> RLM.call(rlm, %{context: "deadline"}) end)
@@ -154,9 +150,8 @@ print(context)|},
   test "turn two receives turn one's assistant action and REPL output as prior messages" do
     parent = self()
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           payload = controller_payload(messages)
 
@@ -186,8 +181,7 @@ print(context)|},
             %{code: "submit(%{answer: #{inspect(answer)}})"}
           end
         end
-      ]
-    }
+      )
 
     rlm = RLM.new("context -> answer", lm: lm, max_iterations: 2)
 
@@ -206,15 +200,13 @@ print(context)|},
   test "max_llm_calls zero permits controller work and denies only a sub-LM call" do
     parent = self()
 
-    controller = %{
-      module: Imp.LM.Static,
-      opts: [
+    controller =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           send(parent, :zero_budget_controller_called)
           %{code: ~S|submit(%{answer: "controller-only"})|}
         end
-      ]
-    }
+      )
 
     controller_only =
       RLM.new("context -> answer",
@@ -230,15 +222,13 @@ print(context)|},
     assert prediction.metadata.rlm.max_llm_calls_scope == :subcalls_only
     assert prediction.metadata.rlm.sub_lm_calls == 0
 
-    sub_lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> send(parent, :unexpected_zero_budget_subcall) end]
-    }
+    sub_lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts -> send(parent, :unexpected_zero_budget_subcall) end
+      )
 
-    querying_controller = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{code: ~S|llm_query("denied")|} end]
-    }
+    querying_controller =
+      Imp.LM.Static.new(handler: fn _messages, _opts -> %{code: ~S|llm_query("denied")|} end)
 
     with_subcall =
       RLM.new("context -> answer",
@@ -267,9 +257,8 @@ print(context)|},
         ])
       )
 
-    sub_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    sub_lm =
+      Imp.LM.Static.new(
         handler: fn [%{content: prompt}], _opts ->
           if prompt == "bad" do
             raise "intentional batched failure"
@@ -277,8 +266,7 @@ print(context)|},
             "ok:" <> prompt
           end
         end
-      ]
-    }
+      )
 
     rlm =
       RLM.new("context -> answer",
@@ -306,9 +294,8 @@ print(context)|},
         %{active: 0, max_active: 0}
       end)
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, opts ->
           payload = controller_payload(messages)
           variables = payload["variables"]
@@ -343,8 +330,7 @@ print(context)|},
             end
           end
         end
-      ]
-    }
+      )
 
     rlm =
       RLM.new("context -> answer",
@@ -379,9 +365,8 @@ print(context)|},
   end
 
   test "recursive batch workers inherit dynamic Imp LM settings" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           payload = controller_payload(messages)
           context = get_in(payload, ["variables", "context", "preview"])
@@ -393,8 +378,7 @@ submit(%{answer: Enum.join(answers, ",")})|}
             %{code: ~S|submit(%{answer: context})|}
           end
         end
-      ]
-    }
+      )
 
     rlm = RLM.new("context -> answer", max_iterations: 1, max_recursion_depth: 2)
 
@@ -404,7 +388,10 @@ submit(%{answer: Enum.join(answers, ",")})|}
     assert Imp.Prediction.get(prediction, :answer) == "left,right"
   end
 
-  test "rlm_query falls back to one-shot generation at the official depth boundary" do
+  # Imp's max_recursion_depth counts levels of child RLMs below the root, the
+  # rule recurse/2 already used. The standalone runtime's max_depth counts
+  # the root as well, so its max_depth=1 is Imp's 0.
+  test "rlm_query falls back to one-shot generation at the depth limit" do
     parent = self()
 
     controller =
@@ -415,22 +402,20 @@ submit(%{answer: answer})|}
         ])
       )
 
-    sub_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    sub_lm =
+      Imp.LM.Static.new(
         handler: fn messages, opts ->
           send(parent, {:fallback_call, messages, Keyword.get(opts, :model)})
           "fallback answer"
         end
-      ]
-    }
+      )
 
     rlm =
       RLM.new("context -> answer",
         lm: controller,
         sub_lm: sub_lm,
         max_iterations: 1,
-        max_recursion_depth: 1
+        max_recursion_depth: 0
       )
 
     assert {:ok, prediction} = RLM.call(rlm, %{context: "root"})
@@ -444,12 +429,45 @@ submit(%{answer: answer})|}
     assert prediction.metadata.rlm_child_traces == []
   end
 
+  test "the default recursion depth gives rlm_query one level of child RLM" do
+    parent = self()
+
+    controller =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          case controller_payload(messages)["variables"]["context"]["preview"] do
+            "root" ->
+              %{code: ~S|submit(%{answer: rlm_query("child prompt")})|}
+
+            "child prompt" ->
+              send(parent, :child_rlm_ran)
+              %{code: ~S|submit(%{answer: "child:" <> rlm_query("grandchild prompt")})|}
+          end
+        end
+      )
+
+    sub_lm =
+      Imp.LM.Static.new(
+        handler: fn [%{content: prompt}], _opts ->
+          send(parent, {:one_shot, prompt})
+          "leaf"
+        end
+      )
+
+    rlm = RLM.new("context -> answer", lm: controller, sub_lm: sub_lm, max_iterations: 1)
+
+    assert {:ok, prediction} = RLM.call(rlm, %{context: "root"})
+    assert_received :child_rlm_ran
+    assert_received {:one_shot, "grandchild prompt"}
+    assert Imp.Prediction.get(prediction, :answer) == "child:leaf"
+    assert prediction.metadata.rlm.max_observed_depth == 1
+  end
+
   test "recursive children share one global sub-LM call budget" do
     {:ok, sub_lm_calls} = Agent.start_link(fn -> 0 end)
 
-    controller = %{
-      module: Imp.LM.Static,
-      opts: [
+    controller =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           case Jason.decode(message_content(List.last(messages))) do
             {:ok, %{"variables" => variables}} ->
@@ -471,19 +489,16 @@ submit(%{answer: answer})|}
               "not a valid extracted prediction"
           end
         end
-      ]
-    }
+      )
 
-    sub_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    sub_lm =
+      Imp.LM.Static.new(
         handler: fn [%{content: prompt}], _opts ->
           Agent.update(sub_lm_calls, &(&1 + 1))
           Process.sleep(10)
           "sub:#{prompt}"
         end
-      ]
-    }
+      )
 
     rlm =
       RLM.new("context -> answer",
@@ -507,9 +522,8 @@ submit(%{answer: answer})|}
   test "recursive batch timeout cannot be downgraded to a partial item failure" do
     parent = self()
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           payload = controller_payload(messages)
           context = get_in(payload, ["variables", "context", "preview"])
@@ -523,8 +537,7 @@ submit(%{answer: Enum.join(answers, ",")})|}
             %{code: ~S|submit(%{answer: context})|}
           end
         end
-      ]
-    }
+      )
 
     rlm =
       RLM.new("context -> answer",
@@ -603,9 +616,8 @@ missing()|},
   test "compaction shortens root prompts while preserving the full trajectory in history" do
     parent = self()
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           last_content = messages |> List.last() |> message_content()
 
@@ -630,8 +642,7 @@ missing()|},
             end
           end
         end
-      ]
-    }
+      )
 
     rlm =
       RLM.new("context -> answer",
@@ -713,14 +724,11 @@ missing()|},
   end
 
   defp scripted_lm(actions) do
-    %{
-      module: Imp.LM.Static,
-      opts: [
-        handler: fn _messages, _opts ->
-          Agent.get_and_update(actions, fn [action | rest] -> {action, rest} end)
-        end
-      ]
-    }
+    Imp.LM.Static.new(
+      handler: fn _messages, _opts ->
+        Agent.get_and_update(actions, fn [action | rest] -> {action, rest} end)
+      end
+    )
   end
 
   defp new_actions(actions) do

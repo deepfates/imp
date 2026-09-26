@@ -18,7 +18,7 @@ behavior is additionally exercised by the repository's pinned 3.3.1 probes.
 ## ReAct
 
 `Imp.Predict.ReAct` retains its provider-native, fail-fast default and offers
-`mode: :dspy_3_2_1` for upstream observation-and-extraction control flow. In the
+`mode: :dspy` for upstream observation-and-extraction control flow. In the
 upstream mode, failed and unknown tool calls become observations, `submit`
 corresponds to upstream `finish`, and final outputs come from a separate
 extraction pass. Both modes accept the pinned implementation's invocation-local

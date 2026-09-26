@@ -42,7 +42,7 @@ defmodule ReActV2LastTextTest do
     prose = "Two looks were enough: the thing is there."
 
     program =
-      Imp.react_v2("intent -> answer", [look()],
+      Imp.react("intent -> answer", [look()],
         lm: recording_lm(owner, prose, 2),
         max_iters: 2
       )
@@ -74,7 +74,7 @@ defmodule ReActV2LastTextTest do
     note = "You have used every step. Answer now, in your own words."
 
     program =
-      Imp.react_v2("intent -> answer", [look()],
+      Imp.react("intent -> answer", [look()],
         lm: recording_lm(owner, "The thing is there."),
         max_iters: 1,
         last_request_note: note
@@ -94,7 +94,7 @@ defmodule ReActV2LastTextTest do
     owner = self()
 
     program =
-      Imp.react_v2("intent -> answer", [look()],
+      Imp.react("intent -> answer", [look()],
         lm: recording_lm(owner, "The thing is there."),
         max_iters: 1
       )
@@ -111,7 +111,7 @@ defmodule ReActV2LastTextTest do
     owner = self()
 
     program =
-      Imp.react_v2("intent -> answer", [look()],
+      Imp.react("intent -> answer", [look()],
         lm: recording_lm(owner, ""),
         max_iters: 1
       )
@@ -127,7 +127,7 @@ defmodule ReActV2LastTextTest do
     prose = "The thing is there."
 
     program =
-      Imp.react_v2("intent -> answer", [look()],
+      Imp.react("intent -> answer", [look()],
         lm: recording_lm(owner, prose),
         max_iters: 1
       )
@@ -172,7 +172,7 @@ defmodule ReActV2LastTextTest do
         end
       )
 
-    program = Imp.react_v2("intent -> answer", [look()], lm: lm, last_request_note: "Last one.")
+    program = Imp.react("intent -> answer", [look()], lm: lm, last_request_note: "Last one.")
 
     assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
     assert Imp.get(prediction, :answer) == "I could not look, so from memory: it is there."
@@ -194,7 +194,7 @@ defmodule ReActV2LastTextTest do
         handler: fn _messages, _opts -> raise(RuntimeError, "provider unavailable") end
       )
 
-    program = Imp.react_v2("intent -> answer", [look()], lm: lm)
+    program = Imp.react("intent -> answer", [look()], lm: lm)
 
     assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
     assert prediction.metadata[:termination_cause] == :prediction_error
@@ -216,7 +216,7 @@ defmodule ReActV2LastTextTest do
         end
       )
 
-    program = Imp.react_v2("intent -> answer", [look()], lm: lm)
+    program = Imp.react("intent -> answer", [look()], lm: lm)
 
     assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
     assert Imp.get(prediction, :answer) == nil
@@ -257,7 +257,7 @@ defmodule ReActV2LastTextTest do
     lm =
       Imp.req_llm("openrouter:test/model", req_module: RelayedErrorReqLLM, owner: self())
 
-    program = Imp.react_v2("intent -> answer", [look()], lm: lm)
+    program = Imp.react("intent -> answer", [look()], lm: lm)
 
     assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
     assert Imp.get(prediction, :answer) == "Answered after all."
@@ -278,7 +278,7 @@ defmodule ReActV2LastTextTest do
       end)
 
     program =
-      Imp.react_v2("intent -> answer", [slow_look],
+      Imp.react("intent -> answer", [slow_look],
         lm: recording_lm(owner, "never asked"),
         max_iters: 1,
         last_request_note: "Last one."
@@ -321,7 +321,7 @@ defmodule ReActV2LastTextTest do
 
     lm = recording_lm(owner, last)
 
-    program = Imp.react_v2("intent -> answer", [look], lm: lm, max_iters: 1)
+    program = Imp.react("intent -> answer", [look], lm: lm, max_iters: 1)
     assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
 
     assert_received :looked
@@ -367,7 +367,7 @@ defmodule ReActV2LastTextTest do
         end
       )
 
-    program = Imp.react_v2("intent -> answer", [identity_status], lm: lm)
+    program = Imp.react("intent -> answer", [identity_status], lm: lm)
     assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
 
     assert_received {:tool_choice, 2, "auto"}
@@ -395,7 +395,7 @@ defmodule ReActV2LastTextTest do
              end
            ), 5}
         ] do
-      program = Imp.react_v2("intent -> answer", [look()], lm: lm, max_iters: max_iters)
+      program = Imp.react("intent -> answer", [look()], lm: lm, max_iters: max_iters)
       assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
       refute Imp.get(prediction, :answer) == "none was sent"
     end
@@ -419,20 +419,20 @@ defmodule ReActV2LastTextTest do
     tool = Imp.tool(:look, "Look at a thing", runner)
 
     dumped =
-      Imp.react_v2("intent -> answer", [tool], last_request_note: "Answer now.")
+      Imp.react("intent -> answer", [tool], last_request_note: "Answer now.")
       |> Imp.dump(registry: registry)
 
     assert dumped["last_request_note"] == "Answer now."
     refute Map.has_key?(dumped, "on_max_iters")
 
-    loaded = Imp.load(dumped, registry: registry)
+    loaded = Imp.load!(dumped, registry: registry)
     assert loaded.last_request_note == "Answer now."
     refute Map.has_key?(loaded.tools, :submit)
 
     with_submit =
-      Imp.react_v2("intent -> answer, confidence: float", [tool])
+      Imp.react("intent -> answer, confidence: float", [tool])
       |> Imp.dump(registry: registry)
-      |> Imp.load(registry: registry)
+      |> Imp.load!(registry: registry)
 
     assert Map.has_key?(with_submit.tools, :submit)
   end

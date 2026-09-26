@@ -5,7 +5,7 @@ defmodule OptimizerBehavioralCorpusTest do
     @behaviour Imp.LM
 
     @impl true
-    def generate(_messages, _opts), do: {:error, :offline_candidate}
+    def generate(_lm, _messages, _opts), do: {:error, :offline_candidate}
   end
 
   defp metric, do: Imp.Metrics.exact_match(:answer)
@@ -30,9 +30,8 @@ defmodule OptimizerBehavioralCorpusTest do
 
   defp france_program do
     Imp.predict("question -> answer",
-      lm: %{
-        module: Imp.LM.Static,
-        opts: [
+      lm:
+        Imp.LM.Static.new(
           handler: fn messages, _opts ->
             prompt = Enum.map_join(messages, "\n", & &1.content)
 
@@ -42,8 +41,7 @@ defmodule OptimizerBehavioralCorpusTest do
               true -> %{answer: "unknown"}
             end
           end
-        ]
-      }
+        )
     )
   end
 
@@ -203,7 +201,7 @@ defmodule OptimizerBehavioralCorpusTest do
   test "GEPA records program failures diagnostically without using them as instruction advice" do
     broken_program =
       Imp.predict("question -> answer",
-        lm: %{module: ErrorLM, opts: []}
+        lm: ErrorLM
       )
 
     compiled =
@@ -233,7 +231,7 @@ defmodule OptimizerBehavioralCorpusTest do
 
     broken_program =
       Imp.predict("question -> answer",
-        lm: fn _messages, _opts -> {:error, reason} end
+        lm: Imp.Test.FunLM.new(fn _messages, _opts -> {:error, reason} end)
       )
 
     compiled =
@@ -343,15 +341,13 @@ defmodule OptimizerBehavioralCorpusTest do
   end
 
   test "SIMBA records an explicitly configured reflection model" do
-    prompt_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    prompt_lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           send(self(), {:simba_judge, messages})
           %{instruction: "Always answer Paris when asked about France."}
         end
-      ]
-    }
+      )
 
     compiled =
       Imp.Optimizer.SIMBA.new(metric(),
@@ -542,7 +538,7 @@ defmodule OptimizerBehavioralCorpusTest do
                  fn -> Imp.Optimizer.GEPA.new(metric(), feedback_fn: fn -> "feedback" end) end
 
     assert_raise ArgumentError,
-                 ~r/Imp\.Optimizer\.COPRO\.new\/2: invalid value for :proposer_lm option: expected nil, an LM module/,
+                 ~r/Imp\.Optimizer\.COPRO\.new\/2: invalid value for :proposer_lm option: expected nil, or an LM struct or module/,
                  fn -> Imp.Optimizer.COPRO.new(metric(), proposer_lm: %{provider: :missing}) end
 
     assert_raise ArgumentError,
@@ -559,15 +555,13 @@ defmodule OptimizerBehavioralCorpusTest do
   end
 
   test "COPRO can use LM-generated score-informed instruction proposals" do
-    proposer_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    proposer_lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           send(self(), {:copro_proposer, messages})
           ~s(["Always answer Paris when asked about France."])
         end
-      ]
-    }
+      )
 
     compiled =
       Imp.Optimizer.COPRO.new(metric(), breadth: 2, depth: 1, proposer_lm: proposer_lm)

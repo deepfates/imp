@@ -101,24 +101,28 @@ defmodule RefineFeedbackTest do
   test "Refine asks the wrapped LM for redacted advice and propagates it" do
     parent = self()
 
-    lm = fn messages, _opts ->
-      prompt = Enum.map_join(messages, "\n", &Map.get(&1, :content, ""))
+    lm =
+      Imp.Test.FunLM.new(fn messages, _opts ->
+        prompt = Enum.map_join(messages, "\n", &Map.get(&1, :content, ""))
 
-      if prompt =~ "program_inputs" do
-        send(parent, {:feedback_prompt, prompt})
+        if prompt =~ "program_inputs" do
+          send(parent, {:feedback_prompt, prompt})
 
-        {:ok,
-         %{discussion: "main produced the wrong answer", advice: %{"main" => "repair the answer"}}}
-      else
-        if prompt =~ "repair the answer" do
-          {:ok, %{answer: "fixed"}}
+          {:ok,
+           %{
+             discussion: "main produced the wrong answer",
+             advice: %{"main" => "repair the answer"}
+           }}
         else
-          {:ok, %{answer: "bad"}}
+          if prompt =~ "repair the answer" do
+            {:ok, %{answer: "fixed"}}
+          else
+            {:ok, %{answer: "bad"}}
+          end
         end
-      end
-    end
+      end)
 
-    program = Imp.Predict.Predict.new("question -> answer", lm: lm)
+    program = Imp.Predict.new("question -> answer", lm: lm)
     metric = fn _example, prediction -> Imp.Prediction.get(prediction, :answer) == "fixed" end
 
     # :api_key is a deliberate extra input (redaction probe); since de-hzcv
@@ -194,18 +198,19 @@ defmodule RefineFeedbackTest do
   test "Refine maps automatic advice to predictor names with N/A fallback" do
     parent = self()
 
-    lm = fn messages, _opts ->
-      prompt = Enum.map_join(messages, "\n", &Map.get(&1, :content, ""))
+    lm =
+      Imp.Test.FunLM.new(fn messages, _opts ->
+        prompt = Enum.map_join(messages, "\n", &Map.get(&1, :content, ""))
 
-      if prompt =~ "program_inputs",
-        do:
-          {:ok,
-           %{
-             discussion: "first needs repair; second is not to blame",
-             advice: %{"first" => "first advice"}
-           }},
-        else: {:ok, %{answer: "unused"}}
-    end
+        if prompt =~ "program_inputs",
+          do:
+            {:ok,
+             %{
+               discussion: "first needs repair; second is not to blame",
+               advice: %{"first" => "first advice"}
+             }},
+          else: {:ok, %{answer: "unused"}}
+      end)
 
     program = %MultiPredictorProgram{
       owner: parent,
@@ -337,13 +342,14 @@ defmodule RefineFeedbackTest do
   test "BestOfN gives each attempt a distinct rollout identity at temperature 1.0" do
     parent = self()
 
-    lm = fn _messages, opts ->
-      send(parent, {:attempt_options, opts})
-      {:ok, %{answer: Integer.to_string(opts[:rollout_id])}}
-    end
+    lm =
+      Imp.Test.FunLM.new(fn _messages, opts ->
+        send(parent, {:attempt_options, opts})
+        {:ok, %{answer: Integer.to_string(opts[:rollout_id])}}
+      end)
 
     program =
-      Imp.Predict.Predict.new("question -> answer",
+      Imp.Predict.new("question -> answer",
         lm: lm,
         config: [rollout_id: 7, temperature: 0.2]
       )

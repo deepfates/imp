@@ -540,8 +540,6 @@ defmodule Imp.LM.Budgeted do
   defstruct [:inner, :budget, :max_output_tokens, record_usage: true]
 
   @impl true
-  def generate(_messages, _opts), do: {:error, :budgeted_lm_instance_required}
-
   def generate(%__MODULE__{} = lm, messages, opts) do
     with {:ok, bounded_opts} <- bound_output_tokens(lm.max_output_tokens, opts),
          {:ok, reservation} <-
@@ -619,10 +617,6 @@ defmodule Imp.LM.Budgeted do
 
   defp sanitize_inner(%Imp.Clients.ReqLLM{} = inner) do
     %{inner | opts: scrub_transport_controls(inner.opts)}
-  end
-
-  defp sanitize_inner(%{module: _module, opts: opts} = inner) when is_list(opts) do
-    %{inner | opts: scrub_transport_controls(opts)}
   end
 
   defp sanitize_inner(inner), do: inner

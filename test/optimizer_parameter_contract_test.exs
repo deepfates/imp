@@ -58,7 +58,7 @@ defmodule Imp.Optimizer.ParameterContractTest do
   test "parameter and set persistence is deterministic and rejects tampering" do
     instruction = Parameter.new("predictor/main/instruction", :instruction, "Answer exactly.")
     config = Parameter.new("predictor/main/config", :config, %{"temperature" => 0})
-    set = Set.new("program/Elixir.Imp.Predict.Predict", [config, instruction])
+    set = Set.new("program/Elixir.Imp.Predict", [config, instruction])
 
     assert set == set |> Set.dump() |> Set.load!()
 

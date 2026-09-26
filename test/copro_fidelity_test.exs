@@ -41,10 +41,7 @@ defmodule Imp.Optimizer.COPROFidelityTest do
 
   defp constant_program(answer \\ "Paris") do
     Imp.predict("question -> answer",
-      lm: %{
-        module: Imp.LM.Static,
-        opts: [handler: fn _messages, _opts -> %{answer: answer} end]
-      }
+      lm: Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: answer} end)
     )
   end
 
@@ -99,9 +96,8 @@ defmodule Imp.Optimizer.COPROFidelityTest do
   test "stores and compares inert prefix metadata without rendering it" do
     parent = self()
 
-    proposer = %{
-      module: Imp.LM.Static,
-      opts: [
+    proposer =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           send(parent, {:proposal_batch, messages})
 
@@ -116,21 +112,18 @@ defmodule Imp.Optimizer.COPROFidelityTest do
             }
           ])
         end
-      ]
-    }
+      )
 
     program =
       Imp.predict("question -> answer",
-        lm: %{
-          module: Imp.LM.Static,
-          opts: [
+        lm:
+          Imp.LM.Static.new(
             handler: fn messages, _opts ->
               prompt = Enum.map_join(messages, "\n", & &1.content)
               send(parent, {:task_prompt, prompt})
               %{answer: "Paris"}
             end
-          ]
-        }
+          )
       )
 
     compiled =
@@ -181,9 +174,8 @@ defmodule Imp.Optimizer.COPROFidelityTest do
   end
 
   test "evaluates duplicate pairs but retains the first equal-score record" do
-    proposer = %{
-      module: Imp.LM.Static,
-      opts: [
+    proposer =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           Jason.encode!([
             %{
@@ -196,8 +188,7 @@ defmodule Imp.Optimizer.COPROFidelityTest do
             }
           ])
         end
-      ]
-    }
+      )
 
     report =
       COPRO.new(Imp.Metrics.exact_match(:answer),
@@ -218,9 +209,8 @@ defmodule Imp.Optimizer.COPROFidelityTest do
   end
 
   test "equal-score reevaluation preserves the first insertion and record depth" do
-    proposer = %{
-      module: Imp.LM.Static,
-      opts: [
+    proposer =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           payload = messages |> List.last() |> Map.fetch!(:content) |> Jason.decode!()
 
@@ -239,8 +229,7 @@ defmodule Imp.Optimizer.COPROFidelityTest do
           |> Enum.take(payload["requested_candidate_count"])
           |> Jason.encode!()
         end
-      ]
-    }
+      )
 
     report =
       COPRO.new(Imp.Metrics.exact_match(:answer),
@@ -261,17 +250,15 @@ defmodule Imp.Optimizer.COPROFidelityTest do
   end
 
   test "scores coordinate candidates on trainset rather than the Imp validation argument" do
-    proposer = %{
-      module: Imp.LM.Static,
-      opts: [
+    proposer =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           Jason.encode!(%{
             "proposed_instruction" => "Answer Paris.",
             "proposed_prefix_for_output_field" => "Answer:"
           })
         end
-      ]
-    }
+      )
 
     mismatched_validation = [
       Imp.example(question: "Elsewhere?", answer: "Berlin") |> Imp.with_inputs(:question)
@@ -501,17 +488,15 @@ defmodule Imp.Optimizer.COPROFidelityTest do
   end
 
   test "uses Python's ties-to-even rounding for candidate percentages" do
-    proposer = %{
-      module: Imp.LM.Static,
-      opts: [
+    proposer =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           Jason.encode!(%{
             "proposed_instruction" => "Keep answering.",
             "proposed_prefix_for_output_field" => "Answer:"
           })
         end
-      ]
-    }
+      )
 
     trainset =
       Enum.map(1..32, fn index ->
@@ -530,9 +515,8 @@ defmodule Imp.Optimizer.COPROFidelityTest do
   test "fans scalar provider responses out with ordered rollout separation" do
     parent = self()
 
-    proposer = %{
-      module: Imp.LM.Static,
-      opts: [
+    proposer =
+      Imp.LM.Static.new(
         handler: fn messages, opts ->
           rollout_id = opts[:rollout_id]
           payload = messages |> List.last() |> Map.fetch!(:content) |> Jason.decode!()
@@ -545,8 +529,7 @@ defmodule Imp.Optimizer.COPROFidelityTest do
             "proposed_prefix_for_output_field" => "Prefix #{rollout_id}:"
           })
         end
-      ]
-    }
+      )
 
     report =
       COPRO.new(Imp.Metrics.exact_match(:answer),
@@ -584,9 +567,8 @@ defmodule Imp.Optimizer.COPROFidelityTest do
   end
 
   test "preserves 3.2.1's cumulative latest-score statistics across predictors" do
-    proposer = %{
-      module: Imp.LM.Static,
-      opts: [
+    proposer =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           payload = messages |> List.last() |> Map.fetch!(:content) |> Jason.decode!()
 
@@ -595,8 +577,7 @@ defmodule Imp.Optimizer.COPROFidelityTest do
             "proposed_prefix_for_output_field" => "Candidate:"
           })
         end
-      ]
-    }
+      )
 
     first = with_instructions(Imp.predict("question -> hint"), "first base")
     second = with_instructions(Imp.predict("hint -> answer"), "second base")
@@ -620,24 +601,19 @@ defmodule Imp.Optimizer.COPROFidelityTest do
   end
 
   test "aborts candidate evaluation at the eval_kwargs error threshold" do
-    proposer = %{
-      module: Imp.LM.Static,
-      opts: [
+    proposer =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           Jason.encode!(%{
             "proposed_instruction" => "Fail once.",
             "proposed_prefix_for_output_field" => "Answer:"
           })
         end
-      ]
-    }
+      )
 
     failing =
       Imp.predict("question -> answer",
-        lm: %{
-          module: Imp.LM.Static,
-          opts: [handler: fn _messages, _opts -> raise "task provider failed" end]
-        }
+        lm: Imp.LM.Static.new(handler: fn _messages, _opts -> raise "task provider failed" end)
       )
 
     optimizer =
@@ -687,7 +663,7 @@ defmodule Imp.Optimizer.COPROFidelityTest do
   end
 
   defp with_instructions(predictor, instructions) do
-    Imp.Predict.Predict.with_signature(predictor, %{
+    Imp.Predict.with_signature(predictor, %{
       predictor.signature
       | instructions: instructions
     })

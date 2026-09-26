@@ -19,7 +19,7 @@ defmodule Imp.Test.ControlledRouteLM do
   @routes ["R17", "R42", "R68", "R93"]
 
   @impl true
-  def generate(_messages, opts) do
+  def generate(_lm, _messages, opts) do
     {:ok, %{route: Enum.fetch!(@routes, Keyword.fetch!(opts, :rollout_id))}}
   end
 end
