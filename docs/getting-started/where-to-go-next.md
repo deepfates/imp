@@ -28,6 +28,8 @@ works the way it does:
   built-in modules, and writing your own.
 - [Tools and MCP](../diving-deeper/tools-and-mcp.md): tools, policies, and MCP
   servers.
+- [Retrieval](../diving-deeper/retrieval.md): retrievers, retrieval before a
+  prediction, and search as a tool.
 - [ReAct](../diving-deeper/react.md): how the agent loop runs and ends.
 - [Metrics and evaluation](../diving-deeper/metrics-and-evaluation.md):
   metrics beyond exact match, and reading an evaluation.
