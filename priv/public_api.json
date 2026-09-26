@@ -935,6 +935,16 @@
     },
     {
       "category": "internal",
+      "module": "Inspect.ExMCP.Client",
+      "source": "lib/imp/mcp/redacted_inspect.ex"
+    },
+    {
+      "category": "internal",
+      "module": "Inspect.ExMCP.Transport.HTTP",
+      "source": "lib/imp/mcp/redacted_inspect.ex"
+    },
+    {
+      "category": "internal",
       "module": "Inspect.Imp.Clients.HTTPTrainer",
       "source": "lib/imp/clients/training.ex"
     },
