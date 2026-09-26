@@ -365,9 +365,8 @@ defmodule Imp.ACP.Host do
     kind, reason -> {:error, {:host_request_failed, {kind, Imp.Redaction.redact(reason)}}}
   end
 
-  defp fetch(map, key, default \\ nil) when is_map(map) do
-    Map.get(map, key, Map.get(map, Atom.to_string(key), default))
-  end
+  defp fetch(map, key, default \\ nil) when is_map(map),
+    do: Map.get(map, Atom.to_string(key), default)
 
   defp object_schema(properties, required) do
     %{

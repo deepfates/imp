@@ -7,9 +7,11 @@ defmodule Imp.Predict.ReActV2 do
 
   ## Which signatures get `submit`
 
-  A task signature with exactly one output of type `:string` has an answer
-  that the model can write as plain text, so its loop offers no `submit` tool.
-  Every other signature (several outputs, or one output that is not text) gets
+  A task signature with exactly one output of type `:string` and no
+  constraints has an answer that the model can write as plain text, so its
+  loop offers no `submit` tool. Every other signature (several outputs, one
+  output that is not text, or one text output with constraints such as an
+  `enum`, whose allowed values reach the model in `submit`'s schema) gets
   the reserved `submit` tool, whose parameters are the signature's outputs,
   exactly as DSPy's ReActV2 has it. The name `submit` is reserved for every
   signature, so a user tool cannot take it.
@@ -29,8 +31,7 @@ defmodule Imp.Predict.ReActV2 do
       the turn's context window was full or its `Imp.Deadline` had passed,
       which would refuse any further request too and so are named instead;
       `termination_error` holds the errors of the requests that failed. One of `:max_iters`, `:parse_error`, `:prediction_error`,
-      `:invalid_answer`, `:empty_tool_calls`, `:context_window_exceeded` and
-      `:deadline_exceeded`.
+      `:empty_tool_calls`, `:context_window_exceeded` and `:deadline_exceeded`.
     * `:termination_error` — for `:incomplete`, the redacted errors of the
       requests that failed.
     * `:finished_by_tool` — the terminal tool that ended the turn.
@@ -44,13 +45,14 @@ defmodule Imp.Predict.ReActV2 do
 
   ## How a turn ends
 
-    * `:answered` (one text output). A step that says something and calls no
+    * `:answered` (one unconstrained text output). A step that says something and calls no
       tool is the answer, in that one request.
     * `:submit` (every other signature). The model calls `submit` with the
       signature's outputs.
     * `:finished_by_tool`. `finish_on` maps a tool name to
       `fn arguments, result, inputs -> {:finish, outputs} | :continue end`. It
-      runs after that tool's call executes; `{:finish, outputs}` validates
+      runs after that tool's call executes, with the string-keyed arguments
+      the tool received; `{:finish, outputs}` validates
       `outputs` against the signature exactly as a `submit` would and ends the
       turn, with `finished_by_tool` naming the tool. `:continue` leaves the
       loop running. When one step calls several terminal tools, the first in
@@ -65,16 +67,18 @@ defmodule Imp.Predict.ReActV2 do
   ## When a turn is interrupted
 
   A turn is interrupted when it reaches `max_iters`, when a step's request
-  fails (`:prediction_error`, `:parse_error`), or when a step calls no tool and
-  gives no answer (`:invalid_answer` for text the output does not
-  accept, and `:empty_tool_calls` for a signature with `submit`).
+  fails (`:prediction_error`, `:parse_error`), or when a step of a signature
+  with `submit` calls no tool (`:empty_tool_calls`). An `enum` output is such a
+  signature: text that is not a `submit` call is `:empty_tool_calls`, never
+  an answer, and a turn with no valid `submit`, the forced one included, ends
+  `:incomplete`.
 
-  With one text output, a step that calls no tool and says nothing is not an
+  With one unconstrained text output, a step that calls no tool and says nothing is not an
   interruption: it is an empty answer, and the turn ends there
   (`:answered`). Saying nothing is how a model declines to answer, and asking
   it again would make declining cost a second request.
 
-  With one text output, every interruption takes the same path: one more
+  With one unconstrained text output, every interruption takes the same path: one more
   request, and its text is the answer (`:last_text`).
   The request is a step like any other: the same tools and the same
   `tool_choice: "auto"`. A provider may refuse a history of tool calls when no
@@ -189,7 +193,7 @@ defmodule Imp.Predict.ReActV2 do
       default: 20,
       doc:
         "Steps before the turn is interrupted. An interrupted turn ends with the " <>
-          "forced `submit`, or, for a signature with one text output, one last " <>
+          "forced `submit`, or, for a signature with one unconstrained text output, one last " <>
           "text-only request."
     ],
     tool_policy: [
@@ -203,7 +207,7 @@ defmodule Imp.Predict.ReActV2 do
       doc:
         "One line of host text put in front of the last request of an interrupted " <>
           "turn, as a user message, and kept in the history: the last text-only " <>
-          "request for a signature with one text output, the forced `submit` for " <>
+          "request for a signature with one unconstrained text output, the forced `submit` for " <>
           "every other. `nil` says nothing; Imp writes no sentence of its own."
     ],
     finish_on: [
@@ -295,7 +299,7 @@ defmodule Imp.Predict.ReActV2 do
   # program goes through here too, so the rule lives in one place.
   #
   # Divergence from DSPy's ReActV2, which offers `submit` for every signature:
-  # a signature with one text output gets none. Its answer is the text the
+  # a signature with one unconstrained text output gets none. Its answer is the text the
   # model writes when it stops calling tools, which is how every other
   # mainstream tool loop ends a turn, and a `submit` beside that would be a
   # second way to say the same thing. DSPy needs `submit` because a signature
@@ -589,8 +593,9 @@ defmodule Imp.Predict.ReActV2 do
       case predict(react.react, react, history, pending) do
         {:ok, prediction, history} ->
           calls = prediction |> Imp.get(:tool_calls, []) |> normalize_calls(turn)
-          outputs = last_text_outputs(react.signature, prediction)
           no_calls = %ToolCalls{tool_calls: []}
+
+          outputs = last_text_outputs(react.signature, prediction)
           history = append_last_step(history, pending, prediction, no_calls, outputs)
 
           final_prediction(
@@ -646,15 +651,11 @@ defmodule Imp.Predict.ReActV2 do
     Map.put(metadata, :unexecuted_tool_calls, Imp.Redaction.redact(unexecuted))
   end
 
+  # Only a signature with one unconstrained text output reaches the last
+  # text request, and any text is its answer.
   defp last_text_outputs(signature, prediction) do
-    case parse_text(signature, prediction) do
-      {:ok, outputs} ->
-        outputs
-
-      {:none, _cause} ->
-        [%Imp.Signature.Field{name: name}] = signature.outputs
-        %{name => nil}
-    end
+    {:ok, outputs} = parse_text(signature, prediction)
+    outputs
   end
 
   # The note is what the model is told, so it goes into the durable history
@@ -1011,32 +1012,40 @@ defmodule Imp.Predict.ReActV2 do
   end
 
   # A step that stops calling tools and says something has answered, when the
-  # task declares exactly one text output for that text to be. Several outputs,
-  # or one that is not text, cannot be filled from text alone and take the
-  # forced submit. The text is validated through the same parse a `submit`'s
-  # arguments go through, so a constrained output is not quietly filled with
-  # something it excludes. What is not an answer carries the interruption it
-  # is.
+  # task declares exactly one unconstrained text output for that text to be.
+  # Several outputs, one that is not text, or one with constraints cannot be
+  # filled from text alone and take the forced submit. Any text is a valid
+  # value of an unconstrained text output, so the text is the answer as it
+  # is. A signature with `submit` has no text answer: that step is the
+  # `:empty_tool_calls` interruption.
   defp parse_text(signature, prediction) do
-    with {:text, [%Imp.Signature.Field{name: name}]} <- text_output(signature),
-         {:written, text} when is_binary(text) and text != "" <-
-           {:written, Imp.get(prediction, :next_thought)},
-         {:ok, parsed} <- Imp.Adapter.Chat.parse(signature, %{name => text}, []) do
-      {:ok, Imp.Prediction.to_map(parsed)}
+    with {:text, [%Imp.Signature.Field{name: name}]} <- text_output(signature) do
+      case Imp.get(prediction, :next_thought) do
+        text when is_binary(text) and text != "" -> {:ok, %{name => text}}
+        _nothing -> {:ok, %{name => nil}}
+      end
     else
       :submit -> {:none, :empty_tool_calls}
-      {:written, _nothing} -> {:ok, %{hd(signature.outputs).name => nil}}
-      {:error, _reason} -> {:none, :invalid_answer}
     end
   end
 
   defp text_output(signature),
     do: if(single_text_output?(signature), do: {:text, signature.outputs}, else: :submit)
 
-  defp single_text_output?(%Imp.Signature{outputs: [%Imp.Signature.Field{type: type}]}),
-    do: type in [:string, "string"]
+  # Text is the answer only when any text is a valid answer: a constrained
+  # string (an enum, a pattern, an answer shape) keeps `submit`, whose schema
+  # tells the model what the output accepts.
+  defp single_text_output?(%Imp.Signature{outputs: [%Imp.Signature.Field{} = field]}),
+    do: field.type in [:string, "string"] and unconstrained?(field)
 
   defp single_text_output?(_signature), do: false
+
+  defp unconstrained?(field) do
+    constraints =
+      Map.get(field.metadata, :constraints, Map.get(field.metadata, "constraints"))
+
+    constraints in [nil, %{}]
+  end
 
   defp execute_call(
          _react,
@@ -1111,11 +1120,11 @@ defmodule Imp.Predict.ReActV2 do
 
     {outputs, missing} =
       Enum.reduce(names, {%{}, []}, fn name, {outputs, missing} ->
-        value = Imp.FieldMap.get(arguments, name, :__missing__)
-
-        if value == :__missing__,
-          do: {outputs, missing ++ [name]},
-          else: {Map.put(outputs, name, value), missing}
+        # The name and the key may be the same text as an atom and a string.
+        case Imp.FieldMap.fetch(arguments, name) do
+          {:ok, value} -> {Map.put(outputs, name, value), missing}
+          :error -> {outputs, missing ++ [name]}
+        end
       end)
 
     cond do

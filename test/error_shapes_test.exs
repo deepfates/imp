@@ -267,12 +267,47 @@ defmodule Imp.ErrorShapesTest do
                Imp.call(%RaisingProgram{}, %{})
     end
 
-    test "a tool the policy does not allow is denied with the run's tag" do
+    # One tag for a denied call; the reason says who denied it: the static
+    # policy (`:tool_policy`) or the run's authorization callback (its reason).
+    test "a tool the policy does not allow is denied with :tool_policy" do
       assert {:error, {:tool_denied, :write, :tool_policy}} =
                Imp.ToolPolicy.authorize([:read], :write, %{})
 
       assert Imp.Adapter.Chat.tool_error_text({:tool_denied, :write, :tool_policy}) ==
                "write is not allowed."
+    end
+
+    test "a call the run's authorization callback denies carries the callback's reason" do
+      lm =
+        Imp.LM.Static.new(
+          handler: fn messages, _opts ->
+            if Enum.any?(messages, &(&1[:role] == :tool)) do
+              %{
+                tool_calls: [
+                  %{id: "s", name: "submit", arguments: %{answer: "no", confidence: 0.1}}
+                ]
+              }
+            else
+              %{tool_calls: [%{id: "w", name: "write", arguments: %{}}]}
+            end
+          end
+        )
+
+      write = Imp.tool(:write, "Write", fn _ -> "written" end)
+      program = Imp.react("intent -> answer, confidence: float", [write], lm: lm, max_iters: 3)
+
+      assert {:ok, run} =
+               Imp.start_run(program, %{intent: "hello"},
+                 authorize: fn _request -> {:deny, :human_rejected} end
+               )
+
+      assert {:ok, prediction} = Task.await(run.task)
+      :ok = Imp.Run.stop(run)
+
+      results =
+        Enum.flat_map(prediction.metadata.history.messages, &Map.get(&1, :tool_call_results, []))
+
+      assert Enum.any?(results, &(&1.result == {:error, {:tool_denied, :write, :human_rejected}}))
     end
 
     test "a policy that raises keeps its exception" do

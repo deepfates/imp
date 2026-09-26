@@ -8,6 +8,12 @@ defmodule Imp.Tool do
   the model or a human reader, the schema is the input contract, and the
   function is ordinary Elixir.
 
+  A tool receives its arguments as a map with string keys, the shape a JSON
+  tool call carries and MCP expects: write `fn %{"country" => country} -> ...`.
+  Keys are never turned into atoms, whichever runtime makes the call and
+  whether or not the atom exists; atom keys passed from Elixir code become
+  strings before the tool runs.
+
   Tool calls validate JSON-schema-shaped input contracts before invoking the
   runner, are wrapped in Imp telemetry, and runtime traces redact sensitive
   values before they are stored.
@@ -15,10 +21,10 @@ defmodule Imp.Tool do
   ## Example
 
       iex> tool =
-      ...>   Imp.Tool.new(:lookup, "lookup a capital city", fn %{country: "France"} ->
+      ...>   Imp.Tool.new(:lookup, "lookup a capital city", fn %{"country" => "France"} ->
       ...>     "Paris"
       ...>   end)
-      iex> Imp.Tool.call(tool, %{country: "France"})
+      iex> Imp.Tool.call(tool, %{"country" => "France"})
       "Paris"
   """
 
@@ -116,14 +122,17 @@ defmodule Imp.Tool do
   end
 
   @doc """
-  Normalizes model/provider tool arguments into the Imp tool-call shape.
+  Normalizes model/provider tool arguments into the argument a tool receives.
 
-  JSON string arguments are decoded. Map keys become existing atoms when the
-  atom is already loaded and stay strings otherwise, avoiding atom leaks from
-  untrusted model output while keeping idiomatic Elixir tool functions pleasant.
+  A JSON string is decoded. Every atom map key becomes a string, at every
+  depth, so a tool receives the same shape whether its call came from a
+  provider's JSON, an interpreter, or Elixir code passing atom keys. Nothing is turned into an
+  atom, so model output cannot create atoms. Structs are left as they are.
 
       iex> Imp.Tool.normalize_arguments(~s({"query":"capital"}))
-      %{query: "capital"}
+      %{"query" => "capital"}
+      iex> Imp.Tool.normalize_arguments(%{query: "capital", filter: %{year: 2024}})
+      %{"query" => "capital", "filter" => %{"year" => 2024}}
   """
   def normalize_arguments(arguments) when is_binary(arguments) do
     case Jason.decode(arguments) do
@@ -132,13 +141,15 @@ defmodule Imp.Tool do
     end
   end
 
-  def normalize_arguments(arguments) when is_map(arguments),
-    do: Map.new(arguments, fn {key, value} -> {safe_existing_atom(key), value} end)
-
-  def normalize_arguments(arguments), do: arguments
+  def normalize_arguments(arguments), do: string_keys(arguments)
 
   @doc """
   Calls a tool with one argument.
+
+  Atom map keys in the argument become strings first, at every depth, as in
+  `normalize_arguments/1`, so `Imp.Tool.call(tool, %{query: "q"})` and a
+  model's `{"query": "q"}` both reach the tool as `%{"query" => "q"}`. A
+  string argument is passed as given, not decoded.
 
   This executes the underlying function inside a `[:imp, :tool]` telemetry
   span after validating the argument against the supported JSON Schema input
@@ -147,6 +158,8 @@ defmodule Imp.Tool do
   runtime.
   """
   def call(%__MODULE__{run: run} = tool, arg) do
+    arg = string_keys(arg)
+
     Imp.Telemetry.span([:imp, :tool], %{tool: tool.name, arguments: arg}, fn ->
       with :ok <- validate_input(tool, arg), do: run.(arg)
     end)
@@ -269,13 +282,16 @@ defmodule Imp.Tool do
           "Imp.Tool names must be atoms or strings; got: #{inspect(name)}"
   end
 
-  defp safe_existing_atom(key) when is_atom(key), do: key
+  defp string_keys(%_{} = struct), do: struct
 
-  defp safe_existing_atom(key) do
-    String.to_existing_atom(to_string(key))
-  rescue
-    ArgumentError -> to_string(key)
-  end
+  defp string_keys(map) when is_map(map),
+    do: Map.new(map, fn {key, value} -> {string_key(key), string_keys(value)} end)
+
+  defp string_keys(list) when is_list(list), do: Enum.map(list, &string_keys/1)
+  defp string_keys(value), do: value
+
+  defp string_key(key) when is_atom(key), do: Atom.to_string(key)
+  defp string_key(key), do: key
 
   defp validate_root(input, schema) do
     type = fetch_schema(schema, :type)

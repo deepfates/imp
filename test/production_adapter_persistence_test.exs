@@ -600,7 +600,7 @@ defmodule ProductionAdapterPersistenceTest do
   end
 
   test "named registry round-trips ReAct CodeAct and RLM tool graphs" do
-    lookup = fn %{query: query} -> "found #{query}" end
+    lookup = fn %{"query" => query} -> "found #{query}" end
 
     policy = fn name, _args ->
       if name in [:lookup, "lookup"], do: :allow, else: {:deny, :not_lookup}

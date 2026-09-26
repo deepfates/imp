@@ -63,6 +63,10 @@ defmodule Imp.Saving do
     end
   end
 
+  # Loading creates no atom. A tagged atom the VM already has loads as that
+  # atom; one it does not (a field name, a tool name, a document key that no
+  # loaded code has mentioned yet) loads as its text, which `Imp.Example`,
+  # `Imp.Prediction` and the tool index look up by text.
   @doc """
   Reads a program artifact written by `save!/3` and returns the program.
 
@@ -478,7 +482,7 @@ defmodule Imp.Saving do
 
   defp load_state!(%{"type" => "knn"} = state) do
     require_keys!(state, ["type", "examples", "k", "vectorizer"])
-    examples = Imp.Optimizer.Report.decode_term(Map.fetch!(state, "examples"))
+    examples = Imp.Optimizer.Report.decode_term_compatible(Map.fetch!(state, "examples"))
     vectorizer = load_vectorizer!(Map.fetch!(state, "vectorizer"))
     # Re-embeds the trainset at load: the stored artifact carries the corpus
     # (examples) and the derivation (vectorizer), never stale vectors.
@@ -514,7 +518,7 @@ defmodule Imp.Saving do
     metadata =
       state
       |> Map.get("metadata", %{})
-      |> Imp.Optimizer.Report.decode_term()
+      |> Imp.Optimizer.Report.decode_term_compatible()
       |> require_map_value!("Avatar metadata")
 
     validate_avatar_predicts!(signature, actor, finisher)
@@ -577,7 +581,7 @@ defmodule Imp.Saving do
         require_keys!(assertion, ["name", "predicate", "message"])
 
         Imp.Assertion.new(
-          Imp.Optimizer.Report.decode_term(assertion["name"]),
+          Imp.Optimizer.Report.decode_term_compatible(assertion["name"]),
           load_callback!(assertion["predicate"], [1, 2], "assertion predicate"),
           message: assertion["message"]
         )
@@ -1171,13 +1175,13 @@ defmodule Imp.Saving do
     states
     |> Enum.map(fn state ->
       require_keys!(state, ["name", "description", "schema", "runner"])
-      name = Imp.Optimizer.Report.decode_term(state["name"])
+      name = Imp.Optimizer.Report.decode_term_compatible(state["name"])
 
       Imp.Tool.new(
         name,
         state["description"],
         load_callback!(state["runner"], 1, "#{context} tool #{name}"),
-        schema: Imp.Optimizer.Report.decode_term(state["schema"])
+        schema: Imp.Optimizer.Report.decode_term_compatible(state["schema"])
       )
     end)
     |> Imp.Tool.index_tools!("saved #{context}")
@@ -1197,7 +1201,7 @@ defmodule Imp.Saving do
     do: load_callback!(name, 2, context)
 
   defp load_tool_policy!(policy, context) do
-    policy = Imp.Optimizer.Report.decode_term(policy)
+    policy = Imp.Optimizer.Report.decode_term_compatible(policy)
 
     case Imp.ToolPolicy.validate(policy) do
       {:ok, policy} -> policy
@@ -1413,10 +1417,12 @@ defmodule Imp.Saving do
   defp decode_predict_metadata(metadata) do
     # These tags are part of the supported TrainingJob.rebind/3 program
     # artifact. Decode only this explicit Saving-owned vocabulary before the
-    # existing-atom-only generic decoder sees the remaining metadata.
+    # generic decoder sees the remaining metadata. That decoder creates no
+    # atoms: the optimizer report here repeats the demos, whose field names
+    # load as strings when this VM never created them.
     metadata
     |> decode_portable_predict_metadata_atoms()
-    |> Imp.Optimizer.Report.decode_term()
+    |> Imp.Optimizer.Report.decode_term_compatible()
   end
 
   defp decode_portable_predict_metadata_atoms(%{"__imp_type__" => "atom", "value" => value} = tag)
@@ -1685,7 +1691,7 @@ defmodule Imp.Saving do
 
   defp load_retriever!(%{"type" => "memory"} = state) do
     Imp.Retrieve.Memory.new(
-      state |> Map.fetch!("docs") |> Imp.Optimizer.Report.decode_term(),
+      state |> Map.fetch!("docs") |> Imp.Optimizer.Report.decode_term_compatible(),
       k: Map.fetch!(state, "k")
     )
   end
@@ -1866,8 +1872,11 @@ defmodule Imp.Saving do
     end
   end
 
+  # A demo's field names are the task's, and the loading VM may never have
+  # created them as atoms. A name whose atom does not exist loads as a string,
+  # which `Imp.Example` looks up by text; no atom is created from the file.
   defp load_demo!(%{"__imp_type__" => "example"} = demo) do
-    case Imp.Optimizer.Report.decode_term(demo) do
+    case Imp.Optimizer.Report.decode_term_compatible(demo) do
       %Imp.Example{} = example ->
         example
 

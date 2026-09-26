@@ -19,7 +19,7 @@ defmodule ToolSchemaRuntimeTest do
 
     refute_received {:schema_tool_called, _input}
     assert "found beam" = Imp.Tool.call(tool, %{query: "beam"})
-    assert_received {:schema_tool_called, %{query: "beam"}}
+    assert_received {:schema_tool_called, %{"query" => "beam"}}
 
     untyped = Imp.Tool.new(:untyped, "untyped", fn input -> input end)
     assert "unchanged" = Imp.Tool.call(untyped, "unchanged")
@@ -153,6 +153,129 @@ defmodule ToolSchemaRuntimeTest do
            ] = prediction.metadata.rlm_trace
 
     refute_received {:schema_tool_called, _input}
+  end
+
+  # A tool receives string keys whichever runtime calls it, and whether or not
+  # the atom a key spells already exists in the VM (`:team` and `:region` do,
+  # through this module).
+  describe "a tool receives string keys" do
+    @arguments %{"team" => "atlas", "filter" => %{"region" => "eu"}}
+    @existing_atoms [:team, :region]
+
+    test "from ReActV2, including finish_on" do
+      parent = self()
+
+      lm =
+        static_lm(fn _messages ->
+          %{tool_calls: [%{id: "c1", name: "route", arguments: @arguments}]}
+        end)
+
+      program =
+        Imp.react("question -> answer", [route_tool(parent)],
+          lm: lm,
+          finish_on: %{
+            route: fn arguments, _result, _inputs ->
+              send(parent, {:finish_on_arguments, arguments})
+              {:finish, %{answer: arguments["team"]}}
+            end
+          }
+        )
+
+      assert {:ok, prediction} = Imp.call(program, %{question: "q"})
+      assert Imp.get(prediction, :answer) == "atlas"
+      assert_received {:route_called, @arguments}
+      assert_received {:finish_on_arguments, @arguments}
+    end
+
+    test "from ReAct" do
+      parent = self()
+      {:ok, turns} = Agent.start_link(fn -> 0 end)
+
+      lm =
+        static_lm(fn _messages ->
+          Agent.get_and_update(turns, fn
+            0 -> {%{tool_calls: [%{name: "route", arguments: @arguments}]}, 1}
+            _ -> {%{tool_calls: [%{name: "submit", arguments: %{"answer" => "atlas"}}]}, 2}
+          end)
+        end)
+
+      react =
+        Imp.Predict.ReAct.new("question -> answer", [route_tool(parent)], lm: lm, max_iters: 2)
+
+      assert {:ok, prediction} = Imp.call(react, %{question: "q"})
+      assert Imp.get(prediction, :answer) == "atlas"
+      assert_received {:route_called, @arguments}
+    end
+
+    test "from Avatar" do
+      parent = self()
+
+      lm =
+        static_lm(fn messages ->
+          prompt = Enum.map_join(messages, "\n", & &1.content)
+
+          cond do
+            prompt =~ "Do not request another tool." -> %{answer: "atlas"}
+            prompt =~ "routed" -> finish_action()
+            true -> %{action: %{tool_name: "route", tool_input_query: @arguments}}
+          end
+        end)
+
+      avatar = Imp.avatar("question -> answer", [route_tool(parent)], lm: lm, max_iters: 2)
+
+      assert {:ok, _prediction} = Imp.call(avatar, %{question: "q"})
+      assert_received {:route_called, @arguments}
+    end
+
+    test "from CodeAct" do
+      parent = self()
+      lm = static_lm(fn _messages -> %{tool: "route", arguments: @arguments} end)
+      code_act = Imp.code_act("question -> answer", [route_tool(parent)], lm: lm, max_iters: 1)
+
+      Imp.call(code_act, %{question: "q"})
+      assert_received {:route_called, @arguments}
+    end
+
+    test "from RLM, whose code passes atom keys" do
+      parent = self()
+      {:ok, turns} = Agent.start_link(fn -> 0 end)
+
+      lm =
+        static_lm(fn _messages ->
+          Agent.get_and_update(turns, fn
+            0 -> {%{code: ~S|route(%{team: "atlas", filter: %{region: "eu"}})|}, 1}
+            _ -> {%{code: ~S|submit(%{answer: "atlas"})|}, 2}
+          end)
+        end)
+
+      rlm = Imp.rlm("question -> answer", lm: lm, tools: [route_tool(parent)], max_iterations: 2)
+
+      assert {:ok, _prediction} = Imp.call(rlm, %{question: "q"})
+      assert_received {:route_called, @arguments}
+    end
+
+    test "from Imp.Tool.call/2 given atom keys" do
+      parent = self()
+
+      assert "routed atlas" =
+               Imp.Tool.call(route_tool(parent), %{team: "atlas", filter: %{region: "eu"}})
+
+      assert_received {:route_called, @arguments}
+    end
+
+    test "decoded from a JSON string" do
+      assert Imp.Tool.normalize_arguments(~s({"team":"atlas","filter":{"region":"eu"}})) ==
+               @arguments
+
+      assert Enum.all?(@existing_atoms, &is_atom/1)
+    end
+  end
+
+  defp route_tool(parent) do
+    Imp.Tool.new(:route, "route a ticket", fn %{"team" => team} = arguments ->
+      send(parent, {:route_called, arguments})
+      "routed #{team}"
+    end)
   end
 
   defp schema_tool(parent) do

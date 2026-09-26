@@ -11,7 +11,7 @@ defmodule Imp.Predict.ReAct do
   appends observations to `history`, and eventually calls the reserved `submit`
   tool. Keep the tool policy narrow in production:
 
-      lookup = Imp.tool(:lookup, "lookup facts", fn %{query: query} -> query end)
+      lookup = Imp.tool(:lookup, "lookup facts", fn %{"query" => query} -> query end)
 
       program =
         Imp.Predict.ReAct.new("question -> answer", [lookup],
@@ -508,13 +508,26 @@ defmodule Imp.Predict.ReAct do
 
       final =
         if agent.mode == :provider_native and submitted? and is_map(result),
-          do: Map.new(result),
+          do: submitted_outputs(agent.signature, result),
           else: final
 
       state = {events ++ [event], final, failure || call_failure, submitted?}
       halt_on_submit? = submitted? and agent.mode == :dspy
 
       if call_failure || final || halt_on_submit?, do: {:halt, state}, else: {:cont, state}
+    end)
+  end
+
+  # `submit` receives string keys, like every tool; the outputs are the
+  # signature's fields, matched to those keys by name.
+  defp submitted_outputs(signature, submitted) do
+    signature
+    |> Imp.Signature.output_names()
+    |> Enum.reduce(%{}, fn name, outputs ->
+      case Map.fetch(submitted, to_string(name)) do
+        {:ok, value} -> Map.put(outputs, name, value)
+        :error -> outputs
+      end
     end)
   end
 

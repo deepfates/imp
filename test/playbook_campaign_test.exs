@@ -39,7 +39,7 @@ defmodule Imp.Optimizer.Playbook.CampaignTest do
     assert {:error, :no_solution} = EquationSearch.solve("1 ? 1 = 3")
     assert {:error, :missing_equation} = EquationSearch.solve_tool(%{})
     assert {:error, :invalid_tool_arguments} = EquationSearch.solve_tool("not a map")
-    assert "2 + 3 * 4 = 14" = EquationSearch.solve_tool(%{numbers: [2, 3, 4], target: 14})
+    assert "2 + 3 * 4 = 14" = EquationSearch.solve_tool(%{"numbers" => [2, 3, 4], "target" => 14})
     assert {:error, :invalid_search_terms} = EquationSearch.solve_parts("2,3,4", 14)
 
     assert {:error, :search_bound_exceeded} =

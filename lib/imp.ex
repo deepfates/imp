@@ -257,7 +257,16 @@ defmodule Imp do
   @doc "Creates a bounded action-history Avatar actor with a reserved Finish action."
   def avatar(signature, tools, opts \\ []), do: Avatar.new(signature, tools, opts)
 
-  @doc "Creates a named tool for ReAct programs and agents."
+  @doc """
+  Creates a named tool for ReAct programs and agents.
+
+  The function receives one map with string keys, the shape a JSON tool call
+  carries, whichever runtime calls it:
+
+      Imp.tool(:lookup, "look up a fact", fn %{"query" => query} -> query end)
+
+  Keys are never atoms, so match on strings. See `Imp.Tool`.
+  """
   def tool(name, description, run, opts \\ []), do: Tool.new(name, description, run, opts)
 
   @doc "Creates a program-of-thought module backed by the BEAM-safe sandbox."
