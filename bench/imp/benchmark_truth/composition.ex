@@ -110,7 +110,7 @@ defmodule Imp.BenchmarkTruth.Composition do
 
     {:ok, prediction} =
       program
-      |> Imp.Predict.Refine.new(metric, max_attempts: 2, feedback_fn: fn _ -> "try exact" end)
+      |> Imp.Predict.Refine.new(metric, n: 2, feedback_fn: fn _ -> "try exact" end)
       |> Imp.Predict.Refine.call(example)
 
     score = answer_score(prediction, example["answer"])
@@ -225,7 +225,7 @@ defmodule Imp.BenchmarkTruth.Composition do
 
     results =
       Imp.Predict.Parallel.map(%QuestionProgram{}, inputs,
-        max_concurrency: max_concurrency,
+        num_threads: max_concurrency,
         timeout: 5_000
       )
 

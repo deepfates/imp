@@ -51,7 +51,7 @@ defmodule Imp.TRLProtocolGRPOLifecycleTest do
 
     job_path = Path.join(context.root, "selected-job.json")
     assert :ok = TrainingJob.save!(result.job, job_path)
-    loaded = TrainingJob.load!(job_path)
+    loaded = TrainingJob.read!(job_path)
     assert loaded.result_model == result.job.result_model
 
     assert Enum.map(loaded.metadata["validation_history"], &{&1["step"], &1["score"]}) ==
@@ -178,7 +178,7 @@ defmodule Imp.TRLProtocolGRPOLifecycleTest do
     assert :ok = TRLDeployment.stop(base_deployment)
 
     script = """
-    job = Imp.Clients.TrainingJob.load!(#{inspect(job_path)})
+    job = Imp.Clients.TrainingJob.read!(#{inspect(job_path)})
     program = Imp.read!(#{inspect(base_program_path)})
     trainer = Imp.Clients.TRLTrainer.new(
       python: #{inspect(System.find_executable("python3"))},

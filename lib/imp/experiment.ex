@@ -490,7 +490,7 @@ defmodule Imp.Experiment do
   end
 
   defp evaluation_keys,
-    do: [:failure_score, :max_concurrency, :max_errors, :timeout, :repetitions, :aggregation]
+    do: [:failure_score, :num_threads, :max_errors, :timeout, :repetitions, :aggregation]
 
   defp validate_repetitions!(repetitions) when is_integer(repetitions) and repetitions > 0,
     do: :ok

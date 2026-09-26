@@ -116,7 +116,7 @@ defmodule UpstreamExam.EvaluateTest do
     program = qa_program([{"What is 1+1?", "2"}, {"What is 2+2?", "4"}])
     devset = [new_example("What is 1+1?", "2"), new_example("What is 2+2?", "4")]
 
-    evaluator = Imp.Evaluate.new(devset, &answer_exact_match/2, max_concurrency: 2)
+    evaluator = Imp.Evaluate.new(devset, &answer_exact_match/2, num_threads: 2)
     result = Imp.Evaluate.run(evaluator, program)
     assert result.score == 1.0
   end

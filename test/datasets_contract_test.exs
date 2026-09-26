@@ -19,7 +19,7 @@ defmodule DatasetsContractTest do
     File.write!(path, ~s({"answer":"4"}\n))
 
     assert_raise Datasets.Error, ~r/missing required input keys \[:question\]/, fn ->
-      Datasets.GSM8K.load(path)
+      Datasets.GSM8K.read!(path)
     end
   after
     cleanup_tmp("missing-question.jsonl")
@@ -99,15 +99,15 @@ defmodule DatasetsContractTest do
                  end
 
     assert_raise ArgumentError,
-                 ~r/Imp\.Datasets\.DataLoader\.load\/3: expected keyword options/,
+                 ~r/Imp\.Datasets\.DataLoader\.read!\/3: expected keyword options/,
                  fn ->
-                   Datasets.DataLoader.load("missing.jsonl", [:question], :not_options)
+                   Datasets.DataLoader.read!("missing.jsonl", [:question], :not_options)
                  end
 
     assert_raise ArgumentError,
-                 ~r/Imp\.Datasets\.DataLoader\.load\/3: invalid value for :format option: expected string/,
+                 ~r/Imp\.Datasets\.DataLoader\.read!\/3: invalid value for :format option: expected string/,
                  fn ->
-                   Datasets.DataLoader.load("missing.jsonl", [:question], format: :csv)
+                   Datasets.DataLoader.read!("missing.jsonl", [:question], format: :csv)
                  end
   end
 
@@ -133,15 +133,15 @@ defmodule DatasetsContractTest do
     end
 
     assert_raise ArgumentError,
-                 ~r/Imp\.Datasets\.DataLoader\.load\/3 expects path to be a binary/,
+                 ~r/Imp\.Datasets\.DataLoader\.read!\/3 expects path to be a binary/,
                  fn ->
-                   Datasets.DataLoader.load(:not_a_path, [:question])
+                   Datasets.DataLoader.read!(:not_a_path, [:question])
                  end
 
     assert_raise ArgumentError,
-                 ~r/Imp\.Datasets\.DataLoader\.load\/3 supports format/,
+                 ~r/Imp\.Datasets\.DataLoader\.read!\/3 supports format/,
                  fn ->
-                   Datasets.DataLoader.load("records.tsv", [:question])
+                   Datasets.DataLoader.read!("records.tsv", [:question])
                  end
   end
 
@@ -153,12 +153,12 @@ defmodule DatasetsContractTest do
     File.write!(csv_path, "question,answer\n2+2?,4\n")
 
     assert [%Imp.Example{} = jsonl] =
-             Datasets.DataLoader.load(jsonl_path, [:question], format: "jsonl")
+             Datasets.DataLoader.read!(jsonl_path, [:question], format: "jsonl")
 
     assert Imp.Example.get(jsonl, :answer) == "4"
 
     assert [%Imp.Example{} = csv] =
-             Datasets.DataLoader.load(csv_path, [:question], format: "csv")
+             Datasets.DataLoader.read!(csv_path, [:question], format: "csv")
 
     assert Imp.Example.get(csv, :answer) == "4"
   after
@@ -210,12 +210,12 @@ defmodule DatasetsContractTest do
 
     File.write!(math_path, ~s({"problem":"1+1","solution":"2","answer":"2"}\n))
 
-    assert [%Imp.Example{} = gsm8k] = Datasets.GSM8K.load(gsm8k_path)
+    assert [%Imp.Example{} = gsm8k] = Datasets.GSM8K.read!(gsm8k_path)
     assert Imp.Example.to_map(Imp.Example.inputs(gsm8k)) == %{question: "2+2?"}
     assert Imp.Example.get(gsm8k, :canonical_answer) == "4"
     assert Imp.Example.get(gsm8k, :source_task) == "gsm8k"
 
-    assert [%Imp.Example{} = hotpot] = Datasets.HotPotQA.load(hotpot_path)
+    assert [%Imp.Example{} = hotpot] = Datasets.HotPotQA.read!(hotpot_path)
 
     assert Imp.Example.to_map(Imp.Example.inputs(hotpot)) == %{
              question: "q",
@@ -225,10 +225,10 @@ defmodule DatasetsContractTest do
     assert Imp.Example.get(hotpot, :id) == "hp"
     assert Imp.Example.get(hotpot, :supporting_facts) == %{"title" => ["t"], "sent_id" => [0]}
 
-    assert [%Imp.Example{} = math] = Datasets.MATH.load(math_path)
+    assert [%Imp.Example{} = math] = Datasets.MATH.read!(math_path)
     assert Imp.Example.to_map(Imp.Example.inputs(math)) == %{problem: "1+1"}
 
-    colors = Datasets.Colors.load([%Datasets.Colors.Record{input: "red", label: "warm"}])
+    colors = Datasets.Colors.load!([%Datasets.Colors.Record{input: "red", label: "warm"}])
     assert [%Imp.Example{} = color] = colors
     assert Imp.Example.to_map(Imp.Example.inputs(color)) == %{input: "red"}
   after

@@ -568,7 +568,7 @@ defmodule ProductionAdapterPersistenceTest do
 
     programs = [
       Imp.Predict.BestOfN.new(base, metric, n: 2, feedback_fn: feedback),
-      Imp.Predict.Refine.new(base, metric, max_attempts: 2),
+      Imp.Predict.Refine.new(base, metric, n: 2),
       Imp.Predict.Assertions.new(
         base,
         [Imp.Assertion.new(:paris, predicate, message: "must be Paris")],
@@ -601,7 +601,11 @@ defmodule ProductionAdapterPersistenceTest do
 
   test "named registry round-trips ReAct CodeAct and RLM tool graphs" do
     lookup = fn %{query: query} -> "found #{query}" end
-    policy = fn name, _args -> name in [:lookup, "lookup"] end
+
+    policy = fn name, _args ->
+      if name in [:lookup, "lookup"], do: :allow, else: {:deny, :not_lookup}
+    end
+
     registry = Imp.Saving.Registry.new(lookup_runner: lookup, tool_policy: policy)
     tool = Imp.tool(:lookup, "lookup facts", lookup, schema: %{query: :string})
 

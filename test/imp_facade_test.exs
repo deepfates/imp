@@ -314,8 +314,10 @@ defmodule ImpFacadeTest do
     assert :ok = Imp.save!(Imp.predict("question -> answer"), path)
     assert %Imp.Predict{} = Imp.read!(path)
 
-    # A path is not a saved program; reading files is `read!/2`'s job.
-    assert {:error, %ArgumentError{}} = Imp.load(path)
+    # A path is not a saved program; reading files is `read!/2`'s job, and the
+    # error says so.
+    assert {:error, %ArgumentError{message: message}} = Imp.load(path)
+    assert message =~ "use Imp.read!/1"
   end
 
   test "facade evaluates and optimizes through the golden path" do
@@ -338,7 +340,12 @@ defmodule ImpFacadeTest do
     assert %{demos: [_]} =
              Imp.optimize!(program, Imp.Optimizer.LabeledFewShot.new(k: 1), trainset)
 
-    random_search = Imp.Optimizer.RandomSearch.new(metric, candidates: 1, demos_per_candidate: 1)
+    random_search =
+      Imp.Optimizer.BootstrapFewShotWithRandomSearch.new(metric,
+        num_candidate_programs: 1,
+        max_bootstrapped_demos: 1
+      )
+
     compiled = Imp.optimize!(program, random_search, trainset, devset)
 
     assert %Imp.Optimizer.Report{optimizer: :random_search} =

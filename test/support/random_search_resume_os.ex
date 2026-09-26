@@ -1,14 +1,14 @@
 defmodule Imp.Test.RandomSearchResumeOS do
   @moduledoc false
 
-  alias Imp.Optimizer.{RandomSearch, Report}
+  alias Imp.Optimizer.{BootstrapFewShotWithRandomSearch, Report}
 
   def run(["create", checkpoint_path, result_path]) do
     {program, optimizer, trainset, devset, counter} = fixture()
 
     report =
       optimizer
-      |> RandomSearch.compile(program, trainset, devset,
+      |> BootstrapFewShotWithRandomSearch.compile(program, trainset, devset,
         restrict: [-3, -2, -1, 0],
         max_candidates: 2
       )
@@ -24,7 +24,7 @@ defmodule Imp.Test.RandomSearchResumeOS do
 
     report =
       optimizer
-      |> RandomSearch.compile(program, trainset, devset,
+      |> BootstrapFewShotWithRandomSearch.compile(program, trainset, devset,
         restrict: [-3, -2, -1, 0],
         resume_state: checkpoint
       )
@@ -50,7 +50,7 @@ defmodule Imp.Test.RandomSearchResumeOS do
     end
 
     optimizer =
-      RandomSearch.new(metric,
+      BootstrapFewShotWithRandomSearch.new(metric,
         metric_identity: %{
           "id" => "random-search-exact-answer",
           "version" => 1,

@@ -40,7 +40,7 @@ defmodule Banking77GEPA do
               minibatch_size: 4,
               seed: 1,
               use_merge: false,
-              max_concurrency: 1,
+              num_threads: 1,
               max_metric_calls: 64,
               max_full_evaluations: 3,
               max_reflection_calls: 2
@@ -48,7 +48,7 @@ defmodule Banking77GEPA do
             data,
             &metric/2,
             artifact_id: "banking77-gepa-selected",
-            evaluation_options: [max_concurrency: 1, max_errors: 0, timeout: 120_000]
+            evaluation_options: [num_threads: 1, max_errors: 0, timeout: 120_000]
           )
         end)
       end)
@@ -69,7 +69,7 @@ defmodule Banking77GEPA do
     baseline =
       Imp.context([lm: task_lm], fn ->
         Imp.evaluate(Router.new(), data.test, &metric/2,
-          max_concurrency: 1,
+          num_threads: 1,
           max_errors: 0,
           timeout: 120_000
         )

@@ -1,7 +1,8 @@
-defmodule Imp.Optimizer.RandomSearch do
+defmodule Imp.Optimizer.BootstrapFewShotWithRandomSearch do
   @behaviour Imp.Optimizer
   @moduledoc """
-  DSPy 3.2.1 BootstrapFewShotWithRandomSearch / BootstrapRS.
+  DSPy 3.2.1 BootstrapFewShotWithRandomSearch, which DSPy also exports as
+  `BootstrapRS`.
 
   Candidate seeds, baseline scheduling, chained labeled-demo sampling, tie
   ordering, and rounded percentage scores follow DSPy 3.2.1. Seeded draws use
@@ -22,7 +23,7 @@ defmodule Imp.Optimizer.RandomSearch do
     Sampling
   }
 
-  alias Imp.Optimizer.RandomSearch.Checkpoint
+  alias Imp.Optimizer.BootstrapFewShotWithRandomSearch.Checkpoint
 
   defstruct [
     :metric,
@@ -36,9 +37,7 @@ defmodule Imp.Optimizer.RandomSearch do
     max_errors: nil,
     stop_at_score: nil,
     metric_threshold: nil,
-    seed: nil,
-    candidates: 16,
-    demos_per_candidate: 4
+    seed: nil
   ]
 
   @option_schema [
@@ -52,13 +51,6 @@ defmodule Imp.Optimizer.RandomSearch do
     stop_at_score: [type: {:custom, __MODULE__, :validate_optional_number, []}, default: nil],
     metric_threshold: [type: {:custom, __MODULE__, :validate_optional_number, []}, default: nil],
     metric_identity: [type: :any, default: nil],
-    # Imp-side aliases. They are normalized immediately and do not change
-    # DSPy's fixed seed schedule.
-    candidates: [type: {:custom, __MODULE__, :validate_optional_non_negative, []}, default: nil],
-    demos_per_candidate: [
-      type: {:custom, __MODULE__, :validate_optional_non_negative, []},
-      default: nil
-    ],
     seed: [type: {:custom, __MODULE__, :validate_optional_integer, []}, default: nil]
   ]
 
@@ -78,28 +70,34 @@ defmodule Imp.Optimizer.RandomSearch do
   ]
 
   def new(metric, opts \\ []) do
-    Imp.FunctionContract.validate!(metric, [2, 3], "Imp.Optimizer.RandomSearch.new/2", "metric")
-    opts = Imp.Options.validate!(opts, @option_schema, "Imp.Optimizer.RandomSearch.new/2")
+    Imp.FunctionContract.validate!(
+      metric,
+      [2, 3],
+      "Imp.Optimizer.BootstrapFewShotWithRandomSearch.new/2",
+      "metric"
+    )
 
-    max_bootstrapped_demos = opts[:demos_per_candidate] || opts[:max_bootstrapped_demos]
-    num_candidate_programs = opts[:candidates] || opts[:num_candidate_programs]
+    opts =
+      Imp.Options.validate!(
+        opts,
+        @option_schema,
+        "Imp.Optimizer.BootstrapFewShotWithRandomSearch.new/2"
+      )
 
     %__MODULE__{
       metric: metric,
       metric_identity:
         DurableCallbackIdentity.normalize!(opts[:metric_identity], :metric_identity),
       teacher_settings: opts[:teacher_settings],
-      max_bootstrapped_demos: max_bootstrapped_demos,
+      max_bootstrapped_demos: opts[:max_bootstrapped_demos],
       max_labeled_demos: opts[:max_labeled_demos],
       max_rounds: opts[:max_rounds],
-      num_candidate_programs: num_candidate_programs,
+      num_candidate_programs: opts[:num_candidate_programs],
       num_threads: opts[:num_threads],
       max_errors: opts[:max_errors],
       stop_at_score: opts[:stop_at_score],
       metric_threshold: opts[:metric_threshold],
-      seed: opts[:seed],
-      candidates: num_candidate_programs,
-      demos_per_candidate: max_bootstrapped_demos
+      seed: opts[:seed]
     }
   end
 
@@ -107,15 +105,6 @@ defmodule Imp.Optimizer.RandomSearch do
   def validate_optional_number(nil), do: {:ok, nil}
   def validate_optional_number(value) when is_number(value), do: {:ok, value}
   def validate_optional_number(_value), do: {:error, "expected nil, an integer, or a float"}
-
-  @doc false
-  def validate_optional_non_negative(nil), do: {:ok, nil}
-
-  def validate_optional_non_negative(value) when is_integer(value) and value >= 0,
-    do: {:ok, value}
-
-  def validate_optional_non_negative(_value),
-    do: {:error, "expected non negative integer"}
 
   @doc false
   def validate_optional_integer(nil), do: {:ok, nil}
@@ -184,7 +173,12 @@ defmodule Imp.Optimizer.RandomSearch do
     labeled_sample = Keyword.get(opts, :labeled_sample, true)
     {max_errors, max_errors_source} = resolve_max_errors!(optimizer.max_errors)
     optimizer = %{optimizer | max_errors: max_errors}
-    :ok = DurableCallbackIdentity.validate_normalized!(optimizer.metric_identity, "RandomSearch")
+
+    :ok =
+      DurableCallbackIdentity.validate_normalized!(
+        optimizer.metric_identity,
+        "BootstrapFewShotWithRandomSearch"
+      )
 
     candidate_seeds =
       optimizer.num_candidate_programs
@@ -192,7 +186,8 @@ defmodule Imp.Optimizer.RandomSearch do
       |> Enum.filter(&allowed?(&1, restrict))
 
     if candidate_seeds == [] do
-      raise RuntimeError, "RandomSearch restrict excluded every DSPy candidate seed"
+      raise RuntimeError,
+            "BootstrapFewShotWithRandomSearch restrict excluded every DSPy candidate seed"
     end
 
     durable? =
@@ -207,7 +202,7 @@ defmodule Imp.Optimizer.RandomSearch do
         optimizer.metric,
         optimizer.metric_identity,
         durable?,
-        "RandomSearch",
+        "BootstrapFewShotWithRandomSearch",
         :metric_identity
       )
 
@@ -452,7 +447,8 @@ defmodule Imp.Optimizer.RandomSearch do
              Enum.map(state.records, & &1.seed) == expected_seeds and
              Enum.map(state.records, & &1.evaluation_order) ==
                evaluation_indices(state.next_index) do
-      raise ArgumentError, "RandomSearch resume state does not follow the candidate seed schedule"
+      raise ArgumentError,
+            "BootstrapFewShotWithRandomSearch resume state does not follow the candidate seed schedule"
     end
 
     reached_stop? =
@@ -460,7 +456,8 @@ defmodule Imp.Optimizer.RandomSearch do
         Enum.any?(state.records, &(&1.score >= stop_at_score))
 
     unless state.stopped == reached_stop? do
-      raise ArgumentError, "RandomSearch resume state stop condition is inconsistent"
+      raise ArgumentError,
+            "BootstrapFewShotWithRandomSearch resume state stop condition is inconsistent"
     end
 
     state
@@ -491,7 +488,11 @@ defmodule Imp.Optimizer.RandomSearch do
   defp runtime_identity(value), do: value
 
   defp validate_compile_options!(opts) do
-    Imp.Options.validate!(opts, @compile_option_schema, "Imp.Optimizer.RandomSearch.compile/5")
+    Imp.Options.validate!(
+      opts,
+      @compile_option_schema,
+      "Imp.Optimizer.BootstrapFewShotWithRandomSearch.compile/5"
+    )
   end
 
   defp seeds(count) when count >= 0, do: Enum.to_list(-3..(count - 1))
@@ -583,12 +584,12 @@ defmodule Imp.Optimizer.RandomSearch do
       optimizer.num_threads || Imp.Settings.snapshot() |> Map.fetch!(:async_max_workers)
 
     # Imp.Evaluate halts at errors >= max_errors (DSPy
-    # parallelizer semantics); translate into RandomSearch's budget error so
+    # parallelizer semantics); translate into BootstrapFewShotWithRandomSearch's budget error so
     # the optimizer-facing contract stays the same.
     result =
       try do
         Imp.Evaluate.new(valset, optimizer.metric,
-          max_concurrency: max_concurrency,
+          num_threads: max_concurrency,
           max_errors: optimizer.max_errors
         )
         |> Imp.Evaluate.run(program)

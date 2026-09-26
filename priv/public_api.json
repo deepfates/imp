@@ -360,6 +360,11 @@
     },
     {
       "category": "internal",
+      "module": "Imp.Optimizer.BootstrapFewShotWithRandomSearch.Checkpoint",
+      "source": "lib/imp/optimizer/bootstrap_few_shot_with_random_search/checkpoint.ex"
+    },
+    {
+      "category": "internal",
       "module": "Imp.Optimizer.BootstrapFinetune.TrainingPlan",
       "source": "lib/imp/optimizer/bootstrap_finetune.ex"
     },
@@ -705,11 +710,6 @@
     },
     {
       "category": "internal",
-      "module": "Imp.Optimizer.RandomSearch.Checkpoint",
-      "source": "lib/imp/optimizer/random_search/checkpoint.ex"
-    },
-    {
-      "category": "internal",
       "module": "Imp.Optimizer.SIMBA.Buckets",
       "source": "lib/imp/optimizer/simba/buckets.ex"
     },
@@ -917,11 +917,6 @@
       "category": "internal",
       "module": "Imp.Tasks.Admission",
       "source": "lib/imp/tasks.ex"
-    },
-    {
-      "category": "internal",
-      "module": "Imp.ToolPolicy",
-      "source": "lib/imp/tool_policy.ex"
     },
     {
       "category": "internal",
@@ -2823,9 +2818,9 @@
         "dump/1",
         "fail/2",
         "load!/2",
-        "load/2",
         "new/1",
         "normalize_status/1",
+        "read!/2",
         "rebind/3",
         "refresh/1",
         "save!/2",
@@ -2852,16 +2847,16 @@
             "fail(job, reason)"
           ],
           "load!/2": [
-            "load!(path, opts \\\\ [])"
-          ],
-          "load/2": [
-            "load(state, opts \\\\ [])"
+            "load!(state, opts \\\\ [])"
           ],
           "new/1": [
             "new(attrs)"
           ],
           "normalize_status/1": [
             "normalize_status(status)"
+          ],
+          "read!/2": [
+            "read!(path, opts \\\\ [])"
           ],
           "rebind/3": [
             "rebind(job, program, opts \\\\ [])"
@@ -3353,15 +3348,15 @@
       "callbacks": [],
       "category": "experimental",
       "functions": [
-        "load/1"
+        "load!/1"
       ],
       "kind": "module",
       "macros": [],
       "module": "Imp.Datasets.Colors",
       "signatures": {
         "functions": {
-          "load/1": [
-            "load(records)"
+          "load!/1": [
+            "load!(records)"
           ]
         }
       },
@@ -3373,15 +3368,15 @@
       "callbacks": [],
       "category": "experimental",
       "functions": [
-        "load/3"
+        "read!/3"
       ],
       "kind": "module",
       "macros": [],
       "module": "Imp.Datasets.DataLoader",
       "signatures": {
         "functions": {
-          "load/3": [
-            "load(path, input_keys, opts \\\\ [])"
+          "read!/3": [
+            "read!(path, input_keys, opts \\\\ [])"
           ]
         }
       },
@@ -3436,19 +3431,19 @@
       "callbacks": [],
       "category": "experimental",
       "functions": [
-        "load/1",
-        "metric/3"
+        "metric/3",
+        "read!/1"
       ],
       "kind": "module",
       "macros": [],
       "module": "Imp.Datasets.GSM8K",
       "signatures": {
         "functions": {
-          "load/1": [
-            "load(path)"
-          ],
           "metric/3": [
             "metric(example, prediction, trace \\\\ nil)"
+          ],
+          "read!/1": [
+            "read!(path)"
           ]
         }
       },
@@ -3460,15 +3455,15 @@
       "callbacks": [],
       "category": "experimental",
       "functions": [
-        "load/1"
+        "read!/1"
       ],
       "kind": "module",
       "macros": [],
       "module": "Imp.Datasets.HotPotQA",
       "signatures": {
         "functions": {
-          "load/1": [
-            "load(path)"
+          "read!/1": [
+            "read!(path)"
           ]
         }
       },
@@ -3480,15 +3475,15 @@
       "callbacks": [],
       "category": "experimental",
       "functions": [
-        "load/1"
+        "read!/1"
       ],
       "kind": "module",
       "macros": [],
       "module": "Imp.Datasets.MATH",
       "signatures": {
         "functions": {
-          "load/1": [
-            "load(path)"
+          "read!/1": [
+            "read!(path)"
           ]
         }
       },
@@ -3658,9 +3653,9 @@
         "devset",
         "display_progress",
         "failure_score",
-        "max_concurrency",
         "max_errors",
         "metric",
+        "num_threads",
         "timeout"
       ],
       "types": [
@@ -4305,7 +4300,7 @@
       "functions": [
         "append/2",
         "dump/1",
-        "load/1",
+        "load!/1",
         "messages/1",
         "new/1",
         "redact/2"
@@ -4321,8 +4316,8 @@
           "dump/1": [
             "dump(history)"
           ],
-          "load/1": [
-            "load(state)"
+          "load!/1": [
+            "load!(state)"
           ],
           "messages/1": [
             "messages(history)"
@@ -4606,10 +4601,11 @@
       },
       "source": "lib/imp/mcp/call_failure.ex",
       "struct_fields": [
+        "index",
         "outcome",
         "reason",
-        "server",
-        "tool"
+        "server_name",
+        "tool_name"
       ],
       "types": [
         {
@@ -4632,7 +4628,7 @@
       "signatures": {
         "types": {
           "context/0": [],
-          "server/0": []
+          "descriptor/0": []
         }
       },
       "source": "lib/imp/mcp/connections.ex",
@@ -4644,7 +4640,7 @@
         },
         {
           "kind": "type",
-          "name": "server/0"
+          "name": "descriptor/0"
         }
       ]
     },
@@ -4700,7 +4696,7 @@
       "signatures": {
         "functions": {
           "authorization_header/3": [
-            "authorization_header(store, credential, resource_url)"
+            "authorization_header(store, credential, server_url)"
           ],
           "await/2": [
             "await(pending, timeout \\\\ 300_000)"
@@ -4751,7 +4747,7 @@
         "flow",
         "listener",
         "redirect_uri",
-        "resource_url",
+        "server_url",
         "state",
         "store"
       ],
@@ -5585,7 +5581,7 @@
       "functions": [
         "new/2"
       ],
-      "kind": "module",
+      "kind": "struct",
       "macros": [],
       "module": "Imp.Optimizer.BootstrapFewShotWithRandomSearch",
       "signatures": {
@@ -5595,8 +5591,21 @@
           ]
         }
       },
-      "source": "lib/imp/optimizer/bootstrap_rs.ex",
-      "struct_fields": [],
+      "source": "lib/imp/optimizer/bootstrap_few_shot_with_random_search.ex",
+      "struct_fields": [
+        "max_bootstrapped_demos",
+        "max_errors",
+        "max_labeled_demos",
+        "max_rounds",
+        "metric",
+        "metric_identity",
+        "metric_threshold",
+        "num_candidate_programs",
+        "num_threads",
+        "seed",
+        "stop_at_score",
+        "teacher_settings"
+      ],
       "types": []
     },
     {
@@ -5622,35 +5631,15 @@
         "exclude_demos",
         "launch_timeout",
         "lifecycle_observer",
-        "max_concurrency",
         "max_demos",
         "metric",
         "multitask",
+        "num_threads",
         "teacher",
         "timeout",
         "train_kwargs",
         "trainer"
       ],
-      "types": []
-    },
-    {
-      "callbacks": [],
-      "category": "stable",
-      "functions": [
-        "new/2"
-      ],
-      "kind": "module",
-      "macros": [],
-      "module": "Imp.Optimizer.BootstrapRS",
-      "signatures": {
-        "functions": {
-          "new/2": [
-            "new(metric, opts \\\\ [])"
-          ]
-        }
-      },
-      "source": "lib/imp/optimizer/bootstrap_rs.ex",
-      "struct_fields": [],
       "types": []
     },
     {
@@ -5731,7 +5720,7 @@
         "extra_instructions",
         "init_temperature",
         "metric",
-        "proposal_max_concurrency",
+        "proposal_concurrency",
         "proposal_response_format",
         "proposer_lm",
         "track_stats"
@@ -5850,7 +5839,6 @@
         "feedback_fn",
         "frontier_type",
         "generations",
-        "max_concurrency",
         "max_full_evaluations",
         "max_merge_invocations",
         "max_metric_calls",
@@ -5861,6 +5849,7 @@
         "metric",
         "minibatch_size",
         "module_selector",
+        "num_threads",
         "perfect_score",
         "proposal_concurrency",
         "proposal_timeout",
@@ -5973,15 +5962,7 @@
     {
       "callbacks": [
         {
-          "name": "on_budget_updated/1",
-          "optional": true
-        },
-        {
           "name": "on_budget_updated/2",
-          "optional": true
-        },
-        {
-          "name": "on_candidate_accepted/1",
           "optional": true
         },
         {
@@ -5989,15 +5970,7 @@
           "optional": true
         },
         {
-          "name": "on_candidate_rejected/1",
-          "optional": true
-        },
-        {
           "name": "on_candidate_rejected/2",
-          "optional": true
-        },
-        {
-          "name": "on_candidate_selected/1",
           "optional": true
         },
         {
@@ -6005,15 +5978,7 @@
           "optional": true
         },
         {
-          "name": "on_combee_aggregation/1",
-          "optional": true
-        },
-        {
           "name": "on_combee_aggregation/2",
-          "optional": true
-        },
-        {
-          "name": "on_combee_batch_selected/1",
           "optional": true
         },
         {
@@ -6021,15 +5986,7 @@
           "optional": true
         },
         {
-          "name": "on_error/1",
-          "optional": true
-        },
-        {
           "name": "on_error/2",
-          "optional": true
-        },
-        {
-          "name": "on_evaluation_end/1",
           "optional": true
         },
         {
@@ -6037,15 +5994,7 @@
           "optional": true
         },
         {
-          "name": "on_evaluation_skipped/1",
-          "optional": true
-        },
-        {
           "name": "on_evaluation_skipped/2",
-          "optional": true
-        },
-        {
-          "name": "on_evaluation_start/1",
           "optional": true
         },
         {
@@ -6053,15 +6002,7 @@
           "optional": true
         },
         {
-          "name": "on_iteration_end/1",
-          "optional": true
-        },
-        {
           "name": "on_iteration_end/2",
-          "optional": true
-        },
-        {
-          "name": "on_iteration_start/1",
           "optional": true
         },
         {
@@ -6069,15 +6010,7 @@
           "optional": true
         },
         {
-          "name": "on_merge_accepted/1",
-          "optional": true
-        },
-        {
           "name": "on_merge_accepted/2",
-          "optional": true
-        },
-        {
-          "name": "on_merge_attempted/1",
           "optional": true
         },
         {
@@ -6085,15 +6018,7 @@
           "optional": true
         },
         {
-          "name": "on_merge_rejected/1",
-          "optional": true
-        },
-        {
           "name": "on_merge_rejected/2",
-          "optional": true
-        },
-        {
-          "name": "on_minibatch_sampled/1",
           "optional": true
         },
         {
@@ -6101,15 +6026,7 @@
           "optional": true
         },
         {
-          "name": "on_optimization_end/1",
-          "optional": true
-        },
-        {
           "name": "on_optimization_end/2",
-          "optional": true
-        },
-        {
-          "name": "on_optimization_start/1",
           "optional": true
         },
         {
@@ -6117,15 +6034,7 @@
           "optional": true
         },
         {
-          "name": "on_pareto_front_updated/1",
-          "optional": true
-        },
-        {
           "name": "on_pareto_front_updated/2",
-          "optional": true
-        },
-        {
-          "name": "on_proposal_end/1",
           "optional": true
         },
         {
@@ -6133,15 +6042,7 @@
           "optional": true
         },
         {
-          "name": "on_proposal_start/1",
-          "optional": true
-        },
-        {
           "name": "on_proposal_start/2",
-          "optional": true
-        },
-        {
-          "name": "on_reflective_dataset_built/1",
           "optional": true
         },
         {
@@ -6149,15 +6050,7 @@
           "optional": true
         },
         {
-          "name": "on_state_saved/1",
-          "optional": true
-        },
-        {
           "name": "on_state_saved/2",
-          "optional": true
-        },
-        {
-          "name": "on_valset_evaluated/1",
           "optional": true
         },
         {
@@ -6174,53 +6067,29 @@
       "module": "Imp.Optimizer.GEPA.Callback",
       "signatures": {
         "callbacks": {
-          "on_budget_updated/1": [],
           "on_budget_updated/2": [],
-          "on_candidate_accepted/1": [],
           "on_candidate_accepted/2": [],
-          "on_candidate_rejected/1": [],
           "on_candidate_rejected/2": [],
-          "on_candidate_selected/1": [],
           "on_candidate_selected/2": [],
-          "on_combee_aggregation/1": [],
           "on_combee_aggregation/2": [],
-          "on_combee_batch_selected/1": [],
           "on_combee_batch_selected/2": [],
-          "on_error/1": [],
           "on_error/2": [],
-          "on_evaluation_end/1": [],
           "on_evaluation_end/2": [],
-          "on_evaluation_skipped/1": [],
           "on_evaluation_skipped/2": [],
-          "on_evaluation_start/1": [],
           "on_evaluation_start/2": [],
-          "on_iteration_end/1": [],
           "on_iteration_end/2": [],
-          "on_iteration_start/1": [],
           "on_iteration_start/2": [],
-          "on_merge_accepted/1": [],
           "on_merge_accepted/2": [],
-          "on_merge_attempted/1": [],
           "on_merge_attempted/2": [],
-          "on_merge_rejected/1": [],
           "on_merge_rejected/2": [],
-          "on_minibatch_sampled/1": [],
           "on_minibatch_sampled/2": [],
-          "on_optimization_end/1": [],
           "on_optimization_end/2": [],
-          "on_optimization_start/1": [],
           "on_optimization_start/2": [],
-          "on_pareto_front_updated/1": [],
           "on_pareto_front_updated/2": [],
-          "on_proposal_end/1": [],
           "on_proposal_end/2": [],
-          "on_proposal_start/1": [],
           "on_proposal_start/2": [],
-          "on_reflective_dataset_built/1": [],
           "on_reflective_dataset_built/2": [],
-          "on_state_saved/1": [],
           "on_state_saved/2": [],
-          "on_valset_evaluated/1": [],
           "on_valset_evaluated/2": []
         },
         "functions": {
@@ -6529,11 +6398,11 @@
       "struct_fields": [
         "config",
         "init_temperature",
-        "max_concurrency",
         "max_errors",
         "metric",
         "metric_identity",
         "metric_threshold",
+        "num_threads",
         "prompt_lm",
         "proposal_response_format",
         "startup_trials",
@@ -6777,48 +6646,13 @@
       "callbacks": [],
       "category": "stable",
       "functions": [
-        "new/2"
-      ],
-      "kind": "struct",
-      "macros": [],
-      "module": "Imp.Optimizer.RandomSearch",
-      "signatures": {
-        "functions": {
-          "new/2": [
-            "new(metric, opts \\\\ [])"
-          ]
-        }
-      },
-      "source": "lib/imp/optimizer/random_search.ex",
-      "struct_fields": [
-        "candidates",
-        "demos_per_candidate",
-        "max_bootstrapped_demos",
-        "max_errors",
-        "max_labeled_demos",
-        "max_rounds",
-        "metric",
-        "metric_identity",
-        "metric_threshold",
-        "num_candidate_programs",
-        "num_threads",
-        "seed",
-        "stop_at_score",
-        "teacher_settings"
-      ],
-      "types": []
-    },
-    {
-      "callbacks": [],
-      "category": "stable",
-      "functions": [
         "attach/2",
         "decode_term/1",
         "dump/1",
         "encode_term/1",
         "fetch/1",
         "json_safe/1",
-        "load/1",
+        "load!/1",
         "new/1"
       ],
       "kind": "struct",
@@ -6844,8 +6678,8 @@
           "json_safe/1": [
             "json_safe(value)"
           ],
-          "load/1": [
-            "load(state)"
+          "load!/1": [
+            "load!(state)"
           ],
           "new/1": [
             "new(attrs \\\\ %{})"
@@ -6884,12 +6718,12 @@
         "bsize",
         "candidate_temperature",
         "demo_input_field_maxlen",
-        "max_concurrency",
         "max_demos",
         "max_steps",
         "metric",
         "metric_identity",
         "num_candidates",
+        "num_threads",
         "prompt_lm",
         "reflection_grounding",
         "sampling_temperature",
@@ -8213,8 +8047,8 @@
       "struct_fields": [
         "fail_count",
         "feedback_fn",
-        "max_attempts",
         "metric",
+        "n",
         "program",
         "threshold"
       ],
@@ -8873,7 +8707,7 @@
         "field_names/1",
         "input_names/1",
         "json_schema/1",
-        "load/1",
+        "load!/1",
         "new/2",
         "output_names/1",
         "prepend_output/2",
@@ -8902,8 +8736,8 @@
           "json_schema/1": [
             "json_schema(signature)"
           ],
-          "load/1": [
-            "load(state)"
+          "load!/1": [
+            "load!(state)"
           ],
           "new/2": [
             "new(spec, instructions \\\\ nil)"
@@ -9217,6 +9051,34 @@
           "kind": "type",
           "name": "outcome/0"
         },
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [
+        "authorize/3"
+      ],
+      "kind": "module",
+      "macros": [],
+      "module": "Imp.ToolPolicy",
+      "signatures": {
+        "functions": {
+          "authorize/3": [
+            "authorize(policy, name, args)"
+          ]
+        },
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/tool_policy.ex",
+      "struct_fields": [],
+      "types": [
         {
           "kind": "type",
           "name": "t/0"

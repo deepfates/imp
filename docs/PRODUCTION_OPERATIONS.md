@@ -135,7 +135,7 @@ Stable event families:
 - `[:imp, :tool, :start | :stop | :exception]`
 - `[:imp, :retriever, :start | :stop | :exception]`
 - `[:imp, :training, :submit | :refresh | :cancel, :start | :stop | :exception]`
-- `[:imp, :optimizer, :trial, :start | :stop | :exception]` (RandomSearch,
+- `[:imp, :optimizer, :trial, :start | :stop | :exception]` (BootstrapFewShotWithRandomSearch,
   COPRO, SIMBA, and MIPROv2 candidate evaluations)
 - `[:imp, :optimizer, :progress]` (GEPA generations)
 
@@ -207,9 +207,9 @@ caller that needs all of its tools wants. A long-lived host whose servers are
 independent passes `on_failure: :drop` instead: a server whose transport or
 `initialize` fails, which accepts the connection and never answers, or which
 cannot answer `tools/list`, is closed and left out, `imported.unavailable`
-carries `%{server: name, index: index, reason: reason}` for it, and the rest of
+carries `%{server_name: name, index: index, reason: reason}` for it, and the rest of
 the catalog is imported. Match absences on `index` — the position of the
-descriptor in the list that was passed in — and print `server`: two descriptors
+descriptor in the list that was passed in — and print `server_name`: two descriptors
 may carry the same name, and one without a name is reported as `"unnamed"`.
 Dropping covers the connection and `tools/list` only — a descriptor
 `:authorize` refused, one whose declared `auth` cannot produce a header (a
@@ -290,8 +290,8 @@ from the term. A timeout is always `:unknown`: ExMCP's client
 sends one HTTP request at a time from its own process, so a call that timed
 out waiting behind another is still sent afterwards.
 
-Each imported tool carries `metadata.mcp` with `server_name`, `tool_name`,
-`schema`, and `annotations`. These describe its original source, regardless of
+Each imported tool carries `metadata.mcp` with `index`, `server_name`,
+`tool_name`, `schema`, and `annotations`. These describe its original source, regardless of
 its execution alias. Import results also index this provenance by execution
 name. This metadata contains no server credentials or connection descriptor.
 
@@ -324,7 +324,7 @@ server = %{
 }
 
 {:ok, imported} =
-  Imp.MCP.connect([server], trusted_servers: [server], credentials: store)
+  Imp.MCP.connect([server], trusted_servers: [server], credential_store: store)
 ```
 
 The grant is one encrypted file per credential under the directory the host

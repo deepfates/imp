@@ -80,7 +80,7 @@ defmodule Imp.Optimizer.GEPATimeoutTest do
       {_compiled, report} =
         Imp.Optimizer.GEPA.new(Imp.Metrics.exact_match(:answer),
           generations: 0,
-          max_concurrency: 32,
+          num_threads: 32,
           timeout: 90
         )
         |> Imp.Optimizer.GEPA.compile_with_report(program, [example()], examples)

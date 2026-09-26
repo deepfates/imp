@@ -268,7 +268,7 @@ defmodule Imp.Optimizer.GEPA.V014ExecutionProfileTest do
       assert optimizer.sampling_strategy == :single
       assert optimizer.selection_strategy == :all_improvements
       assert optimizer.proposal_concurrency == 1
-      assert optimizer.max_concurrency == 1
+      assert optimizer.num_threads == 1
       assert optimizer.frontier_type == :instance
       assert optimizer.acceptance_policy == :strict_improvement
       assert optimizer.merge_acceptance_policy == :equal_or_better
@@ -310,7 +310,7 @@ defmodule Imp.Optimizer.GEPA.V014ExecutionProfileTest do
         execution_profile: :gepa_v0_1_4,
         generations: 0,
         minibatch_size: 2,
-        max_concurrency: 4
+        num_threads: 4
       )
 
     {_selected, report} =
@@ -321,7 +321,7 @@ defmodule Imp.Optimizer.GEPA.V014ExecutionProfileTest do
         Enum.map(100..107, &example/1)
       )
 
-    assert optimizer.max_concurrency == 4
+    assert optimizer.num_threads == 4
     assert Agent.get(counter, & &1.maximum) > 1
     assert report.candidate_count == 1
     assert report.metadata.metric_calls == 8

@@ -143,7 +143,7 @@ defmodule Imp.MCPConnectionTest do
     # is there is named exactly as it was, and the one that is not contributes
     # no name at all.
     assert Enum.map(down.tools, &to_string(&1.name)) == ["one_look"]
-    assert [%{server: "two", index: 1}] = down.unavailable
+    assert [%{server_name: "two", index: 1}] = down.unavailable
     assert Imp.Tool.call(hd(down.tools), %{}) == "observed"
   end
 
@@ -169,7 +169,7 @@ defmodule Imp.MCPConnectionTest do
 
     on_exit(down.cleanup)
     assert Enum.map(down.tools, &to_string(&1.name)) == ["look"]
-    assert [%{server: "other", index: 1}] = down.unavailable
+    assert [%{server_name: "other", index: 1}] = down.unavailable
   end
 
   # Two servers claiming one tool name is a defect in the declaration, so it is
@@ -427,7 +427,9 @@ defmodule Imp.MCPConnectionTest do
     assert Enum.map(imported.tools, & &1.name) == ["look"]
     assert Imp.Tool.call(hd(imported.tools), %{}) == "observed"
 
-    assert [%{server: "down", reason: {:mcp_connection_failed, detail}}] = imported.unavailable
+    assert [%{server_name: "down", reason: {:mcp_connection_failed, detail}}] =
+             imported.unavailable
+
     # The term the refusal would have carried under :refuse: ExMCP's own.
     assert inspect(detail) =~ "econnrefused"
 
@@ -448,7 +450,7 @@ defmodule Imp.MCPConnectionTest do
 
     assert Enum.map(imported.tools, & &1.name) == ["look"]
 
-    assert [%{server: "mute", index: 0, reason: {:mcp_tools_list_failed, "mute", detail}}] =
+    assert [%{server_name: "mute", index: 0, reason: {:mcp_tools_list_failed, "mute", detail}}] =
              imported.unavailable
 
     # The JSON-RPC error the server sent, as it sent it.
@@ -486,6 +488,40 @@ defmodule Imp.MCPConnectionTest do
 
     on_exit(imported.cleanup)
     assert imported.unavailable == []
+  end
+
+  test ":authorize answers :allow or {:deny, reason}, and the context names the descriptor" do
+    working = server("working")
+    parent = self()
+
+    allow = fn descriptor, context ->
+      send(parent, {:context, context})
+      if descriptor["name"] == "working", do: :allow, else: {:deny, :not_reviewed}
+    end
+
+    assert {:ok, imported} = Imp.MCP.connect([working], authorize: allow, cwd: "/tmp")
+    on_exit(imported.cleanup)
+    assert_received {:context, %{cwd: "/tmp", descriptor: ^working}}
+
+    assert {:error, {:mcp_server_not_authorized, "down", :not_reviewed}} =
+             Imp.MCP.connect([closed_port_server("down")], authorize: allow)
+
+    # `true` and `:ok` were the old way to allow; they are not a decision now.
+    assert {:error, {:mcp_server_not_authorized, "working", {:invalid_decision, true}}} =
+             Imp.MCP.connect([working], authorize: fn _descriptor -> true end)
+  end
+
+  test "an imported tool and its failures carry the descriptor's index" do
+    down = closed_port_server("down")
+    working = server("working")
+
+    assert {:ok, imported} =
+             Imp.MCP.connect([down, working], trusted_servers: [down, working], on_failure: :drop)
+
+    on_exit(imported.cleanup)
+    assert [%{server_name: "down", index: 0}] = imported.unavailable
+    assert [tool | _] = imported.tools
+    assert %{index: 1, server_name: "working"} = tool.metadata.mcp
   end
 
   test "dropping covers the connection, never the caller's own refusal" do
@@ -540,8 +576,8 @@ defmodule Imp.MCPConnectionTest do
     assert Enum.map(imported.tools, & &1.name) == ["look"]
 
     assert [
-             %{server: "silent-a", index: 0, reason: {:mcp_connection_failed, :timeout}},
-             %{server: "silent-b", index: 1, reason: {:mcp_connection_failed, :timeout}}
+             %{server_name: "silent-a", index: 0, reason: {:mcp_connection_failed, :timeout}},
+             %{server_name: "silent-b", index: 1, reason: {:mcp_connection_failed, :timeout}}
            ] = imported.unavailable
 
     elapsed = div(micros, 1_000)
@@ -563,7 +599,7 @@ defmodule Imp.MCPConnectionTest do
     # Two descriptors under one name. A caller told only "same is unavailable"
     # cannot tell which of its own two descriptors that is, and matching by name
     # discards the one that connected.
-    assert [%{server: "same", index: 0}] = imported.unavailable
+    assert [%{server_name: "same", index: 0}] = imported.unavailable
     assert Enum.map(imported.tools, & &1.name) == ["look"]
     assert Imp.Tool.call(hd(imported.tools), %{}) == "observed"
   end

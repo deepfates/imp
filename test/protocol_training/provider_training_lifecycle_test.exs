@@ -103,7 +103,7 @@ defmodule ProtocolTrainingProviderLifecycleTest do
     refute File.read!(checkpoint_path) =~ "sk-live-training-test"
 
     job =
-      Imp.Clients.TrainingJob.load!(checkpoint_path,
+      Imp.Clients.TrainingJob.read!(checkpoint_path,
         api_key: "sk-live-training-test"
       )
 

@@ -11,8 +11,8 @@ defmodule Imp.LocalCOPROBanking77ExampleTest do
     source = File.read!(@source)
     readme = File.read!(@readme)
 
-    assert source =~ "COPRO.compile(baseline, examples(rows.train), []"
-    refute source =~ "COPRO.compile(baseline, examples(rows.test)"
+    assert source =~ "Imp.optimize!(baseline, &1, examples(rows.train), num_threads: 1"
+    refute source =~ "Imp.optimize!(baseline, &1, examples(rows.test)"
     assert source =~ "evaluation_dataset == :trainset"
 
     assert readme =~ "that candidate and the original instruction"

@@ -23,7 +23,7 @@ updates, telemetry, and fresh-runtime artifact application.
 | `dspy.Evaluate` | `Imp.evaluate/4` — returns score plus per-example rows |
 | `metric(gold, pred, trace)` | Two- or three-arity function, or `Imp.exact_match(:field)` |
 | `optimizer.compile(program, trainset=...)` | `Imp.optimize!(program, optimizer, trainset)` |
-| `LabeledFewShot`, `BootstrapFewShot`, `BootstrapRS` | Same names, `Imp.Optimizer.*` |
+| `LabeledFewShot`, `BootstrapFewShot`, `BootstrapFewShotWithRandomSearch` (`BootstrapRS`) | Same names, `Imp.Optimizer.*`; `BootstrapRS` is `BootstrapFewShotWithRandomSearch` |
 | `KNNFewShot` | Same name: per-call embedding retrieval (`vectorizer:`) plus metric/teacher-driven BootstrapFewShot over the neighbors |
 | `COPRO`, `SIMBA`, `MIPROv2`, `GEPA` | Same names; GEPA takes `Prediction`-shaped score+feedback metrics |
 | `BootstrapFinetune`, `Ensemble`, `BetterTogether`, `Avatar` | Same capability families, with explicit BEAM-native contracts: local MLX SFT belongs to `BootstrapFinetune`; `Ensemble` returns one normalized `Prediction` and isolates failed children; `Avatar` uses a bounded typed-action runtime and separate finisher |

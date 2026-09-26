@@ -195,7 +195,7 @@ defmodule Imp.Clients.TrainingDispatch do
     case phase do
       "prepared" -> %{phase: :prepared, intent: intent, job: nil}
       "dispatching" -> %{phase: :dispatching, intent: intent, job: nil}
-      "committed" -> %{phase: :committed, intent: intent, job: TrainingJob.load(raw_job)}
+      "committed" -> %{phase: :committed, intent: intent, job: TrainingJob.load!(raw_job)}
       _other -> raise ArgumentError, "invalid training dispatch journal phase"
     end
   end

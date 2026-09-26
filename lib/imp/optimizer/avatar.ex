@@ -93,7 +93,7 @@ defmodule Imp.Optimizer.Avatar do
   @doc false
   def compile(%__MODULE__{} = optimizer, %Imp.Predict.Avatar{} = student, trainset) do
     trainset = Enum.to_list(trainset)
-    evaluator = Imp.Evaluate.new(trainset, optimizer.metric, max_concurrency: 1)
+    evaluator = Imp.Evaluate.new(trainset, optimizer.metric, num_threads: 1)
     baseline = Imp.Evaluate.run(evaluator, student)
 
     state = %{

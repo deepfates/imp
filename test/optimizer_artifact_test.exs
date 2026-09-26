@@ -147,7 +147,7 @@ defmodule Imp.Optimizer.ArtifactTest do
     refute candidate_json =~ "authorization"
     refute candidate_json =~ "providerAuth"
 
-    sanitized_report = Report.load(candidate["report"])
+    sanitized_report = Report.load!(candidate["report"])
     assert sanitized_report.candidates == [%{label: "retained-candidate", nested: %{}}]
     assert sanitized_report.metadata == %{scope: "retained-scope"}
 
@@ -173,7 +173,7 @@ defmodule Imp.Optimizer.ArtifactTest do
 
     refute encoded =~ "CANARY_TYPED_KEY_SECRET"
     assert artifact["payload"]["security"]["credentials_absent"]
-    assert Report.load(candidate["report"]).metadata == %{}
+    assert Report.load!(candidate["report"]).metadata == %{}
   end
 
   test "mixed tagged envelope collisions cannot contradict the artifact security proof" do

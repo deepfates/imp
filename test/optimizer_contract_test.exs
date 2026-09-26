@@ -159,7 +159,7 @@ defmodule Imp.OptimizerContractTest do
   @canonical_modules [
     Imp.Optimizer.LabeledFewShot,
     Imp.Optimizer.BootstrapFewShot,
-    Imp.Optimizer.RandomSearch,
+    Imp.Optimizer.BootstrapFewShotWithRandomSearch,
     Imp.Optimizer.COPRO,
     Imp.Optimizer.MIPROv2,
     Imp.Optimizer.SIMBA,

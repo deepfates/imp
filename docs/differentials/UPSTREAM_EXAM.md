@@ -987,7 +987,7 @@ content chunk, matching DSPy. A false marker prefix is still flushed unchanged.
 
 | Upstream test | Status | Note |
 |---|---|---|
-| test_basic_workflow | pass | RandomSearch compile over the 2-example trainset with a teacher completes and returns a program. |
+| test_basic_workflow | pass | BootstrapFewShotWithRandomSearch compile over the 2-example trainset with a teacher completes and returns a program. |
 
 ## tests/teleprompt/test_copro_optimizer.py (5)
 
@@ -1077,7 +1077,7 @@ content chunk, matching DSPy. A false marker prefix is still flushed unchanged.
 | Upstream test | Status | Note |
 |---|---|---|
 | test_bettertogether_import | n/a | Python import smoke test. |
-| test_bettertogether_initialization_default | pass | Defaults: p → RandomSearch (BootstrapFewShotWithRandomSearch port), w → BootstrapFinetune. |
+| test_bettertogether_initialization_default | pass | Defaults: p → BootstrapFewShotWithRandomSearch, w → BootstrapFinetune. |
 | test_bettertogether_initialization_custom | pass | Custom p/w kept. |
 | test_bettertogether_initialization_invalid_optimizer | pass (adapted) | DSPy raises TypeError at `__init__`; Imp records loud `{:not_an_optimizer, _}` when the step runs (gap #2 — construction-time validation absent; rejection asserted at Imp's boundary). |
 | test_strategy_validation | pass | Valid strategies validate; unknown key "x" is a recorded step error; empty strategy raises. |
@@ -1115,11 +1115,11 @@ the built-in.
 
 | Upstream test | Status | Note |
 |---|---|---|
-| test_evaluate_initialization | pass | devset/metric stored (num_threads → max_concurrency default 1; display flags n/a — no progress UI). |
+| test_evaluate_initialization | pass | devset/metric stored (num_threads default 1; display flags n/a — no progress UI). |
 | test_evaluate_call | pass | Score 1.0 (Imp fraction; DSPy 100.0). |
 | test_evaluate_single_thread_runs_in_main_thread | n/a | Python threading identity; BEAM tasks are the concurrency model. |
 | test_construct_result_df | n/a | pandas DataFrame construction. |
-| test_multithread_evaluate_call | pass | max_concurrency: 2 → 1.0. |
+| test_multithread_evaluate_call | pass | num_threads: 2 → 1.0. |
 | test_multi_thread_evaluate_call_cancelled | n/a | SIGINT/KeyboardInterrupt process signaling. |
 | test_evaluate_call_wrong_answer | pass | Score 0.0. |
 | test_evaluate_display_table | n/a | IPython/pandas display plumbing. |

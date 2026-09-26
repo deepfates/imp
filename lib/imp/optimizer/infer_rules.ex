@@ -774,7 +774,7 @@ defmodule Imp.Optimizer.InferRules do
 
     opts =
       if optimizer.num_threads,
-        do: Keyword.put(opts, :max_concurrency, optimizer.num_threads),
+        do: Keyword.put(opts, :num_threads, optimizer.num_threads),
         else: opts
 
     Imp.Evaluate.new(devset, optimizer.metric, opts)

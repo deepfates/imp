@@ -277,9 +277,9 @@ defmodule Imp.Clients.TrainingJob do
   end
 
   @doc "Restores a training job checkpoint, with transport and credentials supplied explicitly."
-  def load(state, opts \\ [])
+  def load!(state, opts \\ [])
 
-  def load(%{"type" => "imp_training_job", "schema_version" => 1} = state, opts) do
+  def load!(%{"type" => "imp_training_job", "schema_version" => 1} = state, opts) do
     opts = validate_load_opts!(opts)
 
     new(%{
@@ -304,7 +304,7 @@ defmodule Imp.Clients.TrainingJob do
     })
   end
 
-  def load(state, _opts) do
+  def load!(state, _opts) do
     raise ArgumentError, "invalid Imp training job checkpoint: #{inspect(state)}"
   end
 
@@ -332,7 +332,7 @@ defmodule Imp.Clients.TrainingJob do
   end
 
   @doc "Loads and verifies a training job checkpoint from disk."
-  def load!(path, opts \\ []) when is_binary(path) do
+  def read!(path, opts \\ []) when is_binary(path) do
     case path |> File.read!() |> Jason.decode!() do
       %{
         "artifact_type" => "imp_training_job_checkpoint",
@@ -344,10 +344,10 @@ defmodule Imp.Clients.TrainingJob do
           raise ArgumentError, "saved Imp training job checkpoint checksum mismatch"
         end
 
-        load(payload, opts)
+        load!(payload, opts)
 
       state ->
-        load(state, opts)
+        load!(state, opts)
     end
   end
 

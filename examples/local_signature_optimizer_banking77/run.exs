@@ -79,7 +79,7 @@ defmodule LocalSignatureOptimizerBanking77.Runner do
           temperature: 0,
           view_data_batch_size: 16
         )
-        |> SignatureOptimizer.compile(baseline, examples(rows.train), examples(rows.selection))
+        |> then(&Imp.optimize!(baseline, &1, examples(rows.train), examples(rows.selection)))
 
       report = Report.fetch(selected)
       stage = optimization_stage(baseline, selected, report, observer, job)
@@ -178,7 +178,7 @@ defmodule LocalSignatureOptimizerBanking77.Runner do
   defp preflight!(paths) do
     unless sha256_file(paths.data) == @data_sha256, do: raise("Banking77 data digest drift")
     verify_ollama!()
-    job = TrainingJob.load!(paths.job)
+    job = TrainingJob.read!(paths.job)
     {:ok, _manifest} = Imp.Clients.MLXLMTrainer.verify_job(job)
     rows = split_rows!(paths.data)
 
@@ -217,7 +217,7 @@ defmodule LocalSignatureOptimizerBanking77.Runner do
       )
 
     {:ok, rebound} = TrainingJob.rebind(job, source)
-    Imp.Predict.with_lm(rebound, observed(Imp.ProgramAccess.lm(rebound), observer, :task))
+    Imp.Predict.with_lm(rebound, observed(program_lm(rebound), observer, :task))
   end
 
   defp ollama_lm do
@@ -430,6 +430,10 @@ defmodule LocalSignatureOptimizerBanking77.Runner do
   defp sha256_file(path), do: path |> File.read!() |> sha256()
   defp sha256_term(term), do: term |> Jason.encode!() |> sha256()
   defp sha256(bytes), do: :crypto.hash(:sha256, bytes) |> Base.encode16(case: :lower)
+
+  # The LM of the program's first predictor, through the public parameter view.
+  defp program_lm(program),
+    do: program |> Imp.ProgramParameters.predictors() |> hd() |> then(& &1.predictor.lm)
 end
 
 unless System.get_env("IMP_SIGNATURE_DEFINE_ONLY") == "1" do

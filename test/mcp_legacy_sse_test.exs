@@ -308,7 +308,13 @@ defmodule Imp.MCPLegacySSETest do
       assert_received {:imported, imported}
       on_exit(fn -> imported.cleanup.() end)
 
-      assert [%{server: "redirecting", index: 0, reason: {:mcp_sse_credentials_refused, _, _}}] =
+      assert [
+               %{
+                 server_name: "redirecting",
+                 index: 0,
+                 reason: {:mcp_sse_credentials_refused, _, _}
+               }
+             ] =
                imported.unavailable
 
       assert "fast" in Enum.map(imported.tools, &to_string(&1.name))
@@ -333,7 +339,7 @@ defmodule Imp.MCPLegacySSETest do
 
       on_exit(fn -> imported.cleanup.() end)
 
-      assert [%{server: "queried", index: 0, reason: {:mcp_sse_url_refused, "queried", why}}] =
+      assert [%{server_name: "queried", index: 0, reason: {:mcp_sse_url_refused, "queried", why}}] =
                imported.unavailable
 
       assert why =~ "query"

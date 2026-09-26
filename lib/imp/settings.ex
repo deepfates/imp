@@ -58,7 +58,7 @@ defmodule Imp.Settings do
   @not_settings [
     callbacks: "attach handlers with :telemetry.attach/4 to Imp's [:imp, ...] events instead",
     max_errors:
-      "pass :max_errors to BootstrapFewShot.new/2, RandomSearch.new/2, " <>
+      "pass :max_errors to BootstrapFewShot.new/2, BootstrapFewShotWithRandomSearch.new/2, " <>
         "COPRO.compile/5 or Imp.Evaluate.new/3",
     retriever: "give the retriever to the program, as in Imp.rag(program, retriever)"
   ]

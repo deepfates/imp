@@ -166,7 +166,7 @@ defmodule Imp.Optimizer.Report do
     instruction_search: Imp.Optimizer.InstructionSearch,
     labeled_few_shot: Imp.Optimizer.LabeledFewShot,
     mipro_v2: Imp.Optimizer.MIPROv2,
-    random_search: Imp.Optimizer.RandomSearch,
+    random_search: Imp.Optimizer.BootstrapFewShotWithRandomSearch,
     signature_optimizer: Imp.Optimizer.SignatureOptimizer,
     simba: Imp.Optimizer.SIMBA
   }
@@ -240,7 +240,7 @@ defmodule Imp.Optimizer.Report do
     |> Imp.Redaction.redact()
   end
 
-  def load(state) when is_map(state), do: load_report(state, :atoms)
+  def load!(state) when is_map(state), do: load_report(state, :atoms)
 
   @doc false
   def load_portable(state) when is_map(state), do: load_report(state, :strings)

@@ -45,7 +45,7 @@ defmodule Imp.Predict.Parallel do
   """
 
   @option_schema [
-    max_concurrency: [type: :pos_integer, default: System.schedulers_online()],
+    num_threads: [type: :pos_integer, default: System.schedulers_online()],
     timeout: [type: :timeout, default: 30_000],
     on_timeout: [type: {:in, [:exit, :kill_task]}, default: :kill_task]
   ]
@@ -55,7 +55,7 @@ defmodule Imp.Predict.Parallel do
 
   Options:
 
-    * `:max_concurrency` - positive integer task concurrency. Defaults to
+    * `:num_threads` - how many calls run at once, as in DSPy's `dspy.Parallel`. Defaults to
       `System.schedulers_online/0`.
     * `:timeout` - task timeout accepted by `Task.async_stream/5`. Defaults to
       `30_000`.
@@ -102,7 +102,7 @@ defmodule Imp.Predict.Parallel do
   defp run_pairs(pairs, opts) do
     pairs
     |> Imp.Tasks.async_stream(fn {program, input} -> call_program(program, input) end,
-      max_concurrency: opts[:max_concurrency],
+      max_concurrency: opts[:num_threads],
       timeout: opts[:timeout],
       on_timeout: opts[:on_timeout]
     )

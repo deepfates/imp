@@ -208,13 +208,8 @@ defmodule CompletionSurfaceTest do
       )
 
     assert {:error,
-            {:code_act_tool_error, {:tool_authorization_denied, :lookup, :tool_policy},
-             [
-               %{
-                 action: :tool,
-                 output: {:error, {:tool_authorization_denied, :lookup, :tool_policy}}
-               }
-             ]}} =
+            {:code_act_tool_error, {:tool_denied, :lookup, :tool_policy},
+             [%{action: :tool, output: {:error, {:tool_denied, :lookup, :tool_policy}}}]}} =
              Imp.Predict.CodeAct.call(denied, %{question: "q"})
 
     boom = Imp.Tool.new(:boom, "boom", fn _args -> raise "tool exploded" end)

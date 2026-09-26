@@ -198,7 +198,7 @@ defmodule Imp.ExternalCommand.Lifecycle do
         :use_stdio,
         {:args, argv}
       ]
-      |> maybe_put_port_option(:cd, config.cd)
+      |> maybe_put_port_option(:cd, config.cwd)
       |> maybe_put_port_option(:env, encode_env(config.env))
 
     port = Port.open({:spawn_executable, executable}, port_opts)
@@ -531,7 +531,7 @@ defmodule Imp.ExternalCommand.Lifecycle do
       timeout = Keyword.get(opts, :timeout, @default_timeout)
       grace = Keyword.get(opts, :kill_grace_ms, @default_kill_grace)
       max_output = Keyword.get(opts, :max_output_bytes, @default_max_output)
-      cd = Keyword.get(opts, :cd)
+      cwd = Keyword.get(opts, :cwd)
       env = Keyword.get(opts, :env, [])
       secrets = Keyword.get(opts, :secrets, [])
 
@@ -545,8 +545,8 @@ defmodule Imp.ExternalCommand.Lifecycle do
         not (is_integer(max_output) and max_output > 0) ->
           {:error, :invalid_max_output_bytes}
 
-        not (is_nil(cd) or is_binary(cd)) ->
-          {:error, :invalid_command_cd}
+        not (is_nil(cwd) or is_binary(cwd)) ->
+          {:error, :invalid_command_cwd}
 
         not valid_env?(env) ->
           {:error, :invalid_command_env}
@@ -560,7 +560,7 @@ defmodule Imp.ExternalCommand.Lifecycle do
              timeout: timeout,
              kill_grace_ms: grace,
              max_output_bytes: max_output,
-             cd: cd,
+             cwd: cwd,
              env: env,
              secrets: Enum.reject(secrets, &is_nil/1) |> Enum.uniq()
            }}

@@ -131,8 +131,9 @@ Ordinary Imp startup starts no protocol endpoint.
   directly instead of `%{reason: {:error, _}, trace: _}`. A raise inside a
   client, program, tool, tool policy, retriever, optimizer or ACP callback
   keeps the exception struct where 0.4.0 kept its message.
-  `{:tool_denied, tool}` is `{:tool_authorization_denied, tool,
-  :tool_policy}`; `Refine` and `Assertions` return `{:error, reason}`;
+  `{:tool_denied, tool}` is `{:tool_denied, tool, :tool_policy}`, and a run's
+  `:authorize` refusal is `{:tool_denied, tool, reason}`; `Refine` and
+  `Assertions` return `{:error, reason}`;
   `Imp.optimize!` raises `Imp.Error` for a failed optimization. The CHANGELOG
   lists every tag that changed.
 - `Imp.Example` and `Imp.Prediction` keep string keys as strings. Code that
@@ -156,6 +157,16 @@ Ordinary Imp startup starts no protocol endpoint.
   `%{module:, opts:}` map and a bare function are refused; so is a module
   that defines only `generate/2`. A retriever module's `retrieve/3` takes
   itself first.
+- `Imp.MCP.CallFailure` has `server_name`, `tool_name` and `index`; an
+  `unavailable` entry has `server_name`; `:authorize` returns `:allow` or
+  `{:deny, reason}` and its context names the `descriptor`;
+  `:credentials` is `:credential_store`.
+- A `:tool_policy` function returns `:allow` or `{:deny, reason}`, and a
+  refused call is `{:tool_denied, name, reason}`.
+- `max_concurrency` is `num_threads` on evaluation, parallel, search, batch and
+  optimizer options. `Refine`'s `max_attempts` is `n`; `RLM` takes
+  `max_iterations` only. `Imp.Optimizer.RandomSearch` and `BootstrapRS` are
+  `Imp.Optimizer.BootstrapFewShotWithRandomSearch`.
 
 ## Upgrade path
 
@@ -181,8 +192,17 @@ Ordinary Imp startup starts no protocol endpoint.
    and retriever modules the `generate/3` and `retrieve/3` that take the
    client first, and wrap an LM function in a struct that implements
    `Imp.LM`.
-9. Run your held-out evaluation and application smoke test against the new
-   release; a one-text-output ReActV2 program now ends turns differently.
+9. Rename `max_concurrency:` to `num_threads:` where you configure
+   evaluation, optimizers or parallel calls; answer `:authorize` and
+   `:tool_policy` with `:allow` or `{:deny, reason}`; match a refused tool
+   call as `{:tool_denied, name, reason}`; read `server_name` and `tool_name`
+   from MCP failures and absences. Call `Imp.Signature.load!/1`,
+   `Imp.History.load!/1`, `Imp.Optimizer.Report.load!/1` and
+   `Imp.Clients.TrainingJob.load!/2` where you called `load`, and
+   `Imp.Clients.TrainingJob.read!/2` where you read a checkpoint file, and
+   the datasets' `read!` where you called their `load(path)`.
+10. Run your held-out evaluation and application smoke test against the new
+    release; a one-text-output ReActV2 program now ends turns differently.
 
 The [CHANGELOG](CHANGELOG.md) records every user-visible change in this
 release. Generated module documentation is the complete API reference. Start

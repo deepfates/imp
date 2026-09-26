@@ -85,7 +85,7 @@ defmodule Imp.HistoryTest do
       |> Imp.History.dump()
       |> Jason.encode!()
       |> Jason.decode!()
-      |> Imp.History.load()
+      |> Imp.History.load!()
 
     assert restored == history
   end
@@ -129,25 +129,25 @@ defmodule Imp.HistoryTest do
 
   test "history retains unknown symbolic names without weakening strict report decoding" do
     typed = Imp.history([%{result: {:error, %{reason: :refused, retry: false}}, answer: 7}])
-    assert typed |> Imp.History.dump() |> Imp.History.load() == typed
+    assert typed |> Imp.History.dump() |> Imp.History.load!() == typed
     name = "retired_history_symbol_#{System.unique_integer([:positive])}"
     tag = %{"__imp_type__" => "atom", "value" => name}
     assert_raise ArgumentError, fn -> String.to_existing_atom(name) end
     assert_raise ArgumentError, fn -> Imp.Optimizer.Report.decode_term(tag) end
     state = %{"messages" => [%{"result" => tag}]}
-    assert [%{"result" => ^name}] = Imp.History.load(state) |> Imp.History.messages()
+    assert [%{"result" => ^name}] = Imp.History.load!(state) |> Imp.History.messages()
     assert_raise ArgumentError, fn -> String.to_existing_atom(name) end
-    dumped = Imp.History.load(state) |> Imp.History.dump()
+    dumped = Imp.History.load!(state) |> Imp.History.dump()
     assert [%{"result" => ^name}] = Imp.Optimizer.Report.decode_term(dumped["messages"])
 
     collision = %{"__imp_type__" => "map", "entries" => [[tag, 1], [name, 2]]}
 
     assert_raise ArgumentError, ~r/duplicate decoded key/, fn ->
-      Imp.History.load(%{"messages" => [%{"result" => collision}]})
+      Imp.History.load!(%{"messages" => [%{"result" => collision}]})
     end
 
     assert_raise ArgumentError, fn ->
-      Imp.History.load(%{"messages" => [%{"result" => Map.put(tag, "extra", true)}]})
+      Imp.History.load!(%{"messages" => [%{"result" => Map.put(tag, "extra", true)}]})
     end
   end
 
@@ -194,7 +194,7 @@ defmodule Imp.HistoryTest do
       end
     end
     absent.()
-    history = File.read!(#{inspect(path)}) |> Jason.decode!() |> Imp.History.load()
+    history = File.read!(#{inspect(path)}) |> Jason.decode!() |> Imp.History.load!()
     absent.()
     lm = Imp.LM.Static.new(handler: fn messages, _ ->
       unless Enum.any?(messages, fn m ->

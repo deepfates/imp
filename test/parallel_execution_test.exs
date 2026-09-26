@@ -9,7 +9,7 @@ defmodule Imp.ParallelExecutionTest do
 
     @impl true
     def call(%__MODULE__{pairs: pairs}, _inputs) do
-      {:ok, Imp.Prediction.new(results: Parallel.run(pairs, max_concurrency: 2))}
+      {:ok, Imp.Prediction.new(results: Parallel.run(pairs, num_threads: 2))}
     end
   end
 
@@ -26,7 +26,7 @@ defmodule Imp.ParallelExecutionTest do
                    {question, %{question: "three"}}
                  ]
                ],
-               max_concurrency: 2
+               num_threads: 2
              )
 
     assert {:ok, question_prediction} = question_result

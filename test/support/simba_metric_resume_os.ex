@@ -101,7 +101,7 @@ defmodule Imp.Test.SIMBAMetricResumeOS do
         max_steps: 2,
         max_demos: 0,
         prompt_lm: prompt_lm,
-        max_concurrency: 1,
+        num_threads: 1,
         metric_identity: identity,
         seed: 73
       )

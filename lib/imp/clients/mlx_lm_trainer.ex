@@ -11,6 +11,11 @@ defmodule Imp.Clients.MLXLMTrainer do
   are immutable Hugging Face snapshots: a remote repository name is recorded
   for provenance, but the command receives only a local directory whose final
   component is the configured 40-character revision.
+
+  The commands run through `:runner`: a module exporting `run/3` or a
+  three-argument function, called with the executable, its arguments and
+  `timeout:`, `kill_grace_ms:`, `max_output_bytes:` and `cwd:`, the directory
+  to run in. It returns `{:ok, result}` or `{:error, reason}`.
   """
 
   @behaviour Imp.Clients.Trainer
@@ -580,7 +585,7 @@ defmodule Imp.Clients.MLXLMTrainer do
       timeout: trainer.timeout,
       kill_grace_ms: trainer.kill_grace_ms,
       max_output_bytes: trainer.max_output_bytes,
-      cd: cd
+      cwd: cd
     ]
 
     case trainer.runner do

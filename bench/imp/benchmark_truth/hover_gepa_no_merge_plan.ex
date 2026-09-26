@@ -470,7 +470,7 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlan do
       max_metric_calls: @semantic_metric_calls,
       max_reflection_calls: design().optimizer.legal_reflection_transports,
       seed: seed,
-      max_concurrency: @task_concurrency
+      num_threads: @task_concurrency
     )
   end
 
@@ -1077,7 +1077,7 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlan do
         max_metric_calls: 50,
         max_reflection_calls: envelope.max_reflection_calls,
         seed: seed,
-        max_concurrency: 1
+        num_threads: 1
       )
 
     {optimizer, recorder}

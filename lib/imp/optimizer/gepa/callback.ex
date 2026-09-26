@@ -3,10 +3,10 @@ defmodule Imp.Optimizer.GEPA.Callback do
   Synchronous, observational callbacks for GEPA optimization.
 
   This behaviour mirrors the lifecycle in GEPA `v0.1.1` while making the
-  callback contract explicit for the BEAM. A callback is either a module whose
-  implemented hooks have arity one, or `{module, context}` whose hooks have
-  arity two. Every hook is optional and receives an event map; configured
-  callbacks receive their context as the second argument.
+  callback contract explicit for the BEAM. A callback is a module or
+  `{module, context}`. Every hook is optional and takes `(event, context)`:
+  the event map, and the context the callback was registered with, or `nil`
+  for a bare module.
 
   Callbacks run synchronously in registration order. Their return values are
   ignored, so callbacks cannot replace optimizer state or decisions. A callback
@@ -63,11 +63,10 @@ defmodule Imp.Optimizer.GEPA.Callback do
   @type callbacks :: [callback()]
 
   for event <- @events do
-    @callback unquote(event)(event()) :: term()
-    @callback unquote(event)(event(), term()) :: term()
+    @callback unquote(event)(event(), context :: term()) :: term()
   end
 
-  @optional_callbacks Enum.flat_map(@events, &[{&1, 1}, {&1, 2}])
+  @optional_callbacks Enum.map(@events, &{&1, 2})
 
   @doc "Returns the callback lifecycle hook names in upstream order."
   @spec events() :: [atom()]
@@ -114,9 +113,7 @@ defmodule Imp.Optimizer.GEPA.Callback do
     if function_exported?(module, event, 2), do: safely_invoke(module, event, [payload, context])
   end
 
-  defp invoke(module, event, payload) do
-    if function_exported?(module, event, 1), do: safely_invoke(module, event, [payload])
-  end
+  defp invoke(module, event, payload), do: invoke({module, nil}, event, payload)
 
   defp safely_invoke(module, event, arguments) do
     apply(module, event, arguments)

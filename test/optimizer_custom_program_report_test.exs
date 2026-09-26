@@ -163,7 +163,7 @@ defmodule Imp.OptimizerCustomProgramReportTest do
         max_steps: 1,
         max_demos: 0,
         prompt_lm: prompt_lm,
-        max_concurrency: 1
+        num_threads: 1
       )
       |> Imp.Optimizer.SIMBA.compile(program, [example], [example])
 

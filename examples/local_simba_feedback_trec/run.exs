@@ -371,9 +371,9 @@ defmodule LocalSIMBAFeedbackTREC.Runner do
       optimizer = optimizer(rows.contract, rows.treatment, observer)
 
       selected =
-        SIMBA.compile(
-          optimizer,
+        Imp.optimize!(
           baseline,
+          optimizer,
           examples(rows.train, rows.contract, true),
           examples(rows.validation, rows.contract, false)
         )
@@ -577,7 +577,7 @@ defmodule LocalSIMBAFeedbackTREC.Runner do
       max_steps: config["max_steps"],
       max_demos: config["max_demos"],
       prompt_lm: observed(reflection_lm(treatment), observer, :reflection),
-      max_concurrency: 1,
+      num_threads: 1,
       timeout: 120_000,
       seed: config["seed"]
     )
@@ -598,7 +598,7 @@ defmodule LocalSIMBAFeedbackTREC.Runner do
     do:
       Imp.Predict.with_lm(
         program,
-        observed(Imp.ProgramAccess.lm(program), observer, :task)
+        observed(program_lm(program), observer, :task)
       )
 
   defp observed(inner, observer, role),
@@ -732,7 +732,7 @@ defmodule LocalSIMBAFeedbackTREC.Runner do
   end
 
   defp assert_runtime!(program, contract) do
-    lm = Imp.ProgramAccess.lm(program)
+    lm = program_lm(program)
 
     unless program.adapter == Imp.Adapter.SingleField and lm.model == contract["model"]["id"] and
              Keyword.get(lm.opts, :cache) == false and Keyword.get(lm.opts, :max_retries) == 0 and
@@ -742,7 +742,7 @@ defmodule LocalSIMBAFeedbackTREC.Runner do
   end
 
   defp model_identity(program) do
-    case Imp.ProgramAccess.lm(program) do
+    case program_lm(program) do
       %ObservedLM{inner: inner} -> inner.model
       lm -> lm.model
     end
@@ -840,6 +840,10 @@ defmodule LocalSIMBAFeedbackTREC.Runner do
   defp sha256_term(term), do: term |> Jason.encode!() |> sha256()
   defp sha256(bytes), do: :crypto.hash(:sha256, bytes) |> Base.encode16(case: :lower)
   defp coarse_label(row), do: row["label"] |> String.split(":", parts: 2) |> hd()
+
+  # The LM of the program's first predictor, through the public parameter view.
+  defp program_lm(program),
+    do: program |> Imp.ProgramParameters.predictors() |> hd() |> then(& &1.predictor.lm)
 end
 
 unless System.get_env("IMP_SIMBA_FEEDBACK_TREC_DEFINE_ONLY") == "1" do

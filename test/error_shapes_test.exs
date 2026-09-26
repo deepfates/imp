@@ -268,10 +268,10 @@ defmodule Imp.ErrorShapesTest do
     end
 
     test "a tool the policy does not allow is denied with the run's tag" do
-      assert {:error, {:tool_authorization_denied, :write, :tool_policy}} =
+      assert {:error, {:tool_denied, :write, :tool_policy}} =
                Imp.ToolPolicy.authorize([:read], :write, %{})
 
-      assert Imp.Adapter.Chat.tool_error_text({:tool_authorization_denied, :write, :tool_policy}) ==
+      assert Imp.Adapter.Chat.tool_error_text({:tool_denied, :write, :tool_policy}) ==
                "write is not allowed."
     end
 
@@ -383,7 +383,7 @@ defmodule Imp.ErrorShapesTest do
           max_steps: 1,
           max_demos: 0,
           prompt_lm: prompt_lm,
-          max_concurrency: 1,
+          num_threads: 1,
           seed: 1,
           metric_identity: %{"id" => "exact-answer", "version" => 1, "config" => %{}}
         )
