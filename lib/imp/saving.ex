@@ -438,8 +438,9 @@ defmodule Imp.Saving do
     Imp.Predict.RAG.new(
       load_state!(Map.fetch!(state, "program")),
       load_retriever!(Map.fetch!(state, "retriever")),
-      query_field: Imp.Optimizer.Report.decode_term(Map.fetch!(state, "query_field")),
-      context_field: Imp.Optimizer.Report.decode_term(Map.fetch!(state, "context_field")),
+      query_field: Imp.Optimizer.Report.decode_term_compatible(Map.fetch!(state, "query_field")),
+      context_field:
+        Imp.Optimizer.Report.decode_term_compatible(Map.fetch!(state, "context_field")),
       k: Map.fetch!(state, "k"),
       hops: Map.fetch!(state, "hops")
     )
@@ -449,7 +450,7 @@ defmodule Imp.Saving do
     require_keys!(state, @program_of_thought_required_keys)
     signature = Imp.Signature.load!(Map.fetch!(state, "signature"))
     predict = load_state!(Map.fetch!(state, "predict"))
-    output_field = Imp.Optimizer.Report.decode_term(Map.fetch!(state, "output_field"))
+    output_field = Imp.Optimizer.Report.decode_term_compatible(Map.fetch!(state, "output_field"))
 
     %Imp.Predict.ProgramOfThought{
       signature: signature,
@@ -461,15 +462,18 @@ defmodule Imp.Saving do
   defp load_state!(%{"type" => "multi_chain_comparison"} = state) do
     require_keys!(state, ["type", "predict", "last_key", "m"])
     predict = load_state!(Map.fetch!(state, "predict"))
-    last_key = Imp.Optimizer.Report.decode_term(Map.fetch!(state, "last_key"))
+    last_key = Imp.Optimizer.Report.decode_term_compatible(Map.fetch!(state, "last_key"))
     m = Map.fetch!(state, "m")
 
-    unless match?(%Imp.Predict{}, predict) and is_integer(m) and m > 0 and
-             last_key in Imp.Signature.output_names(predict.signature) do
+    declared_last_key =
+      match?(%Imp.Predict{}, predict) &&
+        predict.signature |> Imp.Signature.output_names() |> Imp.FieldMap.find_name(last_key)
+
+    unless is_integer(m) and m > 0 and declared_last_key do
       raise ArgumentError, "invalid saved MultiChainComparison program state"
     end
 
-    %Imp.Predict.MultiChainComparison{predict: predict, last_key: last_key, m: m}
+    %Imp.Predict.MultiChainComparison{predict: predict, last_key: declared_last_key, m: m}
   end
 
   defp load_state!(%{"type" => "knn"} = state) do
@@ -1699,7 +1703,10 @@ defmodule Imp.Saving do
          %Imp.Predict{signature: planner_signature} = predict
        ) do
     cond do
-      Imp.Signature.input_names(planner_signature) != Imp.Signature.input_names(task_signature) ->
+      not Imp.FieldMap.same_names?(
+        Imp.Signature.input_names(planner_signature),
+        Imp.Signature.input_names(task_signature)
+      ) ->
         raise ArgumentError,
               "saved ProgramOfThought planner inputs must match task inputs"
 
@@ -1707,7 +1714,10 @@ defmodule Imp.Saving do
         raise ArgumentError,
               "saved ProgramOfThought planner instructions must match task instructions"
 
-      Imp.Signature.output_names(planner_signature) != [:program, :tool, :arguments] ->
+      not Imp.FieldMap.same_names?(
+        Imp.Signature.output_names(planner_signature),
+        [:program, :tool, :arguments]
+      ) ->
         raise ArgumentError,
               "saved ProgramOfThought planner outputs must be [:program, :tool, :arguments]"
 
@@ -1722,11 +1732,9 @@ defmodule Imp.Saving do
   end
 
   defp validate_program_of_thought_output_field!(%Imp.Signature{} = task_signature, output_field) do
-    if Enum.any?(
-         Imp.Signature.output_names(task_signature),
-         &(to_string(&1) == to_string(output_field))
-       ) do
-      output_field
+    if declared =
+         task_signature |> Imp.Signature.output_names() |> Imp.FieldMap.find_name(output_field) do
+      declared
     else
       raise ArgumentError,
             "saved ProgramOfThought output_field must name one of the task outputs"

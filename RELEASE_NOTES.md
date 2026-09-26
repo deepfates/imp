@@ -25,6 +25,14 @@ in its release definition; see [protocol runtime in
 releases](docs/PRODUCTION_OPERATIONS.md#protocol-runtime-in-releases).
 Ordinary Imp startup starts no protocol endpoint.
 
+`mix deps.get` and `mix hex.audit` report two cowlib advisories
+(CVE-2026-43966, CVE-2026-43969). cowlib arrives only through ExMCP's
+Cowboy server, and Imp's HTTP goes through Req, Finch and Mint. The first is
+fixed one layer up: Cowboy 2.16.0 and later refuse a response header
+containing CR or LF, and a fresh `mix deps.get` resolves Cowboy 2.19.0. The second is in the encoder
+for an outgoing `Cookie` request header, which nothing in Imp's dependency
+tree calls, and no cowlib release fixes it yet.
+
 ## Headline changes
 
 - Imp depends on ExMCP 1.5 from Hex, unpatched. What Imp needed from the
@@ -144,6 +152,23 @@ Ordinary Imp startup starts no protocol endpoint.
   `Imp.ACP.MCP` and `Imp.Core.ToolCall`/`ToolResult` are gone.
   `Imp.MCP.connect/2` imports tools; `Imp.ACP.ToolKind.derive_all/1` gives an
   import's ACP tool kinds.
+- A saved program holds no HTTP header, credential or not. An LM with custom
+  headers (a routing header such as `x-tenant` included) sends requests
+  without them after loading until it is rebound with `Imp.with_lm/2` or a
+  scoped `Imp.context/2`.
+- `Imp.save!` refuses an LM whose `base_url` has a query, fragment or user
+  info.
+- Prompts name types in plain words instead of Python annotations
+  (`one of: atlas, harbor` where 0.4.0 wrote `Literal['atlas', 'harbor']`),
+  values take their JSON spelling (`null`, `true`, `false`), and the
+  structured-output schema is named `outputs`. A non-string answer for a
+  string field is kept as its JSON text (`"true"`, not `"True"`), and a
+  `null` answer is no value rather than the string `"None"`. Fields, order
+  and parsing are unchanged, but a saved optimized program now sends
+  different prompt text.
+- An `Imp.Telemetry` span's `[:exception]` event carries `:kind`, `:reason`
+  and `:stacktrace`, as `:telemetry.span/3` does, instead of `:error` as
+  text.
 - An optimizer's `compile/N` is no longer documented where `Imp.optimize` or
   `Imp.train` runs the optimizer; call those.
 - `Imp.load!/1` reading a file is `Imp.read!/1`; `Imp.load/1` returns
@@ -201,7 +226,13 @@ Ordinary Imp startup starts no protocol endpoint.
    `Imp.Clients.TrainingJob.load!/2` where you called `load`, and
    `Imp.Clients.TrainingJob.read!/2` where you read a checkpoint file, and
    the datasets' `read!` where you called their `load(path)`.
-10. Run your held-out evaluation and application smoke test against the new
+10. Rebind the LM of any loaded program that relies on custom headers, and
+    move a `base_url` query, fragment or user info into configuration the
+    host supplies at load time.
+11. Update telemetry handlers for `[:exception]` to read `:kind`, `:reason`
+    and `:stacktrace`.
+12. Re-evaluate saved optimized programs on held-out data, since their
+    prompt text changed, and run your application smoke test against the new
     release; a one-text-output ReActV2 program now ends turns differently.
 
 The [CHANGELOG](CHANGELOG.md) records every user-visible change in this

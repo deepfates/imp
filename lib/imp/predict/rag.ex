@@ -174,28 +174,7 @@ defmodule Imp.Predict.RAG do
   defp query_text(inputs, field),
     do: field_value(inputs, field, "")
 
-  defp field_value(inputs, field, default) do
-    cond do
-      Map.has_key?(inputs, field) ->
-        Map.fetch!(inputs, field)
-
-      Map.has_key?(inputs, to_string(field)) ->
-        Map.fetch!(inputs, to_string(field))
-
-      is_binary(field) ->
-        existing_atom_value(inputs, field, default)
-
-      true ->
-        default
-    end
-  end
-
-  defp existing_atom_value(inputs, field, default) do
-    atom = String.to_existing_atom(field)
-    Map.get(inputs, atom, default)
-  rescue
-    ArgumentError -> default
-  end
+  defp field_value(inputs, field, default), do: Imp.FieldMap.get(inputs, field, default)
 
   defp render_context(docs) do
     docs

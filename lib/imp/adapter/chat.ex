@@ -189,8 +189,13 @@ defmodule Imp.Adapter.Chat do
   defp coerce_fields(signature, fields) do
     signature.outputs
     |> Enum.reduce(fields, fn field, acc ->
-      if Map.has_key?(acc, field.name),
-        do: Map.update!(acc, field.name, &coerce_field(field, &1)),
+      if Imp.FieldMap.has_key?(acc, field.name),
+        do:
+          Imp.FieldMap.put(
+            acc,
+            field.name,
+            coerce_field(field, Imp.FieldMap.get(acc, field.name))
+          ),
         else: acc
     end)
   end
@@ -379,35 +384,11 @@ defmodule Imp.Adapter.Chat do
     end
   end
 
-  defp fetch_field(fields, name) do
-    string_name = to_string(name)
+  defp fetch_field(fields, name), do: Imp.FieldMap.get(fields, name)
 
-    cond do
-      Map.has_key?(fields, name) ->
-        Map.fetch!(fields, name)
-
-      Map.has_key?(fields, string_name) ->
-        Map.fetch!(fields, string_name)
-
-      (is_binary(name) and existing_atom(name)) && Map.has_key?(fields, existing_atom(name)) ->
-        Map.fetch!(fields, existing_atom(name))
-
-      true ->
-        nil
-    end
-  end
-
-  # Whether `name` is a present key, even with a nil value, across the atom,
-  # string and existing-atom spellings `fetch_field/2` understands. Present-nil
-  # and absent must stay distinguishable, and `fetch_field/2` collapses both to
-  # nil.
-  defp field_present?(fields, name) do
-    string_name = to_string(name)
-
-    Map.has_key?(fields, name) or
-      Map.has_key?(fields, string_name) or
-      ((is_binary(name) and existing_atom(name)) && Map.has_key?(fields, existing_atom(name)))
-  end
+  # Present-nil and absent must stay distinguishable, and `fetch_field/2`
+  # collapses both to nil.
+  defp field_present?(fields, name), do: Imp.FieldMap.has_key?(fields, name)
 
   defp render_inputs(signature, inputs, opts) do
     prefix = Keyword.get(opts, :prefix, "")
@@ -1278,7 +1259,7 @@ defmodule Imp.Adapter.Chat do
 
   defp history_input_fields(signature) do
     signature.inputs
-    |> Enum.filter(&(&1.type == :history or &1.name == :history))
+    |> Enum.filter(&(&1.type == :history or Imp.FieldMap.same_name?(&1.name, :history)))
     |> Enum.map(& &1.name)
     |> MapSet.new()
   end
@@ -1417,12 +1398,6 @@ defmodule Imp.Adapter.Chat do
             acc
         end
     end)
-  end
-
-  defp existing_atom(name) do
-    String.to_existing_atom(name)
-  rescue
-    ArgumentError -> nil
   end
 
   defp validate_format_opts!(opts, context) when is_list(opts) do

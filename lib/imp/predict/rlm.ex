@@ -251,13 +251,10 @@ defmodule Imp.Predict.RLM do
       signature.inputs
       |> Enum.reject(&(Map.get(&1.metadata, :optional) || Map.get(&1.metadata, "optional")))
       |> Enum.map(& &1.name)
-      |> Enum.reject(&input_present?(inputs, &1))
+      |> Enum.reject(&Imp.FieldMap.has_key?(inputs, &1))
 
     if missing == [], do: :ok, else: {:error, {:missing_input_fields, missing}}
   end
-
-  defp input_present?(inputs, name),
-    do: Map.has_key?(inputs, name) or Map.has_key?(inputs, to_string(name))
 
   defp call_with_environment(
          %__MODULE__{persistent: true, session: session} = rlm,

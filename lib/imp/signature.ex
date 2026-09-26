@@ -13,6 +13,9 @@ defmodule Imp.Signature do
   and validated strictly. Validate untrusted application inputs at your own
   boundary when rejection is required.
 
+  Field names written in the string syntax are atoms only if that atom
+  already exists, otherwise strings, so read values with `Imp.get/2`.
+
   The compact string form is ideal for most code:
 
       iex> signature = Imp.Signature.new("question: string -> answer: short_span")

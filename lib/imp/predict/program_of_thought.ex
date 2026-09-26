@@ -298,8 +298,10 @@ defmodule Imp.Predict.ProgramOfThought do
   @carried_loop_keys [:observation, :code_act_history, :previous_program, :error]
 
   defp call_with_signature(pot, signature, inputs) do
-    declared = MapSet.new(signature.inputs, & &1.name)
-    inputs = Map.drop(inputs, Enum.reject(@carried_loop_keys, &MapSet.member?(declared, &1)))
+    declared = Enum.map(signature.inputs, & &1.name)
+
+    inputs =
+      Map.drop(inputs, Enum.reject(@carried_loop_keys, &Imp.FieldMap.find_name(declared, &1)))
 
     pot.predict
     |> Predict.with_signature(signature)
@@ -313,8 +315,8 @@ defmodule Imp.Predict.ProgramOfThought do
     do: %{signature | outputs: append_unique(signature.outputs, fields)}
 
   defp append_unique(existing, additions) do
-    names = MapSet.new(existing, & &1.name)
-    existing ++ Enum.reject(additions, &MapSet.member?(names, &1.name))
+    names = Enum.map(existing, & &1.name)
+    existing ++ Enum.reject(additions, &Imp.FieldMap.find_name(names, &1.name))
   end
 
   defp field(name, kind, type, desc, metadata \\ []) do
@@ -416,9 +418,7 @@ defmodule Imp.Predict.ProgramOfThought do
   end
 
   defp declared_output_name(outputs, key) when is_atom(key) or is_binary(key) do
-    Enum.find_value(outputs, fn field ->
-      if field.name == key or to_string(field.name) == to_string(key), do: field.name
-    end)
+    outputs |> Enum.map(& &1.name) |> Imp.FieldMap.find_name(key)
   end
 
   defp declared_output_name(_outputs, _key), do: nil
@@ -441,8 +441,8 @@ defmodule Imp.Predict.ProgramOfThought do
   defp resolve_output_field!(signature, field) do
     outputs = output_names(signature)
 
-    if field in outputs do
-      field
+    if declared = Imp.FieldMap.find_name(outputs, field) do
+      declared
     else
       raise ArgumentError,
             "Imp.Predict.ProgramOfThought.new/2 :output_field must be one of the signature outputs; got #{inspect(field)} for outputs #{inspect(outputs)}"

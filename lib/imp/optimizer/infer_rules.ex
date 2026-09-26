@@ -909,12 +909,7 @@ defmodule Imp.Optimizer.InferRules do
     |> Enum.join("\n")
   end
 
-  defp fetch_field(fields, name) do
-    case Map.fetch(fields, name) do
-      {:ok, value} -> {:ok, value}
-      :error -> Map.fetch(fields, to_string(name))
-    end
-  end
+  defp fetch_field(fields, name), do: Imp.FieldMap.fetch(fields, name)
 
   defp error_message(%_{} = error), do: Exception.message(error)
   defp error_message(error) when is_binary(error), do: error
