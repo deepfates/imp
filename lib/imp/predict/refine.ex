@@ -388,7 +388,7 @@ defmodule Imp.Predict.Refine do
   end
 
   defp extend_hint_input(%Imp.Signature{} = signature) do
-    if :hint_ in Imp.Signature.input_names(signature) do
+    if signature |> Imp.Signature.input_names() |> Imp.FieldMap.find_name(:hint_) do
       signature
     else
       Imp.Signature.extend(
