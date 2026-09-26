@@ -432,9 +432,8 @@ submit(%{answer: answer})|}
   test "the default recursion depth gives rlm_query one level of child RLM" do
     parent = self()
 
-    controller = %{
-      module: Imp.LM.Static,
-      opts: [
+    controller =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           case controller_payload(messages)["variables"]["context"]["preview"] do
             "root" ->
@@ -445,18 +444,15 @@ submit(%{answer: answer})|}
               %{code: ~S|submit(%{answer: "child:" <> rlm_query("grandchild prompt")})|}
           end
         end
-      ]
-    }
+      )
 
-    sub_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    sub_lm =
+      Imp.LM.Static.new(
         handler: fn [%{content: prompt}], _opts ->
           send(parent, {:one_shot, prompt})
           "leaf"
         end
-      ]
-    }
+      )
 
     rlm = RLM.new("context -> answer", lm: controller, sub_lm: sub_lm, max_iterations: 1)
 

@@ -39,17 +39,15 @@ defmodule RLMPublicSurfaceTest do
       %{reasoning: "finish", code: ~S|submit(%{answer: "done"})|}
     ]
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           send(parent, {:turn, Enum.map_join(messages, "\n", &to_string(&1.content))})
           [action | rest] = Process.get(:rlm_actions)
           Process.put(:rlm_actions, rest)
           action
         end
-      ]
-    }
+      )
 
     Process.put(:rlm_actions, actions)
 
@@ -91,15 +89,13 @@ defmodule RLMPublicSurfaceTest do
   test "the controller prompt names one reply shape" do
     parent = self()
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           send(parent, {:controller_system_prompt, hd(messages).content})
           %{code: ~S|submit(%{answer: "done"})|}
         end
-      ]
-    }
+      )
 
     rlm = Imp.Predict.RLM.new("question -> answer", lm: lm)
     assert {:ok, _prediction} = Imp.Predict.RLM.call(rlm, %{question: "q"})
@@ -114,7 +110,7 @@ defmodule RLMPublicSurfaceTest do
             "\n" <> ~S|{"answer":"Paris"}|,
           ~S|{"answer":"Paris"}{"reasoning":"a } in a string","code":"submit(%{answer: \"Paris\"})"}|
         ] do
-      lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> reply end]}
+      lm = Imp.LM.Static.new(handler: fn _messages, _opts -> reply end)
       rlm = Imp.Predict.RLM.new("question -> answer", lm: lm, max_iterations: 1)
 
       assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{question: "Capital of France?"})
@@ -130,7 +126,7 @@ defmodule RLMPublicSurfaceTest do
     second = ~S|{"reasoning":"b","code":"submit(%{answer: \"B\"})"}|
 
     for reply <- [first <> "\n\n" <> first, first <> "\n\n" <> second] do
-      lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> reply end]}
+      lm = Imp.LM.Static.new(handler: fn _messages, _opts -> reply end)
       rlm = Imp.Predict.RLM.new("question -> answer", lm: lm, max_iterations: 1)
 
       assert {:ok, prediction} = Imp.Predict.RLM.call(rlm, %{question: "q"})
@@ -541,7 +537,7 @@ submit(%{answer: child[:answer]})|
         else: %{code: ~S|submit(%{answer: "done"})|}
     end
 
-    lm = %{module: Imp.LM.Static, opts: [handler: handler]}
+    lm = Imp.LM.Static.new(handler: handler)
     rlm = Imp.Predict.RLM.new("log -> answer", lm: lm, max_iterations: 2)
 
     assert {:ok, _prediction} = Imp.Predict.RLM.call(rlm, %{log: log})
@@ -575,7 +571,7 @@ submit(%{answer: child[:answer]})|
         else: %{code: ~S|submit(%{answer: "done"})|}
     end
 
-    lm = %{module: Imp.LM.Static, opts: [handler: handler]}
+    lm = Imp.LM.Static.new(handler: handler)
 
     rlm =
       Imp.Predict.RLM.new("log -> answer",
