@@ -259,10 +259,7 @@ User-visible changes to Imp are recorded here.
 - The names follow the glossary: a step answered in text ends as `:answered`,
   the last request of an interrupted turn as `:last_text` with
   `last_request_note`, the step signature declares `metadata[:text_field]`, and
-  the tool list sent to a provider is the `:tools_sent` event. Builds of
-  `main` between 0.4.0 and 0.5.0 called them `:last_prose`,
-  `last_prose_note` (later `last_text_note`, beside `forced_submit_notice`),
-  `:prose_step` and `:tools_offered`.
+  the tool list sent to a provider is the `:tools_sent` event.
 - A ReActV2 or ReAct prediction's fields are the signature's outputs and
   nothing else. `history`, `termination_reason`, `termination_cause`,
   `termination_error`, `finished_by_tool`, `unexecuted_tool_calls` and
