@@ -108,6 +108,11 @@ We never wrote a prompt or a parser. We declared a task, and got back a value
 we can use. [Adapters](../diving-deeper/adapters.md) explains how signatures
 become messages and replies become fields.
 
+To run this in a notebook, open
+[Livebook 01](../../livebooks/01_real_lm_front_door.livemd) with a key, or
+[Livebook 02](../../livebooks/02_without_a_provider.livemd) without one; 02
+prints the exact messages Imp sends.
+
 ---
 
 **Next:** [Expanding signatures →](expanding-signatures.md)

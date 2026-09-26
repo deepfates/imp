@@ -19,6 +19,15 @@ defmodule Imp.Optimizer.SIMBA do
   Operational route, cost, budget, transport, and cancellation guards are
   always fatal across sampling, reflection, candidate scoring, and final
   selection.
+
+  ## Checkpoints
+
+  Pass these to `Imp.optimize/4` or `Imp.optimize/5`. `:max_steps` limits new
+  completed search steps in one invocation. `:checkpoint_fn` receives a
+  JSON-safe checkpoint before work, after every completed step, and after every
+  completed final evaluation. Pass any emitted checkpoint back through
+  `:resume_state`. Step and final-evaluation boundaries are atomic; interrupted
+  in-flight work is retried.
   """
 
   alias Imp.Optimizer.{DurableCallbackIdentity, Report, Sampling, SearchPolicy, TrajectoryRunner}
@@ -113,10 +122,12 @@ defmodule Imp.Optimizer.SIMBA do
     {:ok, compiled}
   end
 
+  @doc false
   def compile(%__MODULE__{} = optimizer, program, trainset) do
     compile_run(optimizer, program, trainset, nil, [])
   end
 
+  @doc false
   def compile(%__MODULE__{} = optimizer, program, trainset, final_set_or_opts) do
     if Keyword.keyword?(final_set_or_opts) do
       compile_run(optimizer, program, trainset, nil, final_set_or_opts)
@@ -125,15 +136,7 @@ defmodule Imp.Optimizer.SIMBA do
     end
   end
 
-  @doc """
-  Compiles with invocation-level durable checkpoint and resume controls.
-
-  `:max_steps` limits new completed search steps in this invocation.
-  `:checkpoint_fn` receives a JSON-safe checkpoint before work, after every
-  completed step, and after every completed final evaluation. Pass any emitted
-  checkpoint back through `:resume_state`. Step and final-evaluation boundaries
-  are atomic; interrupted in-flight work is retried.
-  """
+  @doc false
   def compile(%__MODULE__{} = optimizer, program, trainset, final_set, opts) do
     compile_run(optimizer, program, trainset, final_set, opts)
   end
@@ -818,7 +821,7 @@ defmodule Imp.Optimizer.SIMBA do
     fields
     |> Enum.map(fn field ->
       description = if field.desc in [nil, ""], do: "", else: " - #{field.desc}"
-      "\t\t#{field.name}: #{field.type}#{description}"
+      "\t\t#{field.name}: #{Imp.Adapter.FieldType.label(field)}#{description}"
     end)
     |> Enum.join("\n")
   end

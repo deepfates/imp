@@ -114,8 +114,8 @@ defmodule Imp.BenchmarkTruth.LangProBeHeartDiseaseMiproCurrent do
   def provider_free_census do
     %{
       imp: %{
-        task: %{calls: 14_544, max_bytes: 5_462, p95_bytes: 4_616},
-        proposer: %{calls: 147, max_bytes: 5_165, p95_bytes: 4_278}
+        task: %{calls: 14_544, max_bytes: 5_507, p95_bytes: 4_661},
+        proposer: %{calls: 147, max_bytes: 5_171, p95_bytes: 4_305}
       },
       dspy: %{
         task: %{calls: 14_544, max_bytes: 6_187, p95_bytes: 5_341},

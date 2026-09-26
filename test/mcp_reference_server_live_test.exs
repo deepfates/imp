@@ -30,11 +30,11 @@ defmodule MCPReferenceServerLiveTest do
 
     tools =
       npx
-      |> Imp.MCP.StdioClient.new(
+      |> Imp.Test.MCPConnect.stdio!(
         args: ["-y", "@modelcontextprotocol/server-filesystem", root],
         timeout: 60_000
       )
-      |> Imp.MCP.import_tools()
+      |> Map.fetch!(:tools)
 
     assert tools != []
 

@@ -1,6 +1,13 @@
 defmodule Imp.RunTest do
   use ExUnit.Case, async: true
 
+  # How long to wait for a run in progress to reach a point: a message from
+  # its task, callback or observer, or its processes ending. The run gets
+  # there through code the VM loads on first use, and the async tests running
+  # beside this one load code too, so the first test in a VM to take a path
+  # can need more than assert_receive's default of 100 ms.
+  @reached 5_000
+
   defmodule NestedProgram do
     @behaviour Imp.Module
     defstruct [:signature]
@@ -154,7 +161,7 @@ defmodule Imp.RunTest do
                end
              )
 
-    assert_receive {:sink_blocked, delivery}
+    assert_receive {:sink_blocked, delivery}, @reached
     refute delivery == run.control
 
     delivery_monitor = Process.monitor(delivery)
@@ -185,7 +192,7 @@ defmodule Imp.RunTest do
                end
              )
 
-    assert_receive {:sink_waiting, delivery}
+    assert_receive {:sink_waiting, delivery}, @reached
     assert {:ok, _prediction} = Task.await(run.task)
     assert :ok = Imp.Run.barrier(run, owner, :ordered)
     refute_receive {:imp_run_barrier, :ordered}, 20
@@ -219,8 +226,8 @@ defmodule Imp.RunTest do
         Process.sleep(:infinity)
       end)
 
-    assert_receive {:owner_blocked_run, run}
-    assert_receive {:owner_sink_blocked, delivery}
+    assert_receive {:owner_blocked_run, run}, @reached
+    assert_receive {:owner_sink_blocked, delivery}, @reached
 
     task_monitor = Process.monitor(run.task.pid)
     control_monitor = Process.monitor(run.control)
@@ -402,11 +409,11 @@ defmodule Imp.RunTest do
                authorization_timeout: 5_000
              )
 
-    assert_receive {:authorization_callback_started, callback}
+    assert_receive {:authorization_callback_started, callback}, @reached
     callback_monitor = Process.monitor(callback)
 
     assert :ok = Imp.cancel_run(run, :operator_cancelled)
-    assert_receive {:DOWN, ^callback_monitor, :process, ^callback, _reason}
+    assert_receive {:DOWN, ^callback_monitor, :process, ^callback, _reason}, @reached
     refute Process.alive?(run.task.pid)
     refute_received :effect_executed
     refute_receive :late_authorization_decision, 20
@@ -444,15 +451,15 @@ defmodule Imp.RunTest do
         Process.sleep(:infinity)
       end)
 
-    assert_receive {:owned_run, run}
-    assert_receive {:owner_authorization_started, callback}
+    assert_receive {:owned_run, run}, @reached
+    assert_receive {:owner_authorization_started, callback}, @reached
     callback_monitor = Process.monitor(callback)
     run_monitor = Process.monitor(run.task.pid)
 
     Process.exit(owner, :kill)
 
-    assert_receive {:DOWN, ^callback_monitor, :process, ^callback, _reason}
-    assert_receive {:DOWN, ^run_monitor, :process, _run_pid, _reason}
+    assert_receive {:DOWN, ^callback_monitor, :process, ^callback, _reason}, @reached
+    assert_receive {:DOWN, ^run_monitor, :process, _run_pid, _reason}, @reached
     refute_received :effect_executed
     refute_receive :late_authorization_decision, 20
   end
@@ -506,7 +513,7 @@ defmodule Imp.RunTest do
         end
       end)
 
-    assert_receive {:owned_run, run}
+    assert_receive {:owned_run, run}, @reached
     task_monitor = Process.monitor(run.task.pid)
     control_monitor = Process.monitor(run.control)
     send(owner, :crash)

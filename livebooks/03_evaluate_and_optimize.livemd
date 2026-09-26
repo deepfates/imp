@@ -1,4 +1,4 @@
-# Imp 03: Evaluate And Optimize
+# Imp 03: Evaluate and optimize
 
 ```elixir
 imp_checkout? = fn path ->
@@ -32,13 +32,34 @@ else
   # Standalone notebook: install the released package from Hex.
   Mix.install([{:imp, "~> 0.5"}])
 end
-live_provider_enabled? = System.get_env("LIVE_PROVIDER") == "1"
+
+# Live cells run when LIVE_PROVIDER=1 and a key is set: OPENAI_API_KEY, or
+# OPENROUTER_API_KEY for the same model through OpenRouter. In your own code,
+# any ReqLLM model string works.
+live_lm = fn opts ->
+  model = System.get_env("OPENAI_MODEL", "gpt-5.4-mini")
+
+  cond do
+    System.get_env("LIVE_PROVIDER") != "1" ->
+      {:skip, "Set LIVE_PROVIDER=1 and OPENAI_API_KEY to run this cell."}
+
+    key = System.get_env("OPENAI_API_KEY") ->
+      {:ok, Imp.req_llm("openai:" <> model, Keyword.put(opts, :api_key, key))}
+
+    key = System.get_env("OPENROUTER_API_KEY") ->
+      {:ok, Imp.req_llm("openrouter:openai/" <> model, Keyword.put(opts, :api_key, key))}
+
+    true ->
+      {:skip, "Set OPENAI_API_KEY to run this cell."}
+  end
+end
 ```
 
-## Build Train And Dev Sets
+## Build train and dev sets
 
-This notebook gives a program a scorecard. Optimizers are only useful after
-examples and metrics say what better means.
+Livebook 02 showed what a program sends. This notebook gives a program a
+scorecard: optimizers are only useful after examples and a metric say what
+better means.
 
 Optimizers need two kinds of examples. The train set is material they can use
 to build candidates. The dev set is the held-out scorecard used to choose
@@ -55,7 +76,7 @@ devset = [
 ]
 ```
 
-## Define A Metric
+## Define a metric
 
 The metric is the telos of an optimization run. Imp can search demos,
 instructions, or artifacts, but it can only improve what the metric can see.
@@ -64,7 +85,7 @@ instructions, or artifacts, but it can only improve what the metric can see.
 metric = Imp.exact_match(:answer)
 ```
 
-## Evaluate A Baseline
+## Evaluate a baseline
 
 Start with a baseline before optimizing. A baseline tells you whether the
 metric, dev set, adapter, and LM are wired together before search adds motion.
@@ -84,7 +105,7 @@ program = Imp.predict("question -> answer", lm: lm)
 Imp.evaluate(program, devset, metric)
 ```
 
-## Labeled Few-Shot
+## Labeled few-shot
 
 The simplest improvement is to attach known-good examples as demos. This is not
 magic training; it is ordinary data being rendered by the adapter.
@@ -97,7 +118,7 @@ compiled =
 Imp.evaluate(compiled, devset, metric)
 ```
 
-## Random Search
+## Random search
 
 Random search tries several demo subsets and keeps the candidate that scores
 best. Its value is not sophistication; its value is that it creates an
@@ -115,7 +136,7 @@ compiled =
 }
 ```
 
-## Instruction Search
+## Instruction search
 
 Instruction search changes the program instructions and keeps the candidate
 that scores best against the dev set.
@@ -135,7 +156,7 @@ compiled =
 Imp.Optimizer.Report.fetch(compiled)
 ```
 
-## Optimize Anything
+## Optimize anything
 
 Use artifact optimization when the thing you want to improve is not an Imp
 program yet: a config file, policy text, rubric, template, or other named
@@ -172,34 +193,14 @@ result =
 IO.inspect(result, label: "Optimize Anything result")
 ```
 
-## Evaluate A Live Provider
+## Evaluate a live provider
 
 This cell spends a few provider calls only when `LIVE_PROVIDER=1` and provider
 credentials are present. It proves that the same `evaluate -> optimize ->
 report` path works with a real LM, while keeping the dataset intentionally tiny.
 
 ```elixir
-live_lm = fn opts ->
-  if live_provider_enabled? && System.get_env("OPENAI_API_KEY") && System.get_env("OPENAI_MODEL") do
-    {:ok,
-     Imp.req_llm("openai:#{System.fetch_env!("OPENAI_MODEL")}",
-       Keyword.merge(
-         [
-           api_key: System.fetch_env!("OPENAI_API_KEY"),
-           temperature: 0,
-           max_completion_tokens: 100
-         ],
-         opts
-       )
-     )}
-  else
-    {:skip, "Set LIVE_PROVIDER=1, OPENAI_API_KEY, and OPENAI_MODEL to run the live provider cell."}
-  end
-end
-```
-
-```elixir
-case live_lm.(max_completion_tokens: 100) do
+case live_lm.(max_tokens: 100) do
   {:ok, lm} ->
     live_program =
       Imp.predict(
@@ -255,7 +256,7 @@ case live_lm.(max_completion_tokens: 100) do
 end
 ```
 
-## GEPA-Style Reflection
+## GEPA-style reflection
 
 GEPA-style optimization keeps per-example diagnostics, reflects on misses, and
 uses Pareto pressure so an improvement for one case does not erase performance

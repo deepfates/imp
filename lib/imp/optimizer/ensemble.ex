@@ -79,11 +79,11 @@ defmodule Imp.Optimizer.Ensemble.Program do
   rescue
     error ->
       Imp.OperationalSafetyError.raise_if_present!(error)
-      {:error, {:ensemble_program_failed, error_message(error)}}
+      {:error, {:ensemble_program_failed, error}}
   catch
     kind, reason ->
       Imp.OperationalSafetyError.raise_if_present!(reason)
-      {:error, {:ensemble_program_failed, error_message({kind, reason})}}
+      {:error, {:ensemble_program_failed, {kind, reason}}}
   end
 
   defp reduce(reduce_fn, predictions, outputs) do
@@ -103,15 +103,12 @@ defmodule Imp.Optimizer.Ensemble.Program do
   rescue
     error ->
       Imp.OperationalSafetyError.raise_if_present!(error)
-      {:error, {:ensemble_reduce_failed, error_message(error), outputs}}
+      {:error, {:ensemble_reduce_failed, error, outputs}}
   catch
     kind, reason ->
       Imp.OperationalSafetyError.raise_if_present!(reason)
-      {:error, {:ensemble_reduce_failed, error_message({kind, reason}), outputs}}
+      {:error, {:ensemble_reduce_failed, {kind, reason}, outputs}}
   end
-
-  defp error_message(%_{} = exception), do: Exception.message(exception)
-  defp error_message(error), do: inspect(error)
 end
 
 defmodule Imp.Optimizer.Ensemble do
@@ -195,6 +192,7 @@ defmodule Imp.Optimizer.Ensemble do
 
   defp validate_size!(_size, _programs), do: :ok
 
+  @doc false
   def validate_reduce_fn(nil), do: {:ok, nil}
   def validate_reduce_fn(reduce_fn) when is_function(reduce_fn, 1), do: {:ok, reduce_fn}
 

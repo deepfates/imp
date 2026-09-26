@@ -197,7 +197,7 @@ defmodule Imp.MCPConnectionTest do
   test "a tool named after one the program reserves is refused, not renamed" do
     only = server("only")
 
-    assert {:error, {:mcp_tool_name_collision, "look", ["only"]}} =
+    assert {:error, {:mcp_tool_name_reserved, "look", ["only"]}} =
              Imp.MCP.connect([only], trusted_servers: [only], reserved_tool_names: ["look"])
 
     # Unreserved, the same declaration imports under the server's own name.
@@ -259,12 +259,12 @@ defmodule Imp.MCPConnectionTest do
 
   test "HTTP convenience constructor has explicit close and keeps metadata" do
     server = server("fixture")
-    client = Imp.MCP.HTTPClient.new(server["url"])
-    on_exit(fn -> Imp.MCP.Client.close(client) end)
-    [tool] = Imp.MCP.import_tools(client)
+    client = Imp.Test.MCPConnect.http!(server["url"])
+    on_exit(fn -> client.cleanup.() end)
+    [tool] = client.tools
     assert tool.metadata.mcp.tool_name == "look"
     assert Imp.Tool.call(tool, %{}) == "observed"
-    assert :ok = Imp.MCP.Client.close(client)
+    assert :ok = client.cleanup.()
     assert {:error, _} = Imp.Tool.call(tool, %{})
   end
 
@@ -289,9 +289,9 @@ defmodule Imp.MCPConnectionTest do
       )
 
     on_exit(fn -> Plug.Cowboy.shutdown(ref) end)
-    client = Imp.MCP.HTTPClient.new("http://127.0.0.1:#{port}", result_mode: :structured)
-    on_exit(fn -> Imp.MCP.Client.close(client) end)
-    [tool] = Imp.MCP.import_tools(client)
+    client = Imp.Test.MCPConnect.http!("http://127.0.0.1:#{port}", result_mode: :structured)
+    on_exit(fn -> client.cleanup.() end)
+    [tool] = client.tools
     assert {:error, {:mcp_tool_error, failure}} = error = Imp.Tool.call(tool, %{})
 
     # The record keeps the envelope; the model reads the tool's own words.
@@ -330,13 +330,13 @@ defmodule Imp.MCPConnectionTest do
     on_exit(fn -> Plug.Cowboy.shutdown(ref) end)
 
     client =
-      Imp.MCP.HTTPClient.new("http://127.0.0.1:#{port}",
+      Imp.Test.MCPConnect.http!("http://127.0.0.1:#{port}",
         timeout: 2000,
         call_meta: fn _ -> %{"progressToken" => "probe"} end
       )
 
-    on_exit(fn -> Imp.MCP.Client.close(client) end)
-    [tool] = Imp.MCP.import_tools(client)
+    on_exit(fn -> client.cleanup.() end)
+    [tool] = client.tools
 
     assert {:error,
             %Imp.MCP.CallFailure{
@@ -428,8 +428,8 @@ defmodule Imp.MCPConnectionTest do
     assert Imp.Tool.call(hd(imported.tools), %{}) == "observed"
 
     assert [%{server: "down", reason: {:mcp_connection_failed, detail}}] = imported.unavailable
-    assert is_binary(detail) and detail =~ "econnrefused"
-    assert String.length(detail) <= 120
+    # The term the refusal would have carried under :refuse: ExMCP's own.
+    assert inspect(detail) =~ "econnrefused"
 
     # One client for the server that answered, none for the one that did not.
     assert length(client_pids() -- before) == 1
@@ -451,9 +451,8 @@ defmodule Imp.MCPConnectionTest do
     assert [%{server: "mute", index: 0, reason: {:mcp_tools_list_failed, "mute", detail}}] =
              imported.unavailable
 
-    # The message the server sent, not the JSON-RPC envelope it arrived in:
-    # this is read in a log line and in an operator's report.
-    assert detail == "Tools list failed"
+    # The JSON-RPC error the server sent, as it sent it.
+    assert %{"message" => "Tools list failed"} = detail
     assert length(client_pids() -- before) == 1
   end
 
@@ -495,7 +494,7 @@ defmodule Imp.MCPConnectionTest do
 
     # An unauthorized descriptor is the caller's answer, not a server's bad
     # hour: it refuses under :drop exactly as it does under :refuse.
-    assert {:error, {:mcp_server_not_authorized, "down"}} =
+    assert {:error, {:mcp_server_not_authorized, "down", :not_trusted}} =
              Imp.MCP.connect(servers, trusted_servers: [working], on_failure: :drop)
 
     required = [
@@ -510,6 +509,15 @@ defmodule Imp.MCPConnectionTest do
 
     assert {:error, {:mcp_auth_unavailable, "keyed", _}} =
              Imp.MCP.connect(required, trusted_servers: required, on_failure: :drop)
+
+    # A descriptor nobody can address is named by its place in the list.
+    malformed = [working, %{"name" => "bad", "type" => "http", "url" => "not a url"}]
+
+    assert {:error, {:invalid_mcp_server, 1, %ArgumentError{}}} =
+             Imp.MCP.connect(malformed, trusted_servers: malformed, on_failure: :drop)
+
+    assert {:error, {:invalid_mcp_server, 0, %ArgumentError{}}} =
+             Imp.MCP.connect([:not_a_map], trusted_servers: [], on_failure: :drop)
   end
 
   test "a server that accepts the connection and never answers costs its own timeout" do
@@ -588,7 +596,7 @@ defmodule Imp.MCPConnectionTest do
 
   test "removed transport knobs refuse with their names rather than silently doing nothing" do
     assert_raise ArgumentError, ~r/transport/, fn ->
-      Imp.MCP.HTTPClient.new("http://127.0.0.1:1", transport: :old_mock)
+      Imp.Test.MCPConnect.http!("http://127.0.0.1:1", transport: :old_mock)
     end
   end
 end

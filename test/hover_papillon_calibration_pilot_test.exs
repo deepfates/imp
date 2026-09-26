@@ -88,7 +88,11 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibrationPilotTest do
       assert_exact_retriever_outcomes!(imp["outcomes"]["hover"])
       assert Enum.all?(imp["outcomes"]["papillon"], &papillon_components_complete?/1)
 
-      {output, 0} = run_dspy(dspy_root, commit, source)
+      dspy_messages = Path.join(root, "dspy-messages.jsonl")
+
+      {output, 0} =
+        run_dspy(dspy_root, commit, source, IMP_CALIBRATION_MESSAGES_OUT: dspy_messages)
+
       assert output =~ ~s("transports": 48)
       upstream = dspy_root |> Path.join("dspy.json") |> File.read!() |> Jason.decode!()
       assert upstream["imp_candidate"] == %{"commit" => commit, "tracked_clean" => true}
@@ -113,7 +117,7 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibrationPilotTest do
 
       assert_runtime_message_stability!(imp["events"])
       assert_runtime_message_stability!(upstream["events"])
-      assert_renderer_boundary!(imp["events"], upstream["events"])
+      assert_renderer_boundary!(imp["events"], dspy_messages)
 
       assert Enum.all?(upstream["events"], &(&1["status"] == "ok" and &1["parse_status"] == "ok"))
       assert_exact_retriever_outcomes!(upstream["outcomes"]["hover"])
@@ -762,9 +766,26 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibrationPilotTest do
     end)
   end
 
-  defp assert_renderer_boundary!(imp_events, dspy_events) do
+  # DSPy's rendered messages are compared after its Python spellings are put
+  # into Imp's words (`Imp.DSPyWording`), hashed as the events hash them.
+  defp assert_renderer_boundary!(imp_events, dspy_messages_path) do
     imp = Map.new(imp_events, &{renderer_key(&1), &1["message_sha256"]})
-    dspy = Map.new(dspy_events, &{renderer_key(&1), &1["message_sha256"]})
+
+    dspy =
+      dspy_messages_path
+      |> File.stream!()
+      |> Map.new(fn line ->
+        record = Jason.decode!(line)
+
+        hash =
+          record["messages"]
+          |> Imp.DSPyWording.in_imp_words()
+          |> Pilot.canonical_json()
+          |> then(&:crypto.hash(:sha256, &1))
+          |> Base.encode16(case: :lower)
+
+        {renderer_key(record), hash}
+      end)
 
     assert Map.keys(imp) |> Enum.sort() == Map.keys(dspy) |> Enum.sort()
 
@@ -804,7 +825,7 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibrationPilotTest do
     )
   end
 
-  defp run_dspy(root, commit, source, extra_env \\ []) do
+  defp run_dspy(root, commit, source, extra_env) do
     System.cmd(
       Path.expand("tmp/dspy-parity-venv/bin/python"),
       [

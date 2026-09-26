@@ -54,9 +54,13 @@ defmodule Imp.MCP.CallFailure do
   `CallFailure`: the tool said what happened. `Imp.Tool.outcome/1` reads any
   tool call's return value, this one included.
 
-  `reason` is what ExMCP returned, unchanged; a process exit is kept as
-  `{:exit, reason}`. `server` is the descriptor's name and `tool` the name the
-  server published.
+  `reason` is what ExMCP returned, unchanged, when the failure came from
+  ExMCP; a process exit is kept as `{:exit, reason}`. Three reasons are Imp's
+  own, from the connection pool in front of ExMCP: `:timeout` (the caller's
+  `:timeout` passed while the request was out), `:no_idle_connection` (every
+  connection to the server stayed busy until the timeout), and
+  `:not_connected` (the server has no connection left). `server` is the
+  descriptor's name and `tool` the name the server published.
   """
 
   @enforce_keys [:outcome, :server, :tool, :reason]

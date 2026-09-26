@@ -13,13 +13,13 @@ defmodule Mix.Tasks.ImpAcp.McpDemo do
 
   defp program(%{cwd: cwd, mcp_servers: servers}) do
     with {:ok, import} <-
-           Imp.ACP.MCP.import_tools(servers,
+           Imp.MCP.connect(servers,
              cwd: cwd,
              trusted_servers: [demo_server()],
              result_mode: :text
            ) do
       {:ok, Imp.react_v2("question -> answer", import.tools, lm: lm(), max_iters: 2),
-       %{cleanup: import.cleanup, tool_kinds: import.tool_kinds}}
+       %{cleanup: import.cleanup, tool_kinds: Imp.ACP.ToolKind.derive_all(import.annotations)}}
     end
   end
 

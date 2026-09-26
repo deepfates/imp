@@ -182,7 +182,8 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
       "id" => case["id"],
       "status" => "ok",
       "prediction" => prediction_map,
-      "tool_trace" => tool_trace(prediction_map),
+      # A ReAct prediction carries its tool calls in metadata, not as a field.
+      "tool_trace" => tool_trace(normalize(%{"history" => prediction.metadata[:history]})),
       "error" => nil,
       "history" => fixture_history(calls),
       "remaining_responses" => Agent.get(queue, &length/1)
@@ -267,10 +268,9 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
         "tool_trace_cases" => length(tool_trace_cases),
         "tool_trace_parity" => Enum.all?(tool_trace_cases, & &1["tool_trace_parity"]),
         "imp_semantic_checks" => semantic_summary(semantic_checks),
-        # How many cases render byte-identical prompts to DSPy. The count is
-        # computed, not hardcoded, and is reported rather than asserted:
-        # known divergences remain (chain-of-thought reasoning descriptions,
-        # typed-field type hints, whitespace, ReAct, JSON).
+        # How many cases render the same prompt text as DSPy once DSPy's type
+        # annotations are put in Imp's words. The count is computed, not
+        # hardcoded, and is reported rather than asserted.
         #
         # template_parity is boundary-aware: messages are compared per call,
         # so two different call splittings with the same concatenated text do
@@ -348,17 +348,20 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
       "tool_trace_parity" => if(tool_trace_required?, do: tool_trace_parity),
       "expected_tool_trace" => expected_tool_trace,
       "expected_prediction" => expected,
-      # Whether the rendered messages Imp sends are byte-identical to DSPy's
-      # for the same fixture. A divergence means Imp instructs the model
-      # differently. Messages are compared per call, so a divergence in how
-      # work is split across calls is not masked.
+      # Whether the rendered messages Imp sends carry the same text as DSPy's
+      # for the same fixture once DSPy's Python type annotations are put in
+      # Imp's words (`Imp.DSPyWording`). A divergence means Imp instructs the
+      # model differently. Messages are compared per call, so a divergence in
+      # how work is split across calls is not masked.
       "template_parity" =>
-        canonical(call_messages(imp_calls)) == canonical(call_messages(dspy_calls)),
+        canonical(call_messages(imp_calls)) ==
+          canonical(call_messages(dspy_calls)) |> Imp.DSPyWording.in_imp_words(),
       # The per-call request envelope: LM opts on the Imp side, adapter kwargs
       # on the DSPy side (response_format, tools, tool_choice, temperature,
       # ...). This is false wherever Imp and DSPy send different options.
       "envelope_parity" =>
-        canonical(call_envelopes(imp_calls)) == canonical(call_envelopes(dspy_calls)),
+        canonical(call_envelopes(imp_calls)) ==
+          canonical(call_envelopes(dspy_calls)) |> Imp.DSPyWording.in_imp_words(),
       # Surfaced so a divergence is legible in the report rather than only in
       # raw history.
       "imp_call_envelopes" => call_envelopes(imp_calls),
@@ -495,7 +498,12 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
     calls = Agent.get(counter, & &1)
     Agent.stop(counter)
 
-    pass? = generated_content(first) == "Answer: cached" and second == first and calls == 1
+    # A hit returns the stored answer marked as a hit with no usage, since it
+    # cost nothing; the provider is called once.
+    pass? =
+      generated_content(first) == "Answer: cached" and
+        generated_content(second) == generated_content(first) and
+        cache_hit?(second) and not cache_hit?(first) and calls == 1
 
     %{
       "id" => "req_llm_cache_hit_reuses_success",
@@ -504,6 +512,11 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
       "evidence" => %{"calls" => calls, "first" => inspect(first), "second" => inspect(second)}
     }
   end
+
+  defp cache_hit?({:ok, %{__imp_lm_metadata__: %{req_llm: metadata}}}),
+    do: Map.get(metadata, :cache_hit) == true
+
+  defp cache_hit?(_result), do: false
 
   defp generated_content(result) do
     case Imp.LM.Result.unwrap(result) do
@@ -528,7 +541,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
 
     pass? =
       chunks == [
-        %{"chunk" => "tool:", "done" => false},
+        %{"chunk" => "[[ ## answer ## ]]\n", "done" => false},
         %{
           "chunk" => %{
             "tool_calls" => [
@@ -541,8 +554,9 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
           },
           "done" => false
         },
-        %{"chunk" => "Paris", "done" => false},
-        %{"chunk" => nil, "done" => true}
+        %{"chunk" => "Paris\n\n[[ ## completed ## ]]", "done" => false},
+        %{"chunk" => nil, "done" => true},
+        %{"prediction" => %{"answer" => "Paris"}}
       ]
 
     %{
@@ -556,6 +570,9 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
   defp normalize_stream_response(%Imp.Streaming.Messages.StreamResponse{} = response) do
     %{"chunk" => response.chunk, "done" => response.done}
   end
+
+  defp normalize_stream_response(%Imp.Prediction{} = prediction),
+    do: %{"prediction" => prediction |> Imp.Prediction.to_map() |> normalize()}
 
   defp normalize_stream_response(other), do: normalize(other)
 
@@ -655,9 +672,9 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace.StreamReqLLM do
     {:ok,
      %ReqLLM.StreamResponse{
        stream: [
-         ReqLLM.StreamChunk.text("tool:"),
+         ReqLLM.StreamChunk.text("[[ ## answer ## ]]\n"),
          ReqLLM.StreamChunk.tool_call("lookup", %{query: "capital-france"}, %{id: "call_1"}),
-         ReqLLM.StreamChunk.text("Paris"),
+         ReqLLM.StreamChunk.text("Paris\n\n[[ ## completed ## ]]"),
          ReqLLM.StreamChunk.meta(%{finish_reason: "stop"})
        ],
        metadata_handle: self(),

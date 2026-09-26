@@ -884,7 +884,7 @@ defmodule ProviderTrainingLifecycleTest do
         transport: RaisingTrainingTransport
       )
 
-    assert {:error, {:training_transport_failed, "transport exploded"}} =
+    assert {:error, {:training_transport_failed, %RuntimeError{message: "transport exploded"}}} =
              Imp.Clients.Trainer.finetune(transport_trainer, lm, examples(), [])
 
     invalid_json_trainer =
@@ -948,7 +948,7 @@ defmodule ProviderTrainingLifecycleTest do
 
     raising = %{base | transport: RaisingTrainingTransport}
 
-    assert {:error, {:training_refresh_failed, "transport exploded"}} =
+    assert {:error, {:training_refresh_failed, %RuntimeError{message: "transport exploded"}}} =
              Imp.Clients.TrainingJob.refresh(raising)
 
     invalid_json = %{base | transport: InvalidJSONTrainingTransport}
@@ -1072,7 +1072,7 @@ defmodule ProviderTrainingLifecycleTest do
                %{
                  "role" => "system",
                  "content" =>
-                   "Your input fields are:\n1. `question` (str):\nYour output fields are:\n1. `answer` (str):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `answer`."
+                   "Your input fields are:\n1. `question` (string):\nYour output fields are:\n1. `answer` (string):\nAll interactions will be structured in the following way, with the appropriate values filled in.\n\n[[ ## question ## ]]\n{question}\n\n[[ ## answer ## ]]\n{answer}\n\n[[ ## completed ## ]]\nIn adhering to this structure, your objective is: \n        Given the fields `question`, produce the fields `answer`."
                },
                %{"role" => "user", "content" => "[[ ## question ## ]]\n2+2?"},
                # Finetune assistant turns carry the trailing `[[ ## completed ## ]]`

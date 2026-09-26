@@ -113,8 +113,8 @@ defmodule ProtocolMCPProviderTest do
 
     [http_tool] =
       base_url
-      |> then(&Imp.MCP.HTTPClient.new(&1 <> "/mcp-http"))
-      |> Imp.MCP.import_tools()
+      |> then(&Imp.Test.MCPConnect.http!(&1 <> "/mcp-http"))
+      |> Map.fetch!(:tools)
 
     assert http_tool.name == "lookup_http"
     assert Imp.Tool.call(http_tool, %{"key" => "capital"}) == "Paris"
@@ -123,8 +123,8 @@ defmodule ProtocolMCPProviderTest do
     # initialize response and the client must echo it on later requests.
     [stream_tool] =
       base_url
-      |> then(&Imp.MCP.StreamableHTTPClient.new(&1 <> "/mcp-stream"))
-      |> Imp.MCP.import_tools()
+      |> then(&Imp.Test.MCPConnect.http!(&1 <> "/mcp-stream"))
+      |> Map.fetch!(:tools)
 
     assert stream_tool.name == "lookup_stream"
     assert Imp.Tool.call(stream_tool, %{"key" => "runtime"}) == "BEAM"
@@ -170,11 +170,11 @@ defmodule ProtocolMCPProviderTest do
 
     [tool] =
       System.find_executable("elixir")
-      |> Imp.MCP.StdioClient.new(
+      |> Imp.Test.MCPConnect.stdio!(
         args: ["-pa", Path.join([Mix.Project.build_path(), "lib", "jason", "ebin"]), script],
         timeout: 15_000
       )
-      |> Imp.MCP.import_tools()
+      |> Map.fetch!(:tools)
 
     assert tool.name == "echo_stdio"
     assert Imp.Tool.call(tool, %{"text" => "trusted"}) == "trusted"

@@ -1,6 +1,7 @@
 defmodule Imp.Observability.Inspection do
   @moduledoc """
-  A deterministic, redacted debugging snapshot.
+  A deterministic, redacted debugging snapshot, as returned by
+  `Imp.Observability.inspect_artifact/2`.
 
   Inspection entries use a common shape across provider calls, tools, RLM
   actions, optimizer reports, predictions, and telemetry. Large payloads are
@@ -43,7 +44,22 @@ defmodule Imp.Observability.Inspection do
     %__MODULE__{kind: kind, status: status, summary: summary, entries: entries}
   end
 
-  @doc false
+  @doc """
+  Returns `value` as a term `Jason` can encode, deterministically.
+
+  Structs and maps with atom or string keys become maps with string keys; a map
+  with other keys becomes `%{"__imp_type__" => "map", "entries" => [[key,
+  value], ...]}` in a stable order. Tuples become lists, an improper list
+  becomes `%{"__imp_type__" => "improper_list", "head" => ..., "tail" => ...}`,
+  atoms other than `nil`, `true` and `false` become strings, and anything else
+  that is not a number or a binary becomes its `inspect/1` text. Nothing is
+  redacted here; pass a value through `Imp.Redaction.redact/1` first when it
+  may carry secrets.
+
+      iex> Imp.Observability.Inspection.json_safe(%{kind: :tool, args: {1, :a}})
+      %{"args" => [1, "a"], "kind" => "tool"}
+  """
+  @spec json_safe(term()) :: term()
   def json_safe(%__MODULE__{} = inspection), do: json_safe(Map.from_struct(inspection))
 
   def json_safe(value) when is_struct(value), do: value |> Map.from_struct() |> json_safe()

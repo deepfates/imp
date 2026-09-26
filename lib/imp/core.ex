@@ -42,31 +42,6 @@ defmodule Imp.Core do
     @type t :: %__MODULE__{content: term(), metadata: map()}
   end
 
-  defmodule ToolCall do
-    @moduledoc "Provider-neutral tool-call request emitted by an assistant message."
-
-    defstruct [:id, :name, arguments: %{}]
-
-    @type t :: %__MODULE__{
-            id: String.t() | nil,
-            name: atom() | String.t() | nil,
-            arguments: map()
-          }
-  end
-
-  defmodule ToolResult do
-    @moduledoc "Provider-neutral tool result that can be sent back to an LM."
-
-    defstruct [:id, :name, :result, is_error: false]
-
-    @type t :: %__MODULE__{
-            id: String.t() | nil,
-            name: atom() | String.t() | nil,
-            result: term(),
-            is_error: boolean()
-          }
-  end
-
   defmodule LMConfig do
     @moduledoc "Provider-neutral LM generation configuration."
 

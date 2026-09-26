@@ -27,6 +27,9 @@ defmodule Imp.Streaming do
   returns a terminal `{:provider_stream_unsupported, module}` error.
   Without `provider_stream: true`, the program runs once and the result is
   chunked locally (grapheme by grapheme, or through the `:chunker` function).
+
+  Either way a failure is the last element of the stream, as
+  `%Imp.Streaming.Messages.StreamResponse{chunk: {:error, reason}, done: true}`.
   """
   def stream(program, inputs, opts \\ []) do
     owned_opts = validate_opts!(opts, "Imp.Streaming.stream/3")
@@ -202,7 +205,7 @@ defmodule Imp.Streaming do
           fn
             {:done, _} -> {:halt, nil}
             {:ok, text} -> {String.graphemes(text), {:done, text}}
-            {:error, reason} -> {[{:error, reason}], {:done, nil}}
+            {:error, reason} -> {error_response(reason), {:done, nil}}
           end,
           fn _ -> :ok end
         )
@@ -212,7 +215,7 @@ defmodule Imp.Streaming do
         |> call_once(inputs)
         |> case do
           {:ok, text} -> chunker.(text)
-          {:error, reason} -> [{:error, reason}]
+          {:error, reason} -> error_response(reason)
         end
         |> Stream.map(& &1)
     end
@@ -322,7 +325,6 @@ defmodule Imp.Streaming do
   defp stream_error(%Imp.Streaming.Messages.StreamResponse{chunk: {:error, reason}}),
     do: {:error, reason}
 
-  defp stream_error({:error, reason}), do: {:error, reason}
   defp stream_error(_value), do: nil
 
   defp output_names(program), do: Imp.ProgramAccess.output_names(program)
@@ -361,20 +363,22 @@ defmodule Imp.Streaming do
     ArgumentError -> name
   end
 
+  # Options can hold a key, so an error names their shape, never their value.
   defp validate_opts!(opts, context) when is_list(opts) do
     if Keyword.keyword?(opts) do
       opts
       |> Keyword.take(Keyword.keys(@option_schema))
       |> Imp.Options.validate!(@option_schema, context)
     else
-      raise ArgumentError, "#{context}: expected keyword options, got: #{inspect(opts)}"
+      raise ArgumentError, "#{context}: expected keyword options, got #{Imp.Options.shape(opts)}"
     end
   end
 
   defp validate_opts!(opts, context) do
-    raise ArgumentError, "#{context}: expected keyword options, got: #{inspect(opts)}"
+    raise ArgumentError, "#{context}: expected keyword options, got #{Imp.Options.shape(opts)}"
   end
 
+  @doc false
   def validate_chunker(nil), do: {:ok, nil}
   def validate_chunker(chunker) when is_function(chunker, 1), do: {:ok, chunker}
 
@@ -382,6 +386,7 @@ defmodule Imp.Streaming do
     {:error, "expected nil or an arity-1 function, got: #{inspect(chunker)}"}
   end
 
+  @doc false
   def validate_stream_listeners(listeners) when is_list(listeners) do
     if Enum.all?(listeners, &match?(%Imp.Streaming.Messages.StreamListener{}, &1)) do
       {:ok, listeners}

@@ -992,7 +992,9 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
     unless actual == expected, do: raise(ArgumentError, "calibration row checksum mismatch")
   end
 
-  defp canonical_json(value) when is_map(value) do
+  @doc false
+  # The `canonical_json_utf8_v1` serialization whose SHA-256 each event records.
+  def canonical_json(value) when is_map(value) do
     value
     |> Enum.sort_by(fn {key, _value} -> key end)
     |> Enum.map_join(",", fn {key, nested} ->
@@ -1001,10 +1003,10 @@ defmodule Imp.BenchmarkTruth.HoverPapillonCalibration do
     |> then(&("{" <> &1 <> "}"))
   end
 
-  defp canonical_json(value) when is_list(value),
+  def canonical_json(value) when is_list(value),
     do: "[" <> Enum.map_join(value, ",", &canonical_json/1) <> "]"
 
-  defp canonical_json(value), do: Jason.encode!(value)
+  def canonical_json(value), do: Jason.encode!(value)
   defp sha256(value), do: :crypto.hash(:sha256, value) |> Base.encode16(case: :lower)
 
   defp usage_cost(usage), do: usage["provider_cost_usd"]

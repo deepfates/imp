@@ -26,7 +26,7 @@ defmodule ImpFacadeTest do
   end
 
   setup do
-    Imp.configure(lm: nil, adapter: Imp.Adapter.Chat, retriever: nil)
+    Imp.configure(lm: nil, adapter: Imp.Adapter.Chat)
     # Restore the global Imp.Settings Agent to defaults after every test (a
     # non-default :lm set below must not leak into later modules). See dee-fqsr.
     on_exit(&Imp.Settings.reset/0)
@@ -409,10 +409,11 @@ defmodule ImpFacadeTest do
 
   test "call reports program exceptions and throws as structured errors" do
     assert Imp.call(%RaisingProgram{}, %{question: "q"}) ==
-             {:error, {:module_call_failed, RaisingProgram, "program exploded"}}
+             {:error,
+              {:module_call_failed, RaisingProgram, %RuntimeError{message: "program exploded"}}}
 
     assert Imp.call(%ThrowingProgram{}, %{question: "q"}) ==
-             {:error, {:module_call_failed, ThrowingProgram, "{:throw, :program_thrown}"}}
+             {:error, {:module_call_failed, ThrowingProgram, {:throw, :program_thrown}}}
   end
 
   test "call reports invalid module return shapes at the public boundary" do

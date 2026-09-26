@@ -213,7 +213,7 @@ defmodule LiveProviderE2ETest do
         end
       end)
 
-    [lookup] = base_url |> Imp.MCP.HTTPClient.new() |> Imp.MCP.import_tools()
+    [lookup] = base_url |> Imp.Test.MCPConnect.http!() |> Map.fetch!(:tools)
 
     signature =
       Imp.Signature.new(

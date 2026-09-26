@@ -104,7 +104,7 @@ defmodule Imp.ReActV2ContextTest do
     assert {:error, error} =
              Imp.Clients.ReqLLM.generate(lm, [%{role: :user, content: "test"}], [])
 
-    refute match?(%Imp.ContextWindowExceededError{}, error)
+    refute match?(%Imp.LMError{context_window_exceeded: true}, error)
   end
 
   test "current-call tool observations survive irreducible overflow without replay" do
@@ -119,7 +119,7 @@ defmodule Imp.ReActV2ContextTest do
 
       if n == 0,
         do: {:ok, %{tool_calls: [%{id: "effect", name: "write", arguments: %{}}]}},
-        else: {:error, %Imp.ContextWindowExceededError{message: "fixture overflow"}}
+        else: {:error, %Imp.LMError{context_window_exceeded: true, message: "fixture overflow"}}
     end
 
     tool =
@@ -150,7 +150,7 @@ defmodule Imp.ReActV2ContextTest do
       n = Agent.get_and_update(requests, fn seen -> {length(seen), seen ++ [messages]} end)
 
       if n < 2,
-        do: {:error, %Imp.ContextWindowExceededError{message: "limit"}},
+        do: {:error, %Imp.LMError{context_window_exceeded: true, message: "limit"}},
         else: {:ok, "continued"}
     end
 
@@ -194,7 +194,7 @@ defmodule Imp.ReActV2ContextTest do
           {:ok, %{tool_calls: [%{id: "effect", name: "write", arguments: %{}}]}}
 
         1 ->
-          {:error, %Imp.ContextWindowExceededError{message: "limit"}}
+          {:error, %Imp.LMError{context_window_exceeded: true, message: "limit"}}
 
         2 ->
           assert inspect(messages) =~ "current-observation"
@@ -232,7 +232,9 @@ defmodule Imp.ReActV2ContextTest do
 
     lm = fn _, _ ->
       Agent.update(calls, &(&1 + 1))
-      {:error, %Imp.ContextWindowExceededError{message: "instructions alone exceed window"}}
+
+      {:error,
+       %Imp.LMError{context_window_exceeded: true, message: "instructions alone exceed window"}}
     end
 
     {:ok, prediction} = Imp.call(Imp.react_v2("intent -> answer", [], lm: lm), %{intent: "now"})
@@ -247,7 +249,7 @@ defmodule Imp.ReActV2ContextTest do
 
     lm = fn _, _ ->
       Agent.update(calls, &(&1 + 1))
-      {:error, %Imp.ContextWindowExceededError{message: "fixed input too large"}}
+      {:error, %Imp.LMError{context_window_exceeded: true, message: "fixed input too large"}}
     end
 
     prior = Imp.history(Enum.map(1..1024, &%{intent: "old #{&1}", answer: "old"}))

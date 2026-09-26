@@ -120,7 +120,7 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapterTest do
 
     assert record == %{
              "Inputs" => %{"question" => "Capital of France?"},
-             "Generated Outputs" => %{"answer" => "Paris", "certain" => "True"},
+             "Generated Outputs" => %{"answer" => "Paris", "certain" => "true"},
              "Feedback" => "Expected the exact city and confidence flag."
            }
 

@@ -110,7 +110,7 @@ defmodule AutoEvaluationFidelityTest do
   test "auto evaluators fail closed on missing or nonnumeric judgment fields" do
     missing = static_lm(fn _prompt -> %{reasoning: "judge", precision: "high", recall: 1} end)
 
-    assert {:error, %{reason: {:error, %Imp.AdapterParseError{}}}} =
+    assert {:error, %Imp.AdapterParseError{}} =
              SemanticF1.new(lm: missing)
              |> SemanticF1.call(%{question: "q", ground_truth: "a", system_response: "a"})
   end

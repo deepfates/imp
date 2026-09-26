@@ -258,15 +258,13 @@ defmodule RandomSearchGlobalSettingsTest do
     :ok
   end
 
-  test "nil max_errors inherits a global setting while an explicit value wins" do
-    Imp.configure(max_errors: 4)
-
+  test "nil max_errors is ten while an explicit value wins" do
     lm = %{module: Imp.LM.Static, opts: [handler: fn _, _ -> %{answer: "a"} end]}
     program = Imp.predict("question -> answer", lm: lm)
     rows = [Imp.example(question: "q", answer: "a") |> Imp.with_inputs(:question)]
     metric = Imp.Metrics.exact_match(:answer)
 
-    inherited =
+    defaulted =
       RandomSearch.new(metric, num_candidate_programs: 0)
       |> RandomSearch.compile(program, rows, rows, restrict: [-3])
       |> Report.fetch()
@@ -276,7 +274,7 @@ defmodule RandomSearchGlobalSettingsTest do
       |> RandomSearch.compile(program, rows, rows, restrict: [-3])
       |> Report.fetch()
 
-    assert {inherited.metadata.max_errors, inherited.metadata.max_errors_source} == {4, :settings}
+    assert {defaulted.metadata.max_errors, defaulted.metadata.max_errors_source} == {10, :default}
     assert {explicit.metadata.max_errors, explicit.metadata.max_errors_source} == {8, :explicit}
   end
 end

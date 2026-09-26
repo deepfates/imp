@@ -2,7 +2,7 @@ defmodule ImpTest do
   use ExUnit.Case
 
   setup do
-    Imp.configure(lm: nil, adapter: Imp.Adapter.Chat, retriever: nil)
+    Imp.configure(lm: nil, adapter: Imp.Adapter.Chat)
     # Restore the global Imp.Settings Agent to defaults after every test so a
     # non-default :lm (set by tests here) cannot leak into a later module's
     # BootstrapFewShot demo capture. See dee-fqsr (order-dependent digest flake).

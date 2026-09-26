@@ -353,6 +353,7 @@ defmodule Imp.Optimizer.MIPROv2.OptunaStartupSearchTest do
 
             {:error,
              %Imp.AdapterParseError{
+               kind: :missing_fields,
                message: "missing route marker",
                reason: :missing_output_field
              }}
