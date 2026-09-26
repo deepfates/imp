@@ -49,8 +49,8 @@ ticket -> tags: list[str]
 did you mean "array[str]"? (Imp uses array[...] where DSPy uses list[...])
 ```
 
-Unknown types and a name used on both sides of the arrow fail when the
-signature is built, not when the first request goes out.
+Unknown types and a name used twice, on one side of the arrow or on both,
+fail when the signature is built, not when the first request goes out.
 
 ### 3. Outputs are checked strictly, inputs leniently
 
@@ -88,8 +88,10 @@ names mean, and it stays put.
 
 A field name written as an atom stays an atom. A name that arrives as text,
 from the string form or from JSON, becomes an atom only if that atom already
-exists in the VM, so Imp never creates atoms from data. Read values with
-`Imp.get/2`, which matches a field by its name either way.
+exists in the VM, so Imp never creates atoms from data. Examples and
+predictions keep their keys as given: `Imp.example(%{"team" => "atlas"})`
+stores the string `"team"`. Read values with `Imp.get/2`, which matches a
+field by its name either way.
 
 ## API walkthrough
 
@@ -102,9 +104,12 @@ signature =
     "Route the support ticket to the squad that owns it."
   )
 
-Imp.Signature.to_spec(signature)
-#=> "ticket -> team"
+Imp.Signature.json_schema(signature)["properties"]["team"]
+#=> %{"description" => "atlas: money. harbor: the platform. beacon: identity. quill: the product.", "enum" => ["atlas", "harbor", "beacon", "quill"], "type" => "string"}
 ```
+
+That schema is what a provider with structured output receives, and what the
+answer is checked against.
 
 A field is `name`, `name: type`, or `name: type "description"`. Fields are
 separated by commas; a signature has exactly one `->`. An untyped field is a
@@ -127,9 +132,9 @@ The last three are answer shapes for extractive question answering: the value
 is text, and its shape is checked.
 
 The description is part of the prompt. On the tutorial's 20 test tickets, the
-router above without the description scored 0.25 in three runs with
-`gpt-5.4-mini`, and 0.70 with it, because the squad names mean nothing to the
-model until something says what they own:
+router above without the description scored 0.35 to 0.40 in three runs with
+`gpt-5.4-mini`, and 0.75 to 0.80 with it, because the squad names mean nothing
+to the model until something says what they own:
 
 ```elixir
 lm = Imp.req_llm("openai:gpt-5.4-mini", api_key: System.fetch_env!("OPENAI_API_KEY"))
@@ -143,7 +148,7 @@ test =
 router = Imp.predict(signature, lm: lm, adapter: Imp.Adapter.JSON)
 
 Imp.evaluate(router, test, Imp.exact_match(:team)).score
-#=> 0.7
+#=> 0.75
 ```
 
 ### The structured form
@@ -158,7 +163,7 @@ triage =
       inputs: [:ticket, %{name: :plan, type: :string, default: "free"}],
       outputs: [
         %{name: :team, type: :string, constraints: %{enum: ~w[atlas harbor beacon quill]}},
-        %{name: :priority, type: :integer, constraints: %{min: 1, max: 4}},
+        %{name: :priority, type: :integer, constraints: %{minimum: 1, maximum: 4}},
         %{name: :reply, type: :string, desc: "One sentence to the customer."},
         %{name: :duplicate_of, type: :string, optional: true}
       ]
@@ -173,10 +178,12 @@ Imp.Signature.json_schema(triage)["properties"]["priority"]
 A field in the `inputs` or `outputs` list is an atom, a `"name: type"`
 string, or a map. A map takes `name` (required), `type`, `desc`, `default`,
 `optional`, `constraints`, and `metadata`. `Imp.Signature.Field` documents
-each key.
+each key. Every field needs its own name: a name repeated among the inputs,
+among the outputs, or across the two, raises.
 
 - `default` fills an absent value, on either side. An input with a default
-  can be left out of the call.
+  can be left out of the call, and an output the model answers with `null`
+  is absent too.
 - `optional: true` lets the value be absent; it reads as `nil`.
 - A present value is never replaced, even when it is `false`, `0`, `""` or
   `[]`.
@@ -186,12 +193,16 @@ Constraint keys:
 | Key | Applies to |
 | --- | --- |
 | `enum` | any value: one of the list |
-| `min`, `max` (inclusive), `gt`, `lt`, `multiple_of` | numbers |
+| `minimum`, `maximum` (inclusive), `gt`, `lt`, `multiple_of` | numbers |
 | `min_length`, `max_length`, `pattern` | strings |
 | `items` | the element type of an array, as a field map |
 | `properties` | the fields of an object |
 | `any_of` | a union: a list of field maps, one of which must match |
 | `answer_shape` | `:yes_no`, `:short_span` or `:numeric_span` |
+
+A constraint Imp does not know refuses the field when it is built, with the
+key to use: `min` and `max` name `minimum` and `maximum`. Enum members are
+strings, because answers arrive as text; atom members are refused the same way.
 
 ### How a value is checked
 
@@ -206,7 +217,7 @@ adapter shows the model when it asks again:
 field = Enum.find(triage.outputs, &(to_string(&1.name) == "priority"))
 
 Imp.Schema.validate_field(field, 9)
-#=> [%{field: :priority, rule: :max, message: "must be <= 4"}]
+#=> [%{field: :priority, rule: :maximum, message: "must be <= 4"}]
 ```
 
 ### Changing a signature
@@ -218,7 +229,7 @@ Every change returns a new signature.
 - `Imp.Signature.prepend_output(signature, field)` puts a field first among
   the outputs. `Imp.chain_of_thought/2` uses it to add `reasoning` ahead of
   your outputs.
-- `Imp.Signature.dump/1` and `Imp.Signature.load/1` round-trip a signature
+- `Imp.Signature.dump/1` and `Imp.Signature.load!/1` round-trip a signature
   through JSON-friendly data.
 - `Imp.Signature.input_names/1`, `output_names/1` and `to_spec/1` read it.
 

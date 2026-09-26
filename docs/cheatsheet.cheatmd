@@ -109,7 +109,7 @@ Imp.optimize!(program, Imp.Optimizer.BootstrapFewShot.new(metric), trainset)
 ### Search over candidates
 
 ```elixir
-optimizer = Imp.Optimizer.RandomSearch.new(metric)
+optimizer = Imp.Optimizer.BootstrapFewShotWithRandomSearch.new(metric)
 Imp.optimize!(program, optimizer, trainset, valset)
 ```
 
@@ -141,7 +141,7 @@ weather =
 ### An agent loop
 
 ```elixir
-agent = Imp.react_v2("question -> answer", [weather], lm: lm, max_iters: 5)
+agent = Imp.react("question -> answer", [weather], lm: lm, max_iters: 5)
 {:ok, prediction} = Imp.call(agent, %{question: "Is it raining in Lisbon?"})
 
 # Each step's tool calls and their results.
@@ -153,7 +153,7 @@ prediction.metadata.history.messages
 ```elixir
 server = %{"name" => "docs", "type" => "http", "url" => "https://example.com/mcp"}
 {:ok, imported} = Imp.MCP.connect([server], trusted_servers: [server])
-agent = Imp.react_v2("question -> answer", imported.tools, lm: lm)
+agent = Imp.react("question -> answer", imported.tools, lm: lm)
 imported.cleanup.()
 ```
 
@@ -164,7 +164,7 @@ imported.cleanup.()
 
 ```elixir
 :ok = Imp.save!(program, "router.json")
-program = "router.json" |> Imp.load!() |> Imp.with_lm(lm)
+program = "router.json" |> Imp.read!() |> Imp.with_lm(lm)
 ```
 
 ### Capture telemetry around a call

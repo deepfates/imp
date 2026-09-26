@@ -27,14 +27,14 @@ Elixir can be a metric in one line. `Imp.evaluate/4` and every optimizer
 check the function's arity when you build them, so a metric with the wrong
 shape fails at once, not halfway through a run.
 
-### 2. A three-argument metric also receives the trace, every time
+### 2. The trace tells a metric whether it is being evaluated
 
-`fn example, prediction, trace -> ... end` receives the prediction's trace:
-the rendered messages and the raw model output. It receives it during
-evaluation and inside optimizers alike. DSPy passes `trace=None` during
-evaluation so a metric can behave differently there; Imp does not use the
-trace as a mode switch. To make bootstrapping stricter than evaluation, set
-`metric_threshold:` on the optimizer instead.
+`fn example, prediction, trace -> ... end` receives `nil` as the trace when
+the program is evaluated, by `Imp.evaluate/4` and by the validation scoring
+optimizers do through it, and the program's trace (the rendered messages and
+the raw model output) when an optimizer bootstraps demos from a run. This is
+DSPy's `trace=None` switch: a metric can be stricter about the examples it
+lets become demos than about the score it reports.
 
 ### 3. Return a boolean, a number, or a map with a score and feedback
 
@@ -250,13 +250,12 @@ app or plan you're using." Replies and verdicts vary between runs. On
 another run, with no facts, the judge passed a reply that promised dark mode:
 a judge knows only what its inputs tell it.
 
-Imp also ships DSPy's two judges as programs.
-`Imp.Evaluate.SemanticF1` asks a model for the precision and recall of a
-response against a reference and scores their F1; `Imp.Evaluate.CompleteAndGrounded`
-scores completeness against the reference and grounding in retrieved
-context. Call either with `%{example: example, pred: prediction}` inside a
-metric and return the prediction it gives back; its `:score` field is the
-score.
+Imp also ships DSPy's two judges as programs. `Imp.Evaluate.SemanticF1` asks a
+model for the precision and recall of a response against a reference and
+scores their F1; `Imp.Evaluate.CompleteAndGrounded` scores completeness
+against the reference and grounding in retrieved context. Call either with
+`%{example: example, pred: prediction}` inside a metric and return the
+prediction it gives back; its `:score` field is the score.
 
 ### Train, validation and test
 

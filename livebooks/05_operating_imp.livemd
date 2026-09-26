@@ -168,7 +168,7 @@ program = Imp.predict(signature, lm: lm, adapter: Imp.Adapter.JSON)
 path = Path.join(System.tmp_dir!(), "ticket-router-#{System.unique_integer([:positive])}.json")
 :ok = Imp.save!(program, path)
 saved = File.read!(path)
-loaded = Imp.load!(path)
+loaded = Imp.read!(path)
 File.rm!(path)
 
 {String.contains?(saved, "sk-not-saved"), loaded.lm.model, loaded.lm.opts}

@@ -9,8 +9,8 @@ are called natively through the provider, one step may call several tools,
 and the answer arrives directly rather than through a separate extraction
 call.
 
-This module is experimental: its options and metadata may change in a minor
-release.
+`Imp.Predict.ReActV2`, which `Imp.react/3` builds, is stable. The older
+trajectory-based `Imp.Predict.ReAct` is experimental.
 
 Read this when a task needs the model to choose actions, when you want to
 know why a turn ended the way it did, or when you are moving an agent from
@@ -34,12 +34,13 @@ The history comes back as `prediction.metadata.history`. Pass it as the
 
 ### 2. How a turn ends depends on the outputs
 
-A signature with **one text output** (`ticket -> reply`) ends the way most
-tool loops end: when the model stops calling tools and writes text, that text
-is the answer. No `submit` tool is offered. This costs one request fewer and
-matches what models are trained to do.
+A signature with **one unconstrained text output** (`ticket -> reply`) ends
+the way most tool loops end: when the model stops calling tools and writes
+text, that text is the answer. No `submit` tool is offered. This costs one
+request fewer and matches what models are trained to do.
 
-**Every other signature** (several outputs, or one that is not text) gets a
+**Every other signature** (several outputs, one that is not text, or one text
+output with a constraint such as an enum, a pattern or an answer shape) gets a
 `submit` tool whose parameters are the outputs, as in DSPy. Calling it with
 valid values ends the turn; values that do not fit the signature are recorded
 as that call's error, and the loop goes on. The name `submit` is reserved.
@@ -47,9 +48,8 @@ as that call's error, and the loop goes on. The name `submit` is reserved.
 The one-text-output rule has a consequence to design for: any step that
 writes text and calls no tool has answered. A model that says what it is
 about to do, instead of doing it, has given that sentence as its answer.
-And an output typed `string` with a constraint, such as an enum, still takes
-the text path; text that does not fit the constraint is not an answer (see
-below).
+A constrained output never takes that path: its allowed values are in
+`submit`'s schema, and text is not an answer to it.
 
 ### 3. An interrupted turn gets one last request
 
@@ -63,8 +63,12 @@ than return nothing, Imp makes one more request:
   (`:extracted`).
 - With one text output, the request is an ordinary step, same tools, and its
   text is the answer (`:last_text`). Tool calls in it are not run; they are
-  listed in `unexecuted_tool_calls`. Text that does not fit the output makes
-  the answer `nil`.
+  listed in `unexecuted_tool_calls`.
+
+If the last request does not produce an answer either, the turn ends
+`:incomplete`. That is still `{:ok, prediction}`, carrying the history and a
+`termination_cause`, and `Imp.Prediction.complete?/1` is false for it; a turn
+without an answer is never reported complete.
 
 Imp adds nothing to that request unless you pass `last_request_note:`, one
 line of your own text, sent as a user message and kept in the history.
@@ -93,8 +97,8 @@ on_call =
   Imp.tool(
     :on_call,
     "Look up the on-call engineer for a squad.",
-    fn args ->
-      %{"atlas" => "Maya", "harbor" => "Tom", "beacon" => "Ines", "quill" => "Raj"}[args[:team] || args["team"]]
+    fn %{"team" => team} ->
+      %{"atlas" => "Maya", "harbor" => "Tom", "beacon" => "Ines", "quill" => "Raj"}[team]
     end,
     schema: %{
       "type" => "object",
@@ -111,8 +115,8 @@ escalation =
   )
 ```
 
-With `gpt-5.4-mini`, in three runs, the model called `on_call` for atlas and
-then `submit`, every time:
+With `gpt-5.4-mini`, in six runs of six the model called `on_call` for atlas
+and then `submit`:
 
 ```elixir
 lm = Imp.req_llm("openai:gpt-5.4-mini", api_key: System.fetch_env!("OPENAI_API_KEY"))
@@ -124,12 +128,11 @@ escalate = Imp.react(escalation, [on_call], lm: lm, max_iters: 5)
 #=> {"atlas", "Maya", :submit}
 ```
 
-In a tool loop the model reads the task's instructions, the tools, and the
-history. The descriptions of your output fields reach it only inside the
-`submit` tool's parameters. Put what the model needs to decide, such as what
-the squads own, in the instructions. With the squad meanings in the `team`
-field's description instead, the same model called `on_call` for all four
-squads and then submitted harbor.
+Each step shows the model the task's instructions, the output fields with
+their types and descriptions, the tools, and the history. What the model
+needs to decide, such as what the squads own, can go in the instructions or
+in a field's description: with the squad meanings in the `team` field's
+description instead, the same model did the same in six runs of six.
 
 A scripted model shows the loop without a provider. Each step is either tool
 calls or text:
@@ -201,11 +204,11 @@ reply = Imp.react(Imp.signature("ticket -> reply", "Tell the customer who is han
 #=> {"Maya from atlas is looking at the duplicate charge.", :answered}
 ```
 
-That is also how a turn ends when the model narrates instead of acting. Given
-"I can't log in after resetting my password." and instructions to look up who
-is on call before replying, `gpt-5.4-mini` answered "I'm checking who's on
-call for the squad that handles identity/login issues, and I'll let you know
-who's taking this." without calling the tool, in three runs of three. When an
+That is also how a turn ends when the model writes text instead of acting.
+Given "I can't log in after resetting my password." and instructions to look
+up who is on call before replying, `gpt-5.4-mini` called the tool and named
+Ines in five runs of six. In the sixth it wrote the tool call out as JSON
+text instead of making it, and that text was the answer. When an
 answer has to follow a tool call, give the signature a second output, so the
 turn ends only through `submit`, or end it from the tool with `finish_on:`.
 
@@ -223,8 +226,8 @@ page_and_stop =
   Imp.react(escalation, [on_call],
     lm: lm,
     finish_on: %{
-      on_call: fn args, contact, _inputs ->
-        {:finish, %{team: args[:team] || args["team"], contact: contact}}
+      on_call: fn %{"team" => team}, contact, _inputs ->
+        {:finish, %{team: team, contact: contact}}
       end
     }
   )
@@ -260,7 +263,6 @@ When the turn was interrupted, `termination_cause` says why:
 | `:max_iters` | the step budget ran out |
 | `:parse_error` | a step's reply could not be read |
 | `:prediction_error` | a step's request failed |
-| `:invalid_answer` | one text output: a step wrote text the output does not accept |
 | `:empty_tool_calls` | with `submit`: a step called no tool |
 | `:context_window_exceeded` | the prompt no longer fits, even with old episodes left out |
 | `:deadline_exceeded` | the process's `Imp.Deadline` passed |
@@ -280,6 +282,24 @@ lm =
 
 {prediction.metadata.termination_reason, prediction.metadata.termination_cause, Imp.get(prediction, :contact)}
 #=> {:forced_submit, :max_iters, "Maya"}
+```
+
+An enum output keeps `submit`, so text alone does not end the turn. A model
+that only ever writes text is interrupted, the forced `submit` gets text too,
+and the turn has no answer:
+
+```elixir
+lm =
+  script.([
+    %{next_thought: "team: atlas", tool_calls: []},
+    %{next_thought: "team: atlas", tool_calls: []}
+  ])
+
+router = Imp.react(Imp.signature("ticket -> team: enum[atlas,harbor,beacon,quill]"), [on_call], lm: lm)
+{:ok, prediction} = Imp.call(router, %{ticket: "We were charged twice this month."})
+
+{prediction.metadata.termination_reason, prediction.metadata.termination_cause, Imp.Prediction.complete?(prediction)}
+#=> {:incomplete, :empty_tool_calls, false}
 ```
 
 `max_iters` is 20 by default; a call can override it with a `max_iters`

@@ -26,8 +26,8 @@ things a name can't carry. Imp puts it beside the field in the prompt:
 
 ```text
 Your output fields are:
-1. `team` (Literal['atlas', 'harbor', 'beacon', 'quill']): 
-2. `urgency` (Literal['normal', 'high']): high when customers cannot work or data is at risk
+1. `team` (one of: atlas, harbor, beacon, quill): 
+2. `urgency` (one of: normal, high): high when customers cannot work or data is at risk
 ```
 
 Keep descriptions short. The instruction says what the task is, names and
@@ -94,8 +94,8 @@ Values that are present but falsy, like `false`, `0`, or `""`, are kept as
 they are. `Imp.Signature.Field` lists every key a field accepts.
 
 A signature is plain data either way, so it can be built at runtime from
-configuration, stored, and compared. [Signatures](../diving-deeper/signatures.md)
-in Diving deeper covers the rest.
+configuration, stored, and compared.
+[Signatures](../diving-deeper/signatures.md) in Diving deeper covers the rest.
 
 ---
 

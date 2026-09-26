@@ -335,12 +335,14 @@ capture gap stays visible in the export rather than being filled in.
 Event families, each with `:start`, `:stop` and `:exception` unless noted:
 
 - `[:imp, :module, ...]`: one program call.
-- `[:imp, :lm, ...]`: one model request, plus `[:imp, :lm, :stream, :start | :chunk | :stop]`.
+- `[:imp, :lm, ...]`: one model request, plus
+  `[:imp, :lm, :stream, :start | :chunk | :stop]`.
 - `[:imp, :tool, ...]` and `[:imp, :retriever, ...]`.
 - `[:imp, :evaluate, ...]` and `[:imp, :optimizer, ...]`, plus
   `[:imp, :optimizer, :trial, ...]` for candidate evaluations and
   `[:imp, :optimizer, :progress]` for GEPA generations.
-- `[:imp, :adapter, :parse, :retry | :error]` when a model's answer does not parse.
+- `[:imp, :adapter, :parse, :retry | :error]` when a model's answer does not
+  parse.
 - `[:imp, :cache, :hit | :miss]` and the cache's coalescing events.
 
 Every span carries a `:call_id`, and a nested span its parent's

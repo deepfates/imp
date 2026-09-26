@@ -120,11 +120,12 @@ end
 Changing models is then a configuration change, and rotating a key is a
 restart.
 
-The [deployment example](https://github.com/deepfates/imp/blob/main/examples/deployment/README.md)
+The
+[deployment example](https://github.com/deepfates/imp/blob/v0.5.0/examples/deployment/README.md)
 is the complete version of this page: a two-stage program like `TicketTriage`,
-learned parameters loaded and reloaded as an `Imp.Optimizer.Artifact`,
-crashed and timed-out calls contained, and the whole thing restarted in a
-fresh OS process. It runs without a provider.
+learned parameters loaded and reloaded as an `Imp.Optimizer.Artifact`, crashed
+and timed-out calls contained, and the whole thing restarted in a fresh OS
+process. It runs without a provider.
 [Running Imp in production](../production.md) and
 [Runs and supervision](../diving-deeper/runs-and-supervision.md) go further.
 

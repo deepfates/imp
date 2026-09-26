@@ -21,7 +21,7 @@ charter =
   Imp.tool(
     :charter,
     "Read what a squad owns.",
-    fn %{team: team} -> Map.get(charters, team, "There is no squad called #{team}.") end,
+    fn %{"team" => team} -> Map.get(charters, team, "There is no squad called #{team}.") end,
     schema: %{
       "type" => "object",
       "properties" => %{"team" => %{"type" => "string", "enum" => Map.keys(charters)}},

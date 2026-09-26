@@ -38,10 +38,10 @@ The check covers the argument's `type`, `required` keys, and each property's
 `type`, `enum`, `minimum` and `maximum`. Anything deeper is your function's
 to check.
 
-Arguments from a model arrive as a map. A key becomes an atom only when that
-atom already exists in the VM, so Imp never creates atoms from model output.
-Read arguments with both spellings (`args[:team] || args["team"]`), or match
-on the one your application guarantees.
+A tool always receives its arguments as a map with string keys, at every
+depth, whether they came from a model or from your own code: `Imp.Tool.call/2`
+turns atom keys into strings too. Match on strings (`fn %{"team" => team}`).
+Nothing a model sends becomes an atom.
 
 ### 3. Two separate questions: which tools, and this call
 
@@ -97,8 +97,8 @@ on_call =
   Imp.tool(
     :on_call,
     "Look up the on-call engineer for a squad.",
-    fn args ->
-      %{"atlas" => "Maya", "harbor" => "Tom", "beacon" => "Ines", "quill" => "Raj"}[args[:team] || args["team"]]
+    fn %{"team" => team} ->
+      %{"atlas" => "Maya", "harbor" => "Tom", "beacon" => "Ines", "quill" => "Raj"}[team]
     end,
     schema: %{
       "type" => "object",
@@ -125,20 +125,21 @@ definitions.
 ### Tool policies
 
 Pass `tool_policy:` to `Imp.react/3`, `Imp.rlm/2` or `Imp.code_act/3`.
-`Imp.ToolPolicy.authorize/3` is the check they make:
+`Imp.ToolPolicy.authorize/3` is the check they make. A policy function gets
+the tool's name and the string-keyed arguments the tool would receive:
 
 ```elixir
 policy = fn name, args ->
-  if name == :on_call and (args[:team] || args["team"]) == "beacon",
+  if name == :on_call and args["team"] == "beacon",
     do: {:deny, :paged_directly},
     else: :allow
 end
 
-Imp.ToolPolicy.authorize(policy, :on_call, %{team: "beacon"})
+Imp.ToolPolicy.authorize(policy, :on_call, %{"team" => "beacon"})
 #=> {:error, {:tool_denied, :on_call, :paged_directly}}
 ```
 
-A list policy denies with the reason `:not_in_policy`. In a ReAct loop,
+A name or list policy denies with the reason `:tool_policy`. In a ReAct loop,
 `submit` is a tool like the others, so a list policy must include `:submit`
 for the loop to finish with one.
 
@@ -217,10 +218,10 @@ key and option.
 #### Local servers
 
 A stdio server runs in its own process group. Closing its connection, or the
-end of the process it belongs to, sends the group SIGTERM, then SIGKILL a second later, so a
-server that ignores its input closing, and any children it started, stop
-with it. A child that starts its own session (`setsid`) leaves the group and
-is not reached.
+end of the process it belongs to, sends the group SIGTERM, then SIGKILL a
+second later, so a server that ignores its input closing, and any children it
+started, stop with it. A child that starts its own session (`setsid`) leaves
+the group and is not reached.
 
 The server sees only `HOME`, `LANG`, `LOGNAME`, `PATH`, `SHELL`, `TEMP`,
 `TMP`, `TMPDIR`, `TZ`, `USER`, the certificate-path variables and `LC_*` from
