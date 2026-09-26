@@ -84,11 +84,11 @@ defmodule Imp.Predict.RLM do
     recursive children; it excludes controller, extraction, and compaction calls.
   - `:max_time_ms` - optional deadline for the complete RLM call. When omitted,
     RLM effects have no configured deadline.
-  - `:max_recursion_depth` - maximum symbolic child depth; defaults to `1`.
+  - `:max_recursion_depth` - how many levels of child RLMs `rlm_query*` and `recurse/2` may start below the root; defaults to `1`, one level. At the limit `rlm_query*` falls back to a one-shot sub-LM query and `recurse/2` fails.
   - `:max_interpreter_steps` - AST execution steps per controller turn.
   - `:max_interpreter_value_bytes` - maximum serialized size of an interpreter value.
   - `:max_interpreter_effects` - external effects allowed per controller turn.
-  - `:max_preview_chars` - how much large input context the controller sees.
+  - `:max_preview_chars` - characters of each variable's printed value the controller sees each turn.
   - `:max_observation_chars` - truncation limit for string observations.
   - `:compaction` / `:compaction_threshold_pct` - summarize root history at a model-context fraction.
   - `:compaction_context_tokens` - context limit paired with the explicit chars/4 token-estimation fallback; Imp.LM currently exposes no standard tokenizer/context metadata.
@@ -595,7 +595,7 @@ defmodule Imp.Predict.RLM do
       %{
         role: :system,
         content:
-          "You are an RLM controller with a persistent, constrained Elixir environment. Follow the task instructions exactly. Return exactly one JSON object such as {\"reasoning\":\"inspect the context\",\"code\":\"context = load(\\\"context\\\")\\nprint(context)\"}; do not use markdown fences or prose around it. Code may inspect and assign variables, use for comprehensions, call SHOW_VARS(), llm_query(prompt, model \\\\ nil), llm_query_batched(prompts, model \\\\ nil), rlm_query(prompt, model \\\\ nil), rlm_query_batched(prompts, model \\\\ nil), recurse(signature, inputs), load(name), registered tools, print(value), and submit(a_map_with_the_required_output_fields). rlm_query creates an isolated recursive constrained environment and falls back to a one-shot query at the configured depth limit. State persists across turns. Explore and compute in code; when every required output is ready, return code that calls submit/1 with non-empty values. A JSON object containing exactly the required output fields is also accepted as a typed final submission.\n\n" <>
+          "You are an RLM controller with a persistent, constrained Elixir environment. Follow the task instructions exactly. Return exactly one JSON object such as {\"reasoning\":\"inspect the context\",\"code\":\"context = load(\\\"context\\\")\\nprint(context)\"}; do not use markdown fences or prose around it. Code may inspect and assign variables, use for comprehensions, call SHOW_VARS(), llm_query(prompt, model \\\\ nil), llm_query_batched(prompts, model \\\\ nil), rlm_query(prompt, model \\\\ nil), rlm_query_batched(prompts, model \\\\ nil), recurse(signature, inputs), load(name), registered tools, print(value), and submit(a_map_with_the_required_output_fields). rlm_query creates an isolated recursive constrained environment and falls back to a one-shot query at the configured depth limit. State persists across turns. Every reply is that one JSON object, including the last: explore and compute in code, and when every required output is ready, reply with code that calls submit/1 with non-empty values. Only the first object in a reply is run, and you read its output before you write the next.\n\n" <>
             Interpreter.controller_language_guide()
       },
       %{
@@ -979,8 +979,11 @@ defmodule Imp.Predict.RLM do
   defp interpreter_rlm_query_batched(args, runtime),
     do: {:error, {:invalid_rlm_query_batched_arguments, args}, runtime}
 
+  # The same rule `Budget.enter_recursion/2` applies to `recurse/2`: the root
+  # is depth 0 and a child may run at any depth up to `max_recursion_depth`,
+  # so the default of 1 allows one level of child RLMs.
   defp recursive_child_available?(%{depth: depth, rlm: rlm}) do
-    depth + 1 < rlm.max_recursion_depth
+    depth + 1 <= rlm.max_recursion_depth
   end
 
   defp run_recursive_child(
@@ -1781,24 +1784,62 @@ defmodule Imp.Predict.RLM do
     }
   end
 
-  defp describe_value(value, preview_chars) when is_list(value) do
-    %{
-      type: :list,
-      length: length(value),
-      preview: Enum.take(value, preview_chars),
-      truncated: length(value) > preview_chars
-    }
+  defp describe_value(value, preview_chars) when is_list(value),
+    do: Map.merge(%{type: :list, length: length(value)}, printed_preview(value, preview_chars))
+
+  defp describe_value(value, preview_chars) when is_map(value),
+    do: Map.merge(%{type: :map, size: map_size(value)}, printed_preview(value, preview_chars))
+
+  defp describe_value(value, preview_chars)
+       when is_number(value) or is_boolean(value) or is_nil(value) do
+    bytes = :erlang.external_size(value)
+
+    # An integer can hold millions of digits. One too long for the preview is
+    # printed and cut like any value while printing it is cheap, and past
+    # that is described by its approximate number of digits.
+    cond do
+      not is_integer(value) or 3 * bytes <= preview_chars ->
+        %{type: type_of(value), value: value}
+
+      bytes <= 8 * preview_chars ->
+        Map.merge(%{type: :integer}, printed_preview(value, preview_chars))
+
+      true ->
+        %{type: :integer, approximate_digits: round(bytes * 8 * :math.log10(2)), truncated: true}
+    end
   end
 
-  defp describe_value(value, _preview_chars) when is_map(value),
-    do: %{type: :map, keys: Map.keys(value), size: map_size(value)}
+  defp describe_value(value, preview_chars),
+    do: Map.merge(%{type: type_of(value)}, printed_preview(value, preview_chars))
 
-  defp describe_value(value, _preview_chars), do: %{type: type_of(value), value: value}
+  # Every preview is at most `preview_chars` characters of the value as the
+  # controller's language prints it, as upstream previews a variable with
+  # `str(value)[:preview_chars]`. A value too large to print in the preview is
+  # printed with inspect's own limits, so a 20,000-line list costs no more to
+  # describe than its preview; any term prints in at least an eighth of its
+  # external size in characters, so such a value is always truncated.
+  defp printed_preview(value, preview_chars) do
+    {printed, cut?} =
+      if :erlang.external_size(value) <= 8 * preview_chars do
+        {inspect(value, limit: :infinity, printable_limit: :infinity), false}
+      else
+        # Each printed item takes at least three characters with its separator.
+        limit = div(preview_chars, 3) + 1
+        {inspect(value, limit: limit, printable_limit: preview_chars), true}
+      end
+
+    %{
+      preview: String.slice(printed, 0, preview_chars),
+      truncated: cut? or String.length(printed) > preview_chars
+    }
+  end
 
   defp type_of(value) when is_integer(value), do: :integer
   defp type_of(value) when is_float(value), do: :float
   defp type_of(value) when is_boolean(value), do: :boolean
   defp type_of(value) when is_nil(value), do: nil
+  defp type_of(value) when is_atom(value), do: :atom
+  defp type_of(value) when is_tuple(value), do: :tuple
   defp type_of(_value), do: :term
 
   defp tool_metadata(tools) do

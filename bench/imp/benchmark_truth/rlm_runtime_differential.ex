@@ -394,7 +394,11 @@ submit(%{answer: reply})|
         lm: controller,
         sub_lm: sub_lm,
         max_iterations: 1,
-        max_recursion_depth: 1
+        # Imp's max_recursion_depth counts levels of child RLMs below the
+        # root; the standalone max_depth counts the root too. The standalone
+        # side runs at its boundary (depth 1 of max_depth 2), which is Imp's
+        # root with no child level allowed.
+        max_recursion_depth: 0
       )
 
     parent_before = Keyword.fetch!(rlm.lm.opts, :model)

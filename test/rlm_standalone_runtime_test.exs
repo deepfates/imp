@@ -388,7 +388,10 @@ submit(%{answer: Enum.join(answers, ",")})|}
     assert Imp.Prediction.get(prediction, :answer) == "left,right"
   end
 
-  test "rlm_query falls back to one-shot generation at the official depth boundary" do
+  # Imp's max_recursion_depth counts levels of child RLMs below the root, the
+  # rule recurse/2 already used. The standalone runtime's max_depth counts
+  # the root as well, so its max_depth=1 is Imp's 0.
+  test "rlm_query falls back to one-shot generation at the depth limit" do
     parent = self()
 
     controller =
@@ -412,7 +415,7 @@ submit(%{answer: answer})|}
         lm: controller,
         sub_lm: sub_lm,
         max_iterations: 1,
-        max_recursion_depth: 1
+        max_recursion_depth: 0
       )
 
     assert {:ok, prediction} = RLM.call(rlm, %{context: "root"})
@@ -424,6 +427,44 @@ submit(%{answer: answer})|}
     assert prediction.metadata.rlm.sub_lm_calls == 1
     assert prediction.metadata.rlm.max_observed_depth == 0
     assert prediction.metadata.rlm_child_traces == []
+  end
+
+  test "the default recursion depth gives rlm_query one level of child RLM" do
+    parent = self()
+
+    controller = %{
+      module: Imp.LM.Static,
+      opts: [
+        handler: fn messages, _opts ->
+          case controller_payload(messages)["variables"]["context"]["preview"] do
+            "root" ->
+              %{code: ~S|submit(%{answer: rlm_query("child prompt")})|}
+
+            "child prompt" ->
+              send(parent, :child_rlm_ran)
+              %{code: ~S|submit(%{answer: "child:" <> rlm_query("grandchild prompt")})|}
+          end
+        end
+      ]
+    }
+
+    sub_lm = %{
+      module: Imp.LM.Static,
+      opts: [
+        handler: fn [%{content: prompt}], _opts ->
+          send(parent, {:one_shot, prompt})
+          "leaf"
+        end
+      ]
+    }
+
+    rlm = RLM.new("context -> answer", lm: controller, sub_lm: sub_lm, max_iterations: 1)
+
+    assert {:ok, prediction} = RLM.call(rlm, %{context: "root"})
+    assert_received :child_rlm_ran
+    assert_received {:one_shot, "grandchild prompt"}
+    assert Imp.Prediction.get(prediction, :answer) == "child:leaf"
+    assert prediction.metadata.rlm.max_observed_depth == 1
   end
 
   test "recursive children share one global sub-LM call budget" do
