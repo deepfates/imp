@@ -271,7 +271,6 @@ When the turn was interrupted, `termination_cause` says why:
 | `:max_iters` | the step budget ran out |
 | `:parse_error` | a step's reply could not be read |
 | `:prediction_error` | a step's request failed |
-| `:invalid_answer` | one text output: a step wrote text the output does not accept |
 | `:empty_tool_calls` | with `submit`: a step called no tool |
 | `:context_window_exceeded` | the prompt no longer fits, even with old episodes left out |
 | `:deadline_exceeded` | the process's `Imp.Deadline` passed |

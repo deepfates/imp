@@ -125,7 +125,8 @@ definitions.
 ### Tool policies
 
 Pass `tool_policy:` to `Imp.react/3`, `Imp.rlm/2` or `Imp.code_act/3`.
-`Imp.ToolPolicy.authorize/3` is the check they make:
+`Imp.ToolPolicy.authorize/3` is the check they make. A policy function gets
+the tool's name and the string-keyed arguments the tool would receive:
 
 ```elixir
 policy = fn name, args ->
@@ -134,7 +135,7 @@ policy = fn name, args ->
     else: :allow
 end
 
-Imp.ToolPolicy.authorize(policy, :on_call, %{team: "beacon"})
+Imp.ToolPolicy.authorize(policy, :on_call, %{"team" => "beacon"})
 #=> {:error, {:tool_denied, :on_call, :paged_directly}}
 ```
 
