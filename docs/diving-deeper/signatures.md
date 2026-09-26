@@ -178,10 +178,12 @@ Imp.Signature.json_schema(triage)["properties"]["priority"]
 A field in the `inputs` or `outputs` list is an atom, a `"name: type"`
 string, or a map. A map takes `name` (required), `type`, `desc`, `default`,
 `optional`, `constraints`, and `metadata`. `Imp.Signature.Field` documents
-each key.
+each key. Every field needs its own name: a name repeated among the inputs,
+among the outputs, or across the two, raises.
 
 - `default` fills an absent value, on either side. An input with a default
-  can be left out of the call.
+  can be left out of the call, and an output the model answers with `null`
+  is absent too.
 - `optional: true` lets the value be absent; it reads as `nil`.
 - A present value is never replaced, even when it is `false`, `0`, `""` or
   `[]`.
