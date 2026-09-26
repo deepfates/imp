@@ -167,7 +167,7 @@ defmodule Imp.Benchmarks do
     score =
       case Imp.ToolPolicy.authorize([], :double, %{x: 4}) do
         :ok -> 1.0
-        {:error, {:tool_denied, :double}} -> 0.0
+        {:error, {:tool_authorization_denied, :double, :tool_policy}} -> 0.0
       end
 
     result(:supervised_tool_policy_task_negative, score)

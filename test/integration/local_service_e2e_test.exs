@@ -178,7 +178,7 @@ defmodule LocalServiceE2ETest do
         end
       end)
 
-    [tool] = base_url |> Imp.MCP.HTTPClient.new() |> Imp.MCP.import_tools()
+    [tool] = base_url |> Imp.Test.MCPConnect.http!() |> Map.fetch!(:tools)
 
     assert tool.name == "lookup"
     assert Imp.Tool.call(tool, %{"key" => "capital"}) == "Paris"
@@ -217,11 +217,11 @@ defmodule LocalServiceE2ETest do
 
     [tool] =
       System.find_executable("elixir")
-      |> Imp.MCP.StdioClient.new(
+      |> Imp.Test.MCPConnect.stdio!(
         args: ["-pa", Path.join([Mix.Project.build_path(), "lib", "jason", "ebin"]), script],
         timeout: 15_000
       )
-      |> Imp.MCP.import_tools()
+      |> Map.fetch!(:tools)
 
     assert tool.name == "echo"
     assert Imp.Tool.call(tool, %{"text" => "hello"}) == "hello"
@@ -290,7 +290,7 @@ defmodule LocalServiceE2ETest do
         end
       end)
 
-    [tool] = base_url |> Imp.MCP.HTTPClient.new() |> Imp.MCP.import_tools()
+    [tool] = base_url |> Imp.Test.MCPConnect.http!() |> Map.fetch!(:tools)
 
     assert_react_json_tool_arguments(tool)
     assert_rlm_json_tool_arguments(tool)

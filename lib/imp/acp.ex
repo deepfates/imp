@@ -60,7 +60,7 @@ defmodule Imp.ACP do
     ],
     agent_info: [
       type: {:map, :string, :any},
-      doc: "The `agentInfo` the agent announces at `initialize`."
+      doc: "The `agentInfo` announced at `initialize`; `imp` at Imp's version by default."
     ],
     agent_capabilities: [
       type: {:map, :string, :any},
@@ -166,9 +166,13 @@ defmodule Imp.ACP do
     |> Keyword.merge(transport_opts)
     |> Keyword.put(:handler, Imp.ACP.Handler)
     |> Keyword.put(:handler_opts, adapter_opts)
-    |> Keyword.put_new(:agent_info, %{"name" => "imp-acp", "version" => "0.1.0"})
+    |> Keyword.put_new(:agent_info, agent_info())
     |> Keyword.put_new(:agent_capabilities, capabilities(adapter_opts))
   end
+
+  # What `initialize` answers when the host names no agent of its own.
+  defp agent_info,
+    do: %{"name" => "imp", "version" => to_string(Application.spec(:imp, :vsn))}
 
   # Stdio is the ACP wire. Silence logging before starting any dependency so
   # boot output cannot precede the first JSON-RPC frame. ExMCP does the same

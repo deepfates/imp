@@ -1397,7 +1397,12 @@ defmodule BetterTogetherTest do
 
     refute_receive :unexpected_later_step
 
-    assert [%{error: {:optimizer_failed, RaisingOptimizer, "compile exploded"}}] =
+    assert [
+             %{
+               error:
+                 {:optimizer_failed, RaisingOptimizer, %RuntimeError{message: "compile exploded"}}
+             }
+           ] =
              Imp.Optimizer.Report.fetch(compiled).errors
   end
 

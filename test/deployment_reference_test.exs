@@ -356,6 +356,7 @@ defmodule DeploymentReferenceTest do
 
   test "concurrent calls preserve successful and returned structured error identities" do
     parse_error = %Imp.AdapterParseError{
+      kind: :malformed,
       message: "strict chat marker was malformed",
       reason: :missing_output_marker
     }

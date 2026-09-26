@@ -114,6 +114,39 @@ defmodule Imp.Optimizer.RandomSearch.ResumeTest do
     assert Agent.get(counter, & &1) == 0
   end
 
+  test "an explicit max_errors equal to the default resumes a run that had none" do
+    counter = start_supervised!({Agent, fn -> 0 end})
+    {program, optimizer, trainset, devset} = fixture(counter)
+    optimizer = %{optimizer | max_errors: nil}
+
+    checkpoint =
+      optimizer
+      |> RandomSearch.compile(program, trainset, devset, restrict: [-3, -2], max_candidates: 0)
+      |> Report.fetch()
+      |> then(& &1.metadata.resume_state)
+      |> Jason.encode!()
+      |> Jason.decode!()
+
+    resumed =
+      %{optimizer | max_errors: 10}
+      |> RandomSearch.compile(program, trainset, devset,
+        restrict: [-3, -2],
+        resume_state: checkpoint
+      )
+      |> Report.fetch()
+
+    assert resumed.metadata.resumed
+    assert resumed.metadata.max_errors_source == :explicit
+
+    assert_refused(fn ->
+      RandomSearch.compile(%{optimizer | max_errors: 9}, program, trainset, devset,
+        restrict: [-3, -2],
+        resume_state: checkpoint,
+        max_candidates: 0
+      )
+    end)
+  end
+
   test "public optimize front door can pause before the first candidate" do
     counter = start_supervised!({Agent, fn -> 0 end})
     {program, optimizer, trainset, devset} = fixture(counter)

@@ -725,7 +725,8 @@ defmodule ReActV2Test do
     assert Imp.get(prediction, :answer) == "continued"
     assert prediction.metadata[:termination_reason] == :last_text
     assert %Imp.History{messages: [prior, current]} = prediction.metadata[:history]
-    assert prior.question == "prior"
+    # A turn read back from JSON keeps the string keys it was stored with.
+    assert prior["question"] == "prior"
     assert current.answer == "continued"
   end
 

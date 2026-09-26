@@ -39,7 +39,9 @@ defmodule Imp.Optimizer.Avatar do
 
   def new(metric, opts \\ []) do
     Imp.FunctionContract.validate!(metric, [2, 3], "Imp.Optimizer.Avatar.new/2", "metric")
-    opts = Imp.Options.validate!(opts, @option_schema, "Imp.Optimizer.Avatar.new/2")
+
+    opts =
+      Imp.Predict.Options.validate!(opts, @option_schema, "Imp.Optimizer.Avatar.new/2")
 
     unless opts[:optimize_for] in [:max, :min] do
       raise ArgumentError, "Imp.Optimizer.Avatar.new/2: :optimize_for must be :max or :min"
@@ -88,6 +90,7 @@ defmodule Imp.Optimizer.Avatar do
     end
   end
 
+  @doc false
   def compile(%__MODULE__{} = optimizer, %Imp.Predict.Avatar{} = student, trainset) do
     trainset = Enum.to_list(trainset)
     evaluator = Imp.Evaluate.new(trainset, optimizer.metric, max_concurrency: 1)

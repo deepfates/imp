@@ -132,7 +132,7 @@ defmodule WorkspaceAgentTest do
       "url" => "http://127.0.0.1:#{port}/mcp"
     }
 
-    assert {:error, {:mcp_server_not_authorized, "imp-acp-demo"}} =
+    assert {:error, {:mcp_server_not_authorized, "imp-acp-demo", _answer}} =
              WorkspaceAgent.program(%{cwd: root, mcp_servers: [server]},
                provider: :static,
                program: :react,

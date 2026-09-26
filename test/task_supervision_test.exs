@@ -309,8 +309,6 @@ defmodule TaskSupervisionTest do
   end
 
   test "Imp.Tasks.async_stream preserves context and accepts Task options" do
-    Imp.configure(task_marker: :outside)
-
     results =
       Imp.context([task_marker: :inside], fn ->
         [1, 2]

@@ -174,10 +174,10 @@ defmodule Imp.BenchmarkTruth.LangProBeHeartDiseaseProductFitTest do
 
     assert Plan.proposer_prompt_census!(recorded_calls) == %{
              calls: 147,
-             max_bytes: 5_165,
-             min_bytes: 978,
-             ordered_sha256: "4c367dfa9eb821ae48a4996e14d5aee2e238a23b7e74e5df926d3be846d60f24",
-             p95_bytes: 4_278
+             max_bytes: 5_171,
+             min_bytes: 984,
+             ordered_sha256: "ab14bbbdd9b58ab62bcf170187a25ffed9e78aeb7e709a0411d0c957a80c24c1",
+             p95_bytes: 4_305
            }
 
     report = Imp.Optimizer.Report.fetch(compiled)
@@ -193,20 +193,20 @@ defmodule Imp.BenchmarkTruth.LangProBeHeartDiseaseProductFitTest do
                opinion_3: [0, 2, 4, 2, 3, 2, 2, 3, 4, 2, 3, 2],
                vote: [0, 2, 4, 2, 3, 2, 2, 3, 4, 2, 3, 2]
              },
-             max_bytes: 5_462,
-             min_bytes: 1_622,
-             ordered_sha256: "f57a00f05f27a00ccebdd9f4472ca1f8e9a0b1f268e4d54af909e4b6bd315236",
-             p95_bytes: 4_616,
+             max_bytes: 5_507,
+             min_bytes: 1_667,
+             ordered_sha256: "41fa4fe92a1b7fbf7640a1dbc9c58a32431bc8071e559abdd9c27f114a9dccc9",
+             p95_bytes: 4_661,
              source: :actual_pinned_search_demo_arms
            }
 
     task_sizes = Agent.get(task_calls, & &1) |> Enum.map(&byte_size(Jason.encode!(&1)))
     assert length(task_sizes) == 652
-    assert Enum.min(task_sizes) == 1_633
+    assert Enum.min(task_sizes) == 1_678
     # Typed LM envelopes retain an explicit empty tool-call list on each of the
     # two demonstration responses. That is 32 intentional wire bytes beyond
     # the original C12 census, with the task text and demo arms unchanged.
-    assert Enum.max(task_sizes) == 3_400
+    assert Enum.max(task_sizes) == 3_445
   end
 
   @tag :evidence_infrastructure

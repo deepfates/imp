@@ -62,7 +62,7 @@ defmodule Imp.Optimizer.InferRules do
       type: {:custom, Imp.Optimizer.BootstrapFewShot, :validate_optional_number, []},
       default: nil
     ],
-    teacher_settings: [type: :keyword_list, default: []],
+    teacher_settings: [type: {:custom, Imp.Settings, :validate_overrides, []}, default: []],
     max_bootstrapped_demos: [type: :non_neg_integer, default: 4],
     max_labeled_demos: [type: :non_neg_integer, default: 16],
     max_rounds: [type: :non_neg_integer, default: 1],
@@ -154,12 +154,15 @@ defmodule Imp.Optimizer.InferRules do
     error in ArgumentError -> {:error, Exception.message(error)}
   end
 
+  @doc false
   def compile(%__MODULE__{} = optimizer, program, trainset),
     do: compile(optimizer, program, trainset, nil, [])
 
+  @doc false
   def compile(%__MODULE__{} = optimizer, program, trainset, devset),
     do: compile(optimizer, program, trainset, devset, [])
 
+  @doc false
   def compile(%__MODULE__{} = optimizer, program, trainset, devset, opts)
       when is_list(opts) do
     opts = validate_compile_options!(opts)
@@ -723,14 +726,11 @@ defmodule Imp.Optimizer.InferRules do
 
   defp normalize_rules(rules), do: {:error, {:invalid_natural_language_rules, rules}}
 
-  defp context_window_exceeded?(%Imp.ContextWindowExceededError{}), do: true
   defp context_window_exceeded?({:error, reason}), do: context_window_exceeded?(reason)
   defp context_window_exceeded?({:lm_failed, _lm, reason}), do: context_window_exceeded?(reason)
 
-  defp context_window_exceeded?(%Imp.LMError{reason: reason}),
-    do: context_window_exceeded?(reason)
-
-  defp context_window_exceeded?(%{reason: reason}), do: context_window_exceeded?(reason)
+  defp context_window_exceeded?(%Imp.LMError{} = error),
+    do: Imp.Errors.context_window_exceeded?(error)
 
   # Pinned DSPy 3.2.1 also recognizes provider exceptions whose rendered
   # class name contains `ContextWindowExceededError`. Provider adapters do not
@@ -902,15 +902,12 @@ defmodule Imp.Optimizer.InferRules do
     names
     |> Enum.flat_map(fn name ->
       case fetch_field(fields, name) do
-        {:ok, value} -> ["#{name}: #{format_value(value)}"]
+        {:ok, value} -> ["#{name}: #{Imp.Adapter.Chat.format_value(value)}"]
         :error -> []
       end
     end)
     |> Enum.join("\n")
   end
-
-  defp format_value(value) when is_binary(value), do: value
-  defp format_value(value), do: inspect(value)
 
   defp fetch_field(fields, name) do
     case Map.fetch(fields, name) do

@@ -329,20 +329,18 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
   defp component_step(_trace, _component), do: nil
 
   defp stringify_fields(fields) when is_map(fields) do
-    Map.new(fields, fn {key, value} -> {to_string(key), python_string(value)} end)
+    Map.new(fields, fn {key, value} -> {to_string(key), text(value)} end)
   end
 
-  defp stringify_fields(value), do: python_string(value)
+  defp stringify_fields(value), do: text(value)
 
   defp feedback_text(nil), do: ""
   defp feedback_text(value) when is_binary(value), do: value
-  defp feedback_text(value), do: python_string(value)
+  defp feedback_text(value), do: text(value)
 
-  defp python_string(true), do: "True"
-  defp python_string(false), do: "False"
-  defp python_string(nil), do: "None"
-  defp python_string(value) when is_binary(value), do: value
-  defp python_string(value), do: to_string(value)
+  # A value as the reflection model reads it: text as itself, anything else
+  # in its JSON spelling (`true`, `null`, `["a"]`), as adapters render values.
+  defp text(value), do: Imp.Adapter.Chat.format_value(value)
 
   defp example_inputs(%Imp.Example{} = example),
     do: example |> Imp.Example.inputs() |> Imp.Example.to_map()

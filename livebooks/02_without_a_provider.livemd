@@ -1,4 +1,4 @@
-# Imp 02: The Same Program Without A Provider
+# Imp 02: The same program without a provider
 
 
 ```elixir

@@ -24,6 +24,26 @@ defmodule Imp.AssertionsTest do
     end
   end
 
+  defmodule FailingProgram do
+    defstruct []
+
+    def call(%__MODULE__{}, _inputs), do: {:error, :provider_unavailable}
+  end
+
+  test "an assertion wrapper whose every attempt failed returns the last error as an Imp.Module error" do
+    passes = {:passes, fn _prediction -> true end, "Pass."}
+
+    assert {:error, :provider_unavailable} =
+             %FailingProgram{}
+             |> Imp.assert(passes, max_attempts: 2)
+             |> Imp.call(%{question: "q"})
+
+    assert {:error, :no_attempts} =
+             %FailingProgram{}
+             |> Imp.assert(passes, max_attempts: 0)
+             |> Imp.call(%{question: "q"})
+  end
+
   test "assertions inject feedback hints and stop once constraints pass" do
     one_word =
       Imp.assertion(

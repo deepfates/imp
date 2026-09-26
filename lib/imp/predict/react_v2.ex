@@ -230,7 +230,10 @@ defmodule Imp.Predict.ReActV2 do
   @spec new(Imp.Signature.t() | String.t(), [Imp.Tool.t()], keyword()) :: t()
   def new(signature, tools, opts \\ []) do
     signature = Imp.Signature.ensure(signature)
-    opts = Imp.Options.validate!(opts, @option_schema, "Imp.Predict.ReActV2.new/3")
+
+    opts =
+      Imp.Predict.Options.validate!(opts, @option_schema, "Imp.Predict.ReActV2.new/3")
+
     tools = Imp.Tool.index_tools!(tools, "Imp.Predict.ReActV2.new/3")
 
     if Imp.Tool.resolve_name(tools, :submit) do
@@ -279,7 +282,9 @@ defmodule Imp.Predict.ReActV2 do
       react:
         Imp.Predict.Predict.new(
           react_signature,
-          Keyword.merge(opts, config: config, adapter_opts: adapter_opts)
+          opts
+          |> Imp.Predict.Options.take()
+          |> Keyword.merge(config: config, adapter_opts: adapter_opts)
         ),
       tools: tools,
       max_iters: opts[:max_iters],
@@ -470,7 +475,7 @@ defmodule Imp.Predict.ReActV2 do
         end
 
       {:error, reason, history} ->
-        if context_window_exceeded?(reason) do
+        if Imp.Errors.context_window_exceeded?(reason) do
           incomplete_prediction(history, :context_window_exceeded, reason)
         else
           interrupted(
@@ -596,7 +601,7 @@ defmodule Imp.Predict.ReActV2 do
   defp failed_last_request_cause(interruption, error) do
     cond do
       deadline_passed?() -> :deadline_exceeded
-      context_window_exceeded?(error) -> :context_window_exceeded
+      Imp.Errors.context_window_exceeded?(error) -> :context_window_exceeded
       true -> interruption
     end
   end
@@ -655,7 +660,7 @@ defmodule Imp.Predict.ReActV2 do
               {:ok, prediction, history}
 
             {:error, fallback_error, history} ->
-              if context_window_exceeded?(fallback_error),
+              if Imp.Errors.context_window_exceeded?(fallback_error),
                 do: {:error, fallback_error, history},
                 else: {:extract, fallback_error, history}
           end
@@ -1068,7 +1073,7 @@ defmodule Imp.Predict.ReActV2 do
       result -> {result, false, :result}
     end
   rescue
-    error -> {{:error, {:tool_error, tool.name, Exception.message(error)}}, true, :unknown}
+    error -> {{:error, {:tool_error, tool.name, error}}, true, :unknown}
   catch
     kind, reason -> {{:error, {:tool_error, tool.name, {kind, reason}}}, true, :unknown}
   end
@@ -1154,7 +1159,7 @@ defmodule Imp.Predict.ReActV2 do
 
   defp submit?(%ToolCall{name: name}), do: to_string(name) == "submit"
 
-  defp interruption(%Imp.ContextWindowExceededError{}), do: :context_window_exceeded
+  defp interruption(%Imp.LMError{context_window_exceeded: true}), do: :context_window_exceeded
   defp interruption(%Imp.AdapterParseError{}), do: :parse_error
   defp interruption(_reason), do: :prediction_error
 
@@ -1193,7 +1198,7 @@ defmodule Imp.Predict.ReActV2 do
         {:ok, prediction, context}
 
       {:error, reason} ->
-        if context_window_exceeded?(reason) do
+        if Imp.Errors.context_window_exceeded?(reason) do
           remaining = Enum.drop_while(context.boundaries, &(&1 <= context.omitted))
 
           if remaining != [] and context.retries < 8 do
@@ -1222,9 +1227,13 @@ defmodule Imp.Predict.ReActV2 do
             diagnostic =
               if remaining == [], do: :history_not_reducible, else: :recovery_budget_exhausted
 
+            # Still the provider's refusal, so it keeps the provider's status;
+            # the reason says why no shorter history could be sent.
             {:error,
-             %Imp.ContextWindowExceededError{
+             %Imp.LMError{
                message: "ReActV2 context cannot be reduced safely",
+               status: context_status(reason),
+               context_window_exceeded: true,
                reason: %{diagnostic: diagnostic, cause: reason, projection: projection(context)}
              }, context}
           end
@@ -1233,6 +1242,11 @@ defmodule Imp.Predict.ReActV2 do
         end
     end
   end
+
+  defp context_status({:error, reason}), do: context_status(reason)
+  defp context_status({:lm_failed, _client, reason}), do: context_status(reason)
+  defp context_status(%Imp.LMError{status: status}), do: status
+  defp context_status(_reason), do: nil
 
   defp projection(context),
     do: %{
@@ -1246,12 +1260,6 @@ defmodule Imp.Predict.ReActV2 do
 
   defp projection_metadata(fields, context),
     do: Map.put(fields, :context_projection, projection(context))
-
-  defp context_window_exceeded?(%Imp.ContextWindowExceededError{}), do: true
-  defp context_window_exceeded?({:lm_failed, _, reason}), do: context_window_exceeded?(reason)
-  defp context_window_exceeded?({:error, reason}), do: context_window_exceeded?(reason)
-  defp context_window_exceeded?(%{reason: reason}), do: context_window_exceeded?(reason)
-  defp context_window_exceeded?(_), do: false
 
   defp coerce_history(nil), do: {:ok, Imp.History.new()}
   defp coerce_history(%Imp.History{} = history), do: {:ok, history}
@@ -1289,12 +1297,15 @@ defmodule Imp.Predict.ReActV2 do
 
   # What the adapter needs to say about the loop, as data. `finish_tool` is the
   # tool that ends the turn, so a renderer never has to know its name, and nil
-  # when the signature has no `submit` and the answer is plain text.
+  # when the signature has no `submit` and the answer is plain text. `outputs`
+  # are the task's output fields, so each step says what every output means;
+  # otherwise their descriptions reach the model only inside `submit`'s schema.
   defp guidance(signature, tools) do
     %{
       finish_tool: if(single_text_output?(signature), do: nil, else: :submit),
       input_names: Imp.Signature.input_names(signature),
       output_names: Imp.Signature.output_names(signature),
+      outputs: signature.outputs,
       tool_names: tools |> Map.keys() |> Enum.sort()
     }
   end

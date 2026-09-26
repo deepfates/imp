@@ -55,7 +55,9 @@ defmodule Imp.Predict.CodeAct do
   @doc "Builds a bounded CodeAct predictor with an allowlisted tool catalog."
   @spec new(term(), [struct()], keyword()) :: t()
   def new(signature, tools \\ [], opts \\ []) do
-    opts = Imp.Options.validate!(opts, @option_schema, "Imp.Predict.CodeAct.new/3")
+    opts =
+      Imp.Predict.Options.validate!(opts, @option_schema, "Imp.Predict.CodeAct.new/3")
+
     tools = Imp.Tool.index_tools!(tools, "Imp.Predict.CodeAct.new/3")
     pot_opts = Keyword.take(opts, [:lm, :adapter, :demos, :config, :metadata, :output_field])
 
@@ -207,9 +209,12 @@ defmodule Imp.Predict.CodeAct do
     if iteration < code_act.max_iters do
       next_inputs =
         inputs
-        |> next_inputs("Failed to execute the generated program: #{inspect(reason)}", trace)
+        |> next_inputs(
+          "Failed to execute the generated program: #{ProgramOfThought.error_text(reason)}",
+          trace
+        )
         |> Map.put(:previous_program, program)
-        |> Map.put(:error, inspect(reason))
+        |> Map.put(:error, ProgramOfThought.error_text(reason))
 
       run_loop(code_act, next_inputs, trace, iteration + 1)
     else
@@ -246,7 +251,7 @@ defmodule Imp.Predict.CodeAct do
   defp next_inputs(inputs, observation, trace) do
     inputs
     |> Map.put(:observation, observation)
-    |> Map.put(:code_act_history, Enum.reverse(trace))
+    |> Map.put(:code_act_history, ProgramOfThought.model_trajectory(Enum.reverse(trace)))
   end
 
   defp call_tool(%__MODULE__{} = code_act, tool_name, arguments, trace, iteration) do
@@ -275,7 +280,7 @@ defmodule Imp.Predict.CodeAct do
     Imp.Tool.call(tool, arguments)
   rescue
     exception ->
-      {:error, {:tool_error, tool.name, Exception.message(exception)}}
+      {:error, {:tool_error, tool.name, exception}}
   catch
     kind, reason ->
       {:error, {:tool_error, tool.name, {kind, reason}}}

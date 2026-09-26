@@ -47,7 +47,8 @@ defmodule PredictMultiCompletionUsageTest do
           config: [n: 2, json_fallback: false]
         )
 
-      assert {:error, %{reason: {:error, {:completion_parse_failed, 1, _reason}}}} =
+      assert {:error,
+              %Imp.AdapterParseError{kind: :missing_fields, completion_index: 1, trace: %{}}} =
                Imp.Predict.Predict.call(program, %{question: "q"})
     end
 

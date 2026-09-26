@@ -1,4 +1,4 @@
-# Imp 01: Real LM Front Door
+# Imp 01: Real LM front door
 
 ```elixir
 imp_checkout? = fn path ->
@@ -64,7 +64,7 @@ end
 if api_key || openrouter_key, do: "Live model ready: #{model}", else: IO.puts(setup_guidance)
 ```
 
-## Program, Don't Prompt
+## Program, don't prompt
 
 This notebook is the Imp front door. It mirrors the core idea from the
 [README](../README.md): declare a task, run it as a program with a real model,
@@ -73,7 +73,7 @@ then grow the same task into tools, evaluation, optimization, and persistence.
 Manual path: real provider shape first, deterministic development next,
 evaluation and optimization after that, then tools and operations.
 
-## Extract Structured Data
+## Extract structured data
 
 Start with a signature. It names the inputs and outputs that the rest of the
 system can test, evaluate, optimize, and persist. Run the cell and read the
@@ -105,7 +105,7 @@ case live_lm.(max_tokens: 200) do
 end
 ```
 
-## Change The Module, Keep The Task
+## Change the module, keep the task
 
 The task contract stays stable while the execution strategy changes.
 `Imp.chain_of_thought/2` asks the model to reason before answering — same
@@ -137,7 +137,7 @@ case live_lm.(max_tokens: 400) do
 end
 ```
 
-## Add Conversation History
+## Add conversation history
 
 History is prior task data keyed by the signature fields. Imp renders it as
 prior turns for the model, while the program still receives named inputs and
@@ -171,7 +171,7 @@ case live_lm.(max_tokens: 200) do
 end
 ```
 
-## Add Tools With ReAct
+## Add tools with ReAct
 
 Only add tools when the task needs action outside the model. `Imp.react/3`
 keeps tool use inside an explicit policy, and the reserved `submit` tool
@@ -216,7 +216,7 @@ case live_lm.(max_tokens: 400) do
 end
 ```
 
-## Evaluate And Compile
+## Evaluate and compile
 
 Metrics and optimizers work on the same program values you just ran. This
 cell is deliberately provider-free: a scripted `Imp.LM.Static` stands in for
@@ -252,7 +252,7 @@ compiled =
 {Imp.evaluate(program, devset, metric).score, Imp.evaluate(compiled, devset, metric).score}
 ```
 
-## Save Without Secrets
+## Save without secrets
 
 Persistence stores the program shape and safe configuration, never live
 credentials. `Imp.dump/1` returns a portable data representation; loading it

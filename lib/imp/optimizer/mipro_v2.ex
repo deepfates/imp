@@ -44,6 +44,15 @@ defmodule Imp.Optimizer.MIPROv2 do
   mode. The pinned `:dspy_3_2_1` proposer mode deliberately mirrors DSPy's
   Python-truthiness behavior and retains the constructor seed when the compile
   override is zero.
+
+  ## Checkpoints
+
+  Pass these to `Imp.optimize/5`. `:max_trials` limits the number of new
+  objective trials executed by one invocation. `:checkpoint_fn` receives a
+  JSON-safe checkpoint after setup and after each completed trial. Pass any
+  emitted checkpoint back as `:resume_state` to continue without replaying
+  setup or completed trials. Checkpoints are trial-atomic, so an interrupted
+  in-flight trial is retried.
   """
 
   alias Imp.Optimizer.{
@@ -220,19 +229,12 @@ defmodule Imp.Optimizer.MIPROv2 do
     error in ArgumentError -> {:error, Exception.message(error)}
   end
 
+  @doc false
   def compile(%__MODULE__{} = optimizer, program, trainset, valset) do
     compile(optimizer, program, trainset, valset, [])
   end
 
-  @doc """
-  Compiles with optional invocation-level checkpoint and resume controls.
-
-  `:max_trials` limits the number of new objective trials executed by this
-  invocation. `:checkpoint_fn` receives a JSON-safe checkpoint after setup and
-  after each completed trial. Pass any emitted checkpoint back as
-  `:resume_state` to continue without replaying setup or completed trials.
-  Checkpoints are trial-atomic, so an interrupted in-flight trial is retried.
-  """
+  @doc false
   def compile(%__MODULE__{} = optimizer, program, trainset, valset, opts) do
     unless Keyword.keyword?(opts),
       do: raise(ArgumentError, "Imp.Optimizer.MIPROv2.compile/5 expects keyword options")
@@ -240,6 +242,7 @@ defmodule Imp.Optimizer.MIPROv2 do
     compile(optimizer, program, Keyword.merge(opts, trainset: trainset, valset: valset))
   end
 
+  @doc false
   def compile(%__MODULE__{} = optimizer, program, opts) when is_list(opts) do
     unless Keyword.keyword?(opts),
       do: raise(ArgumentError, "Imp.Optimizer.MIPROv2.compile/3 expects keyword options")
