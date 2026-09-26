@@ -2,7 +2,7 @@ defmodule UpstreamExam.EvaluateTest do
   @moduledoc """
   DSPy 3.2.1's own evaluate tests (tests/evaluate/), ported to Imp.
 
-  Tranche 3 of the upstream exam. Disposition map: docs/differentials/UPSTREAM_EXAM.md.
+  Tranche 3 of the upstream exam. Disposition map: research/differentials/UPSTREAM_EXAM.md.
   Seam applied throughout: Imp.Evaluate scores are fractions (1.0), DSPy's are
   percentages (100.0); the assertions translate the scale and nothing else.
   """

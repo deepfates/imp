@@ -3,7 +3,7 @@ defmodule Imp.OptimizerLifecycleArtifactTest do
 
   alias Imp.Optimizer.Artifact
 
-  @root Path.expand("../examples/optimizer_lifecycles", __DIR__)
+  @root Path.expand("../research/optimizer_lifecycles", __DIR__)
   @dataset Path.expand("../priv/tutorial/support_tickets.json", __DIR__)
 
   test "retained classical lifecycle is content-bound and useful after reload" do
@@ -58,8 +58,11 @@ defmodule Imp.OptimizerLifecycleArtifactTest do
     assert result["budget"]["active_reservations"] == 0
     assert result["budget"]["transport_attempts"] == 140
 
+    # The run recorded repository paths from before this experiment moved out
+    # of examples/ (examples/optimizer_lifecycles/...); the record stays as it
+    # was written, and its paths are read inside the experiment's directory.
     Enum.each(result["artifacts"], fn {_family, artifact} ->
-      path = Path.expand("../#{artifact["path"]}", __DIR__)
+      path = Path.join([@root | artifact["path"] |> Path.split() |> Enum.drop(2)])
       assert artifact["sha256"] == sha256(File.read!(path))
       assert path |> Artifact.read!() |> Artifact.inspect() |> Map.fetch!(:champion_id)
     end)

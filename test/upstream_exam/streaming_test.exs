@@ -3,7 +3,7 @@ defmodule UpstreamExam.StreamingTest do
   DSPy 3.2.1's own streaming tests (tests/streaming/test_streaming.py), ported
   to Imp.
 
-  Tranche 3 of the upstream exam. Disposition map: docs/differentials/UPSTREAM_EXAM.md.
+  Tranche 3 of the upstream exam. Disposition map: research/differentials/UPSTREAM_EXAM.md.
 
   Design substitution throughout: DSPy streams via asyncio generators wrapped
   by `streamify`; Imp streams via Enumerables (`Imp.Streaming.stream/3`) and

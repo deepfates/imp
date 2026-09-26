@@ -20,12 +20,16 @@ defmodule Imp.MixProject do
         warnings_as_errors: true,
         extras:
           ["README.md"] ++
+            getting_started_extras() ++
             product_docs() ++
-            repository_docs() ++ livebooks() ++ ["RELEASE_NOTES.md", "CHANGELOG.md"],
+            diving_deeper() ++
+            reference() ++ livebooks() ++ ["RELEASE_NOTES.md", "CHANGELOG.md"],
         groups_for_extras: [
+          "Getting started": getting_started(),
           Guides: product_docs(),
-          Evidence: repository_docs(),
-          Livebooks: livebooks(),
+          "Diving deeper": diving_deeper(),
+          Reference: reference(),
+          Tutorials: livebooks(),
           Releases: ["RELEASE_NOTES.md", "CHANGELOG.md"]
         ],
         groups_for_modules: public_api_doc_groups(),
@@ -115,7 +119,7 @@ defmodule Imp.MixProject do
       # MCP and ACP wire protocols. Both are started only by the protocol entry
       # points (`Imp.ACP.*`, a non-empty `Imp.MCP.connect/2`), never by ordinary
       # Imp boot, so neither is a runtime application here; releases that use
-      # the adapters include them in :load mode (docs/PRODUCTION_OPERATIONS.md).
+      # the adapters include them in :load mode (docs/production.md).
       # erlexec owns the process group of each local MCP server
       # (`Imp.MCP.OwnedStdio`); its application starts a port program, which is
       # why it is started on the first stdio connection and not at boot.
@@ -202,7 +206,10 @@ defmodule Imp.MixProject do
        deployment_example_files() ++
        Path.wildcard("examples/provider_free_ticket_router/**/*") ++
        workspace_agent_example_files() ++
+       getting_started() ++
        product_docs() ++
+       diving_deeper() ++
+       reference() ++
        livebooks() ++
        [
          ".formatter.exs",
@@ -248,37 +255,70 @@ defmodule Imp.MixProject do
     |> Enum.any?(&(&1 in ["_build", "deps"]))
   end
 
+  # One continuous walk-through, in reading order.
+  defp getting_started do
+    ~w(
+      index
+      setting-up
+      first-program
+      expanding-signatures
+      changing-the-module
+      testing-without-a-provider
+      tools-and-agents
+      composing-programs
+      measuring
+      improving
+      save-and-load
+      running-in-your-application
+      where-to-go-next
+    )
+    |> Enum.map(&"docs/getting-started/#{&1}.md")
+  end
+
+  # ExDoc names each page after its file, and "index" would replace the docs'
+  # own index.html, so the path's entry page gets its own name.
+  defp getting_started_extras do
+    Enum.map(getting_started(), fn
+      "docs/getting-started/index.md" = path -> {path, filename: "getting-started"}
+      path -> path
+    end)
+  end
+
   defp product_docs do
     [
-      "docs/LEARNING_PATH.md",
-      "docs/TUTORIAL_TICKET_ROUTING.md",
-      "docs/IMP_FOR_DSPY_USERS.md",
-      "docs/PRODUCTION_OPERATIONS.md",
-      "docs/TRAJECTORIES.md"
+      "docs/coming-from-dspy.md",
+      "docs/production.md"
     ]
   end
 
-  # Rendered into the docs but NOT shipped in the package: they describe
-  # source-checkout commands a Hex consumer cannot run.
-  # docs/BENCHMARKS.md is deliberately NOT here. It is almost entirely bare
-  # `mix …` command spans, which ExDoc resolves to their task modules and then
-  # warns about because those modules are filtered out of the public API docs.
-  # It is a source-checkout document like CONTRIBUTING.md; README, EVIDENCE and
-  # the case study link to it by URL.
-  defp repository_docs do
+  defp diving_deeper do
     [
-      "docs/CASE_STUDY_TREC.md",
-      "docs/EVIDENCE.md"
+      "docs/diving-deeper/signatures.md",
+      "docs/diving-deeper/modules-and-composition.md",
+      "docs/diving-deeper/rlm.md",
+      "docs/diving-deeper/adapters.md",
+      "docs/diving-deeper/react.md",
+      "docs/diving-deeper/tools-and-mcp.md",
+      "docs/diving-deeper/retrieval.md",
+      "docs/diving-deeper/metrics-and-evaluation.md",
+      "docs/diving-deeper/choosing-an-optimizer.md",
+      "docs/diving-deeper/saving-and-artifacts.md",
+      "docs/diving-deeper/runs-and-supervision.md",
+      "docs/diving-deeper/settings-and-context.md"
     ]
+  end
+
+  defp reference do
+    ["docs/cheatsheet.cheatmd"]
   end
 
   defp livebooks do
     [
       "livebooks/01_real_lm_front_door.livemd",
-      "livebooks/02_programming_not_prompting.livemd",
+      "livebooks/02_without_a_provider.livemd",
       "livebooks/03_evaluate_and_optimize.livemd",
       "livebooks/04_tools_agents_mcp_rlm.livemd",
-      "livebooks/05_operate_and_live_checks.livemd"
+      "livebooks/05_operating_imp.livemd"
     ]
   end
 

@@ -73,8 +73,8 @@ module, with the reason and the condition that retires it written there.
 
 `Imp.ACP` owns the default session/program adapter formerly shipped separately
 as the `imp_acp` package. Its namespace stays stable, but consumers depend on
-Imp directly. `docs/PRODUCTION_OPERATIONS.md` describes the MCP lifecycle and
-API migration.
+Imp directly. `Imp.MCP` and `Imp.MCP.Connections` document the MCP lifecycle;
+`docs/production.md` covers releases that use MCP or ACP.
 
 ## Checks
 

@@ -21,8 +21,8 @@ against a local checkout.
 
 ExMCP and erlexec are declared `runtime: false`, so an OTP release that uses
 `Imp.ACP` or `Imp.MCP` must list `applications: [ex_mcp: :load, erlexec: :load]`
-in its release definition; see [protocol runtime in
-releases](docs/PRODUCTION_OPERATIONS.md#protocol-runtime-in-releases).
+in its release definition; see [releases that use MCP or
+ACP](docs/production.md#releases-that-use-mcp-or-acp).
 Ordinary Imp startup starts no protocol endpoint.
 
 `mix deps.get` and `mix hex.audit` report two cowlib advisories

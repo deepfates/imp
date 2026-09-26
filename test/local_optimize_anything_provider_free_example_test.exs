@@ -1,7 +1,7 @@
 defmodule Imp.LocalOptimizeAnythingProviderFreeExampleTest do
   use ExUnit.Case, async: false
 
-  @source "examples/local_optimize_anything_retry_policy/provider_free.exs"
+  @source "research/local_optimize_anything_retry_policy/provider_free.exs"
 
   setup_all do
     previous = System.get_env("IMP_OA_PROVIDER_FREE_DEFINE_ONLY")

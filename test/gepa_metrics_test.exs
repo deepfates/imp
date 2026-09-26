@@ -1059,8 +1059,8 @@ defmodule GepaMetricsTest do
 
   defp run_frozen_ifbench_parity! do
     paths =
-      Path.wildcard("examples/matched_instruction_family_ifbench/data/*.jsonl") ++
-        Path.wildcard("examples/matched_instruction_family_ifbench/data/mipro_stage1/*.jsonl")
+      Path.wildcard("research/matched_instruction_family_ifbench/data/*.jsonl") ++
+        Path.wildcard("research/matched_instruction_family_ifbench/data/mipro_stage1/*.jsonl")
 
     entries =
       Enum.flat_map(paths, fn path ->

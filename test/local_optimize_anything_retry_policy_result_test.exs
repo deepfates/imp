@@ -3,7 +3,7 @@ defmodule Imp.LocalOptimizeAnythingRetryPolicyResultTest do
 
   test "retained strict-decoder stop does not masquerade as optimization" do
     result =
-      "examples/local_optimize_anything_retry_policy/exercised-stopped-result.json"
+      "research/local_optimize_anything_retry_policy/exercised-stopped-result.json"
       |> File.read!()
       |> Jason.decode!()
 
@@ -18,7 +18,7 @@ defmodule Imp.LocalOptimizeAnythingRetryPolicyResultTest do
 
   test "retained recorder stop does not infer its lost in-memory winner" do
     result =
-      "examples/local_optimize_anything_retry_policy/exercised-recorder-stopped-result.json"
+      "research/local_optimize_anything_retry_policy/exercised-recorder-stopped-result.json"
       |> File.read!()
       |> Jason.decode!()
 
@@ -31,7 +31,7 @@ defmodule Imp.LocalOptimizeAnythingRetryPolicyResultTest do
 
   test "completed local condition preserves strict rejection and fresh baseline use" do
     result =
-      "examples/local_optimize_anything_retry_policy/exercised-result.json"
+      "research/local_optimize_anything_retry_policy/exercised-result.json"
       |> File.read!()
       |> Jason.decode!()
 
@@ -46,12 +46,12 @@ defmodule Imp.LocalOptimizeAnythingRetryPolicyResultTest do
 
   test "typed round-robin result preserves the selected mutation and narrow positive outcome" do
     result =
-      "examples/local_optimize_anything_retry_policy/exercised-typed-round-robin-result.json"
+      "research/local_optimize_anything_retry_policy/exercised-typed-round-robin-result.json"
       |> File.read!()
       |> Jason.decode!()
 
     selected =
-      "examples/local_optimize_anything_retry_policy/exercised-typed-round-robin-selected-artifact.json"
+      "research/local_optimize_anything_retry_policy/exercised-typed-round-robin-selected-artifact.json"
       |> File.read!()
       |> Jason.decode!()
 

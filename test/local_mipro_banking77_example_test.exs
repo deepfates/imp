@@ -1,8 +1,8 @@
 defmodule Imp.LocalMIPROBanking77ExampleTest do
   use ExUnit.Case, async: true
 
-  @result "examples/local_mipro_banking77/exercised-result.json"
-  @source "examples/local_mipro_banking77/run.exs"
+  @result "research/local_mipro_banking77/exercised-result.json"
+  @source "research/local_mipro_banking77/run.exs"
 
   test "retained ordinary run preserves search, untouched, and fresh-process boundaries" do
     result = @result |> File.read!() |> Jason.decode!()

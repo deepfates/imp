@@ -1,15 +1,15 @@
 defmodule Imp.LocalSIMBAFeedbackTRECExampleTest do
   use ExUnit.Case, async: false
 
-  @source "examples/local_simba_feedback_trec/run.exs"
-  @contract "examples/local_simba_feedback_trec/task-contract.json"
-  @treatment "examples/local_simba_feedback_trec/usefulness-v4-treatment.json"
+  @source "research/local_simba_feedback_trec/run.exs"
+  @contract "research/local_simba_feedback_trec/task-contract.json"
+  @treatment "research/local_simba_feedback_trec/usefulness-v4-treatment.json"
   @old_simba "benchmarks/data/simba-trec-coarse-v1.json"
-  @old_grpo "examples/local_grpo_opaque_banking77/trec-source-guided-v1-data.json"
-  @stopped_result "examples/local_simba_feedback_trec/exercised-stopped-result.json"
-  @structured_stopped_result "examples/local_simba_feedback_trec/exercised-structured-v2-stopped-result.json"
-  @schema_decode_stopped_result "examples/local_simba_feedback_trec/exercised-schema-decode-v3-stopped-result.json"
-  @phi4_stopped_result "examples/local_simba_feedback_trec/exercised-phi4-reflection-v4-stopped-result.json"
+  @old_grpo "research/local_grpo_opaque_banking77/trec-source-guided-v1-data.json"
+  @stopped_result "research/local_simba_feedback_trec/exercised-stopped-result.json"
+  @structured_stopped_result "research/local_simba_feedback_trec/exercised-structured-v2-stopped-result.json"
+  @schema_decode_stopped_result "research/local_simba_feedback_trec/exercised-schema-decode-v3-stopped-result.json"
+  @phi4_stopped_result "research/local_simba_feedback_trec/exercised-phi4-reflection-v4-stopped-result.json"
 
   setup_all do
     previous = System.get_env("IMP_SIMBA_FEEDBACK_TREC_DEFINE_ONLY")

@@ -1,7 +1,7 @@
 defmodule Imp.LocalSIMBABanking77ExampleTest do
   use ExUnit.Case, async: false
 
-  @source "examples/local_simba_banking77/run.exs"
+  @source "research/local_simba_banking77/run.exs"
 
   setup_all do
     previous = System.get_env("IMP_SIMBA_DEFINE_ONLY")

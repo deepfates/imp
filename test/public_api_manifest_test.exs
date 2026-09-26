@@ -385,20 +385,15 @@ defmodule PublicAPIManifestTest do
     end
   end
 
-  test "owned shipped docs do not present excluded modules as supported" do
+  test "shipped docs do not present excluded modules as supported" do
     excluded =
       Mix.Tasks.Imp.PublicApi.manifest()["excluded_modules"]
       |> Enum.map(& &1["module"])
       |> MapSet.new()
 
     references =
-      [
-        "README.md",
-        "docs/PRODUCTION_OPERATIONS.md",
-        "docs/LEARNING_PATH.md",
-        "docs/IMP_FOR_DSPY_USERS.md",
-        "livebooks/03_evaluate_and_optimize.livemd"
-      ]
+      (["README.md"] ++
+         Path.wildcard("docs/**/*.{md,cheatmd}") ++ Path.wildcard("livebooks/*.livemd"))
       |> Enum.flat_map(fn path ->
         path
         |> File.read!()
@@ -407,7 +402,7 @@ defmodule PublicAPIManifestTest do
       end)
       |> MapSet.new()
 
-    assert MapSet.disjoint?(excluded, references)
+    assert MapSet.intersection(excluded, references) == MapSet.new()
   end
 
   test "policy fails closed for an unclassified documented package module" do

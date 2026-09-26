@@ -47,6 +47,7 @@ jobs:
               - 'benchmarks/**'
               - 'priv/**'
               - 'examples/**'
+              - 'research/**'
               - 'mix.exs'
               - 'mix.lock'
               - '.github/**'
@@ -202,7 +203,7 @@ jobs:
       # Its self-test imports gepa_artifact from the checkout root; the
       # maintainer environment had that on the ambient path, runners don't.
       - run: PYTHONPATH="$PWD/tmp/gepa-artifact" scripts/setup_corrected_gepa_comparator.sh tmp/gepa-artifact
-      # Source-exact IFBench scorer venv (docs/BENCHMARKS.md).
+      # Source-exact IFBench scorer venv (research/BENCHMARKS.md).
       - run: |
           python3 -m venv tmp/ifbench-parity-venv
           tmp/ifbench-parity-venv/bin/python -m pip install -q -r benchmarks/requirements-ifbench-parity.txt

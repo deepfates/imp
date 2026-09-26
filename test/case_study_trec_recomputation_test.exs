@@ -1,6 +1,6 @@
 defmodule ImpTest.CaseStudyTRECRecomputationTest do
   @moduledoc """
-  The README calls TREC the strongest matched result and docs/CASE_STUDY_TREC.md
+  The README calls TREC the strongest matched result and research/CASE_STUDY_TREC.md
   publishes an exact command for recomputing it. The epic requires that an
   independent consumer can recompute the strongest claims without maintainer
   machinery — so that command working is itself a release-blocking property.
@@ -23,12 +23,12 @@ defmodule ImpTest.CaseStudyTRECRecomputationTest do
     "GEPA Imp minus DSPy: -0.0083 95% CI [-0.0458, 0.0292]"
   ]
 
-  @doc_path "docs/CASE_STUDY_TREC.md"
-  @script "examples/matched_instruction_optimizers_trec/recompute_compact.exs"
-  @contract "examples/matched_instruction_optimizers_trec/contract.json"
-  @imp_rows "examples/matched_instruction_optimizers_trec/data/imp-scored-rows.json"
-  @upstream_rows "examples/matched_instruction_optimizers_trec/data/upstream-scored-rows.json"
-  @aggregate "examples/matched_instruction_optimizers_trec/data/aggregate-recomputed.json"
+  @doc_path "research/CASE_STUDY_TREC.md"
+  @script "research/matched_instruction_optimizers_trec/recompute_compact.exs"
+  @contract "research/matched_instruction_optimizers_trec/contract.json"
+  @imp_rows "research/matched_instruction_optimizers_trec/data/imp-scored-rows.json"
+  @upstream_rows "research/matched_instruction_optimizers_trec/data/upstream-scored-rows.json"
+  @aggregate "research/matched_instruction_optimizers_trec/data/aggregate-recomputed.json"
 
   test "the published TREC recomputation command still reproduces the documented result" do
     {output, status} =

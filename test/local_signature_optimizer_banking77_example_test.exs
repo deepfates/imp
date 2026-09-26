@@ -1,8 +1,8 @@
 defmodule Imp.LocalSignatureOptimizerBanking77ExampleTest do
   use ExUnit.Case, async: true
 
-  @source "examples/local_signature_optimizer_banking77/run.exs"
-  @stopped_result "examples/local_signature_optimizer_banking77/exercised-stopped-result.json"
+  @source "research/local_signature_optimizer_banking77/run.exs"
+  @stopped_result "research/local_signature_optimizer_banking77/exercised-stopped-result.json"
 
   test "front door freezes disjoint train, validation, and optimizer-heldout boundaries" do
     source = File.read!(@source)
