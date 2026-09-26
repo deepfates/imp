@@ -70,13 +70,13 @@
     },
     {
       "category": "internal",
-      "module": "Imp.Adapter.CompositeType",
-      "source": "lib/imp/adapter/composite_type.ex"
+      "module": "Imp.Adapter.FieldConstraints",
+      "source": "lib/imp/adapter/field_constraints.ex"
     },
     {
       "category": "internal",
-      "module": "Imp.Adapter.FieldConstraints",
-      "source": "lib/imp/adapter/field_constraints.ex"
+      "module": "Imp.Adapter.FieldType",
+      "source": "lib/imp/adapter/field_type.ex"
     },
     {
       "category": "internal",
