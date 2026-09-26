@@ -908,6 +908,7 @@ defmodule Imp.Saving do
   defp redact_config_entries(entries) when is_list(entries) do
     entries
     |> Imp.Redaction.drop_credentials()
+    |> Imp.Redaction.drop_headers()
     |> Enum.map(fn
       [key, value] ->
         value = redact_config_entries(value)

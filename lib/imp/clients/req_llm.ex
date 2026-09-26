@@ -592,9 +592,19 @@ defmodule Imp.Clients.ReqLLM do
     kind, reason -> {:error, lm_error({kind, reason})}
   end
 
+  # A saved client holds no credential: none by key name, no header at all,
+  # and no URL whose query, fragment or user info could carry a key. The URLs
+  # are checked before sanitizing, which turns a `%URI{}` into a plain map.
   def dump(%__MODULE__{} = lm) do
-    model = lm.model |> encode_model() |> Imp.Redaction.drop_credentials()
-    opts = Imp.Redaction.drop_credentials(lm.opts)
+    encoded_model = encode_model(lm.model)
+    refuse_secret_urls!(encoded_model, lm.opts)
+
+    model =
+      encoded_model
+      |> Imp.Redaction.drop_credentials()
+      |> Imp.Redaction.drop_headers()
+
+    opts = lm.opts |> Imp.Redaction.drop_credentials() |> Imp.Redaction.drop_headers()
 
     %{
       provider: :req_llm,
@@ -603,10 +613,25 @@ defmodule Imp.Clients.ReqLLM do
     }
   end
 
+  defp refuse_secret_urls!(model, opts) do
+    urls = [
+      Keyword.get(opts, :base_url),
+      is_map(model) && (Map.get(model, :base_url) || Map.get(model, "base_url"))
+    ]
+
+    if Enum.any?(urls, &Imp.Redaction.url_with_secret_parts?/1) do
+      raise ArgumentError,
+            "#{inspect(__MODULE__)}: base_url has a query, fragment or user info, which may " <>
+              "carry a key, so the client is not saved; pass the key as :api_key, or give " <>
+              "the saved program an LM when it is loaded"
+    end
+  end
+
   defp validate_new_opts!(opts) when is_list(opts) do
     unless Keyword.keyword?(opts) do
       raise ArgumentError,
-            "#{inspect(__MODULE__)}.new/2 expects keyword options, got: #{inspect(opts)}"
+            "#{inspect(__MODULE__)}.new/2 expects a keyword list of options, got a list " <>
+              "that is not one"
     end
 
     owned_opts =
@@ -617,22 +642,24 @@ defmodule Imp.Clients.ReqLLM do
     {Keyword.fetch!(owned_opts, :req_module), Keyword.fetch!(owned_opts, :opts)}
   end
 
+  # Options can hold a key, so an error names their shape, never their value.
   defp validate_new_opts!(opts) do
     raise ArgumentError,
-          "#{inspect(__MODULE__)}.new/2 expects keyword options, got: #{inspect(opts)}"
+          "#{inspect(__MODULE__)}.new/2 expects a keyword list of options, got #{Imp.Options.shape(opts)}"
   end
 
+  # Options can hold a key, so an error names their shape, never their value.
   defp validate_call_opts!(opts, context) when is_list(opts) do
     if Keyword.keyword?(opts) do
       validate_input_envelope_option!(opts, context)
       normalize_reasoning_effort_option!(opts, context)
     else
-      raise ArgumentError, "#{context} expects keyword options, got: #{inspect(opts)}"
+      raise ArgumentError, "#{context} expects keyword options, got #{Imp.Options.shape(opts)}"
     end
   end
 
   defp validate_call_opts!(opts, context) do
-    raise ArgumentError, "#{context} expects keyword options, got: #{inspect(opts)}"
+    raise ArgumentError, "#{context} expects keyword options, got #{Imp.Options.shape(opts)}"
   end
 
   defp validate_input_envelope_option!(opts, context) do
@@ -1592,7 +1619,7 @@ defmodule Imp.Clients.ReqLLM do
       model: response.model,
       api: map_value(provider_meta, :api_type),
       finish_reason: response.finish_reason,
-      usage: sanitize_usage(response.usage),
+      usage: sanitize_usage(ReqLLM.Response.usage(response)),
       content: ReqLLM.Response.text(response) || "",
       logprobs: logprobs,
       provider_meta: sanitize_provider_meta(provider_meta, logprobs)
@@ -1612,7 +1639,6 @@ defmodule Imp.Clients.ReqLLM do
 
   defp sanitize_usage(nil), do: nil
   defp sanitize_usage(usage) when is_map(usage), do: sanitize_usage_value(usage)
-  defp sanitize_usage(_usage), do: nil
 
   defp sanitize_provider_meta(provider_meta, logprobs) do
     provider_meta

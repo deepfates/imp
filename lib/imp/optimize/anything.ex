@@ -40,9 +40,10 @@ defmodule Imp.Optimize.Anything do
   end
 
   def run(seed_candidate, evaluator, opts) do
+    # The options can hold a W&B key, so the error names shapes, not values.
     raise ArgumentError,
-          "Imp.Optimize.Anything.run/3 expects a text/named/structured seed, evaluator function or nil, and keyword options; got: " <>
-            "#{inspect(seed_candidate)}, #{inspect(evaluator)}, #{inspect(opts)}"
+          "Imp.Optimize.Anything.run/3 expects a text/named/structured seed, evaluator function or nil, and keyword options; got " <>
+            "#{Imp.Options.shape(seed_candidate)}, #{Imp.Options.shape(evaluator)} and #{Imp.Options.shape(opts)}"
   end
 
   @doc "Returns the validation-selected candidate from an Optimize Anything result."

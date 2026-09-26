@@ -363,18 +363,19 @@ defmodule Imp.Streaming do
     ArgumentError -> name
   end
 
+  # Options can hold a key, so an error names their shape, never their value.
   defp validate_opts!(opts, context) when is_list(opts) do
     if Keyword.keyword?(opts) do
       opts
       |> Keyword.take(Keyword.keys(@option_schema))
       |> Imp.Options.validate!(@option_schema, context)
     else
-      raise ArgumentError, "#{context}: expected keyword options, got: #{inspect(opts)}"
+      raise ArgumentError, "#{context}: expected keyword options, got #{Imp.Options.shape(opts)}"
     end
   end
 
   defp validate_opts!(opts, context) do
-    raise ArgumentError, "#{context}: expected keyword options, got: #{inspect(opts)}"
+    raise ArgumentError, "#{context}: expected keyword options, got #{Imp.Options.shape(opts)}"
   end
 
   @doc false
