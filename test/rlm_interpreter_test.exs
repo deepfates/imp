@@ -382,6 +382,163 @@ missing()|
     end
   end
 
+  describe "modules and native functions" do
+    # An Erlang module is an ordinary atom, so the struct and module-value
+    # checks above do not see it. These two stand in for any module in the
+    # VM with a `compare/2` or a `__struct__/0`.
+    defmodule :imp_rlm_probe_sorter do
+      def compare(_left, _right) do
+        send(self(), :probe_compare_ran)
+        :eq
+      end
+
+      def __struct__ do
+        send(self(), :probe_struct_ran)
+        %{}
+      end
+    end
+
+    test "a module is never a value" do
+      interpreter = Interpreter.new(%{}, %{}, nil)
+
+      for source <- [
+            "m = File",
+            "Map.put(%{}, :__struct__, File.Stream)",
+            "Enum.sort([2, 1], File)",
+            "Access.get(File, :cwd)"
+          ] do
+        assert {:error, {:module_value_not_allowed, name}, next} =
+                 Interpreter.execute(interpreter, source),
+               source
+
+        assert name in ["File", "File.Stream"]
+        refute Map.has_key?(next.vars, :m)
+      end
+    end
+
+    test "an Erlang module is not a sorter and not a struct name" do
+      interpreter = Interpreter.new(%{}, %{}, nil)
+
+      for {source, reason} <- [
+            {"Enum.sort([2, 1], :imp_rlm_probe_sorter)",
+             {:sorter_not_allowed, :imp_rlm_probe_sorter}},
+            {"Enum.sort([2, 1], {:asc, :imp_rlm_probe_sorter})",
+             {:sorter_not_allowed, {:asc, :imp_rlm_probe_sorter}}},
+            {"Enum.sort_by([2, 1], fn x -> x end, :imp_rlm_probe_sorter)",
+             {:sorter_not_allowed, :imp_rlm_probe_sorter}},
+            {"Enum.max([2, 1], :imp_rlm_probe_sorter)",
+             {:sorter_not_allowed, :imp_rlm_probe_sorter}},
+            {"Enum.min_by([2, 1], fn x -> x end, :imp_rlm_probe_sorter)",
+             {:sorter_not_allowed, :imp_rlm_probe_sorter}},
+            {"List.keysort([{2}, {1}], 0, :imp_rlm_probe_sorter)",
+             {:sorter_not_allowed, :imp_rlm_probe_sorter}},
+            {"Map.from_struct(:imp_rlm_probe_sorter)",
+             {:module_value_not_allowed, :imp_rlm_probe_sorter}}
+          ] do
+        assert {:error, ^reason, _next} = Interpreter.execute(interpreter, source), source
+      end
+
+      refute_received :probe_compare_ran
+      refute_received :probe_struct_ran
+
+      assert {:ok, [2, 1], _next} = Interpreter.execute(interpreter, "Enum.sort([1, 2], :desc)")
+
+      assert {:ok, [1, 2], _next} =
+               Interpreter.execute(interpreter, "Enum.sort([2, 1], &(&1 <= &2))")
+    end
+
+    test "a function handed to a library call does not come back as a native closure" do
+      interpreter = Interpreter.new(%{}, %{}, nil)
+
+      for source <- [
+            "g = Map.get(%{}, :missing, fn x -> x end)",
+            "g = Enum.reduce([], fn x -> x end, fn _x, acc -> acc end)",
+            "g = List.first([], fn x -> x end)"
+          ] do
+        assert {:error, {:function_value_not_allowed, _message}, next} =
+                 Interpreter.execute(interpreter, source),
+               source
+
+        refute Map.has_key?(next.vars, :g)
+      end
+
+      # Interpreter functions held in data are values like any other.
+      assert {:ok, [%Interpreter.Fn{}], _next} =
+               Interpreter.execute(interpreter, "Enum.map([1], fn _ -> fn y -> y end end)")
+    end
+  end
+
+  describe "patterns" do
+    test "assignment destructures tuples, lists and maps" do
+      interpreter = Interpreter.new(%{row: %{"id" => 7}}, %{}, nil)
+
+      source = ~S"""
+      {a, b} = {1, 2}
+      [first | rest] = ["x", "y", "z"]
+      %{"id" => id} = row
+      [a + b, first, rest, id]
+      """
+
+      assert {:ok, [3, "x", ["y", "z"], 7], _next} = Interpreter.execute(interpreter, source)
+
+      assert {:error, {:no_match, "{a, b}"}, _next} =
+               Interpreter.execute(interpreter, "{a, b} = [1, 2]")
+    end
+
+    test "a list is built with [item | list]" do
+      interpreter = Interpreter.new(%{}, %{}, nil)
+
+      assert {:ok, [3, 2, 1], _next} =
+               Interpreter.execute(
+                 interpreter,
+                 "Enum.reduce([1, 2, 3], [], fn x, acc -> [x | acc] end)"
+               )
+
+      assert {:error, {:invalid_operands, :|}, _next} =
+               Interpreter.execute(interpreter, "[1 | 2]")
+    end
+
+    test "a pin reads a variable the host named with a string" do
+      interpreter = Interpreter.new(%{"target" => 3}, %{}, nil)
+
+      assert {:ok, [:hit, :miss], _next} =
+               Interpreter.execute(
+                 interpreter,
+                 "Enum.map([3, 4], fn ^target -> :hit; _ -> :miss end)"
+               )
+    end
+
+    test "for takes patterns, maps, into: and uniq:, and refuses reduce:" do
+      interpreter = Interpreter.new(%{counts: %{"a" => 1, "b" => 2}}, %{}, nil)
+
+      assert {:ok, ["a", "b"], next} =
+               Interpreter.execute(interpreter, "for {key, _n} <- counts, do: key")
+
+      refute Map.has_key?(next.vars, :key)
+
+      assert {:ok, [1], _next} =
+               Interpreter.execute(interpreter, "for {:ok, v} <- [{:ok, 1}, {:error, 2}], do: v")
+
+      assert {:ok, %{"a" => 2, "b" => 4}, _next} =
+               Interpreter.execute(interpreter, "for {k, n} <- counts, into: %{}, do: {k, n * 2}")
+
+      assert {:ok, [1, 2], _next} =
+               Interpreter.execute(interpreter, "for x <- [1, 1, 2], uniq: true, do: x")
+
+      assert {:error, {:unsupported_for_option, :reduce, _hint}, _next} =
+               Interpreter.execute(
+                 interpreter,
+                 "for x <- [1, 2], reduce: 0 do\n acc -> acc + x\nend"
+               )
+
+      assert {:error, :struct_key_not_allowed, _next} =
+               Interpreter.execute(
+                 interpreter,
+                 "for k <- [String.to_existing_atom(\"__struct__\")], into: %{}, do: {k, 1}"
+               )
+    end
+  end
+
   describe "local calls" do
     test "the pure Kernel functions a model reaches for are allowed" do
       interpreter = Interpreter.new(%{row: %{"team" => "atlas"}, pair: {1, "b"}}, %{}, nil)

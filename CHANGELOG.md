@@ -27,7 +27,12 @@ User-visible changes to Imp are recorded here.
   like a `File.Stream` sent `Enum.join` into `Enumerable.File.Stream` and read
   the named file. A map literal, `submit/1` and the result of a library call
   may no longer carry the key, and a library call takes no struct but a range
-  or MapSet and no Elixir module named as a value.
+  or MapSet and no Elixir module named as a value. A module is not a value at
+  all (`m = File` fails with `{:module_value_not_allowed, "File"}`); a sorter
+  is `:asc`, `:desc` or a function, since an Erlang module given as a sorter
+  had its `compare/2` called, and `Map.from_struct/1` takes no module; and a
+  library call that hands back a function it was given (`Map.get(m, k, f)`)
+  fails the turn instead of leaving a native closure in a variable.
 
 ### Installing
 
@@ -403,7 +408,12 @@ User-visible changes to Imp are recorded here.
   functions `elem/2`, `to_string/1`, the `is_*` type checks, `length/1`,
   `map_size/1`, `tuple_size/1`, `byte_size/1`, `abs/1`, `round/1`, `trunc/1`,
   `div/2`, `rem/2`, `max/2` and `min/2` are available. Other calls return
-  `{:function_not_allowed, ...}`.
+  `{:function_not_allowed, ...}`. Assignment takes the same patterns as a
+  function clause (`{a, b} = pair`, `[first | rest] = lines`), `[x | acc]`
+  builds a list, and a `for` generator takes a pattern and a map
+  (`for {key, n} <- counts`) and the `into:` and `uniq:` options. `into:` and
+  `uniq:` were ignored, and `reduce:` is refused with
+  `{:unsupported_for_option, :reduce, ...}`.
 - RLM controller code that calls a value that is not a function (`g = 1;
   g.(1)`) fails that turn with `{:not_a_function, "g", 1}`, which the
   controller reads and repairs. It ended the whole call with
@@ -425,7 +435,8 @@ User-visible changes to Imp are recorded here.
   printed form, with `length` or `size` beside it, as upstream previews
   `str(value)`; a map's preview shows its values, not only its keys. A
   variable holding a tuple, which could not be encoded into the turn message
-  and ended the call, is previewed the same way.
+  and ended the call, is previewed the same way, and so is an integer too
+  long for the preview.
 - RLM `max_recursion_depth` is one rule: the number of levels of child RLMs
   below the root. `recurse/2` already allowed a child at depth
   `max_recursion_depth`, but `rlm_query*` started one only below it, so the
