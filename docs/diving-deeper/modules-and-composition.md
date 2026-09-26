@@ -264,11 +264,9 @@ system sandbox; it runs inside your VM, so keep the tools you give it narrow.
   variables instead of into the prompt, and lets the model explore them with
   code, call a sub-model on pieces (`llm_query/1`, `llm_query_batched/1`), and
   finish with `submit/1`, which is checked against your signature. Use it when
-  an input is too large or too structured for one prompt. Iterations,
-  sub-model calls, recursion depth and wall time each have their own budget;
-  see `Imp.Predict.RLM`, and
-  [Livebook 04](../../livebooks/04_tools_agents_mcp_rlm.livemd) for RLM runs
-  with lazy inputs, batched sub-queries and a budget that stops a loop.
+  an input is too large or too structured for one prompt. It has its own
+  page, [RLM](rlm.md), and
+  [Livebook 04](../../livebooks/04_tools_agents_mcp_rlm.livemd) runs it.
 
 #### Use tools
 
