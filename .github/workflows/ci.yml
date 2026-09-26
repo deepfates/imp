@@ -236,3 +236,6 @@ jobs:
       # Render docs + validate livebooks, without the package build /
       # campaign / Python differentials.
       - run: mix docs.check
+      # Run the tutorials as notebooks. No provider key is set here, so the
+      # live cells show their setup guidance and every other cell runs.
+      - run: mix livebook.execute.check

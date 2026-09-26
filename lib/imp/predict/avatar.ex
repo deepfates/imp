@@ -317,20 +317,22 @@ defmodule Imp.Predict.Avatar do
     |> Map.new(fn name -> {name, fetch(inputs, name)} end)
   end
 
-  defp has_key?(map, key), do: Map.has_key?(map, key) or Map.has_key?(map, to_string(key))
-  defp fetch(map, key), do: Map.get(map, key, Map.get(map, to_string(key)))
+  defp has_key?(map, key), do: Imp.FieldMap.has_key?(map, key)
+  defp fetch(map, key), do: Imp.FieldMap.get(map, key)
 
   defp optional?(field),
     do: Map.get(field.metadata, :optional, Map.get(field.metadata, "optional", false))
 
   defp validate_reserved_fields!(signature) do
     input_collisions =
-      Imp.Signature.input_names(signature) --
-        (Imp.Signature.input_names(signature) -- @reserved_inputs)
+      signature
+      |> Imp.Signature.input_names()
+      |> Enum.filter(&Imp.FieldMap.find_name(@reserved_inputs, &1))
 
     output_collisions =
-      Imp.Signature.output_names(signature) --
-        (Imp.Signature.output_names(signature) -- @reserved_outputs)
+      signature
+      |> Imp.Signature.output_names()
+      |> Enum.filter(&Imp.FieldMap.find_name(@reserved_outputs, &1))
 
     if input_collisions != [] or output_collisions != [] do
       raise ArgumentError,

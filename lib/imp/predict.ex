@@ -496,26 +496,7 @@ defmodule Imp.Predict do
 
   defp fetch_meta(_map, _key), do: nil
 
-  defp fetch_input(inputs, name) do
-    string_name = to_string(name)
-
-    cond do
-      Map.has_key?(inputs, name) ->
-        Map.fetch!(inputs, name)
-
-      Map.has_key?(inputs, string_name) ->
-        Map.fetch!(inputs, string_name)
-
-      is_binary(name) ->
-        case existing_atom(name) do
-          atom when is_atom(atom) -> Map.get(inputs, atom)
-          _string -> nil
-        end
-
-      true ->
-        nil
-    end
-  end
+  defp fetch_input(inputs, name), do: Imp.FieldMap.get(inputs, name)
 
   defp validate_inputs(signature, inputs) do
     :ok = warn_extra_inputs(signature, inputs)
@@ -534,32 +515,7 @@ defmodule Imp.Predict do
     end
   end
 
-  defp input_present?(inputs, name) do
-    string_name = to_string(name)
-
-    cond do
-      Map.has_key?(inputs, name) ->
-        true
-
-      Map.has_key?(inputs, string_name) ->
-        true
-
-      is_binary(name) ->
-        case existing_atom(name) do
-          atom when is_atom(atom) -> Map.has_key?(inputs, atom)
-          _string -> false
-        end
-
-      true ->
-        false
-    end
-  end
-
-  defp existing_atom(value) when is_binary(value) do
-    String.to_existing_atom(value)
-  rescue
-    ArgumentError -> value
-  end
+  defp input_present?(inputs, name), do: Imp.FieldMap.has_key?(inputs, name)
 
   defp format_with_adapter(adapter, signature, inputs, opts) do
     with :ok <- ensure_adapter_loaded(adapter),
@@ -958,9 +914,7 @@ defmodule Imp.Predict do
 
   defp present_output_fields(%Imp.AdapterParseError{reason: fields}, expected)
        when is_map(fields) do
-    Enum.filter(expected, fn name ->
-      Map.has_key?(fields, name) or Map.has_key?(fields, to_string(name))
-    end)
+    Enum.filter(expected, &Imp.FieldMap.has_key?(fields, &1))
   end
 
   defp present_output_fields(_reason, _expected), do: []

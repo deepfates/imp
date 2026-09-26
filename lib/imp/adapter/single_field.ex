@@ -240,19 +240,9 @@ defmodule Imp.Adapter.SingleField do
   end
 
   defp present?(%Imp.Example{} = example, name),
-    do:
-      Map.has_key?(Imp.Example.to_map(example), name) or
-        Map.has_key?(Imp.Example.to_map(example), to_string(name))
+    do: Imp.FieldMap.has_key?(Imp.Example.to_map(example), name)
 
-  defp present?(map, name), do: match?({:ok, _value}, fetch(map, name))
+  defp present?(map, name), do: Imp.FieldMap.has_key?(map, name)
 
-  defp fetch(map, name) do
-    case Map.fetch(map, name) do
-      {:ok, value} ->
-        {:ok, value}
-
-      :error ->
-        Map.fetch(map, to_string(name))
-    end
-  end
+  defp fetch(map, name), do: Imp.FieldMap.fetch(map, name)
 end

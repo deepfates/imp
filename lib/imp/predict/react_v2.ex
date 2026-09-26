@@ -1111,7 +1111,7 @@ defmodule Imp.Predict.ReActV2 do
 
     {outputs, missing} =
       Enum.reduce(names, {%{}, []}, fn name, {outputs, missing} ->
-        value = Map.get(arguments, name, Map.get(arguments, to_string(name), :__missing__))
+        value = Imp.FieldMap.get(arguments, name, :__missing__)
 
         if value == :__missing__,
           do: {outputs, missing ++ [name]},
@@ -1204,7 +1204,7 @@ defmodule Imp.Predict.ReActV2 do
       |> Enum.filter(fn {entry, _} ->
         outputs != [] and
           Enum.all?(outputs, fn name ->
-            Map.has_key?(entry, name) or Map.has_key?(entry, to_string(name))
+            Imp.FieldMap.has_key?(entry, name)
           end)
       end)
       |> Enum.map(&elem(&1, 1))
@@ -1319,7 +1319,7 @@ defmodule Imp.Predict.ReActV2 do
   defp validate_call_max_iters(max_iters),
     do: {:error, {:invalid_react_v2_max_iters, max_iters}}
 
-  defp fetch_input(inputs, name), do: Map.get(inputs, name, Map.get(inputs, to_string(name)))
+  defp fetch_input(inputs, name), do: Imp.FieldMap.get(inputs, name)
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
