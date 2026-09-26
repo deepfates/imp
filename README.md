@@ -102,13 +102,14 @@ and optimizers for examples, instructions, prompts and weights. You do not
 need to adopt that whole surface at once. Start with a program and a metric;
 reach for a more powerful optimizer or runtime shape when the task earns it.
 
-The supported center is the `Imp` facade, signatures, adapters, evaluation,
+The supported center is the `Imp` facade, signatures, adapters, the
+`Imp.predict`, `Imp.chain_of_thought` and `Imp.react` programs, evaluation,
 static and ReqLLM execution, tools, telemetry, saving, and the deployment
-pattern. Generated docs group optimizer implementations, parameter artifacts,
-agent loops, training integrations, and addressable runs under **Experimental
-optimizers and advanced workflows**. Those APIs are real and tested, but may
-change before 1.0; evaluate them against your own task before making them an
-application dependency.
+pattern. Generated docs group other optimizer implementations, parameter
+artifacts, other agent loops, training integrations, and addressable runs
+under **Experimental optimizers and advanced workflows**. Those APIs are real
+and tested, but may change before 1.0; evaluate them against your own task
+before making them an application dependency.
 
 ## When Imp is a good fit
 

@@ -7989,7 +7989,7 @@
     },
     {
       "callbacks": [],
-      "category": "experimental",
+      "category": "stable",
       "functions": [
         "new/3"
       ],

@@ -212,6 +212,17 @@ defmodule PublicAPIManifestTest do
     assert "Imp.Signature" in stable
     assert "Imp.Optimizer.GEPA" in stable
     assert "Imp.Optimizer.GRPO" in experimental
+
+    # What Getting started teaches as the core programs is stable; the other
+    # predictors and agent loops are not.
+    for module <- ~w(Imp.Predict Imp.Predict.ChainOfThought Imp.Predict.ReActV2) do
+      assert module in stable
+    end
+
+    for module <- ~w(Imp.Predict.RLM Imp.Predict.CodeAct Imp.Predict.ProgramOfThought) do
+      assert module in experimental
+    end
+
     assert "Imp.Optimize.Anything" in experimental
     assert "Imp.Optimizer" in extension
 
