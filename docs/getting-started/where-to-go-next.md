@@ -26,6 +26,8 @@ works the way it does:
   and a reply becomes fields.
 - [Modules and composition](../diving-deeper/modules-and-composition.md): the
   built-in modules, and writing your own.
+- [RLM](../diving-deeper/rlm.md): inputs too large for a prompt, explored
+  with code and a sub-model.
 - [Tools and MCP](../diving-deeper/tools-and-mcp.md): tools, policies, and MCP
   servers.
 - [ReAct](../diving-deeper/react.md): how the agent loop runs and ends.
