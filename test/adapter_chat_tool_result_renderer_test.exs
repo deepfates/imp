@@ -39,7 +39,7 @@ defmodule Imp.Adapter.ChatToolResultRendererTest do
     look = Imp.tool(:look, "Look", fn _ -> big() end)
 
     program =
-      Imp.react_v2("intent -> answer", [look],
+      Imp.react("intent -> answer", [look],
         lm: recording_lm(owner),
         adapter_opts: [
           tool_result_renderer: fn result, call ->
@@ -59,7 +59,7 @@ defmodule Imp.Adapter.ChatToolResultRendererTest do
   test "the default renderer is today's prose" do
     owner = self()
     look = Imp.tool(:look, "Look", fn _ -> "seen" end)
-    program = Imp.react_v2("intent -> answer", [look], lm: recording_lm(owner))
+    program = Imp.react("intent -> answer", [look], lm: recording_lm(owner))
 
     assert {:ok, _} = Imp.call(program, %{intent: "hello"})
     assert tool_contents(request(2)) == ["seen"]

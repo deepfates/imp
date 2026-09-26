@@ -9,8 +9,6 @@ defmodule GRPOMultiStudentTest do
     defstruct [:model, :output]
 
     @impl true
-    def generate(_messages, _opts), do: {:error, :student_lm_instance_required}
-
     def generate(%__MODULE__{output: output}, _messages, _opts), do: {:ok, output}
   end
 

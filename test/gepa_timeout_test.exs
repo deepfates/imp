@@ -41,15 +41,13 @@ defmodule Imp.Optimizer.GEPATimeoutTest do
   end
 
   test "threads the optimizer timeout into trajectory evaluation and reports it" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           Process.sleep(40)
           %{answer: "ok"}
         end
-      ]
-    }
+      )
 
     program = Imp.predict("question -> answer", lm: lm)
 
@@ -67,15 +65,13 @@ defmodule Imp.Optimizer.GEPATimeoutTest do
   test "one full validation deadline bounds 45 examples across effective-concurrency waves" do
     examples = List.duplicate(example(), 45)
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           Process.sleep(20)
           %{answer: "ok"}
         end
-      ]
-    }
+      )
 
     program = Imp.predict("question -> answer", lm: lm)
     started_at = System.monotonic_time(:millisecond)
@@ -121,16 +117,14 @@ defmodule Imp.Optimizer.GEPATimeoutTest do
 
     program =
       Imp.predict("question -> answer",
-        lm: %{
-          module: Imp.LM.Static,
-          opts: [handler: fn _messages, _opts -> %{answer: "wrong"} end]
-        }
+        lm: Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "wrong"} end)
       )
 
-    reflection_lm = fn _messages, opts ->
-      send(owner, {:reflection_lm_started, self(), opts})
-      Process.sleep(:infinity)
-    end
+    reflection_lm =
+      Imp.Test.FunLM.new(fn _messages, opts ->
+        send(owner, {:reflection_lm_started, self(), opts})
+        Process.sleep(:infinity)
+      end)
 
     started_at = System.monotonic_time(:millisecond)
 

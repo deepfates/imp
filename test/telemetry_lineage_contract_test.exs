@@ -60,7 +60,7 @@ defmodule Imp.TelemetryLineageContractTest do
 
   test "LM spans are distinct children of the program call" do
     lm = Imp.req_llm("openai:gpt-fixture", req_module: ProviderFixture, cache: false)
-    program = Imp.Predict.Predict.new("question -> answer", lm: lm)
+    program = Imp.Predict.new("question -> answer", lm: lm)
 
     assert {:ok, prediction} = Imp.call(program, %{question: "2+2?"})
     assert Imp.get(prediction, :answer) == "4"
@@ -78,7 +78,7 @@ defmodule Imp.TelemetryLineageContractTest do
 
   test "evaluation is the causal parent of each evaluated program call" do
     lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "4"} end)
-    program = Imp.Predict.Predict.new("question -> answer", lm: lm)
+    program = Imp.Predict.new("question -> answer", lm: lm)
 
     example =
       Imp.Example.new(question: "2+2?", answer: "4") |> Imp.Example.with_inputs([:question])

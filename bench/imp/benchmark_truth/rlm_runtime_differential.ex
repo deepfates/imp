@@ -372,9 +372,8 @@ print("recover-me")|
   defp run_imp_case!("recursive_depth_boundary") do
     parent = self()
 
-    controller = %{
-      module: Imp.LM.Static,
-      opts: [
+    controller =
+      Imp.LM.Static.new(
         model: "parent-model",
         handler: fn _messages, _opts ->
           %{
@@ -382,8 +381,7 @@ print("recover-me")|
 submit(%{answer: reply})|
           }
         end
-      ]
-    }
+      )
 
     sub_lm =
       static_lm(fn _messages, opts ->
@@ -396,7 +394,11 @@ submit(%{answer: reply})|
         lm: controller,
         sub_lm: sub_lm,
         max_iterations: 1,
-        max_recursion_depth: 1
+        # Imp's max_recursion_depth counts levels of child RLMs below the
+        # root; the standalone max_depth counts the root too. The standalone
+        # side runs at its boundary (depth 1 of max_depth 2), which is Imp's
+        # root with no child level allowed.
+        max_recursion_depth: 0
       )
 
     parent_before = Keyword.fetch!(rlm.lm.opts, :model)
@@ -1093,7 +1095,7 @@ missing()|)
     )
   end
 
-  defp static_lm(handler), do: %{module: Imp.LM.Static, opts: [handler: handler]}
+  defp static_lm(handler), do: Imp.LM.Static.new(handler: handler)
 
   defp observe_imp_boundary(
          %{

@@ -212,7 +212,7 @@ defmodule WorkspaceAgent do
           "documentation and source over files belonging to this example application."
       )
 
-    Imp.react_v2(signature, tools,
+    Imp.react(signature, tools,
       lm: lm,
       max_iters: 12,
       config: [max_tokens: 1_600, temperature: 0.0]

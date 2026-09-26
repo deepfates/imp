@@ -30,7 +30,7 @@ defmodule GepaCampaignTest do
   end
 
   defmodule ZeroCostUsageLM do
-    def generate(_messages, _opts) do
+    def generate(_lm, _messages, _opts) do
       :telemetry.execute(
         [:req_llm, :token_usage],
         %{tokens: %{input_tokens: 10, output_tokens: 5}, total_cost: 0.0},
@@ -49,7 +49,7 @@ defmodule GepaCampaignTest do
     result =
       GepaCampaign.run(
         campaign_opts(dataset_root, rows_dir,
-          lm: %{module: ZeroCostUsageLM, opts: []},
+          lm: ZeroCostUsageLM,
           token_cost: nil,
           pricing_source: "local LM Studio usage telemetry; zero provider spend"
         )
@@ -68,16 +68,14 @@ defmodule GepaCampaignTest do
     write_dataset_root!(dataset_root)
     owner = self()
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, opts ->
           prompt = Enum.map_join(messages, "\n", &Map.get(&1, :content, ""))
           send(owner, {:gepa_task_prompt, prompt})
           static_gold_handler(messages, opts)
         end
-      ]
-    }
+      )
 
     GepaCampaign.run(
       campaign_opts(dataset_root, rows_dir,
@@ -339,7 +337,7 @@ defmodule GepaCampaignTest do
 
     lm =
       static_gold_lm()
-      |> put_in([:opts, :handler], fn messages, opts ->
+      |> put_in([Access.key!(:opts), :handler], fn messages, opts ->
         Agent.update(calls, &(&1 + 1))
         static_gold_handler(messages, opts)
       end)
@@ -402,7 +400,7 @@ defmodule GepaCampaignTest do
 
     lm =
       static_gold_lm()
-      |> put_in([:opts, :handler], fn messages, opts ->
+      |> put_in([Access.key!(:opts), :handler], fn messages, opts ->
         Agent.update(calls, &(&1 + 1))
         static_gold_handler(messages, opts)
       end)
@@ -482,7 +480,7 @@ defmodule GepaCampaignTest do
 
     lm =
       static_gold_lm()
-      |> put_in([:opts, :handler], fn messages, handler_opts ->
+      |> put_in([Access.key!(:opts), :handler], fn messages, handler_opts ->
         Agent.update(calls, &(&1 + 1))
 
         :telemetry.execute(
@@ -569,7 +567,7 @@ defmodule GepaCampaignTest do
 
     lm =
       static_gold_lm()
-      |> put_in([:opts, :handler], fn messages, handler_opts ->
+      |> put_in([Access.key!(:opts), :handler], fn messages, handler_opts ->
         call_index = Agent.get_and_update(calls, fn count -> {count, count + 1} end)
 
         if call_index == 0 do
@@ -618,7 +616,7 @@ defmodule GepaCampaignTest do
 
     lm =
       static_gold_lm()
-      |> put_in([:opts, :handler], fn messages, handler_opts ->
+      |> put_in([Access.key!(:opts), :handler], fn messages, handler_opts ->
         maximum =
           Agent.get_and_update(concurrency, fn state ->
             active = state.active + 1
@@ -654,7 +652,7 @@ defmodule GepaCampaignTest do
 
     lm =
       static_gold_lm()
-      |> put_in([:opts, :handler], fn _messages, _handler_opts ->
+      |> put_in([Access.key!(:opts), :handler], fn _messages, _handler_opts ->
         send(receiver, :slow_evaluation_started)
         Process.sleep(:infinity)
       end)
@@ -865,9 +863,8 @@ defmodule GepaCampaignTest do
     write_dataset_root!(dataset_root)
     receiver = self()
 
-    reflection_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    reflection_lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           send(receiver, {:reflection_call, messages})
 
@@ -876,8 +873,7 @@ defmodule GepaCampaignTest do
             __imp_lm_metadata__: %{provider: "test"}
           }
         end
-      ]
-    }
+      )
 
     result =
       campaign_opts(dataset_root, rows_dir,
@@ -910,7 +906,8 @@ defmodule GepaCampaignTest do
       campaign_opts(dataset_root, rows_dir,
         campaign_id: "gepa-campaign-semantic-stop",
         generations: 5,
-        reflection_lm: fn _messages, _opts -> {:error, :malformed_provider_output} end,
+        reflection_lm:
+          Imp.Test.FunLM.new(fn _messages, _opts -> {:error, :malformed_provider_output} end),
         execution: %{
           "semantic_progress" => %{"max_consecutive_proposal_errors" => 2}
         }
@@ -1026,10 +1023,7 @@ defmodule GepaCampaignTest do
   end
 
   defp static_gold_lm do
-    %{
-      module: Imp.LM.Static,
-      opts: [handler: &static_gold_handler/2]
-    }
+    Imp.LM.Static.new(handler: &static_gold_handler/2)
   end
 
   defp drain_barrier_events(events) do
@@ -1088,14 +1082,11 @@ defmodule GepaCampaignTest do
   end
 
   defp static_reflection_lm do
-    %{
-      module: Imp.LM.Static,
-      opts: [
-        handler: fn _messages, _opts ->
-          %{__imp_lm_output__: %{"instruction" => "Answer exactly."}}
-        end
-      ]
-    }
+    Imp.LM.Static.new(
+      handler: fn _messages, _opts ->
+        %{__imp_lm_output__: %{"instruction" => "Answer exactly."}}
+      end
+    )
   end
 
   defp set_family_budget!(dataset_root, family, budget) do

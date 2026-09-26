@@ -10,6 +10,7 @@ defmodule Imp.Optimizer.BootstrapRS do
 
   defdelegate new(metric, opts \\ []), to: Imp.Optimizer.RandomSearch
 
+  @doc false
   def compile(optimizer, program, trainset, devset \\ nil, opts \\ []) do
     Imp.Optimizer.RandomSearch.compile(optimizer, program, trainset, devset, opts)
   end
@@ -25,6 +26,7 @@ defmodule Imp.Optimizer.BootstrapFewShotWithRandomSearch do
 
   defdelegate new(metric, opts \\ []), to: Imp.Optimizer.RandomSearch
 
+  @doc false
   def compile(optimizer, program, trainset, devset \\ nil, opts \\ []) do
     Imp.Optimizer.RandomSearch.compile(optimizer, program, trainset, devset, opts)
   end

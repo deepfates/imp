@@ -43,13 +43,15 @@ defmodule KNNFewShotTest do
     assert [nearest] = Imp.Predict.KNN.call(knn, %{question: "alpha beta zeta"})
     assert Imp.Example.get(nearest, :answer) == "B"
 
-    # PROVE-TEETH against the pre-port algorithm: token overlap ranks the SAME
-    # query the OTHER way ("alpha beta" overlap with e1, zero with e2), so this
-    # test fails against the old token-overlap KNN (which lives on, honestly
-    # named, as Imp.Retrievers.KNN).
-    token_overlap = Imp.Retrievers.KNN.new(trainset(), k: 1, field: :question)
-    assert [overlap_nearest] = Imp.Retrievers.KNN.call(token_overlap, "alpha beta zeta")
-    assert Imp.Example.get(overlap_nearest, :answer) == "A"
+    # Token overlap ranks the same query the other way: "alpha beta" is shared
+    # with e1 and nothing with e2, so the answer above comes from the embeddings.
+    query_terms = MapSet.new(~w(alpha beta zeta))
+
+    overlap = fn text ->
+      text |> String.split() |> MapSet.new() |> MapSet.intersection(query_terms) |> MapSet.size()
+    end
+
+    assert overlap.("alpha beta gamma") > overlap.("delta epsilon")
   end
 
   test "KNN returns top-k in descending score order" do
@@ -97,15 +99,13 @@ defmodule KNNFewShotTest do
 
     {:ok, calls} = Agent.start_link(fn -> [] end)
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           Agent.update(calls, &(&1 ++ [messages]))
           %{answer: "4"}
         end
-      ]
-    }
+      )
 
     student = Imp.predict("question -> answer", lm: lm)
 
@@ -164,15 +164,10 @@ defmodule KNNFewShotTest do
       Imp.example(question: "alpha", answer: "teacher-made") |> Imp.with_inputs(:question)
     ]
 
-    student_lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "student-answer"} end]
-    }
+    student_lm =
+      Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "student-answer"} end)
 
-    teacher_lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "teacher-made"} end]
-    }
+    teacher_lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "teacher-made"} end)
 
     student = Imp.predict("question -> answer", lm: student_lm)
     teacher = Imp.predict("question -> answer", lm: teacher_lm)

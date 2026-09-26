@@ -51,7 +51,7 @@ defmodule Mix.Tasks.ImpAcp.HostEffectsDemo do
         end
       )
 
-    program = Imp.react_v2("question -> answer", tools, lm: lm, max_iters: 3)
+    program = Imp.react("question -> answer", tools, lm: lm, max_iters: 3)
     {:ok, program, fn -> if Process.alive?(step), do: Agent.stop(step) end}
   end
 

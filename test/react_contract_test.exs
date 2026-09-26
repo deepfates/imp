@@ -2,14 +2,12 @@ defmodule ReActContractTest do
   use ExUnit.Case, async: true
 
   test "submit must provide required signature outputs" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           %{tool_calls: [%{name: :submit, arguments: %{extra: "only"}}]}
         end
-      ]
-    }
+      )
 
     agent = Imp.Predict.ReAct.new("question -> answer", [], lm: lm, max_iters: 1)
 
@@ -18,14 +16,12 @@ defmodule ReActContractTest do
   end
 
   test "empty tool calls cannot bypass required output validation" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           %{tool_calls: []}
         end
-      ]
-    }
+      )
 
     agent = Imp.Predict.ReAct.new("question -> answer", [], lm: lm, max_iters: 1)
 
@@ -36,9 +32,8 @@ defmodule ReActContractTest do
   test "provider-native mode forces its reserved submit after an empty action" do
     {:ok, calls} = Agent.start_link(fn -> 0 end)
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, opts ->
           turn = Agent.get_and_update(calls, &{&1, &1 + 1})
 
@@ -52,8 +47,7 @@ defmodule ReActContractTest do
               %{tool_calls: [%{name: :submit, arguments: %{answer: "Paris"}}]}
           end
         end
-      ]
-    }
+      )
 
     agent = Imp.Predict.ReAct.new("question -> answer", [], lm: lm, max_iters: 1)
 
@@ -65,14 +59,12 @@ defmodule ReActContractTest do
   end
 
   test "max iteration exhaustion is an error with trace history" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           %{tool_calls: [%{name: :lookup, arguments: %{}}]}
         end
-      ]
-    }
+      )
 
     lookup = Imp.Tool.new(:lookup, "lookup", fn _args -> "observed" end)
     agent = Imp.Predict.ReAct.new("question -> answer", [lookup], lm: lm, max_iters: 1)
@@ -84,15 +76,13 @@ defmodule ReActContractTest do
   test "zero max_iters fails before calling the model" do
     parent = self()
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           send(parent, :react_lm_called)
           %{tool_calls: []}
         end
-      ]
-    }
+      )
 
     agent = Imp.Predict.ReAct.new("question -> answer", [], lm: lm, max_iters: 0)
 
@@ -105,15 +95,13 @@ defmodule ReActContractTest do
   test "invocation-local max_iters overrides the constructor budget without reaching the LM inputs" do
     parent = self()
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           send(parent, {:react_messages, messages})
           %{tool_calls: [%{name: :lookup, arguments: %{}}]}
         end
-      ]
-    }
+      )
 
     lookup = Imp.Tool.new(:lookup, "lookup", fn _args -> "observed" end)
     agent = Imp.Predict.ReAct.new("question -> answer", [lookup], lm: lm, max_iters: 4)
@@ -129,10 +117,7 @@ defmodule ReActContractTest do
   test "invocation-local max_iters is validated before calling the model" do
     parent = self()
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> send(parent, :react_lm_called) end]
-    }
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> send(parent, :react_lm_called) end)
 
     agent = Imp.Predict.ReAct.new("question -> answer", [], lm: lm)
 
@@ -183,14 +168,12 @@ defmodule ReActContractTest do
   end
 
   test "tool policy denial stops ReAct before executing LM-selected tool" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           %{tool_calls: [%{name: :lookup, arguments: %{query: "secret"}}]}
         end
-      ]
-    }
+      )
 
     lookup = Imp.Tool.new(:lookup, "lookup", fn _args -> raise "should not run" end)
     agent = Imp.Predict.ReAct.new("question -> answer", [lookup], lm: lm, tool_policy: [])
@@ -200,14 +183,12 @@ defmodule ReActContractTest do
   end
 
   test "unknown LM-selected tools fail immediately instead of spinning to max iterations" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           %{tool_calls: [%{name: "external_tool", arguments: %{query: "x"}}]}
         end
-      ]
-    }
+      )
 
     agent = Imp.Predict.ReAct.new("question -> answer", [], lm: lm, max_iters: 3)
 
@@ -216,14 +197,12 @@ defmodule ReActContractTest do
   end
 
   test "malformed provider tool calls become structured ReAct errors" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           %{tool_calls: ["not-a-tool-call"]}
         end
-      ]
-    }
+      )
 
     agent = Imp.Predict.ReAct.new("question -> answer", [], lm: lm, max_iters: 1)
 
@@ -232,14 +211,12 @@ defmodule ReActContractTest do
   end
 
   test "provider JSON string tool arguments are decoded before execution" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           %{tool_calls: [%{name: :lookup, arguments: ~s({"query":"capital"})}]}
         end
-      ]
-    }
+      )
 
     lookup = Imp.Tool.new(:lookup, "lookup", fn %{query: "capital"} -> %{answer: "Paris"} end)
     agent = Imp.Predict.ReAct.new("question -> answer", [lookup], lm: lm, max_iters: 1)
@@ -251,9 +228,8 @@ defmodule ReActContractTest do
   end
 
   test "OpenAI-style nested function tool calls are normalized before execution" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           %{
             tool_calls: [
@@ -276,8 +252,7 @@ defmodule ReActContractTest do
             ]
           }
         end
-      ]
-    }
+      )
 
     lookup = Imp.Tool.new(:lookup, "lookup", fn %{query: "capital"} -> "Paris" end)
     agent = Imp.Predict.ReAct.new("question -> answer", [lookup], lm: lm, max_iters: 1)
@@ -302,14 +277,12 @@ defmodule ReActContractTest do
   end
 
   test "string tool policies authorize normalized ReAct tool names" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           %{tool_calls: [%{name: "lookup", arguments: %{query: "capital"}}]}
         end
-      ]
-    }
+      )
 
     lookup = Imp.Tool.new(:lookup, "lookup", fn %{query: "capital"} -> "Paris" end)
 
@@ -325,14 +298,12 @@ defmodule ReActContractTest do
   end
 
   test "tool exceptions become structured ReAct errors" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           %{tool_calls: [%{name: :lookup, arguments: %{query: "x"}}]}
         end
-      ]
-    }
+      )
 
     lookup = Imp.Tool.new(:lookup, "lookup", fn _args -> raise "provider exploded" end)
     agent = Imp.Predict.ReAct.new("question -> answer", [lookup], lm: lm, max_iters: 3)
@@ -342,14 +313,12 @@ defmodule ReActContractTest do
   end
 
   test "tool policy exceptions become structured ReAct errors" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           %{tool_calls: [%{name: :lookup, arguments: %{query: "x"}}]}
         end
-      ]
-    }
+      )
 
     lookup = Imp.Tool.new(:lookup, "lookup", fn _args -> "observed" end)
     policy = fn _name, _args -> raise "policy broke" end
@@ -368,9 +337,8 @@ defmodule ReActContractTest do
   test "submit short-circuits later provider tool calls" do
     parent = self()
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           %{
             tool_calls: [
@@ -379,8 +347,7 @@ defmodule ReActContractTest do
             ]
           }
         end
-      ]
-    }
+      )
 
     side_effect =
       Imp.Tool.new(:side_effect, "must not run after submit", fn _args ->
@@ -397,7 +364,7 @@ defmodule ReActContractTest do
   end
 
   # ------------------------------------------------------------------
-  # :dspy_3_2_1 — byte-faithful port of DSPy 3.2.1 dspy.ReAct.
+  # :dspy — byte-faithful port of DSPy 3.2.1 dspy.ReAct.
   #
   # In this mode the reasoning signature is (inputs + trajectory) ->
   # next_thought (str), next_tool_name (Literal[tools + 'finish']),
@@ -410,7 +377,7 @@ defmodule ReActContractTest do
   # (react_dspy_tool_lookup). The full-prompt byte-parity is locked in
   # golden_trace_test.exs; these tests lock the control-flow and shape.
 
-  test "dspy_3_2_1: reasoning signature and instructions match dspy.ReAct" do
+  test "dspy: reasoning signature and instructions match dspy.ReAct" do
     lookup =
       Imp.Tool.new(:lookup, "Lookup a fact by query.", fn %{query: q} -> q end,
         schema: %{
@@ -423,7 +390,7 @@ defmodule ReActContractTest do
     signature =
       Imp.signature("question -> answer", "Use the lookup tool when external facts are needed.")
 
-    agent = Imp.Predict.ReAct.new(signature, [lookup], lm: nil, mode: :dspy_3_2_1)
+    agent = Imp.Predict.ReAct.new(signature, [lookup], lm: nil, mode: :dspy)
 
     react = agent.react.signature
 
@@ -469,7 +436,7 @@ defmodule ReActContractTest do
     refute Map.has_key?(agent.tools, :submit)
   end
 
-  test "dspy_3_2_1: interleaves the text trajectory then extracts after finish" do
+  test "dspy: interleaves the text trajectory then extracts after finish" do
     parent = self()
 
     Process.put(:react_actions, [
@@ -486,12 +453,13 @@ defmodule ReActContractTest do
       %{reasoning: "The lookup observation says Paris.", answer: "Paris"}
     ])
 
-    lm = fn messages, _opts ->
-      send(parent, {:react_messages, messages})
-      [next | rest] = Process.get(:react_actions)
-      Process.put(:react_actions, rest)
-      {:ok, next}
-    end
+    lm =
+      Imp.Test.FunLM.new(fn messages, _opts ->
+        send(parent, {:react_messages, messages})
+        [next | rest] = Process.get(:react_actions)
+        Process.put(:react_actions, rest)
+        {:ok, next}
+      end)
 
     lookup =
       Imp.Tool.new(:lookup, "Lookup a fact by query.", fn %{query: "capital-france"} ->
@@ -504,7 +472,7 @@ defmodule ReActContractTest do
     agent =
       Imp.Predict.ReAct.new(signature, [lookup],
         lm: lm,
-        mode: :dspy_3_2_1,
+        mode: :dspy,
         max_iters: 5
       )
 
@@ -544,7 +512,7 @@ defmodule ReActContractTest do
     assert third_user =~ "`[[ ## answer ## ]]`"
   end
 
-  test "dspy_3_2_1: iteration exhaustion falls through to extraction" do
+  test "dspy: iteration exhaustion falls through to extraction" do
     Process.put(:react_actions, [
       %{next_thought: "look it up", next_tool_name: "lookup", next_tool_args: %{}},
       %{reasoning: "Use the observation", answer: "observed"}
@@ -555,7 +523,7 @@ defmodule ReActContractTest do
     agent =
       Imp.Predict.ReAct.new("question -> answer", [lookup],
         lm: sequence_lm(:react_actions),
-        mode: :dspy_3_2_1,
+        mode: :dspy,
         max_iters: 1
       )
 
@@ -566,7 +534,7 @@ defmodule ReActContractTest do
     assert [%{tool: :lookup, result: "observed"}] = prediction.metadata[:history]
   end
 
-  test "dspy_3_2_1: truncates the oldest tool call but retains the remaining call" do
+  test "dspy: truncates the oldest tool call but retains the remaining call" do
     Process.put(:react_context_responses, [
       {:ok,
        %{next_thought: "t", next_tool_name: "lookup", next_tool_args: %{"query" => "first"}}},
@@ -578,19 +546,20 @@ defmodule ReActContractTest do
       {:ok, %{reasoning: "The retained trajectory is enough", answer: "done"}}
     ])
 
-    lm = fn messages, _opts ->
-      [next | rest] = Process.get(:react_context_responses)
-      Process.put(:react_context_responses, rest)
-      send(self(), {:react_context_messages, messages})
-      next
-    end
+    lm =
+      Imp.Test.FunLM.new(fn messages, _opts ->
+        [next | rest] = Process.get(:react_context_responses)
+        Process.put(:react_context_responses, rest)
+        send(self(), {:react_context_messages, messages})
+        next
+      end)
 
     lookup = Imp.Tool.new(:lookup, "lookup", fn %{query: query} -> query end)
 
     agent =
       Imp.Predict.ReAct.new("question -> answer", [lookup],
         lm: lm,
-        mode: :dspy_3_2_1,
+        mode: :dspy,
         max_iters: 3
       )
 
@@ -613,14 +582,14 @@ defmodule ReActContractTest do
     assert inspect(Enum.at(messages, 4)) =~ "second"
   end
 
-  test "dspy_3_2_1: reports an overflow when no trajectory can be truncated" do
+  test "dspy: reports an overflow when no trajectory can be truncated" do
     error = %Imp.LMError{context_window_exceeded: true, message: "input alone is too long"}
-    lm = fn _messages, _opts -> {:error, error} end
+    lm = Imp.Test.FunLM.new(fn _messages, _opts -> {:error, error} end)
 
     agent =
       Imp.Predict.ReAct.new("question -> answer", [],
         lm: lm,
-        mode: :dspy_3_2_1,
+        mode: :dspy,
         max_iters: 1
       )
 
@@ -628,7 +597,7 @@ defmodule ReActContractTest do
              Imp.Predict.ReAct.call(agent, %{question: "q"})
   end
 
-  test "dspy_3_2_1: context recovery retains the only completed tool call" do
+  test "dspy: context recovery retains the only completed tool call" do
     Process.put(:react_single_call_context_responses, [
       {:ok,
        %{
@@ -640,19 +609,20 @@ defmodule ReActContractTest do
       {:ok, %{reasoning: "Use the retained observation", answer: "fact"}}
     ])
 
-    lm = fn messages, _opts ->
-      [next | rest] = Process.get(:react_single_call_context_responses)
-      Process.put(:react_single_call_context_responses, rest)
-      send(self(), {:react_single_call_context_messages, messages})
-      next
-    end
+    lm =
+      Imp.Test.FunLM.new(fn messages, _opts ->
+        [next | rest] = Process.get(:react_single_call_context_responses)
+        Process.put(:react_single_call_context_responses, rest)
+        send(self(), {:react_single_call_context_messages, messages})
+        next
+      end)
 
     lookup = Imp.Tool.new(:lookup, "lookup", fn %{query: query} -> query end)
 
     agent =
       Imp.Predict.ReAct.new("question -> answer", [lookup],
         lm: lm,
-        mode: :dspy_3_2_1,
+        mode: :dspy,
         max_iters: 2
       )
 
@@ -675,7 +645,7 @@ defmodule ReActContractTest do
     assert inspect(Enum.at(messages, 2)) =~ "fact"
   end
 
-  test "dspy_3_2_1: also truncates the extraction trajectory retries" do
+  test "dspy: also truncates the extraction trajectory retries" do
     Process.put(:react_extraction_context_responses, [
       {:ok,
        %{next_thought: "t", next_tool_name: "lookup", next_tool_args: %{"query" => "first"}}},
@@ -687,19 +657,20 @@ defmodule ReActContractTest do
       {:ok, %{reasoning: "The retained trajectory is enough", answer: "done"}}
     ])
 
-    lm = fn messages, _opts ->
-      [next | rest] = Process.get(:react_extraction_context_responses)
-      Process.put(:react_extraction_context_responses, rest)
-      send(self(), {:react_extraction_context_messages, messages})
-      next
-    end
+    lm =
+      Imp.Test.FunLM.new(fn messages, _opts ->
+        [next | rest] = Process.get(:react_extraction_context_responses)
+        Process.put(:react_extraction_context_responses, rest)
+        send(self(), {:react_extraction_context_messages, messages})
+        next
+      end)
 
     lookup = Imp.Tool.new(:lookup, "lookup", fn %{query: query} -> query end)
 
     agent =
       Imp.Predict.ReAct.new("question -> answer", [lookup],
         lm: lm,
-        mode: :dspy_3_2_1,
+        mode: :dspy,
         max_iters: 3
       )
 
@@ -716,7 +687,7 @@ defmodule ReActContractTest do
     refute inspect(Enum.at(messages, 5)) =~ "second"
   end
 
-  test "dspy_3_2_1: tool exceptions become recoverable observations" do
+  test "dspy: tool exceptions become recoverable observations" do
     Process.put(:react_actions, [
       %{next_thought: "try lookup", next_tool_name: "lookup", next_tool_args: %{"query" => "x"}},
       %{next_thought: "done", next_tool_name: "finish", next_tool_args: %{}},
@@ -728,7 +699,7 @@ defmodule ReActContractTest do
     agent =
       Imp.Predict.ReAct.new("question -> answer", [lookup],
         lm: sequence_lm(:react_actions),
-        mode: :dspy_3_2_1,
+        mode: :dspy,
         max_iters: 3
       )
 
@@ -747,7 +718,7 @@ defmodule ReActContractTest do
     assert Process.get(:react_actions) == []
   end
 
-  test "dspy_3_2_1: a tool returning an error tuple is a recoverable observation" do
+  test "dspy: a tool returning an error tuple is a recoverable observation" do
     Process.put(:react_actions, [
       %{next_thought: "try lookup", next_tool_name: "lookup", next_tool_args: %{}},
       %{next_thought: "done", next_tool_name: "finish", next_tool_args: %{}},
@@ -759,7 +730,7 @@ defmodule ReActContractTest do
     agent =
       Imp.Predict.ReAct.new("question -> answer", [lookup],
         lm: sequence_lm(:react_actions),
-        mode: :dspy_3_2_1
+        mode: :dspy
       )
 
     assert {:ok, prediction} = Imp.Predict.ReAct.call(agent, %{question: "q"})
@@ -772,7 +743,7 @@ defmodule ReActContractTest do
 
   # DSPy's MCP boundary raises on an error result and ReAct shows the exception;
   # Imp keeps the envelope as a term, and the model reads the tool's own words.
-  test "dspy_3_2_1: an MCP error result is observed as the tool's own words" do
+  test "dspy: an MCP error result is observed as the tool's own words" do
     Process.put(:react_actions, [
       %{next_thought: "try lookup", next_tool_name: "lookup", next_tool_args: %{}},
       %{next_thought: "done", next_tool_name: "finish", next_tool_args: %{}},
@@ -790,7 +761,7 @@ defmodule ReActContractTest do
     agent =
       Imp.Predict.ReAct.new("question -> answer", [lookup],
         lm: sequence_lm(:react_actions),
-        mode: :dspy_3_2_1
+        mode: :dspy
       )
 
     assert {:ok, prediction} = Imp.Predict.ReAct.call(agent, %{question: "q"})
@@ -801,7 +772,7 @@ defmodule ReActContractTest do
            ] = prediction.metadata[:history]
   end
 
-  test "dspy_3_2_1: an invalid/missing action is a parse failure that extracts" do
+  test "dspy: an invalid/missing action is a parse failure that extracts" do
     # react.py breaks the loop on a reasoning-signature ValueError (an action it
     # cannot parse) and proceeds straight to extraction. Here the model omits
     # next_tool_name/next_tool_args, so the reasoning signature cannot be parsed.
@@ -816,7 +787,7 @@ defmodule ReActContractTest do
       Imp.Predict.ReAct.new("question -> answer", [],
         lm: sequence_lm(:react_actions),
         adapter: Imp.Adapter.JSON,
-        mode: :dspy_3_2_1,
+        mode: :dspy,
         max_iters: 2
       )
 
@@ -828,20 +799,21 @@ defmodule ReActContractTest do
     assert prediction.metadata[:history] == []
   end
 
-  test "dspy_3_2_1: tool policy stays fail-fast (Imp safety extension)" do
+  test "dspy: tool policy stays fail-fast (Imp safety extension)" do
     parent = self()
 
-    lm = fn _messages, _opts ->
-      send(parent, :react_lm_called)
-      {:ok, %{next_thought: "look", next_tool_name: "lookup", next_tool_args: %{}}}
-    end
+    lm =
+      Imp.Test.FunLM.new(fn _messages, _opts ->
+        send(parent, :react_lm_called)
+        {:ok, %{next_thought: "look", next_tool_name: "lookup", next_tool_args: %{}}}
+      end)
 
     lookup = Imp.Tool.new(:lookup, "lookup", fn _args -> raise "must not execute" end)
 
     agent =
       Imp.Predict.ReAct.new("question -> answer", [lookup],
         lm: lm,
-        mode: :dspy_3_2_1,
+        mode: :dspy,
         tool_policy: []
       )
 
@@ -858,21 +830,18 @@ defmodule ReActContractTest do
     agent = Imp.Predict.ReAct.new("question -> answer", [], lm: nil)
     assert agent.mode == :provider_native
 
-    assert_raise ArgumentError, ~r/expected one of \[:provider_native, :dspy_3_2_1\]/, fn ->
+    assert_raise ArgumentError, ~r/expected one of \[:provider_native, :dspy\]/, fn ->
       Imp.Predict.ReAct.new("question -> answer", [], mode: :source_faithful)
     end
   end
 
   defp sequence_lm(key) do
-    %{
-      module: Imp.LM.Static,
-      opts: [
-        handler: fn _messages, _opts ->
-          [next | rest] = Process.get(key)
-          Process.put(key, rest)
-          next
-        end
-      ]
-    }
+    Imp.LM.Static.new(
+      handler: fn _messages, _opts ->
+        [next | rest] = Process.get(key)
+        Process.put(key, rest)
+        next
+      end
+    )
   end
 end

@@ -25,6 +25,12 @@ defmodule Imp.Saving do
   @artifact_schema_version 1
   @registry_context_key {__MODULE__, :registry}
 
+  @doc """
+  Writes `program` to `path` as a checksummed JSON artifact, readable with
+  `read!/2`. The file is written atomically with mode `0600` and carries no
+  credentials. Takes the same `:registry` option as `dump/2`.
+  """
+  @spec save!(struct(), Path.t(), keyword()) :: :ok
   def save!(program, path, opts \\ []) do
     directory = Path.dirname(path)
     File.mkdir_p!(directory)
@@ -57,25 +63,70 @@ defmodule Imp.Saving do
     end
   end
 
-  def load!(path, opts \\ []) do
+  @doc """
+  Reads a program artifact written by `save!/3` and returns the program.
+
+  The artifact's checksum is verified before anything in it is loaded. Raises
+  `File.Error` when the file cannot be read and `ArgumentError` when it is not
+  a checksummed Imp artifact or its program cannot be loaded. Takes the same
+  `:registry` option as `load/2`.
+  """
+  @spec read!(Path.t(), keyword()) :: struct()
+  def read!(path, opts \\ []) do
     path
     |> File.read!()
     |> Jason.decode!()
     |> then(&with_registry(opts, fn -> load_artifact!(&1) end))
   end
 
+  @doc """
+  Returns `program` as a JSON-safe map that `load/2` turns back into it.
+
+  Credentials are left out. A program that holds callbacks (metrics, tool
+  runners, policies) is dumped by their names in the `:registry`, an
+  `Imp.Saving.Registry`.
+  """
+  @spec dump(struct(), keyword()) :: map()
   def dump(program, opts) do
     with_registry(opts, fn -> dump(program) end)
   end
 
+  @doc "Same as `dump(program, [])`."
+  @spec dump(struct()) :: map()
   def dump(program) do
     program
     |> dump_state()
     |> redact_dump()
   end
 
-  def load(state, opts) do
-    with_registry(opts, fn -> load(state) end)
+  @doc """
+  Loads a program from the portable map `dump/2` returns.
+
+  Returns `{:ok, program}`, or `{:error, %ArgumentError{}}` when `state` is not
+  a program Imp can load: a missing or unknown `"type"`, a malformed field, an
+  adapter or client outside the allowlist, or a callback name the `:registry`
+  does not hold. Nothing in `state` is turned into an atom that does not
+  already exist, and no credential is read from it.
+
+  Options:
+
+    * `:registry` - an `Imp.Saving.Registry` naming the callbacks a saved
+      program refers to (metrics, tool runners, policies).
+  """
+  @spec load(map(), keyword()) :: {:ok, struct()} | {:error, Exception.t()}
+  def load(state, opts \\ []) do
+    {:ok, load!(state, opts)}
+  rescue
+    error in ArgumentError -> {:error, error}
+  end
+
+  @doc """
+  Loads a program from the portable map `dump/2` returns, raising
+  `ArgumentError` where `load/2` returns an error.
+  """
+  @spec load!(map(), keyword()) :: struct()
+  def load!(state, opts \\ []) do
+    with_registry(opts, fn -> load_state!(state) end)
   end
 
   defp load_artifact!(
@@ -93,7 +144,7 @@ defmodule Imp.Saving do
       raise ArgumentError, "saved Imp artifact payload checksum mismatch"
     end
 
-    load(payload)
+    load_state!(payload)
   end
 
   defp load_artifact!(%{"artifact_type" => @artifact_type, "schema_version" => version}) do
@@ -104,9 +155,9 @@ defmodule Imp.Saving do
     raise ArgumentError, "saved Imp file is not a checksummed program artifact envelope"
   end
 
-  defp dump_state(%Imp.Predict.Predict{} = program) do
+  defp dump_state(%Imp.Predict{} = program) do
     program
-    |> Imp.Predict.Predict.dump()
+    |> Imp.Predict.dump()
     |> Map.update!("config", &dump_portable_config!(&1, "Predict config"))
     |> Map.put("type", "predict")
   end
@@ -344,7 +395,7 @@ defmodule Imp.Saving do
             "portable saving supports data-only program graphs; callback-bearing programs require named registries"
   end
 
-  def load(%{"type" => "predict"} = state) do
+  defp load_state!(%{"type" => "predict"} = state) do
     require_keys!(state, @predict_required_keys)
     signature = Map.fetch!(state, "signature")
     demos = require_list!(state, "demos")
@@ -364,28 +415,28 @@ defmodule Imp.Saving do
       |> maybe_put_adapter(state)
       |> maybe_put_lm(state)
 
-    Imp.Predict.Predict.new(Imp.Signature.load(signature), opts)
+    Imp.Predict.new(Imp.Signature.load(signature), opts)
   end
 
-  def load(%{"type" => "with_playbook"} = state) do
+  defp load_state!(%{"type" => "with_playbook"} = state) do
     require_keys!(state, ["type", "program", "playbook"])
 
     Imp.Playbook.WithContext.new(
-      load(Map.fetch!(state, "program")),
+      load_state!(Map.fetch!(state, "program")),
       Imp.Playbook.load!(Map.fetch!(state, "playbook"))
     )
   end
 
-  def load(%{"type" => "chain_of_thought"} = state) do
-    predict = state |> Map.put("type", "predict") |> load()
+  defp load_state!(%{"type" => "chain_of_thought"} = state) do
+    predict = state |> Map.put("type", "predict") |> load_state!()
     %Imp.Predict.ChainOfThought{predict: predict}
   end
 
-  def load(%{"type" => "rag"} = state) do
+  defp load_state!(%{"type" => "rag"} = state) do
     require_keys!(state, @rag_required_keys)
 
     Imp.Predict.RAG.new(
-      load(Map.fetch!(state, "program")),
+      load_state!(Map.fetch!(state, "program")),
       load_retriever!(Map.fetch!(state, "retriever")),
       query_field: Imp.Optimizer.Report.decode_term(Map.fetch!(state, "query_field")),
       context_field: Imp.Optimizer.Report.decode_term(Map.fetch!(state, "context_field")),
@@ -394,10 +445,10 @@ defmodule Imp.Saving do
     )
   end
 
-  def load(%{"type" => "program_of_thought"} = state) do
+  defp load_state!(%{"type" => "program_of_thought"} = state) do
     require_keys!(state, @program_of_thought_required_keys)
     signature = Imp.Signature.load(Map.fetch!(state, "signature"))
-    predict = load(Map.fetch!(state, "predict"))
+    predict = load_state!(Map.fetch!(state, "predict"))
     output_field = Imp.Optimizer.Report.decode_term(Map.fetch!(state, "output_field"))
 
     %Imp.Predict.ProgramOfThought{
@@ -407,13 +458,13 @@ defmodule Imp.Saving do
     }
   end
 
-  def load(%{"type" => "multi_chain_comparison"} = state) do
+  defp load_state!(%{"type" => "multi_chain_comparison"} = state) do
     require_keys!(state, ["type", "predict", "last_key", "m"])
-    predict = load(Map.fetch!(state, "predict"))
+    predict = load_state!(Map.fetch!(state, "predict"))
     last_key = Imp.Optimizer.Report.decode_term(Map.fetch!(state, "last_key"))
     m = Map.fetch!(state, "m")
 
-    unless match?(%Imp.Predict.Predict{}, predict) and is_integer(m) and m > 0 and
+    unless match?(%Imp.Predict{}, predict) and is_integer(m) and m > 0 and
              last_key in Imp.Signature.output_names(predict.signature) do
       raise ArgumentError, "invalid saved MultiChainComparison program state"
     end
@@ -421,7 +472,7 @@ defmodule Imp.Saving do
     %Imp.Predict.MultiChainComparison{predict: predict, last_key: last_key, m: m}
   end
 
-  def load(%{"type" => "knn"} = state) do
+  defp load_state!(%{"type" => "knn"} = state) do
     require_keys!(state, ["type", "examples", "k", "vectorizer"])
     examples = Imp.Optimizer.Report.decode_term(Map.fetch!(state, "examples"))
     vectorizer = load_vectorizer!(Map.fetch!(state, "vectorizer"))
@@ -430,7 +481,7 @@ defmodule Imp.Saving do
     Imp.Predict.KNN.new(Map.fetch!(state, "k"), examples, vectorizer: vectorizer)
   end
 
-  def load(%{"type" => "avatar"} = state) do
+  defp load_state!(%{"type" => "avatar"} = state) do
     state = require_portable_json!(state, "saved Avatar")
 
     require_keys!(state, [
@@ -444,8 +495,8 @@ defmodule Imp.Saving do
     ])
 
     signature = Imp.Signature.load(state["signature"])
-    actor = require_predict!(load(state["actor"]), "Avatar actor")
-    finisher = require_predict!(load(state["finisher"]), "Avatar finisher")
+    actor = require_predict!(load_state!(state["actor"]), "Avatar actor")
+    finisher = require_predict!(load_state!(state["finisher"]), "Avatar finisher")
     tools = load_tools!(state["tools"], "Avatar")
     max_iters = require_non_negative_integer!(state["max_iters"], "Avatar max_iters")
 
@@ -476,11 +527,11 @@ defmodule Imp.Saving do
     }
   end
 
-  def load(%{"type" => "best_of_n"} = state) do
+  defp load_state!(%{"type" => "best_of_n"} = state) do
     require_keys!(state, ["type", "program", "metric", "feedback", "n", "threshold"])
 
     Imp.Predict.BestOfN.new(
-      load(Map.fetch!(state, "program")),
+      load_state!(Map.fetch!(state, "program")),
       load_callback!(Map.fetch!(state, "metric"), 2, "BestOfN metric"),
       n: require_non_negative_integer!(Map.fetch!(state, "n"), "BestOfN n"),
       threshold: require_threshold!(Map.fetch!(state, "threshold"), "BestOfN threshold"),
@@ -488,7 +539,7 @@ defmodule Imp.Saving do
     )
   end
 
-  def load(%{"type" => "refine"} = state) do
+  defp load_state!(%{"type" => "refine"} = state) do
     require_keys!(state, [
       "type",
       "program",
@@ -500,7 +551,7 @@ defmodule Imp.Saving do
     ])
 
     Imp.Predict.Refine.new(
-      load(Map.fetch!(state, "program")),
+      load_state!(Map.fetch!(state, "program")),
       load_callback!(Map.fetch!(state, "metric"), 2, "Refine metric"),
       max_attempts:
         require_non_negative_integer!(Map.fetch!(state, "max_attempts"), "Refine max_attempts"),
@@ -514,7 +565,7 @@ defmodule Imp.Saving do
     )
   end
 
-  def load(%{"type" => "assertions"} = state) do
+  defp load_state!(%{"type" => "assertions"} = state) do
     require_keys!(state, ["type", "program", "assertions", "max_attempts", "strict"])
 
     assertions =
@@ -530,13 +581,13 @@ defmodule Imp.Saving do
         )
       end)
 
-    Imp.Predict.Assertions.new(load(state["program"]), assertions,
+    Imp.Predict.Assertions.new(load_state!(state["program"]), assertions,
       max_attempts: state["max_attempts"],
       strict: state["strict"]
     )
   end
 
-  def load(%{"type" => "react"} = state) do
+  defp load_state!(%{"type" => "react"} = state) do
     require_keys!(state, [
       "type",
       "signature",
@@ -555,7 +606,7 @@ defmodule Imp.Saving do
 
     %Imp.Predict.ReAct{
       signature: signature,
-      react: require_predict!(load(state["react"]), "ReAct"),
+      react: require_predict!(load_state!(state["react"]), "ReAct"),
       tools: Map.put(tools, reserved_name, reserved),
       max_iters: require_non_negative_integer!(state["max_iters"], "ReAct max_iters"),
       tool_policy: load_tool_policy!(state["tool_policy"], "ReAct tool policy"),
@@ -563,14 +614,14 @@ defmodule Imp.Saving do
     }
   end
 
-  def load(%{"type" => "react_v2"} = state) do
+  defp load_state!(%{"type" => "react_v2"} = state) do
     require_keys!(state, ["type", "signature", "react", "tools", "max_iters", "tool_policy"])
     tools = load_tools!(state["tools"], "ReActV2")
     signature = Imp.Signature.load(state["signature"])
 
     %Imp.Predict.ReActV2{
       signature: signature,
-      react: require_predict!(load(state["react"]), "ReActV2"),
+      react: require_predict!(load_state!(state["react"]), "ReActV2"),
       tools: Imp.Predict.ReActV2.put_submit(tools, signature),
       max_iters: require_non_negative_integer!(state["max_iters"], "ReActV2 max_iters"),
       last_request_note: load_react_v2_last_request_note!(state["last_request_note"]),
@@ -579,7 +630,7 @@ defmodule Imp.Saving do
     }
   end
 
-  def load(%{"type" => "code_act"} = state) do
+  defp load_state!(%{"type" => "code_act"} = state) do
     require_keys!(state, [
       "type",
       "program_of_thought",
@@ -589,14 +640,14 @@ defmodule Imp.Saving do
     ])
 
     %Imp.Predict.CodeAct{
-      program_of_thought: require_program_of_thought!(load(state["program_of_thought"])),
+      program_of_thought: require_program_of_thought!(load_state!(state["program_of_thought"])),
       tools: load_tools!(state["tools"], "CodeAct"),
       max_iters: require_non_negative_integer!(state["max_iters"], "CodeAct max_iters"),
       tool_policy: load_tool_policy!(state["tool_policy"], "CodeAct tool policy")
     }
   end
 
-  def load(%{"type" => "rlm"} = state) do
+  defp load_state!(%{"type" => "rlm"} = state) do
     require_keys!(state, [
       "type",
       "signature",
@@ -664,31 +715,37 @@ defmodule Imp.Saving do
     }
   end
 
-  def load(%{"type" => "semantic_f1"} = state) do
+  defp load_state!(%{"type" => "semantic_f1"} = state) do
     require_keys!(state, ["type", "predict", "threshold", "decompositional"])
 
     %Imp.Evaluate.SemanticF1{
-      predict: require_chain_of_thought!(load(state["predict"]), "SemanticF1"),
+      predict: require_chain_of_thought!(load_state!(state["predict"]), "SemanticF1"),
       threshold: require_threshold!(Map.fetch!(state, "threshold"), "SemanticF1 threshold"),
       decompositional: Map.fetch!(state, "decompositional") == true
     }
   end
 
-  def load(%{"type" => "complete_and_grounded_v2"} = state) do
+  defp load_state!(%{"type" => "complete_and_grounded_v2"} = state) do
     require_keys!(state, ["type", "completeness", "groundedness", "threshold"])
 
     %Imp.Evaluate.CompleteAndGrounded{
       completeness:
-        require_chain_of_thought!(load(state["completeness"]), "CompleteAndGrounded completeness"),
+        require_chain_of_thought!(
+          load_state!(state["completeness"]),
+          "CompleteAndGrounded completeness"
+        ),
       groundedness:
-        require_chain_of_thought!(load(state["groundedness"]), "CompleteAndGrounded groundedness"),
+        require_chain_of_thought!(
+          load_state!(state["groundedness"]),
+          "CompleteAndGrounded groundedness"
+        ),
       threshold: require_threshold!(state["threshold"], "CompleteAndGrounded threshold")
     }
   end
 
-  def load(%{"type" => "knn_few_shot_program"} = state) do
+  defp load_state!(%{"type" => "knn_few_shot_program"} = state) do
     require_keys!(state, ["type", "student", "knn", "teacher", "bootstrap"])
-    knn = load(state["knn"])
+    knn = load_state!(state["knn"])
 
     unless match?(%Imp.Predict.KNN{}, knn) do
       raise ArgumentError, "saved KNNFewShot knn must be a KNN program"
@@ -709,8 +766,8 @@ defmodule Imp.Saving do
     metric = load_optional_callback(bootstrap["metric"], [2, 3], "KNNFewShot bootstrap metric")
 
     %Imp.Optimizer.KNNFewShot.Program{
-      student: load(state["student"]),
-      teacher: if(state["teacher"], do: load(state["teacher"])),
+      student: load_state!(state["student"]),
+      teacher: if(state["teacher"], do: load_state!(state["teacher"])),
       optimizer: %Imp.Optimizer.KNNFewShot{
         knn: knn,
         bootstrap:
@@ -726,9 +783,9 @@ defmodule Imp.Saving do
     }
   end
 
-  def load(%{"type" => "ensemble_program"} = state) do
+  defp load_state!(%{"type" => "ensemble_program"} = state) do
     require_keys!(state, ["type", "programs", "reduce_fn", "size", "deterministic"])
-    programs = require_list!(state, "programs") |> Enum.map(&load/1)
+    programs = require_list!(state, "programs") |> Enum.map(&load_state!/1)
 
     ensemble =
       Imp.Optimizer.Ensemble.new(
@@ -741,7 +798,7 @@ defmodule Imp.Saving do
     Imp.Optimizer.Ensemble.compile(ensemble, programs)
   end
 
-  def load(%{"type" => "optimizer_parameter_snapshot"} = state) do
+  defp load_state!(%{"type" => "optimizer_parameter_snapshot"} = state) do
     exact_keys!(state, ["type", "predictors"], "saved optimizer parameter snapshot")
 
     entries =
@@ -758,17 +815,17 @@ defmodule Imp.Saving do
     Imp.Optimizer.Artifact.ParameterSnapshot.new(entries)
   end
 
-  def load(%{"type" => "imp_optimizer_trajectory"} = state), do: Trajectory.load!(state)
+  defp load_state!(%{"type" => "imp_optimizer_trajectory"} = state), do: Trajectory.load!(state)
 
-  def load(%{"type" => type}) do
+  defp load_state!(%{"type" => type}) do
     raise ArgumentError, "unsupported saved Imp program type: #{inspect(type)}"
   end
 
-  def load(state) when is_map(state) do
+  defp load_state!(state) when is_map(state) do
     raise ArgumentError, "saved Imp program is missing required key \"type\""
   end
 
-  def load(state) do
+  defp load_state!(state) do
     raise ArgumentError, "saved Imp program must be a map, got: #{inspect(state)}"
   end
 
@@ -884,7 +941,7 @@ defmodule Imp.Saving do
   defp load_optional_callback(name, arities, context),
     do: load_callback!(name, arities, context)
 
-  defp dump_avatar_predict(%Imp.Predict.Predict{} = predict, context) do
+  defp dump_avatar_predict(%Imp.Predict{} = predict, context) do
     predict
     |> dump()
     |> Map.put("signature", dump_portable_signature!(predict.signature, "#{context} signature"))
@@ -1162,14 +1219,16 @@ defmodule Imp.Saving do
     do: raise(ArgumentError, "invalid saved ReActV2 last_request_note: #{inspect(other)}")
 
   defp dump_react_mode!(:provider_native), do: "provider_native"
-  defp dump_react_mode!(:dspy_3_2_1), do: "dspy_3_2_1"
+  defp dump_react_mode!(:dspy), do: "dspy"
 
   defp dump_react_mode!(mode) do
     raise ArgumentError, "unsupported ReAct mode for persistence: #{inspect(mode)}"
   end
 
   defp load_react_mode!("provider_native"), do: :provider_native
-  defp load_react_mode!("dspy_3_2_1"), do: :dspy_3_2_1
+  defp load_react_mode!("dspy"), do: :dspy
+  # The mode's name before 0.5.0, still in programs saved then.
+  defp load_react_mode!("dspy_3_2_1"), do: :dspy
 
   defp load_react_mode!(mode) do
     raise ArgumentError, "invalid saved ReAct mode: #{inspect(mode)}"
@@ -1195,7 +1254,7 @@ defmodule Imp.Saving do
   defp dump_adapter(_adapter, true), do: nil
   defp dump_adapter(adapter, false) when is_atom(adapter), do: Atom.to_string(adapter)
 
-  defp require_predict!(%Imp.Predict.Predict{} = predict, _context), do: predict
+  defp require_predict!(%Imp.Predict{} = predict, _context), do: predict
 
   defp require_predict!(program, context),
     do:
@@ -1632,7 +1691,7 @@ defmodule Imp.Saving do
 
   defp validate_program_of_thought_predict!(
          %Imp.Signature{} = task_signature,
-         %Imp.Predict.Predict{signature: planner_signature} = predict
+         %Imp.Predict{signature: planner_signature} = predict
        ) do
     cond do
       Imp.Signature.input_names(planner_signature) != Imp.Signature.input_names(task_signature) ->
@@ -1772,7 +1831,7 @@ defmodule Imp.Saving do
       |> maybe_put_adapter(state)
       |> maybe_put_lm(state)
 
-    Imp.Predict.Predict.new(Imp.Signature.load(signature), opts)
+    Imp.Predict.new(Imp.Signature.load(signature), opts)
   end
 
   defp load_parameter_predictor!(state) do

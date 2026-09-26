@@ -47,7 +47,7 @@ defmodule ReActV2LastRequestNoteTest do
     note = "You have used every turn. Submit the answer you have now."
 
     program =
-      Imp.react_v2(@signature, [look()],
+      Imp.react(@signature, [look()],
         lm: recording_lm(owner),
         max_iters: 1,
         last_request_note: note
@@ -75,7 +75,7 @@ defmodule ReActV2LastRequestNoteTest do
     owner = self()
 
     program =
-      Imp.react_v2(@signature, [look()], lm: recording_lm(owner), max_iters: 1)
+      Imp.react(@signature, [look()], lm: recording_lm(owner), max_iters: 1)
 
     assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
     [{first, _}, {forced, _}] = requests(2)
@@ -88,23 +88,23 @@ defmodule ReActV2LastRequestNoteTest do
 
   test "the note is saved with the program, whichever kind of signature it has" do
     for signature <- [@signature, "intent -> answer"] do
-      program = Imp.react_v2(signature, [], last_request_note: "Answer now.")
+      program = Imp.react(signature, [], last_request_note: "Answer now.")
       dumped = Imp.dump(program)
       assert dumped["last_request_note"] == "Answer now."
-      assert Imp.load(dumped).last_request_note == "Answer now."
+      assert Imp.load!(dumped).last_request_note == "Answer now."
     end
   end
 
   test "the option takes a string or nil and nothing else" do
     for bad <- [fn _reason -> "no" end, 7] do
       assert_raise ArgumentError, ~r/last_request_note/, fn ->
-        Imp.react_v2(@signature, [look()], last_request_note: bad)
+        Imp.react(@signature, [look()], last_request_note: bad)
       end
     end
 
     for gone <- [:forced_submit_notice, :last_text_note] do
       assert_raise ArgumentError, ~r/unknown options/, fn ->
-        Imp.react_v2(@signature, [look()], [{gone, "Submit now."}])
+        Imp.react(@signature, [look()], [{gone, "Submit now."}])
       end
     end
   end

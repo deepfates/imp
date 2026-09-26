@@ -237,18 +237,15 @@ defmodule Imp.Benchmarks do
   end
 
   defp reward_lm do
-    %{
-      module: Imp.LM.Static,
-      opts: [
-        handler: fn messages, _opts ->
-          prompt = Enum.map_join(messages, "\n", & &1.content)
+    Imp.LM.Static.new(
+      handler: fn messages, _opts ->
+        prompt = Enum.map_join(messages, "\n", & &1.content)
 
-          if prompt =~ "[[ ## answer ## ]]\nParis",
-            do: %{answer: "Paris"},
-            else: %{answer: "unknown"}
-        end
-      ]
-    }
+        if prompt =~ "[[ ## answer ## ]]\nParis",
+          do: %{answer: "Paris"},
+          else: %{answer: "unknown"}
+      end
+    )
   end
 
   defp reward_trainset do

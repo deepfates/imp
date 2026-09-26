@@ -377,19 +377,16 @@ defmodule Imp.Optimizer.MIPROv2.ResumeTest do
          metric \\ Imp.Metrics.exact_match(:answer),
          identity \\ metric_identity()
        ) do
-    task_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    task_lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           Agent.update(state, &Map.update!(&1, :task_calls, fn count -> count + 1 end))
           %{answer: "yes"}
         end
-      ]
-    }
+      )
 
-    prompt_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    prompt_lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           Agent.update(
             state,
@@ -398,8 +395,7 @@ defmodule Imp.Optimizer.MIPROv2.ResumeTest do
 
           ["Answer consistently.", "Return yes.", "Use the demonstrations."]
         end
-      ]
-    }
+      )
 
     program = Imp.predict("question -> answer", lm: task_lm)
 

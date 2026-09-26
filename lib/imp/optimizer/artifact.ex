@@ -75,7 +75,7 @@ defmodule Imp.Optimizer.Artifact do
       |> json_normalize!("optimizer candidate program")
 
     # A dump is not accepted as portable until the saving layer can restore it.
-    restored = Saving.load(state, registry_opts)
+    restored = Saving.load!(state, registry_opts)
     ensure_predictors!(restored)
 
     %{
@@ -372,10 +372,10 @@ defmodule Imp.Optimizer.Artifact do
 
       ProgramParameters.update_predictor(acc, target_name, fn live_predictor ->
         live_predictor
-        |> Imp.Predict.Predict.with_signature(
+        |> Imp.Predict.with_signature(
           resolve_signature(source_predictor.signature, target_predictor.signature, identity)
         )
-        |> Imp.Predict.Predict.with_demos(
+        |> Imp.Predict.with_demos(
           resolve_demos(source_predictor.demos, target_predictor.signature, identity)
         )
         |> Map.put(:config, resolve_config(source_predictor.config, target_predictor.config))
@@ -689,7 +689,7 @@ defmodule Imp.Optimizer.Artifact do
 
   defp restore_program(candidate, opts) do
     validate_keyword!(opts, [:registry], "artifact operation")
-    Saving.load(candidate["program"], saving_opts(opts))
+    Saving.load!(candidate["program"], saving_opts(opts))
   end
 
   defp require_applicable_candidate!(%{"kind" => "value"}) do

@@ -182,19 +182,27 @@ defmodule Mix.Tasks.Imp.Benchmark.RagToolFailureDifferential do
     {:ok, queue} = Agent.start_link(fn -> imp_responses(scenario) end)
     {:ok, tool_state} = Agent.start_link(fn -> %{unstable: %{}, idempotency: MapSet.new()} end)
 
-    lm = fn _messages, _opts ->
-      Agent.get_and_update(queue, fn
-        [response | rest] -> {{:ok, response}, rest}
-        [] -> {{:error, :fixture_response_queue_exhausted}, []}
-      end)
-    end
+    # An exhausted queue raises, which the LM boundary reports as the call's
+    # error, where the scripted function used to return one.
+    lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          case Agent.get_and_update(queue, fn
+                 [response | rest] -> {response, rest}
+                 [] -> {:exhausted, []}
+               end) do
+            :exhausted -> raise "fixture response queue exhausted"
+            response -> response
+          end
+        end
+      )
 
     tools = fixture_tools(tool_state)
 
     program =
       Imp.Predict.ReAct.new("question -> answer", tools,
         lm: lm,
-        mode: :dspy_3_2_1,
+        mode: :dspy,
         max_iters: scenario["max_iters"]
       )
       |> maybe_remove_ghost_tool(scenario["id"])
@@ -228,7 +236,7 @@ defmodule Mix.Tasks.Imp.Benchmark.RagToolFailureDifferential do
   end
 
   defp imp_responses(scenario) do
-    # :dspy_3_2_1 faithful contract: each turn is the three reasoning fields
+    # :dspy faithful contract: each turn is the three reasoning fields
     # (next_thought / next_tool_name / next_tool_args), and the reserved
     # terminator is `finish` (no submit alias). The final response is the
     # separate ChainOfThought extraction turn.

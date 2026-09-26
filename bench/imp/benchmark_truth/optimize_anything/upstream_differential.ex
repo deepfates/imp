@@ -140,8 +140,6 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.UpstreamDifferential do
     def initial_state, do: %{next_sequence: 1, active: %{}, calls: []}
 
     @impl true
-    def generate(_messages, _opts), do: {:error, :audited_lm_instance_required}
-
     def generate(%__MODULE__{} = lm, messages, opts) do
       sequence = begin_call!(lm.audit, messages)
       result = Imp.LM.generate(lm.inner, messages, opts)
@@ -309,8 +307,6 @@ defmodule Imp.BenchmarkTruth.OptimizeAnything.UpstreamDifferential do
     end
 
     @impl true
-    def generate(_messages, _opts), do: {:error, :matched_retry_lm_instance_required}
-
     def generate(%__MODULE__{} = lm, messages, opts) do
       attempt(lm, messages, opts, 0)
     end

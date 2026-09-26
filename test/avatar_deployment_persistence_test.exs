@@ -20,7 +20,7 @@ defmodule AvatarDeploymentPersistenceTest do
     assert :ok = Imp.save!(avatar, path, registry: registry)
 
     loaded =
-      Task.async(fn -> Imp.load!(path, registry: registry) end)
+      Task.async(fn -> Imp.read!(path, registry: registry) end)
       |> Task.await()
       |> Imp.Predict.Avatar.with_lm(deployment_lm())
 
@@ -80,7 +80,7 @@ defmodule AvatarDeploymentPersistenceTest do
            end)
 
     loaded =
-      Task.async(fn -> Imp.load!(path) end)
+      Task.async(fn -> Imp.read!(path) end)
       |> Task.await()
       |> Imp.Predict.Avatar.with_lm(finish_lm())
 
@@ -114,14 +114,11 @@ defmodule AvatarDeploymentPersistenceTest do
   end
 
   defp static_lm(handler) do
-    %{
-      module: Imp.LM.Static,
-      opts: [
-        handler: fn messages, _opts ->
-          messages |> Enum.map_join("\n", & &1.content) |> handler.()
-        end
-      ]
-    }
+    Imp.LM.Static.new(
+      handler: fn messages, _opts ->
+        messages |> Enum.map_join("\n", & &1.content) |> handler.()
+      end
+    )
   end
 
   defp finish_action, do: %{action: %{tool_name: "Finish", tool_input_query: %{}}}

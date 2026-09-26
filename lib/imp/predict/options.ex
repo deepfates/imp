@@ -1,6 +1,6 @@
 defmodule Imp.Predict.Options do
   @moduledoc false
-  # `Imp.Predict.Predict.new/2`'s options, and the check every constructor
+  # `Imp.Predict.new/2`'s options, and the check every constructor
   # that builds a Predict shares. Predict and ChainOfThought read `schema/0`
   # while they compile, so this module must not depend on another Imp module
   # at compile time: in the compile cycle Predict belongs to, a module that

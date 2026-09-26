@@ -62,21 +62,30 @@ defmodule Mix.Tasks.Imp.PublicApi do
       |> Keyword.fetch!(:files)
       |> MapSet.new()
 
-    modules = packaged_documented_modules(package_files)
+    packaged = packaged_modules(package_files)
+    modules = for {module, :documented} <- packaged, do: module
+    hidden = for {module, :hidden} <- packaged, do: module
     policy = load_policy!(Keyword.get(opts, :policy, @default_policy_path))
     validate_policy!(policy, modules)
 
+    classified =
+      Enum.map(modules, fn module -> {module, classify!(inspect(module), policy)} end) ++
+        Enum.map(hidden, fn module -> {module, "internal"} end)
+
     {public_modules, excluded_modules} =
-      modules
-      |> Enum.map(fn module -> {module, classify!(inspect(module), policy)} end)
+      classified
       |> Enum.sort_by(fn {module, _category} -> inspect(module) end)
       |> Enum.reduce({[], []}, fn {module, category}, {public, excluded} ->
-        entry = module_entry(module, category, policy)
-
         if category == "internal" do
-          {public, [Map.take(entry, ["category", "module", "source"]) | excluded]}
+          entry = %{
+            "category" => category,
+            "module" => inspect(module),
+            "source" => source_path(module)
+          }
+
+          {public, [entry | excluded]}
         else
-          {[entry | public], excluded}
+          {[module_entry(module, category, policy) | public], excluded}
         end
       end)
 
@@ -206,18 +215,37 @@ defmodule Mix.Tasks.Imp.PublicApi do
     end
   end
 
-  defp packaged_documented_modules(package_files) do
-    :imp
-    |> Application.spec(:modules)
-    |> List.wrap()
-    |> Enum.filter(fn module ->
-      Code.ensure_loaded?(module) and MapSet.member?(package_files, source_path(module)) and
-        documented_module?(module)
-    end)
+  # Every packaged module is recorded: a documented module under its policy
+  # category, and a `@moduledoc false` module as internal. A module with no
+  # `@moduledoc` at all is refused, so none can leave the manifest unnoticed.
+  defp packaged_modules(package_files) do
+    packaged =
+      :imp
+      |> Application.spec(:modules)
+      |> List.wrap()
+      |> Enum.filter(fn module ->
+        Code.ensure_loaded?(module) and MapSet.member?(package_files, source_path(module))
+      end)
+      |> Enum.map(&{&1, module_doc_status(&1)})
+
+    case for({module, :undocumented} <- packaged, do: inspect(module)) do
+      [] ->
+        packaged
+
+      undocumented ->
+        Mix.raise(
+          "packaged modules without a @moduledoc: #{Enum.join(Enum.sort(undocumented), ", ")}. " <>
+            "Document each one, or mark it @moduledoc false if it is internal."
+        )
+    end
   end
 
-  defp documented_module?(module) do
-    match?({:docs_v1, _, _, _, %{"en" => _}, _, _}, Code.fetch_docs(module))
+  defp module_doc_status(module) do
+    case Code.fetch_docs(module) do
+      {:docs_v1, _, _, _, %{"en" => _}, _, _} -> :documented
+      {:docs_v1, _, _, _, :hidden, _, _} -> :hidden
+      _none -> :undocumented
+    end
   end
 
   defp module_entry(module, category, policy) do

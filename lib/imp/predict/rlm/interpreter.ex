@@ -13,6 +13,15 @@ defmodule Imp.Predict.RLM.Interpreter do
     defstruct [:kind, :name, :arguments]
   end
 
+  defmodule Fn do
+    @moduledoc false
+    # An anonymous function written by controller code: its clauses stay AST
+    # and run through the interpreter, so a library function that calls it
+    # never runs code the interpreter did not evaluate.
+    @enforce_keys [:arity, :clauses]
+    defstruct [:arity, :clauses]
+  end
+
   @default_max_steps 10_000
   @default_max_output_chars 8_000
   @default_max_source_bytes 32_000
@@ -45,40 +54,69 @@ defmodule Imp.Predict.RLM.Interpreter do
   ]
   @unary_operators [:+, :-, :!, :not]
 
-  @string_functions %{
-    length: 1,
-    slice: [2, 3],
-    split: [1, 2],
-    trim: 1,
-    trim_leading: 1,
-    trim_trailing: 1,
-    downcase: 1,
-    upcase: 1,
-    replace: 3,
-    contains?: 2,
-    starts_with?: 2,
-    ends_with?: 2
+  # Controller code may call every public function of these modules except
+  # the refused ones below. They are pure apart from the functions they are
+  # given, and those are interpreter functions (`Fn`), which cannot reach an
+  # effect. A map may not pose as a struct (see `check_library_argument/2`),
+  # so protocol dispatch inside these modules reaches only plain data.
+  @library_modules %{Enum: Enum, Keyword: Keyword, List: List, Map: Map, String: String}
+  # Kernel functions of plain data a model calls without a module: type
+  # checks, sizes, tuple access, arithmetic. Nothing that makes atoms, sends,
+  # spawns or reaches the process.
+  @kernel_functions MapSet.new([
+                      {:elem, 2},
+                      {:to_string, 1},
+                      {:is_map, 1},
+                      {:is_list, 1},
+                      {:is_binary, 1},
+                      {:is_integer, 1},
+                      {:is_float, 1},
+                      {:is_number, 1},
+                      {:is_boolean, 1},
+                      {:is_atom, 1},
+                      {:is_tuple, 1},
+                      {:is_nil, 1},
+                      {:length, 1},
+                      {:map_size, 1},
+                      {:tuple_size, 1},
+                      {:byte_size, 1},
+                      {:abs, 1},
+                      {:round, 1},
+                      {:trunc, 1},
+                      {:div, 2},
+                      {:rem, 2},
+                      {:max, 2},
+                      {:min, 2}
+                    ])
+  @refused_functions %{
+    # Atoms are never garbage-collected; generated code must not mint them.
+    {:String, :to_atom} => "creates atoms",
+    {:List, :to_atom} => "creates atoms",
+    # A lazy stream carries native closures into the variable space.
+    {:String, :splitter} => "returns a lazy stream",
+    # These read and advance the process's random state, so a repaired cell
+    # would not recompute the same value.
+    {:Enum, :random} => "is nondeterministic",
+    {:Enum, :shuffle} => "is nondeterministic",
+    {:Enum, :take_random} => "is nondeterministic"
   }
-  @enum_functions %{
-    at: [2, 3],
-    slice: 2,
-    take: 2,
-    drop: 2,
-    chunk_every: [2, 3],
-    join: [1, 2],
-    count: 1,
-    reverse: 1,
-    uniq: 1,
-    concat: 1,
-    member?: 2,
-    min: 1,
-    max: 1,
-    # Aggregations that take no function argument. Generated code cannot write
-    # a lambda, so `Enum.reduce/3` is out of reach and these are listed
-    # explicitly.
-    sum: 1,
-    product: 1
-  }
+  @library_functions for {alias_name, module} <- @library_modules,
+                         {function, arity} <- module.__info__(:functions),
+                         not Map.has_key?(@refused_functions, {alias_name, function}),
+                         into: MapSet.new(),
+                         do: {alias_name, function, arity}
+  # Library functions whose function argument returns an accumulator rather
+  # than an element of the result; each return is bounded on its own instead
+  # of adding to the call's running total.
+  @accumulator_functions [
+    {:Enum, :reduce},
+    {:Enum, :reduce_while},
+    {:Enum, :chunk_while},
+    {:List, :foldl},
+    {:List, :foldr}
+  ]
+  @fn_frame {__MODULE__, :fn_frame}
+  @fn_failure {__MODULE__, :fn_failure}
 
   defstruct vars: %{},
             protected_vars: %{},
@@ -93,7 +131,8 @@ defmodule Imp.Predict.RLM.Interpreter do
             effect_journal: [],
             effect_results: [],
             effect_requests: [],
-            steps: 0
+            steps: 0,
+            in_function: false
 
   @type t :: %__MODULE__{}
 
@@ -102,8 +141,9 @@ defmodule Imp.Predict.RLM.Interpreter do
     %{
       binary_operators: @binary_operators,
       unary_operators: @unary_operators,
-      string_functions: @string_functions,
-      enum_functions: @enum_functions
+      library_modules: @library_modules |> Map.keys() |> Enum.sort(),
+      library_functions: @library_functions,
+      refused_functions: @refused_functions
     }
   end
 
@@ -111,10 +151,11 @@ defmodule Imp.Predict.RLM.Interpreter do
   def controller_language_guide do
     """
     The controller executes a small Elixir-shaped language, not general Elixir.
-    Supported values and data are strings, numbers, booleans, nil, existing atom literals, lists, maps, tuples, and integer ranges; unfamiliar atom literals are represented as strings rather than creating VM atoms. Supported control is variable assignment, `if condition, do: value, else: value`, and bounded `for item <- items, do: expression` comprehensions. Pipelines with `|>` are supported. Supported operators are #{format_operators(@binary_operators ++ @unary_operators)}. Use `Access.get(container, key)` or `container[key]` for map/list/string access.
-    Only these String calls are available: #{format_allowlist(:String, @string_functions)}.
-    Only these Enum calls are available: #{format_allowlist(:Enum, @enum_functions)}.
-    Important traps: `case`, anonymous functions, arbitrary module calls, `Enum.find`, and `hd` are not supported. Use `if` instead of `case`, a comprehension plus `Enum.at(values, 0)` instead of `Enum.find` or `hd`, and string concatenation with `<>` instead of interpolation or binary `<<>>` syntax. String literals themselves are supported.
+    Supported values and data are strings, numbers, booleans, nil, existing atom literals, lists, maps, tuples, and integer ranges; unfamiliar atom literals are represented as strings rather than creating VM atoms. Supported control is assignment to a variable or a pattern (`{a, b} = pair`, `[first | rest] = lines`), `if condition, do: value, else: value`, and bounded `for pattern <- list_range_or_map, filter, do: expression` comprehensions, which take `into:` and `uniq:` but not `reduce:`. `[item | list]` builds a list. Pipelines with `|>` are supported. Supported operators are #{format_operators(@binary_operators ++ @unary_operators)}. Use `Access.get(container, key)` or `container[key]` for map/list/string access.
+    Every function of `Enum`, `Keyword`, `List`, `Map` and `String` is available except #{format_refused()}; a sorter is `:asc`, `:desc` or a function, never a module. Other modules cannot be called or used as values. Without a module, #{format_kernel()} are available.
+    Anonymous functions (`fn x -> ... end`, with several clauses, guards, and tuple, list or map patterns) and captures (`&String.downcase/1`, `&(&1 + 1)`) can be passed to those functions. Inside a function, `print` works but registered tools, the task built-ins and `submit` do not; call those from a `for` comprehension instead.
+    A function held in a variable, or written in place, can also be called directly: `f.(x)`, `(fn x -> x * 2 end).(3)`.
+    Important traps: `case` and `hd` are not supported. Use `if` or a multi-clause `fn` instead of `case`, `List.first` instead of `hd`, and string concatenation with `<>` instead of interpolation or binary `<<>>` syntax. String literals themselves are supported.
     Registered tools and the built-ins named in the task prompt are the only effectful calls. A failed cell rolls back its assignments while retaining already-completed effects for deterministic repair.
     """
     |> String.trim()
@@ -200,7 +241,7 @@ defmodule Imp.Predict.RLM.Interpreter do
          {:ok, source} <- normalize_repl_helpers(source),
          {:ok, ast} <- parse(source),
          :ok <- check_ast_budget(ast, interpreter.max_steps) do
-      case eval(ast, interpreter) do
+      case safe_eval(ast, interpreter) do
         {:ok, value, next} ->
           {:ok, value, finish_transaction(next)}
 
@@ -227,6 +268,14 @@ defmodule Imp.Predict.RLM.Interpreter do
     else
       {:error, reason} -> {:error, reason, original}
     end
+  end
+
+  # A defect in the interpreter must reach the model as a failed cell, not
+  # end the whole RLM call.
+  defp safe_eval(ast, interpreter) do
+    eval(ast, interpreter)
+  rescue
+    error -> {:error, {:interpreter_error, Exception.message(error)}, interpreter}
   end
 
   defp check_source_budget(source, max_bytes) do
@@ -383,6 +432,17 @@ defmodule Imp.Predict.RLM.Interpreter do
     end
   end
 
+  # `{a, b} = pair`, `[first | rest] = lines`, `%{"id" => id} = row`: the
+  # patterns a function clause takes.
+  defp eval_node({:=, _, [pattern, expression]}, state) do
+    with {:ok, value, state} <- eval(expression, state) do
+      case bind(pattern, value, state.vars) do
+        {:ok, vars} -> {:ok, value, %{state | vars: vars}}
+        :error -> {:error, {:no_match, render(pattern)}, state}
+      end
+    end
+  end
+
   defp eval_node({name, _, context}, state)
        when (is_atom(name) or is_binary(name)) and (is_atom(context) or is_nil(context)) do
     case fetch_var(state.vars, name) do
@@ -396,11 +456,20 @@ defmodule Imp.Predict.RLM.Interpreter do
   defp eval_node({left, right}, state),
     do: eval_collection([left, right], state, &List.to_tuple/1)
 
-  defp eval_node(list, state) when is_list(list), do: eval_collection(list, state, & &1)
+  defp eval_node(list, state) when is_list(list) do
+    case List.last(list) do
+      {:|, _, [head, tail]} -> eval_cons(Enum.drop(list, -1) ++ [head], tail, state)
+      _other -> eval_collection(list, state, & &1)
+    end
+  end
 
   defp eval_node({:%{}, _, pairs}, state) do
     eval_pairs(pairs, state, [])
   end
+
+  defp eval_node({:fn, _, clauses}, state), do: build_fn(clauses, state)
+
+  defp eval_node({:&, _, [capture]}, state), do: build_capture(capture, state)
 
   defp eval_node({:if, _, [condition, clauses]}, state) when is_list(clauses) do
     with {:ok, condition, state} <- eval(condition, state) do
@@ -453,10 +522,28 @@ defmodule Imp.Predict.RLM.Interpreter do
   end
 
   defp eval_node({{:., _, [{:__aliases__, _, [module]}, function]}, _, args}, state)
-       when module in [:String, :Enum, "String", "Enum"] and
-              (is_atom(function) or is_binary(function)) and is_list(args) do
+       when (is_atom(function) or is_binary(function)) and is_list(args) and
+              (is_map_key(@library_modules, module) or is_binary(module)) do
     eval_allowlisted(module, function, args, state)
   end
+
+  defp eval_node({{:., _, [container, key]}, metadata, []}, state)
+       when is_atom(key) or is_binary(key) do
+    if Keyword.get(metadata, :no_parens, false) and not match?({:__aliases__, _, _}, container) do
+      with {:ok, container, state} <- eval(container, state) do
+        case container do
+          %{^key => value} -> {:ok, value, state}
+          _ -> {:error, {:key_not_found, key}, state}
+        end
+      end
+    else
+      eval_module_call(container, key, [], state)
+    end
+  end
+
+  defp eval_node({{:., _, [module, function]}, _, args}, state)
+       when (is_atom(function) or is_binary(function)) and is_list(args),
+       do: eval_module_call(module, function, args, state)
 
   defp eval_node({:print, _, [expression]}, state) do
     with {:ok, value, state} <- eval(expression, state) do
@@ -467,9 +554,13 @@ defmodule Imp.Predict.RLM.Interpreter do
     end
   end
 
+  defp eval_node({:submit, _, args}, %{in_function: true} = state) when is_list(args),
+    do: {:error, :submit_inside_fn, state}
+
   defp eval_node({:submit, _, args}, state) when is_list(args) do
     with {:ok, values, state} <- eval_arguments(args, state),
-         {:ok, output} <- submission(values) do
+         {:ok, output} <- submission(values),
+         :ok <- check_constructed(output, state) do
       {:final, output, state}
     else
       {:error, reason} -> {:error, reason, state}
@@ -489,12 +580,102 @@ defmodule Imp.Predict.RLM.Interpreter do
     {:ok, "Available variables: #{inspect(variables)}", state}
   end
 
-  defp eval_node({name, _, args}, state)
-       when (is_atom(name) or is_binary(name)) and is_list(args) do
-    invoke_callback(name, args, state)
+  # `f.(x)` and `(fn x -> ... end).(x)`. An interpreter function is AST the
+  # interpreter runs, so calling one directly is the same evaluation a library
+  # call makes through `call_fn/3`, on this state: its steps and output count
+  # against the cell, its bindings stay inside it, and inside it effects and
+  # `submit` are refused. A value that is not a function is an error the model
+  # reads.
+  defp eval_node({{:., _, [callee]}, _, args}, state) when is_list(args) do
+    with {:ok, value, state} <- eval(callee, state) do
+      case value do
+        %Fn{} = function -> call_direct(function, render(callee), args, state)
+        _other -> {:error, {:not_a_function, render(callee), value}, state}
+      end
+    end
   end
 
-  defp eval_node(ast, state), do: {:error, {:unsupported_expression, Macro.to_string(ast)}, state}
+  # A module named as a value (`File`, `m = File.Stream`) is never data: a
+  # module is how a forged struct or a sorter reaches code outside the
+  # language.
+  defp eval_node({:__aliases__, _, parts}, state) when is_list(parts),
+    do: {:error, {:module_value_not_allowed, Enum.map_join(parts, ".", &to_string/1)}, state}
+
+  defp eval_node({name, _, args}, state)
+       when (is_atom(name) or is_binary(name)) and is_list(args) do
+    if {normalize_known_name(name), length(args)} in @kernel_functions and
+         not Map.has_key?(state.callbacks, name) and
+         not Map.has_key?(state.callbacks, to_string(name)) do
+      eval_kernel(normalize_known_name(name), args, state)
+    else
+      invoke_callback(name, args, state)
+    end
+  end
+
+  defp eval_node(ast, state), do: {:error, {:unsupported_expression, render(ast)}, state}
+
+  # The parser keeps a name whose atom does not exist as a string, which
+  # `Macro.to_string/1` cannot print. Each such name is printed through a
+  # placeholder variable and put back in order; no atom is created.
+  defp render(ast) do
+    {ast, names} =
+      Macro.prewalk(ast, [], fn
+        {name, meta, context}, names when is_binary(name) and is_atom(context) ->
+          {{:imp_rendered_name, meta, nil}, [name | names]}
+
+        other, names ->
+          {other, names}
+      end)
+
+    names
+    |> Enum.reverse()
+    |> Enum.reduce(Macro.to_string(ast), fn name, text ->
+      String.replace(text, "imp_rendered_name", name, global: false)
+    end)
+  rescue
+    _error -> "an expression"
+  end
+
+  # `to_string/1` and `is_nil/1` are macros in Kernel, not functions.
+  defp kernel_apply(:to_string, [value]), do: String.Chars.to_string(value)
+  defp kernel_apply(:is_nil, [value]), do: value == nil
+  defp kernel_apply(name, values), do: apply(Kernel, name, values)
+
+  defp eval_kernel(name, args, state) do
+    with {:ok, values, state} <- eval_arguments(args, state),
+         :ok <- check_library_arguments(values, state) do
+      {:ok, kernel_apply(name, values), state}
+    end
+  rescue
+    error -> {:error, {:kernel_call_failed, name, Exception.message(error)}, state}
+  end
+
+  defp eval_module_call(module, function, args, state) do
+    module =
+      case module do
+        {:__aliases__, _, parts} -> Enum.map_join(parts, ".", &to_string/1)
+        module when is_atom(module) or is_binary(module) -> to_string(module)
+        module -> render(module)
+      end
+
+    {:error,
+     {:function_not_allowed, existing_atom_or_string(module), normalize_known_name(function),
+      length(args)}, state}
+  end
+
+  # `[x | acc]`: the items in front of a list.
+  defp eval_cons(items, tail, state) do
+    with {:ok, items, state} <- eval_arguments(items, state),
+         {:ok, tail, state} <- eval(tail, state) do
+      if is_list(tail) do
+        with :ok <- check_projected_budget(projected_list_concat_size(items, tail), state) do
+          {:ok, items ++ tail, state}
+        end
+      else
+        {:error, {:invalid_operands, :|}, state}
+      end
+    end
+  end
 
   defp eval_sequence([], state, value), do: {:ok, value, state}
 
@@ -521,14 +702,20 @@ defmodule Imp.Predict.RLM.Interpreter do
 
   defp eval_pairs([], state, pairs), do: {:ok, Map.new(Enum.reverse(pairs)), state}
 
+  # A map with a `__struct__` key is dispatched by every protocol as that
+  # struct, so controller code may not write one (see `check_constructed/2`).
   defp eval_pairs([{key, value} | rest], state, pairs) do
     with {:ok, key, state} <- eval(key, state),
+         :ok <- refuse_struct_key(key, state),
          {:ok, value, state} <- eval(value, state) do
       eval_pairs(rest, state, [{key, value} | pairs])
     end
   end
 
   defp eval_pairs(_pairs, state, _result), do: {:error, :invalid_map, state}
+
+  defp refuse_struct_key(:__struct__, state), do: {:error, :struct_key_not_allowed, state}
+  defp refuse_struct_key(_key, _state), do: :ok
 
   defp eval_binary(operator, left_ast, right_ast, state) when operator in [:and, :&&, :or, :||] do
     with {:ok, left, state} <- eval(left_ast, state) do
@@ -605,12 +792,31 @@ defmodule Imp.Predict.RLM.Interpreter do
 
   defp eval_for(args, state) do
     {clauses, options} = Enum.split_while(args, &(not keyword_ast?(&1)))
-    body = Keyword.get(List.last(options, []), :do)
+    options = Enum.concat(options)
+    body = Keyword.get(options, :do)
 
-    if is_nil(body) do
-      {:error, :for_requires_do_block, state}
-    else
-      eval_for_clauses(clauses, body, state, [])
+    case Keyword.keys(options) -- [:do, :into, :uniq] do
+      [] when is_nil(body) ->
+        {:error, :for_requires_do_block, state}
+
+      [] ->
+        with {:ok, values, state} <- eval_for_clauses(clauses, body, state, []),
+             {:ok, uniq, state} <- eval(Keyword.get(options, :uniq, false), state) do
+          values = if truthy?(uniq), do: Enum.uniq(values), else: values
+          collect_for(Keyword.fetch(options, :into), values, state)
+        end
+
+      [option | _rest] ->
+        {:error, {:unsupported_for_option, option, "use Enum.reduce instead"}, state}
+    end
+  end
+
+  # `into:` collects the results as `Enum.into/2` would, under its checks.
+  defp collect_for(:error, values, state), do: {:ok, values, state}
+
+  defp collect_for({:ok, into}, values, state) do
+    with {:ok, into, state} <- eval(into, state) do
+      eval_allowlisted_values(:Enum, :into, [values, into], state)
     end
   end
 
@@ -628,21 +834,26 @@ defmodule Imp.Predict.RLM.Interpreter do
     end
   end
 
-  defp eval_for_clauses([{:<-, _, [{name, _, context}, enumerable]} | rest], body, state, results)
-       when (is_atom(name) or is_binary(name)) and (is_atom(context) or is_nil(context)) do
+  # A generator's pattern is a function clause's (`{key, value} <- map`), and
+  # an item that does not match it is skipped, as in Elixir.
+  defp eval_for_clauses([{:<-, _, [pattern, enumerable]} | rest], body, state, results) do
     with {:ok, enumerable, state} <- eval(enumerable, state),
-         true <- is_list(enumerable) or is_struct(enumerable, Range) do
+         true <- is_list(enumerable) or is_struct(enumerable, Range) or plain_map?(enumerable) do
       Enum.reduce_while(enumerable, {:ok, results, state}, fn item, {:ok, acc, current} ->
-        current = %{current | vars: Map.put(current.vars, name, item)}
+        case bind(pattern, item, current.vars) do
+          {:ok, vars} ->
+            case eval_for_clauses(rest, body, %{current | vars: vars}, acc) do
+              {:ok, produced, next} -> {:cont, {:ok, produced, next}}
+              other -> {:halt, other}
+            end
 
-        case eval_for_clauses(rest, body, current, acc) do
-          {:ok, produced, next} -> {:cont, {:ok, produced, next}}
-          other -> {:halt, other}
+          :error ->
+            {:cont, {:ok, acc, current}}
         end
       end)
-      |> restore_for_var(state, name)
+      |> restore_for_var(state, pattern_names(pattern))
     else
-      false -> {:error, :for_requires_list_or_range, state}
+      false -> {:error, :for_requires_list_range_or_map, state}
       other -> other
     end
   end
@@ -660,19 +871,38 @@ defmodule Imp.Predict.RLM.Interpreter do
     end
   end
 
-  defp restore_for_var({:ok, values, next}, original, name) do
-    {:ok, values, restore_for_var_binding(next, original, name)}
+  defp plain_map?(value), do: is_map(value) and not is_struct(value)
+
+  defp pattern_names(pattern) do
+    {_pattern, names} =
+      Macro.prewalk(pattern, [], fn
+        {name, _, context} = node, names
+        when (is_atom(name) or is_binary(name)) and (is_atom(context) or is_nil(context)) ->
+          {node, [name | names]}
+
+        node, names ->
+          {node, names}
+      end)
+
+    names
+  end
+
+  defp restore_for_var({:ok, values, next}, original, names) do
+    {:ok, values, restore_for_vars(next, original, names)}
   end
 
   defp restore_for_var(
          {:error, {:value_budget_exceeded, _bytes, _max_bytes} = reason, next},
          original,
-         name
+         names
        ) do
-    {:error, reason, restore_for_var_binding(next, original, name)}
+    {:error, reason, restore_for_vars(next, original, names)}
   end
 
-  defp restore_for_var(other, _original, _name), do: other
+  defp restore_for_var(other, _original, _names), do: other
+
+  defp restore_for_vars(next, original, names),
+    do: Enum.reduce(names, next, &restore_for_var_binding(&2, original, &1))
 
   defp restore_for_var_binding(next, original, name) do
     vars =
@@ -687,32 +917,410 @@ defmodule Imp.Predict.RLM.Interpreter do
   defp eval_allowlisted(module, function, args, state) do
     module = normalize_known_name(module)
     function = normalize_known_name(function)
-    allowed = if module == :String, do: @string_functions, else: @enum_functions
-    target = if module == :String, do: String, else: Enum
-    arities = List.wrap(Map.get(allowed, function))
 
-    if length(args) in arities do
-      with {:ok, values, state} <- eval_arguments(args, state) do
-        try do
-          with :ok <- check_transformation_budget(module, function, values, state) do
-            {:ok, apply(target, function, values), state}
-          end
-        rescue
-          error -> {:error, {:transformation_error, Exception.message(error)}, state}
-        end
-      end
+    if {module, function, length(args)} in @library_functions do
+      with {:ok, values, state} <- eval_arguments(args, state),
+           do: eval_allowlisted_values(module, function, values, state)
     else
       {:error, {:function_not_allowed, module, function, length(args)}, state}
     end
   end
 
-  defp format_allowlist(module, functions) do
-    functions
-    |> Enum.sort_by(fn {name, _arities} -> to_string(name) end)
-    |> Enum.flat_map(fn {name, arities} ->
-      Enum.map(List.wrap(arities), &"#{module}.#{name}/#{&1}")
+  defp eval_allowlisted_values(module, function, values, state) do
+    with :ok <- check_library_arguments(values, state),
+         :ok <- check_module_arguments(module, function, values, state),
+         :ok <- check_transformation_budget(module, function, values, state),
+         {:ok, value, state} <- apply_library(module, function, values, state),
+         :ok <- check_constructed(value, state) do
+      {:ok, value, state}
+    end
+  end
+
+  # Protocols dispatch on a map's `__struct__` key, so a map that merely
+  # carries one is treated as that struct: a map shaped like a File.Stream
+  # sends `Enum.join` into `Enumerable.File.Stream` and reads the named file,
+  # and the same holds for Collectable, String.Chars, Inspect and any other
+  # protocol with an implementation loaded in the VM. Controller code
+  # therefore never holds a struct it did not receive from the host: a map
+  # literal may not name the key (`eval_pairs/3`), and the result of every
+  # library call is checked here, since library functions build maps from
+  # data. Genuine ranges and MapSets, and the interpreter's own functions,
+  # are the only structs a library call may take or return; no other struct,
+  # and no Elixir module named as a value (a forged struct's module, or a
+  # sorter whose `compare/2` would run), is passed to one.
+  @data_structs [Range, MapSet]
+
+  # Two kinds of library argument name a module whose functions the library
+  # then calls: a sorter that is a module (or `{:asc, module}`) has its
+  # `compare/2` called, and `Map.from_struct/1` given a module calls its
+  # `__struct__/0`. Elixir modules are refused as values anywhere; an Erlang
+  # module is an ordinary atom, so here only `:asc`, `:desc` and functions
+  # sort, and `Map.from_struct/1` takes a struct.
+  @sorting_functions [
+    {:Enum, :sort},
+    {:Enum, :sort_by},
+    {:Enum, :min},
+    {:Enum, :max},
+    {:Enum, :min_by},
+    {:Enum, :max_by},
+    {:Enum, :min_max_by},
+    {:List, :keysort}
+  ]
+
+  defp check_module_arguments(:Map, :from_struct, [module], state) when is_atom(module),
+    do: {:error, {:module_value_not_allowed, module}, state}
+
+  defp check_module_arguments(module, function, [_enumerable | rest], state)
+       when {module, function} in @sorting_functions do
+    case Enum.find(rest, &module_sorter?/1) do
+      nil -> :ok
+      sorter -> {:error, {:sorter_not_allowed, sorter}, state}
+    end
+  end
+
+  defp check_module_arguments(_module, _function, _values, _state), do: :ok
+
+  defp module_sorter?(direction) when direction in [:asc, :desc], do: false
+  defp module_sorter?(value) when is_atom(value), do: true
+  defp module_sorter?({_direction, module}) when is_atom(module), do: true
+  defp module_sorter?(_value), do: false
+
+  defp check_library_arguments(values, state) do
+    case Enum.find_value(values, &library_argument_error(&1, state.max_value_bytes)) do
+      nil -> :ok
+      reason -> {:error, reason, state}
+    end
+  end
+
+  defp check_constructed(value, state) do
+    case forged_struct(value) do
+      nil ->
+        :ok
+
+      function when is_function(function) ->
+        {:error,
+         {:function_value_not_allowed,
+          "a library call returned a function it was given; a function is only an argument to a library call"},
+         state}
+
+      _forged ->
+        {:error, :struct_key_not_allowed, state}
+    end
+  end
+
+  # An interpreter function is AST the interpreter runs; what it touches is
+  # checked when it runs.
+  defp library_argument_error(%Fn{}, _max_bytes), do: nil
+
+  # Library functions materialize a range before the result's size can be
+  # checked, and each element takes at least a byte of the value budget.
+  defp library_argument_error(%Range{} = range, max_bytes) do
+    cond do
+      not genuine_data_struct?(range) -> {:module_value_not_allowed, Range}
+      Range.size(range) > max_bytes -> {:value_budget_exceeded, Range.size(range), max_bytes}
+      true -> nil
+    end
+  end
+
+  defp library_argument_error(%{__struct__: module} = value, max_bytes) do
+    if genuine_data_struct?(value),
+      do: value |> Map.from_struct() |> library_argument_error(max_bytes),
+      else: {:module_value_not_allowed, module}
+  end
+
+  defp library_argument_error(value, max_bytes) when is_map(value) do
+    Enum.find_value(value, fn {key, item} ->
+      library_argument_error(key, max_bytes) || library_argument_error(item, max_bytes)
     end)
-    |> Enum.join(", ")
+  end
+
+  defp library_argument_error([head | tail], max_bytes),
+    do: library_argument_error(head, max_bytes) || library_argument_error(tail, max_bytes)
+
+  defp library_argument_error(value, max_bytes) when is_tuple(value),
+    do: value |> Tuple.to_list() |> library_argument_error(max_bytes)
+
+  defp library_argument_error(value, _max_bytes)
+       when is_atom(value) and value not in @data_structs do
+    if String.starts_with?(Atom.to_string(value), "Elixir."),
+      do: {:module_value_not_allowed, value},
+      else: nil
+  end
+
+  defp library_argument_error(_value, _max_bytes), do: nil
+
+  defp forged_struct(%{__struct__: _module} = value) do
+    if genuine_data_struct?(value),
+      do: value |> Map.from_struct() |> forged_struct(),
+      else: value
+  end
+
+  defp forged_struct(value) when is_map(value),
+    do: Enum.find_value(value, fn {key, item} -> forged_struct(key) || forged_struct(item) end)
+
+  defp forged_struct([head | tail]), do: forged_struct(head) || forged_struct(tail)
+  defp forged_struct(value) when is_tuple(value), do: value |> Tuple.to_list() |> forged_struct()
+  # A library call is given an interpreter function as a native closure
+  # (`native_function/2`), and some hand an argument back (`Map.get(m, k,
+  # f)`, a `reduce` over nothing): such a closure is not a value code keeps.
+  defp forged_struct(value) when is_function(value), do: value
+  defp forged_struct(_value), do: nil
+
+  defp genuine_data_struct?(%Range{first: first, last: last, step: step} = range),
+    do: is_integer(first) and is_integer(last) and is_integer(step) and map_size(range) == 4
+
+  defp genuine_data_struct?(%MapSet{map: map} = set), do: is_map(map) and map_size(set) == 2
+
+  defp genuine_data_struct?(%Fn{arity: arity, clauses: clauses} = function),
+    do: arity in 0..3 and is_list(clauses) and map_size(function) == 3
+
+  defp genuine_data_struct?(_value), do: false
+
+  # Interpreter functions run inside a native library call, which cannot
+  # thread interpreter state. The call's step count, output and the running
+  # size of its function results live in a frame in the process dictionary
+  # for the duration of the call, and are folded back into the state after
+  # it; the previous frame is restored so calls may nest.
+  defp apply_library(module, function, values, state) do
+    outer = Process.get(@fn_frame)
+
+    Process.put(@fn_frame, %{
+      steps: state.steps,
+      output: state.output,
+      bytes: 0,
+      counted: {module, function} not in @accumulator_functions
+    })
+
+    try do
+      value =
+        apply(Map.fetch!(@library_modules, module), function, native_arguments(values, state))
+
+      frame = Process.get(@fn_frame)
+      {:ok, value, %{state | steps: frame.steps, output: frame.output}}
+    rescue
+      error -> {:error, {:transformation_error, Exception.message(error)}, state}
+    catch
+      :throw, {@fn_failure, reason} -> {:error, reason, state}
+    after
+      if outer, do: Process.put(@fn_frame, outer), else: Process.delete(@fn_frame)
+    end
+  end
+
+  defp native_arguments(values, state), do: Enum.map(values, &native_function(&1, state))
+
+  defp native_function(%Fn{arity: 0} = function, state),
+    do: fn -> call_fn(function, [], state) end
+
+  defp native_function(%Fn{arity: 1} = function, state),
+    do: fn a -> call_fn(function, [a], state) end
+
+  defp native_function(%Fn{arity: 2} = function, state),
+    do: fn a, b -> call_fn(function, [a, b], state) end
+
+  defp native_function(%Fn{arity: 3} = function, state),
+    do: fn a, b, c -> call_fn(function, [a, b, c], state) end
+
+  defp native_function(value, _state), do: value
+
+  defp call_fn(%Fn{clauses: clauses}, args, state) do
+    frame = Process.get(@fn_frame)
+    state = %{state | steps: frame.steps, output: frame.output, in_function: true}
+
+    result =
+      with {:ok, body, state} <- select_clause(clauses, args, state) do
+        eval(body, state)
+      end
+
+    case result do
+      {:ok, value, next} ->
+        bytes = if frame.counted, do: frame.bytes + :erlang.external_size(value), else: 0
+
+        if bytes > state.max_value_bytes,
+          do: throw({@fn_failure, {:value_budget_exceeded, bytes, state.max_value_bytes}})
+
+        Process.put(@fn_frame, %{frame | steps: next.steps, output: next.output, bytes: bytes})
+        value
+
+      {:error, reason, _state} ->
+        throw({@fn_failure, reason})
+    end
+  end
+
+  defp call_direct(%Fn{arity: arity, clauses: clauses}, name, args, state) do
+    with {:ok, values, state} <- eval_arguments(args, state) do
+      if length(values) == arity do
+        inner = %{state | in_function: true}
+
+        result =
+          with {:ok, body, inner} <- select_clause(clauses, values, inner),
+               do: eval(body, inner)
+
+        case result do
+          {:ok, value, next} ->
+            {:ok, value, %{next | vars: state.vars, in_function: state.in_function}}
+
+          {:error, reason, next} ->
+            {:error, reason, %{next | vars: state.vars, in_function: state.in_function}}
+
+          other ->
+            other
+        end
+      else
+        {:error, {:wrong_arity, name, arity, length(values)}, state}
+      end
+    end
+  end
+
+  defp select_clause([], args, state), do: {:error, {:fn_clause_not_matched, args}, state}
+
+  defp select_clause([{params, guard, body} | rest], args, state) do
+    with {:ok, vars} <- bind_all(params, args, state.vars),
+         {:ok, true, state} <- eval_guard(guard, %{state | vars: vars}) do
+      {:ok, body, state}
+    else
+      :error -> select_clause(rest, args, state)
+      {:ok, false, _state} -> select_clause(rest, args, state)
+      {:error, reason, _state} -> {:error, reason, state}
+    end
+  end
+
+  defp eval_guard(nil, state), do: {:ok, true, state}
+
+  defp eval_guard(guard, state) do
+    with {:ok, value, state} <- eval(guard, state), do: {:ok, truthy?(value), state}
+  end
+
+  defp bind_all([], [], vars), do: {:ok, vars}
+
+  defp bind_all([pattern | patterns], [value | values], vars) do
+    with {:ok, vars} <- bind(pattern, value, vars), do: bind_all(patterns, values, vars)
+  end
+
+  defp bind_all(_patterns, _values, _vars), do: :error
+
+  defp bind({:^, _, [{name, _, context}]}, value, vars)
+       when (is_atom(name) or is_binary(name)) and (is_atom(context) or is_nil(context)) do
+    case fetch_var(vars, name) do
+      {:ok, pinned} when pinned === value -> {:ok, vars}
+      _other -> :error
+    end
+  end
+
+  defp bind({name, _, context}, value, vars)
+       when (is_atom(name) or is_binary(name)) and (is_atom(context) or is_nil(context)) do
+    if String.starts_with?(to_string(name), "_"),
+      do: {:ok, vars},
+      else: {:ok, Map.put(vars, name, value)}
+  end
+
+  defp bind({:=, _, [left, right]}, value, vars) do
+    with {:ok, vars} <- bind(left, value, vars), do: bind(right, value, vars)
+  end
+
+  defp bind({:{}, _, patterns}, value, vars) when is_tuple(value),
+    do: bind_all(patterns, Tuple.to_list(value), vars)
+
+  defp bind({:%{}, _, pairs}, value, vars) when is_map(value) do
+    Enum.reduce_while(pairs, {:ok, vars}, fn {key, pattern}, {:ok, vars} ->
+      with {:ok, item} <- Map.fetch(value, key),
+           {:ok, vars} <- bind(pattern, item, vars) do
+        {:cont, {:ok, vars}}
+      else
+        :error -> {:halt, :error}
+      end
+    end)
+  end
+
+  defp bind({left, right}, {a, b}, vars), do: bind_all([left, right], [a, b], vars)
+
+  defp bind(patterns, value, vars) when is_list(patterns) and is_list(value) do
+    case List.last(patterns) do
+      {:|, _, [head, tail]} ->
+        count = length(patterns) - 1
+
+        if length(value) > count do
+          {items, rest} = Enum.split(value, count)
+          bind_all(Enum.drop(patterns, -1) ++ [head, tail], items ++ [hd(rest), tl(rest)], vars)
+        else
+          :error
+        end
+
+      _ ->
+        bind_all(patterns, value, vars)
+    end
+  end
+
+  defp bind(literal, value, vars)
+       when is_binary(literal) or is_number(literal) or is_atom(literal) do
+    if literal === value, do: {:ok, vars}, else: :error
+  end
+
+  defp bind(_pattern, _value, _vars), do: :error
+
+  defp build_fn(clauses, state) do
+    clauses =
+      Enum.map(clauses, fn
+        {:->, _, [[{:when, _, params_and_guard}], body]} ->
+          {params, [guard]} = Enum.split(params_and_guard, -1)
+          {params, guard, body}
+
+        {:->, _, [params, body]} ->
+          {params, nil, body}
+      end)
+
+    case clauses |> Enum.map(fn {params, _, _} -> length(params) end) |> Enum.uniq() do
+      [arity] when arity <= 3 -> {:ok, %Fn{arity: arity, clauses: clauses}, state}
+      _ -> {:error, :fn_arity_not_supported, state}
+    end
+  end
+
+  defp build_capture({:/, _, [call, arity]}, state)
+       when is_integer(arity) and arity in 0..3 do
+    params = for index <- 1..arity//1, do: {"&#{index}", [], nil}
+
+    case call do
+      {{:., _, [_module, function]} = callee, _, []} when is_atom(function) ->
+        {:ok, %Fn{arity: arity, clauses: [{params, nil, {callee, [], params}}]}, state}
+
+      {name, _, context} when is_atom(name) and is_atom(context) ->
+        {:ok, %Fn{arity: arity, clauses: [{params, nil, {name, [], params}}]}, state}
+
+      _ ->
+        build_capture_expression({:/, [], [call, arity]}, state)
+    end
+  end
+
+  defp build_capture(expression, state), do: build_capture_expression(expression, state)
+
+  defp build_capture_expression(expression, state) do
+    {body, arity} =
+      Macro.prewalk(expression, 0, fn
+        {:&, _, [index]}, arity when is_integer(index) ->
+          {{"&#{index}", [], nil}, max(arity, index)}
+
+        node, arity ->
+          {node, arity}
+      end)
+
+    if arity in 1..3 do
+      params = for index <- 1..arity, do: {"&#{index}", [], nil}
+      {:ok, %Fn{arity: arity, clauses: [{params, nil, body}]}, state}
+    else
+      {:error, :invalid_capture, state}
+    end
+  end
+
+  defp format_kernel do
+    @kernel_functions
+    |> Enum.sort()
+    |> Enum.map_join(", ", fn {name, arity} -> "`#{name}/#{arity}`" end)
+  end
+
+  defp format_refused do
+    @refused_functions
+    |> Map.keys()
+    |> Enum.sort()
+    |> Enum.map_join(", ", fn {module, function} -> "`#{module}.#{function}`" end)
   end
 
   defp format_operators(operators) do
@@ -726,24 +1334,33 @@ defmodule Imp.Predict.RLM.Interpreter do
       Map.get(state.callbacks, name) ||
         if(is_atom(name), do: Map.get(state.callbacks, Atom.to_string(name)))
 
-    if effect do
-      with {:ok, values, state} <- eval_arguments(args, state) do
-        request = %Effect{kind: effect, name: to_string(name), arguments: values}
-        occurrence = Enum.count(state.effect_requests, &(&1 == request))
+    cond do
+      effect && state.in_function ->
+        {:error, {:effect_inside_fn, to_string(name)}, state}
 
-        case effect_result(state.effect_results, request, occurrence) do
-          :error ->
-            {:effect, request, state}
+      effect ->
+        invoke_effect(effect, name, args, state)
 
-          {:ok, {:ok, value}} ->
-            {:ok, value, %{state | effect_requests: [request | state.effect_requests]}}
+      true ->
+        {:error, {:function_not_allowed, name}, state}
+    end
+  end
 
-          {:ok, {:error, reason}} ->
-            {:error, reason, %{state | effect_requests: [request | state.effect_requests]}}
-        end
+  defp invoke_effect(effect, name, args, state) do
+    with {:ok, values, state} <- eval_arguments(args, state) do
+      request = %Effect{kind: effect, name: to_string(name), arguments: values}
+      occurrence = Enum.count(state.effect_requests, &(&1 == request))
+
+      case effect_result(state.effect_results, request, occurrence) do
+        :error ->
+          {:effect, request, state}
+
+        {:ok, {:ok, value}} ->
+          {:ok, value, %{state | effect_requests: [request | state.effect_requests]}}
+
+        {:ok, {:error, reason}} ->
+          {:error, reason, %{state | effect_requests: [request | state.effect_requests]}}
       end
-    else
-      {:error, {:function_not_allowed, name}, state}
     end
   end
 
@@ -798,6 +1415,26 @@ defmodule Imp.Predict.RLM.Interpreter do
       {:error, bytes} -> value_budget_error(bytes, state)
       :unknown -> :ok
     end
+  end
+
+  defp check_transformation_budget(:String, :duplicate, [string, count], state)
+       when is_binary(string) and is_integer(count) and count >= 0,
+       do: check_projected_budget(byte_size(string) * count + 6, state)
+
+  defp check_transformation_budget(:List, :duplicate, [value, count], state)
+       when is_integer(count) and count >= 0,
+       do: check_projected_budget(:erlang.external_size(value) * count + 6, state)
+
+  defp check_transformation_budget(:String, function, [string, count | padding], state)
+       when function in [:pad_leading, :pad_trailing] and is_binary(string) and
+              is_integer(count) and count >= 0 do
+    padding_bytes =
+      case padding do
+        [pad] when is_binary(pad) -> max(byte_size(pad), 1)
+        _ -> 1
+      end
+
+    check_projected_budget(byte_size(string) + count * padding_bytes + 6, state)
   end
 
   defp check_transformation_budget(_module, _function, _values, _state), do: :ok

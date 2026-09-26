@@ -1,7 +1,7 @@
 defmodule Imp.Optimizer.Artifact.ParameterSnapshot do
   @moduledoc false
 
-  alias Imp.Predict.Predict
+  alias Imp.Predict
   alias Imp.ProgramParameters
 
   @enforce_keys [:predictors]

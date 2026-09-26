@@ -2,14 +2,22 @@ defmodule Imp.Retrieve do
   @moduledoc """
   Retriever behaviour and dispatch boundary for RAG-style Imp programs.
 
-  A retriever can be a module, a struct implementing `retrieve/3`, or a
-  two-argument callback function. All retrievers return `{:ok, docs}` or
-  `{:error, reason}`. Documents are normalized to maps, so keyword-list
-  documents are accepted while malformed rows fail before they reach a RAG
-  program.
+  A retriever is a struct whose module implements this behaviour, such a
+  module itself, or a two-argument function `(query, opts)`. All retrievers
+  return `{:ok, docs}` or `{:error, reason}`. Documents are normalized to maps,
+  so keyword-list documents are accepted while malformed rows fail before they
+  reach a RAG program.
   """
 
-  @callback retrieve(query :: String.t(), opts :: keyword()) :: {:ok, [map()]} | {:error, term()}
+  @typedoc "A retriever: a struct or module implementing this behaviour, or a function."
+  @type t :: struct() | module() | (String.t(), keyword() -> {:ok, list()} | {:error, term()})
+
+  @doc """
+  Returns the documents for `query`. `retriever` is the struct or the module
+  as it was given.
+  """
+  @callback retrieve(retriever :: struct() | module(), query :: String.t(), opts :: keyword()) ::
+              {:ok, [map()]} | {:error, term()}
 
   def retrieve(retriever, query, opts \\ [])
 
@@ -32,8 +40,8 @@ defmodule Imp.Retrieve do
   end
 
   defp do_retrieve(module, query, opts) when is_atom(module) do
-    if Code.ensure_loaded?(module) and function_exported?(module, :retrieve, 2) do
-      call_retriever(fn -> module.retrieve(query, opts) end, module)
+    if Code.ensure_loaded?(module) and function_exported?(module, :retrieve, 3) do
+      call_retriever(fn -> module.retrieve(module, query, opts) end, module)
     else
       {:error, {:not_a_retriever, module}}
     end
@@ -155,7 +163,9 @@ defmodule Imp.Retrieve do
     end
 
     @impl true
-    def retrieve(%__MODULE__{} = retriever, query, opts \\ []) do
+    def retrieve(retriever, query, opts \\ [])
+
+    def retrieve(%__MODULE__{} = retriever, query, opts) do
       opts =
         Imp.Options.validate!(opts, @retrieve_option_schema, "Imp.Retrieve.Memory.retrieve/3")
 

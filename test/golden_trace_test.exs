@@ -96,7 +96,7 @@ defmodule GoldenTraceTest do
              "prediction_parity"
            ]
 
-    # ReAct :dspy_3_2_1 byte-faithfulness (dee-kzop): the reshaped `:dspy_3_2_1`
+    # ReAct :dspy byte-faithfulness (dee-kzop): the reshaped `:dspy`
     # mode reproduces dspy.ReAct exactly. `react_dspy_tool_lookup` drives Imp's
     # faithful mode and real dspy.ReAct with the SAME text-trajectory responses,
     # so the reasoning-signature prompt (question + trajectory ->

@@ -5,8 +5,6 @@ defmodule Imp.Test.MultiStudentGRPOLM do
   defstruct [:model, :output]
 
   @impl true
-  def generate(_messages, _opts), do: {:error, :multi_student_lm_instance_required}
-
   def generate(%__MODULE__{output: output}, _messages, _opts), do: {:ok, output}
 end
 

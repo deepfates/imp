@@ -4,10 +4,7 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapterTest do
   alias Imp.Optimizer.GEPA.{Adapter, Candidate, Evaluation, ProgramAdapter}
 
   test "runs a real Imp program and produces component reflection records" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-    }
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "Paris"} end)
 
     program = Imp.predict("question -> answer", lm: lm)
 
@@ -48,10 +45,7 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapterTest do
   test "uses named component feedback only for reflective evaluations" do
     owner = self()
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-    }
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "Paris"} end)
 
     program = Imp.predict("question -> answer", lm: lm)
     metric = fn _example, _prediction -> %{score: 0.5, feedback: "metric feedback"} end
@@ -150,7 +144,7 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapterTest do
   end
 
   test "rejects unknown callbacks and fails closed when callback execution breaks" do
-    lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "x"} end]}
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "x"} end)
     program = Imp.predict("question -> answer", lm: lm)
     metric = fn _example, _prediction -> 1.0 end
 
@@ -195,16 +189,14 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapterTest do
   end
 
   test "keeps program and metric failures ordered and diagnostic-only" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           if inspect(messages) =~ "program failure",
             do: {:error, :program_failure},
             else: %{answer: "ok"}
         end
-      ]
-    }
+      )
 
     program = Imp.predict("question -> answer", lm: lm)
 

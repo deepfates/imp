@@ -121,10 +121,7 @@ defmodule Imp.AssertionsTest do
 
     program =
       Imp.predict("question -> answer",
-        lm: %{
-          module: Imp.LM.Static,
-          opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-        }
+        lm: Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "Paris"} end)
       )
       |> Imp.assert(one_word)
 

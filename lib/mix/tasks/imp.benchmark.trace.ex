@@ -128,17 +128,17 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
 
   defp build_imp_program("react", signature, _adapter, lm, _demos),
     do:
-      Imp.react(signature, Process.get(:imp_golden_trace_tools, []),
+      Imp.Predict.ReAct.new(signature, Process.get(:imp_golden_trace_tools, []),
         lm: lm,
         max_iters: Process.get(:imp_golden_trace_max_iters, 20)
       )
 
   defp build_imp_program("react_dspy", signature, adapter, lm, _demos),
     do:
-      Imp.react(signature, Process.get(:imp_golden_trace_tools, []),
+      Imp.Predict.ReAct.new(signature, Process.get(:imp_golden_trace_tools, []),
         lm: lm,
         adapter: adapter_module(adapter),
-        mode: :dspy_3_2_1,
+        mode: :dspy,
         max_iters: Process.get(:imp_golden_trace_max_iters, 20)
       )
 
@@ -465,7 +465,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace do
 
     dumped = Imp.Saving.dump(program)
     encoded = inspect(dumped)
-    loaded = Imp.Saving.load(dumped)
+    loaded = Imp.Saving.load!(dumped)
 
     pass? =
       not String.contains?(encoded, secret) and

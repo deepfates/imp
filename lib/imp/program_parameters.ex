@@ -20,13 +20,14 @@ defmodule Imp.ProgramParameters do
   alias Imp.Optimizer.Parameter.Set
   alias Imp.Optimizer.Component
 
+  alias Imp.Predict
+
   alias Imp.Predict.{
     Assertions,
     BestOfN,
     ChainOfThought,
     CodeAct,
     MultiChainComparison,
-    Predict,
     ProgramOfThought,
     RAG,
     ReAct,

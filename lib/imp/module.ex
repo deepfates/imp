@@ -17,7 +17,7 @@ defmodule Imp.Module do
   program optimizer by implementing the paired optional callbacks
   `optimizer_predictors/1` and `update_optimizer_predictor/3`. Both callbacks
   are required together. Predictor names must be unique atoms or strings and
-  each value must be an `Imp.Predict.Predict` struct. The update callback must
+  each value must be an `Imp.Predict` struct. The update callback must
   return the same program struct after applying the supplied function to the
   named predictor. `Imp.ProgramParameters` validates this contract before an
   optimizer can use it.
@@ -30,7 +30,7 @@ defmodule Imp.Module do
   """
 
   @type optimizer_predictor_name :: atom() | String.t()
-  @type optimizer_predictor :: %Imp.Predict.Predict{}
+  @type optimizer_predictor :: %Imp.Predict{}
   @type optimizer_predictor_entry ::
           {optimizer_predictor_name(), optimizer_predictor()}
           | %{name: optimizer_predictor_name(), predictor: optimizer_predictor()}
@@ -67,8 +67,8 @@ defmodule Imp.Module do
 
   Successful programs must return a `Imp.Prediction`:
 
-      iex> lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
-      iex> program = Imp.Predict.Predict.new("question -> answer", lm: lm)
+      iex> lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "4"} end)
+      iex> program = Imp.Predict.new("question -> answer", lm: lm)
       iex> {:ok, prediction} = Imp.Module.call(program, %{question: "2+2?"})
       iex> Imp.Prediction.get(prediction, :answer)
       "4"

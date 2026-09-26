@@ -47,14 +47,11 @@ defmodule Imp.OptimizerParameterSnapshotTest do
     code = """
     alias Imp.Optimizer.Artifact
     alias Imp.TestSupport.TwoStageOptimizerProgram
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts ->
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts ->
         call = Process.get(:two_stage_call, 0)
         Process.put(:two_stage_call, call + 1)
         if rem(call, 2) == 1, do: %{route: "R42"}, else: %{evidence: "card payment not recognized"}
-      end, runtime_marker: "fresh-child-runtime"]
-    }
+      end, runtime_marker: "fresh-child-runtime")
     live = TwoStageOptimizerProgram.new(lm)
     applied = #{inspect(path)} |> Artifact.read!() |> Artifact.apply(live)
     {:ok, prediction} = Imp.call(applied, %{utterance: "I do not recognize this card payment"})
@@ -90,14 +87,14 @@ defmodule Imp.OptimizerParameterSnapshotTest do
       |> json_round_trip()
 
     assert_raise ArgumentError, ~r/unexpected or missing keys/, fn ->
-      snapshot |> Map.put("module", "Unsafe.Consumer") |> Imp.load()
+      snapshot |> Map.put("module", "Unsafe.Consumer") |> Imp.load!()
     end
 
     assert_raise ArgumentError, ~r/unexpected or missing keys/, fn ->
       update_in(snapshot["predictors"], fn [first | rest] ->
         [Map.put(first, "consumer_state", %{}) | rest]
       end)
-      |> Imp.load()
+      |> Imp.load!()
     end
   end
 
@@ -119,20 +116,17 @@ defmodule Imp.OptimizerParameterSnapshotTest do
   end
 
   defp static_lm(marker) do
-    %{
-      module: Imp.LM.Static,
-      opts: [
-        handler: fn _messages, _opts ->
-          call = Process.get(:two_stage_call, 0)
-          Process.put(:two_stage_call, call + 1)
+    Imp.LM.Static.new(
+      handler: fn _messages, _opts ->
+        call = Process.get(:two_stage_call, 0)
+        Process.put(:two_stage_call, call + 1)
 
-          if rem(call, 2) == 1,
-            do: %{route: "R42"},
-            else: %{evidence: "card payment not recognized"}
-        end,
-        runtime_marker: marker
-      ]
-    }
+        if rem(call, 2) == 1,
+          do: %{route: "R42"},
+          else: %{evidence: "card payment not recognized"}
+      end,
+      runtime_marker: marker
+    )
   end
 
   defp json_round_trip(value), do: value |> Jason.encode!() |> Jason.decode!()

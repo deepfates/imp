@@ -44,7 +44,7 @@ defmodule Imp.ReActV2ContextTest do
         req_http_options: [retry: false, max_retries: 0]
       )
 
-    program = Imp.react_v2("intent -> answer", [], lm: lm)
+    program = Imp.react("intent -> answer", [], lm: lm)
 
     history =
       Enum.reduce(1..12, Imp.history(), fn n, history ->
@@ -110,17 +110,18 @@ defmodule Imp.ReActV2ContextTest do
   test "current-call tool observations survive irreducible overflow without replay" do
     {:ok, counter} = Agent.start_link(fn -> %{calls: 0, effects: 0, sizes: []} end)
 
-    lm = fn messages, _ ->
-      n =
-        Agent.get_and_update(counter, fn state ->
-          {state.calls,
-           %{state | calls: state.calls + 1, sizes: state.sizes ++ [length(messages)]}}
-        end)
+    lm =
+      Imp.Test.FunLM.new(fn messages, _ ->
+        n =
+          Agent.get_and_update(counter, fn state ->
+            {state.calls,
+             %{state | calls: state.calls + 1, sizes: state.sizes ++ [length(messages)]}}
+          end)
 
-      if n == 0,
-        do: {:ok, %{tool_calls: [%{id: "effect", name: "write", arguments: %{}}]}},
-        else: {:error, %Imp.LMError{context_window_exceeded: true, message: "fixture overflow"}}
-    end
+        if n == 0,
+          do: {:ok, %{tool_calls: [%{id: "effect", name: "write", arguments: %{}}]}},
+          else: {:error, %Imp.LMError{context_window_exceeded: true, message: "fixture overflow"}}
+      end)
 
     tool =
       Imp.tool(:write, "write", fn _ ->
@@ -131,7 +132,7 @@ defmodule Imp.ReActV2ContextTest do
     prior = Imp.history([%{intent: "earlier", answer: "old"}])
 
     {:ok, prediction} =
-      Imp.call(Imp.react_v2("intent -> answer", [tool], lm: lm), %{intent: "now", history: prior})
+      Imp.call(Imp.react("intent -> answer", [tool], lm: lm), %{intent: "now", history: prior})
 
     assert Imp.get(prediction, :answer) == nil
     assert prediction.metadata[:termination_reason] == :incomplete
@@ -146,13 +147,14 @@ defmodule Imp.ReActV2ContextTest do
   test "whole prior groups are omitted together, including a trailing unfinished group" do
     {:ok, requests} = Agent.start_link(fn -> [] end)
 
-    lm = fn messages, _ ->
-      n = Agent.get_and_update(requests, fn seen -> {length(seen), seen ++ [messages]} end)
+    lm =
+      Imp.Test.FunLM.new(fn messages, _ ->
+        n = Agent.get_and_update(requests, fn seen -> {length(seen), seen ++ [messages]} end)
 
-      if n < 2,
-        do: {:error, %Imp.LMError{context_window_exceeded: true, message: "limit"}},
-        else: {:ok, "continued"}
-    end
+        if n < 2,
+          do: {:error, %Imp.LMError{context_window_exceeded: true, message: "limit"}},
+          else: {:ok, "continued"}
+      end)
 
     prior =
       Imp.history([
@@ -170,7 +172,7 @@ defmodule Imp.ReActV2ContextTest do
       ])
 
     {:ok, prediction} =
-      Imp.call(Imp.react_v2("intent -> answer", [], lm: lm), %{intent: "now", history: prior})
+      Imp.call(Imp.react("intent -> answer", [], lm: lm), %{intent: "now", history: prior})
 
     assert Imp.get(prediction, :answer) == "continued"
     assert Enum.take(prediction.metadata[:history].messages, 3) == prior.messages
@@ -186,27 +188,29 @@ defmodule Imp.ReActV2ContextTest do
   test "a successful smaller retry preserves the current effect and never executes it again" do
     {:ok, state} = Agent.start_link(fn -> %{calls: 0, effects: 0} end)
 
-    lm = fn messages, _ ->
-      n = Agent.get_and_update(state, &{&1.calls, %{&1 | calls: &1.calls + 1}})
+    lm =
+      Imp.Test.FunLM.new(fn messages, _ ->
+        n = Agent.get_and_update(state, &{&1.calls, %{&1 | calls: &1.calls + 1}})
 
-      case n do
-        0 ->
-          {:ok, %{tool_calls: [%{id: "effect", name: "write", arguments: %{}}]}}
+        case n do
+          0 ->
+            {:ok, %{tool_calls: [%{id: "effect", name: "write", arguments: %{}}]}}
 
-        1 ->
-          {:error, %Imp.LMError{context_window_exceeded: true, message: "limit"}}
+          1 ->
+            {:error, %Imp.LMError{context_window_exceeded: true, message: "limit"}}
 
-        2 ->
-          assert inspect(messages) =~ "current-observation"
+          2 ->
+            assert inspect(messages) =~ "current-observation"
 
-          assert Enum.any?(messages, fn m ->
-                   m.role == :user and String.contains?(m.content, "[[ ## intent ## ]]\ncurrent")
-                 end)
+            assert Enum.any?(messages, fn m ->
+                     m.role == :user and
+                       String.contains?(m.content, "[[ ## intent ## ]]\ncurrent")
+                   end)
 
-          refute inspect(messages) =~ "prior-answer"
-          {:ok, "done"}
-      end
-    end
+            refute inspect(messages) =~ "prior-answer"
+            {:ok, "done"}
+        end
+      end)
 
     tool =
       Imp.tool(:write, "fixture effect", fn _ ->
@@ -217,7 +221,7 @@ defmodule Imp.ReActV2ContextTest do
     prior = Imp.history([%{intent: "prior", answer: "prior-answer"}])
 
     {:ok, prediction} =
-      Imp.call(Imp.react_v2("intent -> answer", [tool], lm: lm), %{
+      Imp.call(Imp.react("intent -> answer", [tool], lm: lm), %{
         intent: "current",
         history: prior
       })
@@ -230,14 +234,15 @@ defmodule Imp.ReActV2ContextTest do
   test "an irreducible first request does not make an unchanged forced-submit request" do
     {:ok, calls} = Agent.start_link(fn -> 0 end)
 
-    lm = fn _, _ ->
-      Agent.update(calls, &(&1 + 1))
+    lm =
+      Imp.Test.FunLM.new(fn _, _ ->
+        Agent.update(calls, &(&1 + 1))
 
-      {:error,
-       %Imp.LMError{context_window_exceeded: true, message: "instructions alone exceed window"}}
-    end
+        {:error,
+         %Imp.LMError{context_window_exceeded: true, message: "instructions alone exceed window"}}
+      end)
 
-    {:ok, prediction} = Imp.call(Imp.react_v2("intent -> answer", [], lm: lm), %{intent: "now"})
+    {:ok, prediction} = Imp.call(Imp.react("intent -> answer", [], lm: lm), %{intent: "now"})
     assert Imp.get(prediction, :answer) == nil
     assert prediction.metadata[:termination_reason] == :incomplete
     assert prediction.metadata[:termination_cause] == :context_window_exceeded
@@ -247,15 +252,16 @@ defmodule Imp.ReActV2ContextTest do
   test "recovery is finite even when every reduced prompt is refused" do
     {:ok, calls} = Agent.start_link(fn -> 0 end)
 
-    lm = fn _, _ ->
-      Agent.update(calls, &(&1 + 1))
-      {:error, %Imp.LMError{context_window_exceeded: true, message: "fixed input too large"}}
-    end
+    lm =
+      Imp.Test.FunLM.new(fn _, _ ->
+        Agent.update(calls, &(&1 + 1))
+        {:error, %Imp.LMError{context_window_exceeded: true, message: "fixed input too large"}}
+      end)
 
     prior = Imp.history(Enum.map(1..1024, &%{intent: "old #{&1}", answer: "old"}))
 
     {:ok, prediction} =
-      Imp.call(Imp.react_v2("intent -> answer", [], lm: lm), %{intent: "now", history: prior})
+      Imp.call(Imp.react("intent -> answer", [], lm: lm), %{intent: "now", history: prior})
 
     assert prediction.metadata[:history] == prior
     assert prediction.metadata[:context_projection].recovery_requests == 8
@@ -266,15 +272,16 @@ defmodule Imp.ReActV2ContextTest do
   test "non-context failure does not trigger adaptive history retries" do
     {:ok, calls} = Agent.start_link(fn -> 0 end)
 
-    lm = fn _, _ ->
-      Agent.update(calls, &(&1 + 1))
-      {:error, :unrelated_provider_failure}
-    end
+    lm =
+      Imp.Test.FunLM.new(fn _, _ ->
+        Agent.update(calls, &(&1 + 1))
+        {:error, :unrelated_provider_failure}
+      end)
 
     prior = Imp.history([%{intent: "prior", answer: "old"}])
 
     {:ok, prediction} =
-      Imp.call(Imp.react_v2("intent -> answer", [], lm: lm), %{intent: "now", history: prior})
+      Imp.call(Imp.react("intent -> answer", [], lm: lm), %{intent: "now", history: prior})
 
     assert prediction.metadata[:history] == prior
     assert prediction.metadata[:context_projection] == nil

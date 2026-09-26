@@ -10,7 +10,7 @@ defmodule Imp.TrainingFacadeConsumerTest do
     defstruct [:model]
 
     @impl true
-    def generate(messages, _opts) do
+    def generate(_lm, messages, _opts) do
       question =
         messages
         |> Enum.map_join("\n", &Map.get(&1, :content, ""))

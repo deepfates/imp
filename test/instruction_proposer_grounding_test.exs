@@ -6,16 +6,14 @@ defmodule Imp.Optimizer.InstructionProposerGroundingTest do
   test "grounded proposer independently controls program, data, demo, and tip context" do
     parent = self()
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           payload = messages |> List.last() |> Map.fetch!(:content) |> Jason.decode!()
           send(parent, {:proposal_payload, payload})
           %{"instructions" => ["Candidate instruction"]}
         end
-      ]
-    }
+      )
 
     program = Imp.predict("question -> answer")
     example = Imp.example(question: "q", answer: "a") |> Imp.with_inputs(:question)
@@ -79,15 +77,13 @@ defmodule Imp.Optimizer.InstructionProposerGroundingTest do
   test "proposal reports preserve distinct rollout ids and fallback failures" do
     parent = self()
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, opts ->
           send(parent, {:proposal_rollout, opts[:rollout_id]})
           %{"instructions" => ["Instruction #{opts[:rollout_id]}"]}
         end
-      ]
-    }
+      )
 
     program = Imp.predict("question -> answer")
     example = Imp.example(question: "q", answer: "a") |> Imp.with_inputs(:question)
@@ -119,13 +115,14 @@ defmodule Imp.Optimizer.InstructionProposerGroundingTest do
   end
 
   test "provider envelopes produce proposals instead of silent fallbacks" do
-    lm = fn _messages, _opts ->
-      {:ok,
-       %{
-         __imp_lm_output__: %{"instructions" => ["Use the provider proposal."]},
-         __imp_lm_metadata__: %{req_llm: %{provider: "test"}}
-       }}
-    end
+    lm =
+      Imp.Test.FunLM.new(fn _messages, _opts ->
+        {:ok,
+         %{
+           __imp_lm_output__: %{"instructions" => ["Use the provider proposal."]},
+           __imp_lm_metadata__: %{req_llm: %{provider: "test"}}
+         }}
+      end)
 
     program = Imp.predict("question -> answer")
     example = Imp.example(question: "q", answer: "a") |> Imp.with_inputs(:question)
@@ -164,16 +161,14 @@ defmodule Imp.Optimizer.InstructionProposerGroundingTest do
   test "proposal slots rotate only augmented demos and preserve repeated instructions" do
     parent = self()
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, opts ->
           payload = messages |> List.last() |> Map.fetch!(:content) |> Jason.decode!()
           send(parent, {:proposal_demos, opts[:rollout_id], payload["demonstrations"]})
           %{"instructions" => ["same instruction"]}
         end
-      ]
-    }
+      )
 
     program = Imp.predict("question -> answer")
 

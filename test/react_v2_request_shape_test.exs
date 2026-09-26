@@ -32,7 +32,7 @@ defmodule ReActV2RequestShapeTest do
     do: {m[:role], m[:content], m[:tool_calls]}
 
   test "each step's request is the previous request plus the newest exchange" do
-    program = Imp.react_v2("intent -> answer", [look()], lm: recording_lm(self(), 3))
+    program = Imp.react("intent -> answer", [look()], lm: recording_lm(self(), 3))
     assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
     assert Imp.get(prediction, :answer) == "ok"
 
@@ -47,7 +47,7 @@ defmodule ReActV2RequestShapeTest do
   end
 
   test "the roster goes to the provider once, natively, and never as text" do
-    program = Imp.react_v2("intent -> answer", [look()], lm: recording_lm(self(), 2))
+    program = Imp.react("intent -> answer", [look()], lm: recording_lm(self(), 2))
     assert {:ok, _} = Imp.call(program, %{intent: "hello"})
 
     for {messages, opts} <- requests(2) do
@@ -62,7 +62,7 @@ defmodule ReActV2RequestShapeTest do
   end
 
   test "the loop's guidance is adapter data, said by the default system renderer" do
-    program = Imp.react_v2("intent -> answer", [look()], lm: recording_lm(self(), 1))
+    program = Imp.react("intent -> answer", [look()], lm: recording_lm(self(), 1))
     assert {:ok, _} = Imp.call(program, %{intent: "hello"})
     [{[system | _], _}] = requests(1)
 
@@ -87,7 +87,7 @@ defmodule ReActV2RequestShapeTest do
         end
       )
 
-    program = Imp.react_v2("intent -> answer, confidence: float", [look()], lm: submit_lm)
+    program = Imp.react("intent -> answer, confidence: float", [look()], lm: submit_lm)
     assert {:ok, _} = Imp.call(program, %{intent: "hello"})
     assert_received {:system, system}
 
@@ -130,7 +130,7 @@ defmodule ReActV2RequestShapeTest do
         ]
       })
 
-    program = Imp.react_v2(signature, [look()], lm: lm)
+    program = Imp.react(signature, [look()], lm: lm)
     assert {:ok, _} = Imp.call(program, %{ticket: "We were charged twice."})
     assert_received {:system, system}
 
@@ -152,7 +152,7 @@ defmodule ReActV2RequestShapeTest do
     end
 
     program =
-      Imp.react_v2("intent -> answer", [look()],
+      Imp.react("intent -> answer", [look()],
         lm: recording_lm(self(), 2),
         adapter_opts: [system_renderer: renderer]
       )

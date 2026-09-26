@@ -42,7 +42,7 @@ defmodule ImpDeployment.AgentOptimization do
     ]
 
     react =
-      Imp.react_v2("request -> answer", tools,
+      Imp.react("request -> answer", tools,
         lm: lm,
         max_iters: 3,
         config: [max_tokens: 700]

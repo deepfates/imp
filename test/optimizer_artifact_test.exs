@@ -280,7 +280,7 @@ defmodule Imp.Optimizer.ArtifactTest do
           end)
 
         signature = %{predictor.signature | outputs: outputs}
-        Imp.Predict.Predict.with_signature(predictor, signature)
+        Imp.Predict.with_signature(predictor, signature)
       end)
 
     assert_raise ArgumentError, ~r/incompatible signature/, fn ->
@@ -453,15 +453,16 @@ defmodule Imp.Optimizer.ArtifactTest do
           %{output | prefix: prefix}
         end)
 
-      Imp.Predict.Predict.with_signature(predictor, %{predictor.signature | outputs: outputs})
+      Imp.Predict.with_signature(predictor, %{predictor.signature | outputs: outputs})
     end)
   end
 
   defp runtime_program(instruction, answer, opts) do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: answer} end, api_key: opts[:api_key]]
-    }
+    lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts -> %{answer: answer} end,
+        api_key: opts[:api_key]
+      )
 
     Imp.chain_of_thought("question -> answer")
     |> Imp.ProgramParameters.put_instruction(:main, instruction)

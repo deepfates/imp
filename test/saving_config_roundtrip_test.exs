@@ -3,7 +3,7 @@ defmodule SavingConfigRoundtripTest do
 
   # Regression: the README/tutorial template program carries
   # `config: [json_retries: 1]`. decode_config_key's allowlist did not map
-  # "json_retries" back to an atom, so `Imp.save!` succeeded and `Imp.load!`
+  # "json_retries" back to an atom, so `Imp.save!` succeeded and `Imp.read!`
   # raised (`invalid value for :config option: expected keyword list, got:
   # [{"json_retries", 1}]`) — a silent-until-load failure on the front-door
   # path, found live by the real-data campaign's operate cell.
@@ -21,14 +21,11 @@ defmodule SavingConfigRoundtripTest do
 
     try do
       :ok = Imp.save!(program, path)
-      loaded = Imp.load!(path)
+      loaded = Imp.read!(path)
 
       assert loaded.config[:json_retries] == 1
 
-      lm = %{
-        module: Imp.LM.Static,
-        opts: [handler: fn _messages, _opts -> %{team: "security"} end]
-      }
+      lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{team: "security"} end)
 
       {:ok, prediction} =
         Imp.context([lm: lm], fn ->
@@ -44,7 +41,7 @@ defmodule SavingConfigRoundtripTest do
   test "json_fallback survives the artifact boundary as an atom key" do
     program = Imp.predict("question -> answer", config: [json_retries: 2, json_fallback: false])
 
-    loaded = program |> Imp.dump() |> Imp.load()
+    loaded = program |> Imp.dump() |> Imp.load!()
 
     assert loaded.config[:json_retries] == 2
     assert loaded.config[:json_fallback] == false

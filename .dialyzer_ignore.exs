@@ -37,7 +37,7 @@
    {286, 30}},
   # defensive clause for non-covered differential rows
   {"bench/imp/benchmark_truth/optimize_anything/upstream_differential.ex", :pattern_match_cov,
-   {227, 10}},
+   {225, 10}},
   # MapSet opacity on case-id sets typed through campaign JSON (col 21)
   {"bench/imp/benchmark_truth/rlm_campaign.ex", :call_without_opaque, {813, 21}},
   # MapSet opacity on case-id sets typed through campaign JSON (col 53)
@@ -58,7 +58,7 @@
   # defensive guard: ReqLLM.Response types provider_meta as map() with a %{}
   # default, but the struct does not enforce it (a caller can build one with
   # nil), and ReqLLM's own OpenTelemetry attributes guard it with is_map/1.
-  {"lib/imp/clients/req_llm.ex", :guard_fail, 1614},
+  {"lib/imp/clients/req_llm.ex", :guard_fail, 1617},
   # defensive error clause on an always-ok internal call
   {"lib/imp/clients/training.ex", :pattern_match, {1215, 13}},
   # defensive error clause on an always-ok internal call
@@ -92,15 +92,10 @@
   {"lib/imp/optimizer/simba.ex", :pattern_match_cov, {698, 8}},
   # defensive clause for non-covered trace entries
   {"lib/imp/optimizer/trajectory.ex", :pattern_match_cov, {270, 8}},
-  # behaviour callback specs term(); impl narrows to %__MODULE__{} on
-  # purpose so bad input crashes loudly
-  {"lib/imp/retrieve.ex", :callback_arg_type_mismatch, {158, 9}},
   # defensive error clause on an always-ok retriever call
-  {"lib/imp/retrieve.ex", :pattern_match, {113, 8}},
+  {"lib/imp/retrieve.ex", :pattern_match, {121, 8}},
   # defensive fallback paired with the 106 clause
-  {"lib/imp/retrieve.ex", :pattern_match_cov, {114, 8}},
-  # behaviour callback specs term(); impl narrows on purpose (see retrieve.ex)
-  {"lib/imp/retrievers/http.ex", :callback_arg_type_mismatch, {97, 7}},
+  {"lib/imp/retrieve.ex", :pattern_match_cov, {122, 8}},
   # MapSet opacity on run-id sets typed through MLflow JSON
   {"lib/imp/tracking/mlflow.ex", :call_without_opaque, {361, 8}},
   # defensive clause dialyzer pins to the module head (line 1)
@@ -112,7 +107,7 @@
   # defensive nil-fallback clause for env maps the task always populates
   {"lib/mix/tasks/imp.benchmark.parity.ex", :pattern_match, {715, 11}},
   # raise-only helper: invalid_snapshot!/2 exists to Mix.raise
-  {"lib/mix/tasks/imp.public_api.ex", :no_return, {838, 8}},
+  {"lib/mix/tasks/imp.public_api.ex", :no_return, {866, 8}},
 
   # --- Surfaced 2026-08-08 during ignore-file regeneration (imp-fkwy): 583
   # commits landed without CI, and these warnings accumulated unpinned.

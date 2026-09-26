@@ -469,7 +469,7 @@ defmodule LocalSIMBAFeedbackTREC.Runner do
     observer = observer!(paths)
 
     try do
-      source = Imp.load!(paths.program)
+      source = Imp.read!(paths.program)
       assert_runtime!(source, rows.contract)
       baseline = observe_program(source, observer)
       selected = paths.artifact |> Artifact.read!() |> Artifact.apply(baseline)
@@ -601,7 +601,7 @@ defmodule LocalSIMBAFeedbackTREC.Runner do
 
   defp observe_program(program, observer),
     do:
-      Imp.Predict.Predict.with_lm(
+      Imp.Predict.with_lm(
         program,
         observed(Imp.ProgramAccess.lm(program), observer, :task)
       )
