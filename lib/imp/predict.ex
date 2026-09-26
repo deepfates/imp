@@ -1,4 +1,4 @@
-defmodule Imp.Predict.Predict do
+defmodule Imp.Predict do
   @moduledoc """
   Basic Imp program that maps signature inputs to typed outputs with an LM.
 
@@ -6,7 +6,9 @@ defmodule Imp.Predict.Predict do
   input map with an adapter, calls the configured LM, parses the result into a
   `Imp.Prediction`, and attaches trace metadata. Most higher-level modules
   such as ChainOfThought, RAG, ReAct, BestOfN, and optimizers eventually compose
-  around this shape.
+  around this shape, which is why they live under `Imp.Predict.*`: as in DSPy,
+  where `dspy.ChainOfThought` wraps a `dspy.Predict`, each of them holds or
+  builds one.
 
   Required inputs are validated before an LM call is made. This keeps missing
   data as a local program error instead of spending provider calls on malformed
@@ -14,15 +16,15 @@ defmodule Imp.Predict.Predict do
 
   ## Example
 
-      iex> lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
-      iex> program = Imp.Predict.Predict.new("question -> answer", lm: lm)
-      iex> {:ok, prediction} = Imp.Predict.Predict.call(program, %{question: "2+2?"})
+      iex> lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "4"} end)
+      iex> program = Imp.Predict.new("question -> answer", lm: lm)
+      iex> {:ok, prediction} = Imp.Predict.call(program, %{question: "2+2?"})
       iex> Imp.Prediction.get(prediction, :answer)
       "4"
 
-      iex> silent_lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "unused"} end]}
-      iex> missing = Imp.Predict.Predict.new("question, context -> answer", lm: silent_lm)
-      iex> Imp.Predict.Predict.call(missing, %{question: "2+2?"})
+      iex> silent_lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "unused"} end)
+      iex> missing = Imp.Predict.new("question, context -> answer", lm: silent_lm)
+      iex> Imp.Predict.call(missing, %{question: "2+2?"})
       {:error, {:missing_input_fields, [:context]}}
   """
 
@@ -61,7 +63,7 @@ defmodule Imp.Predict.Predict do
       signature: Imp.Signature.ensure(signature),
       lm: predict_opts[:lm],
       adapter: predict_opts[:adapter],
-      demos: Imp.Example.normalize_demos!(predict_opts[:demos], "Imp.Predict.Predict.new/2"),
+      demos: Imp.Example.normalize_demos!(predict_opts[:demos], "Imp.Predict.new/2"),
       config: predict_opts[:config],
       adapter_opts: predict_opts[:adapter_opts],
       metadata: predict_opts[:metadata],
@@ -112,7 +114,7 @@ defmodule Imp.Predict.Predict do
   to the LM request, including a predicted-outputs `:prediction` map. Raises
   `ArgumentError` if `config` is not a keyword list.
 
-      Imp.Predict.Predict.call(program, %{question: "..."},
+      Imp.Predict.call(program, %{question: "..."},
         temperature: 0.2,
         prediction: %{type: "content", content: "..."}
       )
@@ -120,7 +122,7 @@ defmodule Imp.Predict.Predict do
   def call(%__MODULE__{} = predict, inputs, config) do
     unless Keyword.keyword?(config) do
       raise ArgumentError,
-            "Imp.Predict.Predict.call/3 expects per-call config as a keyword list, got: #{inspect(config)}"
+            "Imp.Predict.call/3 expects per-call config as a keyword list, got: #{inspect(config)}"
     end
 
     call(%{predict | config: Keyword.merge(predict.config, config)}, inputs)
@@ -261,7 +263,7 @@ defmodule Imp.Predict.Predict do
   def with_demos(%__MODULE__{} = predict, demos),
     do: %{
       predict
-      | demos: Imp.Example.normalize_demos!(demos, "Imp.Predict.Predict.with_demos/2")
+      | demos: Imp.Example.normalize_demos!(demos, "Imp.Predict.with_demos/2")
     }
 
   @doc "Returns a copy of the program pinned to a concrete LM."
@@ -301,7 +303,7 @@ defmodule Imp.Predict.Predict do
   defp require_lm(lm), do: {:ok, lm}
 
   defp validate_opts!(opts) do
-    {opts, Imp.Predict.Options.validate!(opts, @option_schema, "Imp.Predict.Predict.new/2")}
+    {opts, Imp.Predict.Options.validate!(opts, @option_schema, "Imp.Predict.new/2")}
   end
 
   defp normalize_inputs(inputs) do

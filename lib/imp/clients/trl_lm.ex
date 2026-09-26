@@ -40,6 +40,7 @@ defmodule Imp.Clients.TRLLM do
 
   def response_format_capability(%__MODULE__{}), do: Imp.LM.Capability.none()
 
+  @impl true
   def generate(%__MODULE__{} = lm, messages, opts) do
     with :ok <- validate_rollout_source(lm),
          :ok <- validate_generation_mode(lm),
@@ -139,14 +140,6 @@ defmodule Imp.Clients.TRLLM do
          completion
        ),
        do: %{field => String.trim(completion)}
-
-  @impl true
-  def generate(messages, opts) do
-    case Imp.Settings.fetch!(:lm) do
-      %__MODULE__{} = lm -> generate(lm, messages, opts)
-      _other -> {:error, :trl_lm_not_configured}
-    end
-  end
 
   defp rollout_request(
          %__MODULE__{rollout_source: :model_generated, generation_mode: mode},

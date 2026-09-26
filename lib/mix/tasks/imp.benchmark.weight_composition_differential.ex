@@ -245,11 +245,11 @@ defmodule Mix.Tasks.Imp.Benchmark.WeightCompositionDifferential do
 
   @doc false
   def local_observations("bootstrap_finetune") do
-    shared_lm = %{
-      module: Imp.LM.Static,
-      model: "fixture",
-      opts: [handler: fn _messages, _opts -> %{first_answer: "one", second_answer: "two"} end]
-    }
+    shared_lm =
+      Imp.LM.Static.new(
+        model: "fixture",
+        handler: fn _messages, _opts -> %{first_answer: "one", second_answer: "two"} end
+      )
 
     program = %TwoPredictorProgram{
       first: Imp.predict("question -> first_answer", lm: shared_lm),
@@ -363,9 +363,8 @@ defmodule Mix.Tasks.Imp.Benchmark.WeightCompositionDifferential do
 
   defp fixture_program do
     Imp.predict("question -> answer",
-      lm: %{
-        module: Imp.LM.Static,
-        opts: [
+      lm:
+        Imp.LM.Static.new(
           handler: fn messages, _opts ->
             prompt = Enum.map_join(messages, "\n", & &1.content)
 
@@ -378,8 +377,7 @@ defmodule Mix.Tasks.Imp.Benchmark.WeightCompositionDifferential do
 
             %{answer: answer}
           end
-        ]
-      }
+        )
     )
   end
 

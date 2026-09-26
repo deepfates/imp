@@ -7,7 +7,7 @@ defmodule Imp.SavingCurrentSchemaTest do
     for key <-
           ~w(max_recursion_depth max_interpreter_steps max_interpreter_value_bytes max_interpreter_effects) do
       assert_raise ArgumentError, ~r/missing required keys/, fn ->
-        state |> Map.delete(key) |> Imp.Saving.load()
+        state |> Map.delete(key) |> Imp.Saving.load!()
       end
     end
   end
@@ -17,7 +17,7 @@ defmodule Imp.SavingCurrentSchemaTest do
 
     for key <- ~w(threshold decompositional) do
       assert_raise ArgumentError, ~r/missing required keys/, fn ->
-        state |> Map.delete(key) |> Imp.Saving.load()
+        state |> Map.delete(key) |> Imp.Saving.load!()
       end
     end
   end
@@ -29,7 +29,7 @@ defmodule Imp.SavingCurrentSchemaTest do
     }
 
     assert_raise ArgumentError, ~r/unsupported saved Imp program type/, fn ->
-      Imp.Saving.load(stale)
+      Imp.Saving.load!(stale)
     end
   end
 end

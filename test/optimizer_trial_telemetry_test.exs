@@ -7,10 +7,7 @@ defmodule OptimizerTrialTelemetryTest do
 
   defp program do
     Imp.predict("question -> answer",
-      lm: %{
-        module: Imp.LM.Static,
-        opts: [handler: fn _messages, _opts -> %{answer: "constant"} end]
-      }
+      lm: Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "constant"} end)
     )
   end
 

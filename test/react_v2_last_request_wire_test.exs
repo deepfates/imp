@@ -40,7 +40,7 @@ defmodule Imp.ReActV2LastRequestWireTest do
         )
 
       look = Imp.tool(:look, "Look at a thing", fn _arguments -> "it is there" end)
-      program = Imp.react_v2("intent -> answer", [look], lm: lm, max_iters: 1)
+      program = Imp.react("intent -> answer", [look], lm: lm, max_iters: 1)
 
       assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
       assert Imp.get(prediction, :answer) == "It is there."

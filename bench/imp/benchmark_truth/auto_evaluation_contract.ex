@@ -181,16 +181,13 @@ defmodule Imp.BenchmarkTruth.AutoEvaluationContract do
   end
 
   defp scripted_lm(parent, spec) do
-    %{
-      module: Imp.LM.Static,
-      opts: [
-        handler: fn messages, _opts ->
-          prompt = Enum.map_join(messages, "\n", & &1.content)
-          send(parent, {:auto_evaluation_prompt, prompt})
-          judgment(spec, prompt)
-        end
-      ]
-    }
+    Imp.LM.Static.new(
+      handler: fn messages, _opts ->
+        prompt = Enum.map_join(messages, "\n", & &1.content)
+        send(parent, {:auto_evaluation_prompt, prompt})
+        judgment(spec, prompt)
+      end
+    )
   end
 
   defp judgment(%{"evaluator" => "semantic_f1"} = spec, _prompt) do

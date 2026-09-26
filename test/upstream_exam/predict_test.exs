@@ -33,7 +33,7 @@ defmodule UpstreamExam.PredictTest do
 
     def new(signature, forward_fn, opts \\ []) do
       %__MODULE__{
-        predictor: Imp.Predict.Predict.new(signature, opts),
+        predictor: Imp.Predict.new(signature, opts),
         forward_fn: forward_fn
       }
     end
@@ -73,7 +73,7 @@ defmodule UpstreamExam.PredictTest do
   defp dummy_lm(responses) do
     {:ok, agent} = Agent.start_link(fn -> responses end)
 
-    fn _messages, opts ->
+    Imp.Test.FunLM.new(fn _messages, opts ->
       n = Keyword.get(opts, :n, 1)
 
       popped =
@@ -90,13 +90,13 @@ defmodule UpstreamExam.PredictTest do
         {1, [response]} -> {:ok, response}
         {_n, completions} -> {:ok, completions}
       end
-    end
+    end)
   end
 
   # Upstream test_lm_usage's mocked litellm ModelResponse: fixed answer plus a
   # usage entry, delivered through the Imp LM metadata envelope.
   defp usage_reporting_lm do
-    fn _messages, _opts ->
+    Imp.Test.FunLM.new(fn _messages, _opts ->
       {:ok,
        %{
          __imp_lm_output__: %{answer: "Paris"},
@@ -104,16 +104,16 @@ defmodule UpstreamExam.PredictTest do
            req_llm: %{provider: "openai", model: "gpt-4o-mini", usage: %{total_tokens: 10}}
          }
        }}
-    end
+    end)
   end
 
   defp capture_lm(response_fun) do
     test_pid = self()
 
-    fn messages, opts ->
+    Imp.Test.FunLM.new(fn messages, opts ->
       send(test_pid, {:lm_call, messages, opts})
       response_fun.(messages)
-    end
+    end)
   end
 
   # Upstream DummyVectorizer (dspy/utils/dummies.py): character-bigram counts
@@ -242,7 +242,7 @@ defmodule UpstreamExam.PredictTest do
 
       count_calls = fn module, inputs ->
         Agent.update(module_calls, &(&1 + 1))
-        Imp.Predict.Predict.call(module.predictor, inputs)
+        Imp.Predict.call(module.predictor, inputs)
       end
 
       reward_fn = fn _inputs, prediction ->
@@ -285,7 +285,7 @@ defmodule UpstreamExam.PredictTest do
         if calls <= 2 do
           raise "Deliberately failing"
         else
-          Imp.Predict.Predict.call(module.predictor, inputs)
+          Imp.Predict.call(module.predictor, inputs)
         end
       end
 
@@ -323,11 +323,12 @@ defmodule UpstreamExam.PredictTest do
     # sections (upstream's trailing "[[ ## completion ## ]]" typo included);
     # answer parses to "Paris" and reasoning is the plain string.
     test "chain of thought with marker completion" do
-      lm = fn _messages, _opts ->
-        {:ok,
-         "[[ ## reasoning ## ]]\nStep-by-step thinking about the capital of France\n" <>
-           "[[ ## answer ## ]]\nParis\n[[ ## completion ## ]]"}
-      end
+      lm =
+        Imp.Test.FunLM.new(fn _messages, _opts ->
+          {:ok,
+           "[[ ## reasoning ## ]]\nStep-by-step thinking about the capital of France\n" <>
+             "[[ ## answer ## ]]\nParis\n[[ ## completion ## ]]"}
+        end)
 
       cot = Imp.chain_of_thought("question -> answer", lm: lm)
 
@@ -620,7 +621,7 @@ defmodule UpstreamExam.PredictTest do
       payload = %{type: "content", content: "A chicken crossing the kitchen"}
 
       assert {:ok, _prediction} =
-               Imp.Predict.Predict.call(
+               Imp.Predict.call(
                  program,
                  %{question: "Why did a chicken cross the kitchen?"},
                  prediction: payload
@@ -658,7 +659,7 @@ defmodule UpstreamExam.PredictTest do
       original = Imp.predict(Imp.signature("input -> output", "original instructions"))
       state = Imp.dump(original)
 
-      loaded = Imp.load(state)
+      loaded = Imp.load!(state)
       assert loaded.signature.instructions == "original instructions"
     end
 
@@ -676,13 +677,13 @@ defmodule UpstreamExam.PredictTest do
         Imp.example(content: "¿Qué tal?", language: "SPANISH", translation: "Hello there")
         |> Imp.with_inputs([:content, :language])
 
-      original = Imp.Predict.Predict.new(signature, demos: [demo])
+      original = Imp.Predict.new(signature, demos: [demo])
       state = Imp.dump(original)
 
       assert length(state["demos"]) == 1
 
       round_tripped = state |> Jason.encode!() |> Jason.decode!()
-      loaded = Imp.load(round_tripped)
+      loaded = Imp.load!(round_tripped)
 
       assert length(loaded.demos) == 1
       assert Imp.Example.get(hd(loaded.demos), :content) == "¿Qué tal?"
@@ -717,7 +718,7 @@ defmodule UpstreamExam.PredictTest do
       new_instance = Imp.predict(new_signature)
       refute Imp.Signature.dump(new_instance.signature) == Imp.Signature.dump(original.signature)
 
-      loaded = Imp.load!(file_path)
+      loaded = Imp.read!(file_path)
       assert Imp.Signature.dump(loaded.signature) == Imp.Signature.dump(original.signature)
     end
 
@@ -727,7 +728,7 @@ defmodule UpstreamExam.PredictTest do
       cot = Imp.chain_of_thought("question -> answer")
       predictors = Imp.ProgramParameters.predictors(cot)
 
-      assert [%{name: _name, predictor: %Imp.Predict.Predict{}}] = predictors
+      assert [%{name: _name, predictor: %Imp.Predict{}}] = predictors
     end
 
     # Upstream: test_call_predict_with_chat_history (chat adapter) — a History
@@ -1397,7 +1398,7 @@ defmodule UpstreamExam.PredictTest do
           %{reasoning: "I added the numbers successfully", c: 3}
         ])
 
-      react = Imp.react("a, b -> c: integer", [foo], lm: lm, mode: :dspy_3_2_1)
+      react = Imp.Predict.ReAct.new("a, b -> c: integer", [foo], lm: lm, mode: :dspy)
 
       assert {:ok, outputs} = Imp.call(react, %{a: 1, b: 2})
       assert Imp.get(outputs, :c) == 3
@@ -1435,7 +1436,7 @@ defmodule UpstreamExam.PredictTest do
           %{reasoning: "I added the numbers successfully", c: 3}
         ])
 
-      react = Imp.react("a, b -> c: integer", [foo], lm: lm, mode: :dspy_3_2_1)
+      react = Imp.Predict.ReAct.new("a, b -> c: integer", [foo], lm: lm, mode: :dspy)
 
       assert {:ok, outputs} = Imp.call(react, %{a: 1, b: 2, max_iters: 2})
       assert Imp.get(outputs, :c) == 3
@@ -1472,7 +1473,7 @@ defmodule UpstreamExam.PredictTest do
 
       count_calls = fn module, inputs ->
         Agent.update(module_calls, &(&1 + 1))
-        Imp.Predict.Predict.call(module.predictor, inputs)
+        Imp.Predict.call(module.predictor, inputs)
       end
 
       reward_fn = fn _inputs, prediction ->
@@ -1512,7 +1513,7 @@ defmodule UpstreamExam.PredictTest do
         if calls <= 2 do
           raise "Deliberately failing"
         else
-          Imp.Predict.Predict.call(module.predictor, inputs)
+          Imp.Predict.call(module.predictor, inputs)
         end
       end
 
@@ -1600,7 +1601,7 @@ defmodule UpstreamExam.PredictTest do
 
     # Upstream: TestRLMInitialization::test_forward_validates_required_inputs
     test "rlm forward validates required inputs" do
-      lm = fn _messages, _opts -> {:ok, %{reasoning: "noop", code: "1"}} end
+      lm = Imp.Test.FunLM.new(fn _messages, _opts -> {:ok, %{reasoning: "noop", code: "1"}} end)
       rlm = Imp.rlm("context, query -> answer", max_iterations: 3, lm: lm)
 
       assert {:error, {:missing_input_fields, missing}} =

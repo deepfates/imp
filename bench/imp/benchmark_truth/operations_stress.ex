@@ -174,11 +174,11 @@ defmodule Imp.BenchmarkTruth.OperationsStress do
 
     dumped = Imp.Saving.dump(program)
     encoded = Jason.encode!(json_safe(dumped))
-    loaded = Imp.Saving.load(dumped)
+    loaded = Imp.Saving.load!(dumped)
 
     pass? =
       not String.contains?(encoded, secret) and
-        match?(%Imp.Predict.Predict{adapter: Imp.Adapter.JSON}, loaded) and
+        match?(%Imp.Predict{adapter: Imp.Adapter.JSON}, loaded) and
         match?(%Imp.Clients.ReqLLM{model: "openai:gpt-test"}, loaded.lm)
 
     check("save_load_round_trip_redacts_credentials", "persistence", pass?, %{

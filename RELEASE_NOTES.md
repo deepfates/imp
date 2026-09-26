@@ -127,7 +127,7 @@ Ordinary Imp startup starts no protocol endpoint.
   `Imp.Clients.ReqLLM` request is `%Imp.LMError{}` (with `status`,
   `retryable` and `context_window_exceeded`; `Imp.ContextWindowExceededError`
   is gone), and a completion that cannot be parsed is
-  `%Imp.AdapterParseError{kind: ...}`, which `Imp.Predict.Predict` returns
+  `%Imp.AdapterParseError{kind: ...}`, which `Imp.Predict` returns
   directly instead of `%{reason: {:error, _}, trace: _}`. A raise inside a
   client, program, tool, tool policy, retriever, optimizer or ACP callback
   keeps the exception struct where 0.4.0 kept its message.
@@ -145,6 +145,17 @@ Ordinary Imp startup starts no protocol endpoint.
   import's ACP tool kinds.
 - An optimizer's `compile/N` is no longer documented where `Imp.optimize` or
   `Imp.train` runs the optimizer; call those.
+- `Imp.load!/1` reading a file is `Imp.read!/1`; `Imp.load/1` returns
+  `{:ok, program}` and `Imp.load!/1` takes the dumped map.
+- `Imp.react/3` builds ReActV2 and `Imp.react_v2` is gone.
+  `Imp.Predict.ReAct`'s `mode: :dspy_3_2_1` is `mode: :dspy`.
+- `Imp.Predict.Predict` is `Imp.Predict`.
+- `Imp.Retrievers.KNN` is deleted; `Imp.Retrieve.Memory` retrieves by token
+  overlap.
+- An LM is a struct or module whose `generate/3` takes it first. The
+  `%{module:, opts:}` map and a bare function are refused; so is a module
+  that defines only `generate/2`. A retriever module's `retrieve/3` takes
+  itself first.
 
 ## Upgrade path
 
@@ -165,7 +176,12 @@ Ordinary Imp startup starts no protocol endpoint.
    and `Imp.Errors.context_window_exceeded?/1`), parse failures on
    `%Imp.AdapterParseError{kind: ...}`, and exception reasons on the struct
    rather than its text.
-8. Run your held-out evaluation and application smoke test against the new
+8. Rename `Imp.react_v2` to `Imp.react`, `Imp.Predict.Predict` to
+   `Imp.Predict`, and `Imp.load!(path)` to `Imp.read!(path)`; give custom LMs
+   and retriever modules the `generate/3` and `retrieve/3` that take the
+   client first, and wrap an LM function in a struct that implements
+   `Imp.LM`.
+9. Run your held-out evaluation and application smoke test against the new
    release; a one-text-output ReActV2 program now ends turns differently.
 
 The [CHANGELOG](CHANGELOG.md) records every user-visible change in this

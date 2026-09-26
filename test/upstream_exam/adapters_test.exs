@@ -47,10 +47,10 @@ defmodule UpstreamExam.AdaptersTest do
   defp capture_lm(response_fun) do
     test_pid = self()
 
-    fn messages, opts ->
+    Imp.Test.FunLM.new(fn messages, opts ->
       send(test_pid, {:lm_call, messages, opts})
       response_fun.(messages)
-    end
+    end)
   end
 
   # ---------------------------------------------------------------------------
@@ -202,7 +202,11 @@ defmodule UpstreamExam.AdaptersTest do
     # Upstream: tests/adapters/test_chat_adapter.py::test_chat_adapter_sync_call
     # (DummyLM returning {"answer": "Paris"} == the chat-rendered completion)
     test "chat adapter sync call" do
-      lm = fn _messages, _opts -> {:ok, "[[ ## answer ## ]]\nParis\n\n[[ ## completed ## ]]"} end
+      lm =
+        Imp.Test.FunLM.new(fn _messages, _opts ->
+          {:ok, "[[ ## answer ## ]]\nParis\n\n[[ ## completed ## ]]"}
+        end)
+
       program = Imp.predict("question -> answer", adapter: Imp.Adapter.Chat, lm: lm)
 
       assert {:ok, prediction} = Imp.call(program, %{question: "What is the capital of France?"})
@@ -429,7 +433,7 @@ defmodule UpstreamExam.AdaptersTest do
     # (Imp's LM boundary rejects a nil generation before the adapter parses;
     # either way the null-content case is a loud error, never silent nil fields.)
     test "null content is a loud error" do
-      lm = fn _messages, _opts -> {:ok, nil} end
+      lm = Imp.Test.FunLM.new(fn _messages, _opts -> {:ok, nil} end)
       cot = Imp.chain_of_thought("question -> answer", lm: lm)
 
       assert {:error, _reason} = Imp.call(cot, %{question: "test"})
@@ -437,7 +441,7 @@ defmodule UpstreamExam.AdaptersTest do
 
     # Upstream: tests/adapters/test_chat_adapter.py::test_empty_string_content_raises_adapter_parse_error
     test "empty string content is a loud error" do
-      lm = fn _messages, _opts -> {:ok, ""} end
+      lm = Imp.Test.FunLM.new(fn _messages, _opts -> {:ok, ""} end)
       cot = Imp.chain_of_thought("question -> answer", lm: lm)
 
       assert {:error, _reason} = Imp.call(cot, %{question: "test"})
@@ -464,7 +468,7 @@ defmodule UpstreamExam.AdaptersTest do
 
     # Upstream: tests/adapters/test_json_adapter.py::test_json_adapter_sync_call
     test "json adapter sync call" do
-      lm = fn _messages, _opts -> {:ok, ~s({"answer": "Paris"})} end
+      lm = Imp.Test.FunLM.new(fn _messages, _opts -> {:ok, ~s({"answer": "Paris"})} end)
       program = Imp.predict("question -> answer", adapter: Imp.Adapter.JSON, lm: lm)
 
       assert {:ok, prediction} = Imp.call(program, %{question: "What is the capital of France?"})
@@ -595,13 +599,21 @@ defmodule UpstreamExam.AdaptersTest do
     # Upstream: tests/adapters/test_json_adapter.py::test_error_message_on_json_adapter_failure
     # (provider errors must propagate unchanged, not be swallowed)
     test "error message on json adapter failure" do
-      lm = fn _messages, _opts -> {:error, %RuntimeError{message: "RuntimeError!"}} end
+      lm =
+        Imp.Test.FunLM.new(fn _messages, _opts ->
+          {:error, %RuntimeError{message: "RuntimeError!"}}
+        end)
+
       program = Imp.predict("question -> answer", adapter: Imp.Adapter.JSON, lm: lm)
 
       assert {:error, %RuntimeError{message: "RuntimeError!"}} =
                Imp.call(program, %{question: "Dummy question!"})
 
-      lm2 = fn _messages, _opts -> {:error, %ArgumentError{message: "ValueError!"}} end
+      lm2 =
+        Imp.Test.FunLM.new(fn _messages, _opts ->
+          {:error, %ArgumentError{message: "ValueError!"}}
+        end)
+
       program2 = Imp.predict("question -> answer", adapter: Imp.Adapter.JSON, lm: lm2)
 
       assert {:error, %ArgumentError{message: "ValueError!"}} =
@@ -1056,22 +1068,24 @@ defmodule UpstreamExam.AdaptersTest do
     test "two step adapter call" do
       test_pid = self()
 
-      main_lm = fn messages, _opts ->
-        send(test_pid, {:main_lm, messages})
-        {:ok, "text from main LM"}
-      end
+      main_lm =
+        Imp.Test.FunLM.new(fn messages, _opts ->
+          send(test_pid, {:main_lm, messages})
+          {:ok, "text from main LM"}
+        end)
 
-      extraction_lm = fn messages, _opts ->
-        send(test_pid, {:extraction_lm, messages})
+      extraction_lm =
+        Imp.Test.FunLM.new(fn messages, _opts ->
+          send(test_pid, {:extraction_lm, messages})
 
-        {:ok,
-         """
+          {:ok,
+           """
 
-         [[ ## solution ## ]] result
-         [[ ## answer ## ]] 12
-         [[ ## completed ## ]]
-         """}
-      end
+           [[ ## solution ## ]] result
+           [[ ## answer ## ]] 12
+           [[ ## completed ## ]]
+           """}
+        end)
 
       signature =
         Imp.Signature.new(%{
@@ -1119,16 +1133,17 @@ defmodule UpstreamExam.AdaptersTest do
 
     # Upstream: tests/adapters/test_two_step_adapter.py::test_two_step_adapter_parse
     test "two step adapter parse" do
-      extraction_lm = fn _messages, _opts ->
-        {:ok,
-         """
+      extraction_lm =
+        Imp.Test.FunLM.new(fn _messages, _opts ->
+          {:ok,
+           """
 
-             {
-                 "tags": ["AI", "deep learning", "neural networks"],
-                 "confidence": 0.87
-             }
-         """}
-      end
+               {
+                   "tags": ["AI", "deep learning", "neural networks"],
+                   "confidence": 0.87
+               }
+           """}
+        end)
 
       signature =
         Imp.Signature.new(%{
@@ -1158,7 +1173,7 @@ defmodule UpstreamExam.AdaptersTest do
     # unusable extraction text, the JSON retry also fails, and the loud
     # extraction failure surfaces, matching DSPy's ValueError.)
     test "two step adapter parse errors" do
-      extraction_lm = fn _messages, _opts -> {:ok, "invalid response"} end
+      extraction_lm = Imp.Test.FunLM.new(fn _messages, _opts -> {:ok, "invalid response"} end)
       signature = Imp.signature("question -> answer")
 
       assert {:error,
@@ -1458,7 +1473,7 @@ defmodule UpstreamExam.AdaptersTest do
           |> Imp.dump()
           |> Jason.encode!()
           |> Jason.decode!()
-          |> Imp.load()
+          |> Imp.load!()
 
         assert [%Imp.Example{} = restored_demo] = restored_program.demos
 
@@ -1554,9 +1569,10 @@ defmodule UpstreamExam.AdaptersTest do
     # (the behavior: result.reasoning is an ordinary string value usable with
     # the language's string operations)
     test "reasoning with chain of thought" do
-      lm = fn _messages, _opts ->
-        {:ok, %{reasoning: "Let me think step by step", answer: "42"}}
-      end
+      lm =
+        Imp.Test.FunLM.new(fn _messages, _opts ->
+          {:ok, %{reasoning: "Let me think step by step", answer: "42"}}
+        end)
 
       cot = Imp.chain_of_thought("question -> answer", lm: lm)
       assert {:ok, prediction} = Imp.call(cot, %{question: "What is the answer?"})

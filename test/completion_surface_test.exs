@@ -39,10 +39,7 @@ defmodule CompletionSurfaceTest do
   end
 
   test "program of thought evaluates arithmetic in a safe sandbox" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{program: "x * 2 + 1"} end]
-    }
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{program: "x * 2 + 1"} end)
 
     program = Imp.Predict.ProgramOfThought.new("x -> answer", lm: lm)
 
@@ -102,10 +99,7 @@ defmodule CompletionSurfaceTest do
   end
 
   test "ProgramOfThought reports malformed generated code explicitly" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{program: %{not: "source"}} end]
-    }
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{program: %{not: "source"}} end)
 
     program = Imp.Predict.ProgramOfThought.new("x -> answer", lm: lm)
 
@@ -133,16 +127,14 @@ defmodule CompletionSurfaceTest do
       %{program: "observation + 1"}
     ]
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           [action | rest] = Process.get(:code_act_actions)
           Process.put(:code_act_actions, rest)
           action
         end
-      ]
-    }
+      )
 
     lookup = Imp.Tool.new(:lookup, "lookup a number", fn %{key: "n"} -> 41 end)
     Process.put(:code_act_actions, actions)
@@ -162,16 +154,14 @@ defmodule CompletionSurfaceTest do
       %{program: "observation + 1"}
     ]
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           [action | rest] = Process.get(:code_act_actions)
           Process.put(:code_act_actions, rest)
           action
         end
-      ]
-    }
+      )
 
     lookup = Imp.Tool.new(:lookup, "lookup a number", fn %{key: "n"} -> 41 end)
     Process.put(:code_act_actions, actions)
@@ -190,16 +180,14 @@ defmodule CompletionSurfaceTest do
   end
 
   test "CodeAct fails immediately on unknown denied or crashing tools with traces" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           [action | rest] = Process.get(:code_act_failure_actions)
           Process.put(:code_act_failure_actions, rest)
           action
         end
-      ]
-    }
+      )
 
     Process.put(:code_act_failure_actions, [%{tool: "missing", arguments: %{}}])
     unknown = Imp.Predict.CodeAct.new("question -> answer", [], lm: lm)
@@ -247,14 +235,12 @@ defmodule CompletionSurfaceTest do
   end
 
   test "CodeAct sandbox rejection includes redacted trace context" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           %{program: "System.cmd(\"echo\", [])"}
         end
-      ]
-    }
+      )
 
     code_act = Imp.Predict.CodeAct.new("question -> answer", [], lm: lm, max_iters: 1)
 
@@ -272,15 +258,13 @@ defmodule CompletionSurfaceTest do
   test "CodeAct zero max_iters fails before calling the planner" do
     parent = self()
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           send(parent, :code_act_lm_called)
           %{program: "1 + 1"}
         end
-      ]
-    }
+      )
 
     code_act = Imp.Predict.CodeAct.new("question -> answer", [], lm: lm, max_iters: 0)
 
@@ -366,17 +350,11 @@ defmodule CompletionSurfaceTest do
   end
 
   defp static_program_lm(source) do
-    %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{program: source} end]
-    }
+    Imp.LM.Static.new(handler: fn _messages, _opts -> %{program: source} end)
   end
 
   test "streaming exposes predictions as an enumerable" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "beam"} end]
-    }
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "beam"} end)
 
     program = Imp.predict("question -> answer", lm: lm)
 
@@ -398,7 +376,7 @@ defmodule CompletionSurfaceTest do
   end
 
   test "streaming helpers validate owned options and provider-stream inputs" do
-    lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "beam"} end]}
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "beam"} end)
     program = Imp.predict("question -> answer", lm: lm)
 
     assert_raise ArgumentError, ~r/Imp\.Streaming\.stream\/3: expected keyword options/, fn ->
@@ -429,20 +407,9 @@ defmodule CompletionSurfaceTest do
   end
 
   test "provider streaming reports LM misconfiguration as error chunks" do
-    assert_raise ArgumentError,
-                 ~r/Imp\.Predict\.Predict\.new\/2: invalid value for :lm option: expected configured LM :opts to be a keyword list/,
-                 fn ->
-                   Imp.predict("question -> answer",
-                     lm: %{
-                       module: Imp.LM.Static,
-                       opts: %{handler: fn _messages, _opts -> %{answer: "ok"} end}
-                     }
-                   )
-                 end
-
     bad_handler =
       Imp.predict("question -> answer",
-        lm: %{module: Imp.LM.Static, opts: [handler: :not_a_function]}
+        lm: Imp.LM.Static.new(handler: :not_a_function)
       )
 
     assert [
@@ -457,12 +424,12 @@ defmodule CompletionSurfaceTest do
     assert message =~ "expects :handler"
 
     assert_raise ArgumentError,
-                 ~r/Imp\.Predict\.Predict\.new\/2: invalid value for :lm option: expected nil, an LM module/,
+                 ~r/Imp\.Predict\.new\/2: invalid value for :lm option: expected nil, or an LM struct or module/,
                  fn -> Imp.predict("question -> answer", lm: %{provider: :missing}) end
   end
 
   test "provider streaming reports adapter setup failures as error chunks" do
-    lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "ok"} end]}
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "ok"} end)
 
     raising_format = Imp.predict("question -> answer", lm: lm, adapter: StreamingRaisingAdapter)
 
@@ -493,7 +460,7 @@ defmodule CompletionSurfaceTest do
              |> Enum.to_list()
 
     assert_raise ArgumentError,
-                 ~r/Imp\.Predict\.Predict\.new\/2: invalid value for :adapter option: expected an adapter module exporting format\/3 and parse\/3/,
+                 ~r/Imp\.Predict\.new\/2: invalid value for :adapter option: expected an adapter module exporting format\/3 and parse\/3/,
                  fn ->
                    Imp.predict("question -> answer",
                      lm: lm,
@@ -505,15 +472,13 @@ defmodule CompletionSurfaceTest do
   test "provider streaming applies adapter supplied LM options" do
     owner = self()
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, opts ->
           send(owner, {:streaming_lm_opts, opts})
           %{answer: "ok"}
         end
-      ]
-    }
+      )
 
     program = Imp.predict("question -> answer", lm: lm, adapter: StreamingLMOptsAdapter)
 
@@ -528,14 +493,12 @@ defmodule CompletionSurfaceTest do
   end
 
   test "streaming fallback collects structured outputs in signature order" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn _messages, _opts ->
           %{second: "two", first: "one"}
         end
-      ]
-    }
+      )
 
     program = Imp.predict("question -> first, second", lm: lm)
 
@@ -551,18 +514,15 @@ defmodule CompletionSurfaceTest do
   end
 
   test "streaming fallback collects wrapper outputs through their task contracts" do
-    pot_lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{program: "x * 2"} end]
-    }
+    pot_lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{program: "x * 2"} end)
 
     pot = Imp.program_of_thought("x -> doubled", lm: pot_lm, output_field: :doubled)
     assert Imp.Streaming.collect(pot, %{x: 21}) == "42"
 
-    cot_lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "Paris", reasoning: "known"} end]
-    }
+    cot_lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts -> %{answer: "Paris", reasoning: "known"} end
+      )
 
     cot = Imp.chain_of_thought("question -> answer", lm: cot_lm)
     assert Imp.Streaming.collect(cot, %{question: "France capital?"}) == "knownParis"
@@ -585,7 +545,7 @@ defmodule CompletionSurfaceTest do
   end
 
   test "advanced optimizers return executable compiled programs" do
-    lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "4"} end)
     program = Imp.predict("question -> answer", lm: lm)
 
     trainset = [
@@ -639,13 +599,13 @@ defmodule CompletionSurfaceTest do
       end)
 
     assert Enum.all?(compiled, fn candidate ->
-             {:ok, prediction} = Imp.Predict.Predict.call(candidate, %{question: "2+2?"})
+             {:ok, prediction} = Imp.Predict.call(candidate, %{question: "2+2?"})
              Imp.Prediction.get(prediction, :answer) == "4"
            end)
   end
 
   test "finetuning and GRPO require an explicit trainer backend" do
-    lm = %{module: Imp.LM.Static, opts: [handler: fn _messages, _opts -> %{answer: "4"} end]}
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "4"} end)
     program = Imp.predict("question -> answer", lm: lm)
     metric = Imp.Metrics.exact_match(:answer)
 
@@ -657,7 +617,7 @@ defmodule CompletionSurfaceTest do
       Imp.Optimizer.BootstrapFinetune.new(metric)
       |> Imp.Optimizer.BootstrapFinetune.compile(program, trainset)
 
-    assert %{program: %Imp.Predict.Predict{}, error: :trainer_required} = result
+    assert %{program: %Imp.Predict{}, error: :trainer_required} = result
 
     reward = fn example ->
       if Imp.Example.get(example, :answer) == "4", do: 1.0, else: 0.0
@@ -671,10 +631,7 @@ defmodule CompletionSurfaceTest do
   test "save/load, embeddings, and structured adapters work" do
     # The program below is saved, so its LM comes from context: saving refuses
     # a Static-pinned program.
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> ~s({"answer":"ok"}) end]
-    }
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> ~s({"answer":"ok"}) end)
 
     program = Imp.predict("question -> answer", adapter: Imp.Adapter.JSON)
 
@@ -686,13 +643,13 @@ defmodule CompletionSurfaceTest do
 
     assert {:ok, prediction} =
              Imp.context([lm: lm], fn ->
-               Imp.Predict.Predict.call(program, %{question: "ship?"})
+               Imp.Predict.call(program, %{question: "ship?"})
              end)
 
     assert Imp.Prediction.get(prediction, :answer) == "ok"
 
     assert :ok = Imp.Saving.save!(program, path)
-    assert %Imp.Predict.Predict{} = Imp.Saving.load!(path)
+    assert %Imp.Predict{} = Imp.Saving.read!(path)
     File.rm(path)
 
     assert {:ok, [vector]} =
@@ -727,10 +684,11 @@ defmodule CompletionSurfaceTest do
     # `text -> outputs` signature via the ChatAdapter path.
     {:ok, calls} = Agent.start_link(fn -> [] end)
 
-    extraction_lm = fn messages, _opts ->
-      Agent.update(calls, &(&1 ++ [messages]))
-      {:ok, "[[ ## answer ## ]]\nParis\n\n[[ ## completed ## ]]"}
-    end
+    extraction_lm =
+      Imp.Test.FunLM.new(fn messages, _opts ->
+        Agent.update(calls, &(&1 ++ [messages]))
+        {:ok, "[[ ## answer ## ]]\nParis\n\n[[ ## completed ## ]]"}
+      end)
 
     assert {:ok, prediction} =
              Imp.Settings.context([two_step_extraction_lm: extraction_lm], fn ->

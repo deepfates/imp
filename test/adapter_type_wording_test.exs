@@ -115,7 +115,7 @@ defmodule Imp.AdapterTypeWordingTest do
         end
       )
 
-    agent = Imp.Predict.ReAct.new(Imp.signature(@router), [tool], mode: :dspy_3_2_1, lm: lm)
+    agent = Imp.Predict.ReAct.new(Imp.signature(@router), [tool], mode: :dspy, lm: lm)
     _ = Imp.Predict.ReAct.call(agent, %{ticket: "t"})
 
     assert_received {:messages, messages}

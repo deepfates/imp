@@ -33,7 +33,7 @@ defmodule Imp.BenchmarkTruth.LocalMLXCampaignTest do
       |> Imp.Saving.dump()
       |> Jason.encode!()
       |> Jason.decode!()
-      |> Imp.Saving.load()
+      |> Imp.Saving.load!()
 
     refute Keyword.has_key?(Imp.ProgramAccess.lm(loaded).opts, :api_key)
 
@@ -70,7 +70,7 @@ defmodule Imp.BenchmarkTruth.LocalMLXCampaignTest do
     assert get_in(portable, ["lm", "model", "id"]) == model_path
     assert get_in(portable, ["lm", "model", "model"]) == model_path
 
-    loaded = Imp.Saving.load(portable)
+    loaded = Imp.Saving.load!(portable)
 
     restored = LocalMLXCampaign.restore_runtime_credentials!(loaded, runtime_lm)
     assert Imp.ProgramAccess.lm(restored) == runtime_lm

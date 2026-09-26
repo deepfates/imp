@@ -48,19 +48,17 @@ defmodule EnsembleReplayTest do
     dumped = Imp.dump(ensemble)
     assert dumped["seed"] == 77
 
-    loaded = Imp.load(dumped)
+    loaded = Imp.load!(dumped)
     assert loaded.ensemble.seed == 77
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
           answer = Enum.find(["alpha", "beta", "gamma", "delta"], &String.contains?(prompt, &1))
           %{answer: answer}
         end
-      ]
-    }
+      )
 
     original = ensemble |> Imp.with_lm(lm) |> selected_answers(%{question: "persisted replay"})
     restored = loaded |> Imp.with_lm(lm) |> selected_answers(%{question: "persisted replay"})
@@ -76,7 +74,7 @@ defmodule EnsembleReplayTest do
       |> Imp.dump()
       |> Map.delete("seed")
 
-    assert Imp.load(state).ensemble.seed == 0
+    assert Imp.load!(state).ensemble.seed == 0
   end
 
   test "size zero executes every program like pinned DSPy 3.2.1" do

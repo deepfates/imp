@@ -283,7 +283,7 @@ defmodule Imp.OptimizerContractTest do
     program = Imp.predict("question -> answer")
     trainer = Imp.Optimizer.BootstrapFinetune.new(metric)
 
-    assert {:error, {:training_not_started, :trainer_required, %Imp.Predict.Predict{} = compiled}} =
+    assert {:error, {:training_not_started, :trainer_required, %Imp.Predict{} = compiled}} =
              Imp.train(program, trainer, [])
 
     assert Imp.Optimizer.Report.fetch(compiled).optimizer == :bootstrap_finetune

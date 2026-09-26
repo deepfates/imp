@@ -139,7 +139,7 @@ defmodule LiveProviderE2ETest do
       )
 
     agent =
-      Imp.react(signature, [lookup],
+      Imp.Predict.ReAct.new(signature, [lookup],
         lm: live_lm(max_completion_tokens: 1024),
         tool_policy: [:lookup, :submit],
         max_iters: 4
@@ -226,7 +226,7 @@ defmodule LiveProviderE2ETest do
       )
 
     agent =
-      Imp.react(signature, [lookup],
+      Imp.Predict.ReAct.new(signature, [lookup],
         lm: live_lm(max_completion_tokens: 1024),
         tool_policy: [:lookup_capital, :submit],
         max_iters: 4
@@ -345,7 +345,7 @@ defmodule LiveProviderE2ETest do
 
   test "live provider drives ReActV2 native submit" do
     program =
-      Imp.react_v2(
+      Imp.react(
         Imp.signature(
           "question -> answer",
           "Call submit with answer exactly Paris. Do not call any other tool."

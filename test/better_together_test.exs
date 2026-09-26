@@ -418,9 +418,8 @@ defmodule BetterTogetherTest do
 
   defp program do
     Imp.predict("question -> answer",
-      lm: %{
-        module: Imp.LM.Static,
-        opts: [
+      lm:
+        Imp.LM.Static.new(
           handler: fn messages, _opts ->
             prompt = Enum.map_join(messages, "\n", & &1.content)
 
@@ -434,8 +433,7 @@ defmodule BetterTogetherTest do
 
             %{answer: answer}
           end
-        ]
-      }
+        )
     )
   end
 
@@ -1262,15 +1260,9 @@ defmodule BetterTogetherTest do
   end
 
   test "routes an explicit teacher into BootstrapFewShot" do
-    student_lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "student"} end]
-    }
+    student_lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "student"} end)
 
-    teacher_lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "teacher"} end]
-    }
+    teacher_lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "teacher"} end)
 
     student = Imp.predict("question -> answer", lm: student_lm)
     teacher = Imp.predict("question -> answer", lm: teacher_lm)
@@ -1300,17 +1292,17 @@ defmodule BetterTogetherTest do
   end
 
   test "routes an explicit teacher into BootstrapFinetune while training the student LM" do
-    student_lm = %{
-      module: Imp.LM.Static,
-      model: "student-base",
-      opts: [handler: fn _messages, _opts -> %{answer: "student"} end]
-    }
+    student_lm =
+      Imp.LM.Static.new(
+        model: "student-base",
+        handler: fn _messages, _opts -> %{answer: "student"} end
+      )
 
-    teacher_lm = %{
-      module: Imp.LM.Static,
-      model: "teacher-base",
-      opts: [handler: fn _messages, _opts -> %{answer: "teacher"} end]
-    }
+    teacher_lm =
+      Imp.LM.Static.new(
+        model: "teacher-base",
+        handler: fn _messages, _opts -> %{answer: "teacher"} end
+      )
 
     student = Imp.predict("question -> answer", lm: student_lm)
     teacher = Imp.predict("question -> answer", lm: teacher_lm)
@@ -1660,17 +1652,17 @@ defmodule BetterTogetherTest do
       end
     end)
 
-    hung_lm = %{
-      module: Imp.LM.Static,
-      model: "hung-base",
-      opts: [handler: fn _messages, _opts -> %{first_answer: "first"} end]
-    }
+    hung_lm =
+      Imp.LM.Static.new(
+        model: "hung-base",
+        handler: fn _messages, _opts -> %{first_answer: "first"} end
+      )
 
-    fast_lm = %{
-      module: Imp.LM.Static,
-      model: "fast-base",
-      opts: [handler: fn _messages, _opts -> %{second_answer: "second"} end]
-    }
+    fast_lm =
+      Imp.LM.Static.new(
+        model: "fast-base",
+        handler: fn _messages, _opts -> %{second_answer: "second"} end
+      )
 
     student = %TwoPredictorProgram{
       first: Imp.predict("question -> first_answer", lm: hung_lm),
@@ -1734,17 +1726,17 @@ defmodule BetterTogetherTest do
   end
 
   test "a provider-cancelled job cancels every still-running peer" do
-    cancelled_lm = %{
-      module: Imp.LM.Static,
-      model: "cancelled-base",
-      opts: [handler: fn _messages, _opts -> %{first_answer: "first"} end]
-    }
+    cancelled_lm =
+      Imp.LM.Static.new(
+        model: "cancelled-base",
+        handler: fn _messages, _opts -> %{first_answer: "first"} end
+      )
 
-    running_lm = %{
-      module: Imp.LM.Static,
-      model: "running-base",
-      opts: [handler: fn _messages, _opts -> %{second_answer: "second"} end]
-    }
+    running_lm =
+      Imp.LM.Static.new(
+        model: "running-base",
+        handler: fn _messages, _opts -> %{second_answer: "second"} end
+      )
 
     student = %TwoPredictorProgram{
       first: Imp.predict("question -> first_answer", lm: cancelled_lm),
@@ -1872,17 +1864,17 @@ defmodule BetterTogetherTest do
       end
     end)
 
-    failed_lm = %{
-      module: Imp.LM.Static,
-      model: "failed-before-refresh-error",
-      opts: [handler: fn _messages, _opts -> %{first_answer: "first"} end]
-    }
+    failed_lm =
+      Imp.LM.Static.new(
+        model: "failed-before-refresh-error",
+        handler: fn _messages, _opts -> %{first_answer: "first"} end
+      )
 
-    refresh_error_lm = %{
-      module: Imp.LM.Static,
-      model: "refresh-error-base",
-      opts: [handler: fn _messages, _opts -> %{second_answer: "second"} end]
-    }
+    refresh_error_lm =
+      Imp.LM.Static.new(
+        model: "refresh-error-base",
+        handler: fn _messages, _opts -> %{second_answer: "second"} end
+      )
 
     student = %TwoPredictorProgram{
       first: Imp.predict("question -> first_answer", lm: failed_lm),
@@ -1956,17 +1948,17 @@ defmodule BetterTogetherTest do
       end
     end)
 
-    failed_lm = %{
-      module: Imp.LM.Static,
-      model: "failed-base",
-      opts: [handler: fn _messages, _opts -> %{first_answer: "first"} end]
-    }
+    failed_lm =
+      Imp.LM.Static.new(
+        model: "failed-base",
+        handler: fn _messages, _opts -> %{first_answer: "first"} end
+      )
 
-    blocked_lm = %{
-      module: Imp.LM.Static,
-      model: "blocked-base",
-      opts: [handler: fn _messages, _opts -> %{second_answer: "second"} end]
-    }
+    blocked_lm =
+      Imp.LM.Static.new(
+        model: "blocked-base",
+        handler: fn _messages, _opts -> %{second_answer: "second"} end
+      )
 
     student = %TwoPredictorProgram{
       first: Imp.predict("question -> first_answer", lm: failed_lm),
@@ -2043,16 +2035,14 @@ defmodule BetterTogetherTest do
 
     student =
       Imp.predict("question -> answer",
-        lm: %{
-          module: Imp.LM.Static,
-          model: "hung-teacher-trace",
-          opts: [
+        lm:
+          Imp.LM.Static.new(
+            model: "hung-teacher-trace",
             handler: fn _messages, _opts ->
               send(owner, :hung_training_preparation_started)
               receive do: (:never -> :ok)
             end
-          ]
-        }
+          )
       )
 
     trainer = fn _lm, _examples, _opts ->

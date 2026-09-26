@@ -179,7 +179,7 @@ defmodule Imp.TRLProtocolGRPOLifecycleTest do
 
     script = """
     job = Imp.Clients.TrainingJob.load!(#{inspect(job_path)})
-    program = Imp.load!(#{inspect(base_program_path)})
+    program = Imp.read!(#{inspect(base_program_path)})
     trainer = Imp.Clients.TRLTrainer.new(
       python: #{inspect(System.find_executable("python3"))},
       model_path: #{inspect(model_path)},

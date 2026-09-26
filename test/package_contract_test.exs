@@ -511,10 +511,7 @@ defmodule PackageContractTest do
       end
     end
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> %{answer: "Paris"} end]
-    }
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "Paris"} end)
 
     Imp.configure(lm: lm, adapter: Imp.Adapter.Chat)
 
@@ -558,7 +555,7 @@ defmodule PackageContractTest do
     loaded =
       compiled
       |> Imp.dump()
-      |> Imp.load()
+      |> Imp.load!()
 
     {:ok, loaded_prediction} =
       Imp.call(loaded, %{question: "What city is the Eiffel Tower in?"})
@@ -746,7 +743,7 @@ defmodule PackageContractTest do
       labeled_few_shot
     )
 
-    unless match?(%Imp.Predict.Predict{demos: [_]}, labeled_few_shot) do
+    unless match?(%Imp.Predict{demos: [_]}, labeled_few_shot) do
       raise "LabeledFewShot package lifecycle did not attach its selected demonstration"
     end
 
@@ -766,7 +763,7 @@ defmodule PackageContractTest do
       bootstrap_few_shot
     )
 
-    unless match?(%Imp.Predict.Predict{demos: [_]}, bootstrap_few_shot) do
+    unless match?(%Imp.Predict{demos: [_]}, bootstrap_few_shot) do
       raise "BootstrapFewShot package lifecycle did not attach its accepted trace"
     end
 
@@ -969,22 +966,17 @@ defmodule PackageContractTest do
       end)
 
     react_lm =
-      %{
-        module: Imp.LM.Static,
-        opts: [
-          handler: fn _messages, _opts ->
+      Imp.LM.Static.new(handler: fn _messages, _opts ->
             Agent.get_and_update(queue, fn
               [response | rest] -> {response, rest}
               [] -> {%{tool_calls: [%{name: :submit, arguments: %{answer: "Paris"}}]}, []}
             end)
-          end
-        ]
-      }
+          end)
 
     lookup =
       Imp.tool(:lookup, "lookup facts", fn %{query: "capital-france"} -> "Paris" end)
 
-    react = Imp.react("question -> answer: short_span", [lookup], lm: react_lm, max_iters: 3)
+    react = Imp.Predict.ReAct.new("question -> answer: short_span", [lookup], lm: react_lm, max_iters: 3)
 
     {:ok, react_prediction} =
       Imp.call(react, %{question: "What city is the Eiffel Tower in?"})
@@ -1017,10 +1009,7 @@ defmodule PackageContractTest do
 
     chooser =
       Imp.multi_chain_comparison("question -> answer",
-        lm: %{
-          module: Imp.LM.Static,
-          opts: [handler: fn _messages, _opts -> %{rationale: "agreement", answer: "Paris"} end]
-        },
+        lm: Imp.LM.Static.new(handler: fn _messages, _opts -> %{rationale: "agreement", answer: "Paris"} end),
         m: 2
       )
 

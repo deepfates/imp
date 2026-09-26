@@ -202,11 +202,11 @@ defmodule SchemaConstraintsTest do
     program =
       Imp.predict(signature,
         adapter: Imp.Adapter.JSON,
-        lm: %{module: Imp.LM.Static, opts: [handler: handler]},
+        lm: Imp.LM.Static.new(handler: handler),
         config: [native_json_schema: true]
       )
 
-    assert {:ok, prediction} = Imp.Predict.Predict.call(program, %{question: "runtime?"})
+    assert {:ok, prediction} = Imp.Predict.call(program, %{question: "runtime?"})
     assert [%{"label" => "BEAM", "confidence" => 0.9}] = Imp.get(prediction, :items)
     assert_receive {:static_schema, schema}
 

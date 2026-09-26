@@ -97,9 +97,8 @@ defmodule Imp.Optimizer.SIMBA.StatePrimitivesTest do
   test "reflection binds exact multi-predictor string advice schema and preserves typed inputs" do
     parent = self()
 
-    prompt_lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    prompt_lm =
+      Imp.LM.Static.new(
         handler: fn messages, opts ->
           send(parent, {:reflection_request, messages, opts[:response_format]})
 
@@ -108,8 +107,7 @@ defmodule Imp.Optimizer.SIMBA.StatePrimitivesTest do
             module_advice: %{first: "Be precise.", second: "Check the final answer."}
           }
         end
-      ]
-    }
+      )
 
     payload = reflection_payload()
 

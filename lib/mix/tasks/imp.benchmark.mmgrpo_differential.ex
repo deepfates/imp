@@ -249,16 +249,14 @@ defmodule Mix.Tasks.Imp.Benchmark.MmgrpoDifferential do
   end
 
   defp run_predictor_fixture(config) do
-    lm = %{
-      module: Imp.LM.Static,
-      model: "provider-free-fixture",
-      opts: [
+    lm =
+      Imp.LM.Static.new(
+        model: "provider-free-fixture",
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", &Map.get(&1, :content, ""))
           if String.contains?(prompt, "first"), do: %{first: "one"}, else: %{second: "two"}
         end
-      ]
-    }
+      )
 
     program = %FixtureTwoPredictorProgram{
       first: Imp.predict("question -> first", lm: lm),
@@ -279,7 +277,7 @@ defmodule Mix.Tasks.Imp.Benchmark.MmgrpoDifferential do
   end
 
   defp run_imp_fixture(handler, reward, ids, opts) do
-    lm = %{module: Imp.LM.Static, opts: [handler: handler], model: "provider-free-fixture"}
+    lm = Imp.LM.Static.new(handler: handler, model: "provider-free-fixture")
     program = Imp.predict("question -> answer", lm: lm)
     run_imp_program_fixture(program, reward, ids, opts)
   end

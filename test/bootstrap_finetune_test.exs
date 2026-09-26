@@ -71,11 +71,7 @@ defmodule BootstrapFinetuneTest do
   end
 
   defp lm(model, output) do
-    %{
-      module: Imp.LM.Static,
-      model: model,
-      opts: [handler: fn _messages, _opts -> output end]
-    }
+    Imp.LM.Static.new(model: model, handler: fn _messages, _opts -> output end)
   end
 
   defp two_predictor_program(first_lm, second_lm, opts \\ []) do
@@ -94,16 +90,13 @@ defmodule BootstrapFinetuneTest do
   end
 
   defp slow_lm(sleep_ms) do
-    %{
-      module: Imp.LM.Static,
+    Imp.LM.Static.new(
       model: "slow-base",
-      opts: [
-        handler: fn _messages, _opts ->
-          Process.sleep(sleep_ms)
-          %{answer: "ok"}
-        end
-      ]
-    }
+      handler: fn _messages, _opts ->
+        Process.sleep(sleep_ms)
+        %{answer: "ok"}
+      end
+    )
   end
 
   defp always_pass(_example, _prediction), do: 1.0

@@ -46,6 +46,8 @@ defmodule Imp do
 
   alias Imp.{Example, Prediction, Settings, Signature, Tool}
 
+  alias Imp.Predict
+
   alias Imp.Predict.{
     Assertions,
     Avatar,
@@ -55,10 +57,8 @@ defmodule Imp do
     KNN,
     MultiChainComparison,
     Parallel,
-    Predict,
     ProgramOfThought,
     RAG,
-    ReAct,
     ReActV2,
     Refine
   }
@@ -237,11 +237,16 @@ defmodule Imp do
   @doc "Calls any Imp retriever and normalizes returned documents."
   defdelegate retrieve(retriever, query, opts \\ []), to: Imp.Retrieve
 
-  @doc "Creates an iterative provider-tool-call ReAct program with reserved submit."
-  def react(signature, tools, opts \\ []), do: ReAct.new(signature, tools, opts)
+  @doc """
+  Creates a tool-using agent: an `Imp.Predict.ReActV2` program.
 
-  @doc "Creates a native-tool-aware ReActV2 program with structured history and typed completion."
-  def react_v2(signature, tools, opts \\ []), do: ReActV2.new(signature, tools, opts)
+  The model calls `tools` natively, one step per request, and the turn ends
+  when it answers in text or, for a signature a text answer cannot fill, calls
+  `submit`. See `Imp.Predict.ReActV2.new/3` for the options.
+  `Imp.Predict.ReAct` is the earlier loop, kept for its byte-faithful
+  `mode: :dspy` port of DSPy's `dspy.ReAct`.
+  """
+  def react(signature, tools, opts \\ []), do: ReActV2.new(signature, tools, opts)
 
   @doc "Creates a bounded action-history Avatar actor with a reserved Finish action."
   def avatar(signature, tools, opts \\ []), do: Avatar.new(signature, tools, opts)
@@ -541,17 +546,23 @@ defmodule Imp do
   defdelegate dump(program), to: Imp.Saving
   defdelegate dump(program, opts), to: Imp.Saving
 
-  @doc "Loads an Imp program from a portable saved representation."
-  defdelegate load(state), to: Imp.Saving
-  defdelegate load(state, opts), to: Imp.Saving
+  @doc """
+  Loads a program from the portable map `dump/1` returns.
+
+  Returns `{:ok, program}` or `{:error, %ArgumentError{}}`; see
+  `Imp.Saving.load/2`.
+  """
+  defdelegate load(state, opts \\ []), to: Imp.Saving
+
+  @doc "Loads a program from the portable map `dump/1` returns, raising on failure."
+  defdelegate load!(state, opts \\ []), to: Imp.Saving
 
   @doc "Writes an Imp program artifact to disk as JSON."
   defdelegate save!(program, path), to: Imp.Saving
   defdelegate save!(program, path, opts), to: Imp.Saving
 
-  @doc "Loads an Imp program artifact from disk."
-  defdelegate load!(path), to: Imp.Saving
-  defdelegate load!(path, opts), to: Imp.Saving
+  @doc "Reads a program artifact `save!/2` wrote to disk; see `Imp.Saving.read!/2`."
+  defdelegate read!(path, opts \\ []), to: Imp.Saving
 
   @doc "Creates a ReqLLM-backed multi-provider LM client."
   def req_llm(model_spec, opts \\ []), do: Imp.Clients.ReqLLM.new(model_spec, opts)

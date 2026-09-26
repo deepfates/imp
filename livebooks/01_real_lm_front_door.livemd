@@ -182,7 +182,7 @@ case live_lm.(max_tokens: 400) do
   {:ok, lm} ->
     lookup =
       Imp.tool(:lookup, "Look up a fact by query.", fn args ->
-        case args["query"] do
+        case args[:query] || args["query"] do
           "capital-france" -> "Paris"
           other -> {:error, {:unknown_query, other}}
         end
@@ -198,11 +198,11 @@ case live_lm.(max_tokens: 400) do
       Imp.react(
         Imp.signature(
           "question -> answer",
-          "Answer using the lookup tool: first call lookup with query \"capital-france\", then call submit with the answer it returned."
+          "Answer using the lookup tool: first call lookup with query \"capital-france\", then answer with the city it returned."
         ),
         [lookup],
         lm: lm,
-        tool_policy: [:lookup, :submit],
+        tool_policy: [:lookup],
         max_iters: 4
       )
 
@@ -244,7 +244,7 @@ metric = Imp.exact_match(:answer)
 compiled =
   program
   |> Imp.optimize!(
-    Imp.Optimizer.BootstrapFewShotWithRandomSearch.new(metric, num_candidate_programs: 2, max_bootstrapped_demos: 1),
+    Imp.Optimizer.RandomSearch.new(metric, candidates: 2, demos_per_candidate: 1),
     trainset,
     devset
   )
@@ -267,7 +267,7 @@ case live_lm.([]) do
 
     %{
       credential_in_artifact?: inspect(state) =~ (api_key || openrouter_key),
-      loadable?: match?({:ok, %{__struct__: Imp.Predict}}, Imp.load(state))
+      loadable?: match?(%{__struct__: Imp.Predict}, Imp.load!(state))
     }
 
   :missing_key ->

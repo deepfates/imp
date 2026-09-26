@@ -4,7 +4,7 @@ defmodule Imp.Usage do
 
   Ports DSPy 3.2.1's `track_usage` / `UsageTracker` surface
   (dspy/utils/usage_tracker.py): when the `:track_usage` setting is true,
-  `Imp.Predict.Predict.call` runs inside `track/1`, every LM call that reports
+  `Imp.Predict.call` runs inside `track/1`, every LM call that reports
   provider usage is recorded against its model, and the aggregate lands on the
   returned prediction (read it with `Imp.Prediction.get_lm_usage/1`).
 

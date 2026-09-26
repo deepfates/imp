@@ -94,7 +94,7 @@ defmodule Imp.OutputNullAndValueTextTest do
 
     agent =
       Imp.Predict.ReAct.new(Imp.signature("question -> answer"), [tool],
-        mode: :dspy_3_2_1,
+        mode: :dspy,
         lm: lm
       )
 

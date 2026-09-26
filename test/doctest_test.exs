@@ -15,12 +15,13 @@ defmodule ImpDoctestTest do
   doctest Imp.Predict.Aggregation
   doctest Imp.Predict.MultiChainComparison
   doctest Imp.Predict.Parallel
-  doctest Imp.Predict.Predict
+  doctest Imp.Predict
   doctest Imp.Predict.RAG
   doctest Imp.Redaction
   doctest Imp.Retrieve
   doctest Imp.Settings
   doctest Imp.Signature
+  doctest Imp.Signature.ParseError
   doctest Imp.Tasks
   doctest Imp.Telemetry
   doctest Imp.Tool

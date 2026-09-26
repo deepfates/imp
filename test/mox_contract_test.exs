@@ -6,7 +6,7 @@ defmodule MoxContractTest do
   setup :verify_on_exit!
 
   test "Imp.LM generate contract drives Predict through a verified mock" do
-    expect(Imp.Test.LMMock, :generate, fn messages, opts ->
+    expect(Imp.Test.LMMock, :generate, fn Imp.Test.LMMock, messages, opts ->
       assert [%{role: :system}, %{role: :user, content: content}] = messages
       assert content =~ "Capital?"
       assert Keyword.fetch!(opts, :temperature) == 0
@@ -84,7 +84,7 @@ defmodule MoxContractTest do
   end
 
   test "Imp.Retrieve behaviour contract is verified by Mox" do
-    expect(Imp.Test.RetrieverMock, :retrieve, fn query, opts ->
+    expect(Imp.Test.RetrieverMock, :retrieve, fn Imp.Test.RetrieverMock, query, opts ->
       assert query == "beam"
       assert Keyword.fetch!(opts, :k) == 2
       {:ok, [%{text: "BEAM", score: 1.0}]}

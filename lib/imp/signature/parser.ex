@@ -1,4 +1,26 @@
 defmodule Imp.Signature.ParseError do
+  @moduledoc """
+  Raised when a signature string cannot be parsed.
+
+  `Imp.Signature.new/2`, and every constructor that takes a signature string,
+  raises it. `:input` is the string as given and `:position` the offset where
+  parsing stopped. The message quotes the input, points at that position, and
+  suggests a spelling when the mistake is a near miss, such as a misspelled type.
+
+      iex> try do
+      ...>   Imp.Signature.new("question -> answer: strng")
+      ...> rescue
+      ...>   error in Imp.Signature.ParseError -> error.position
+      ...> end
+      18
+  """
+
+  @type t :: %__MODULE__{
+          message: String.t(),
+          input: String.t(),
+          position: non_neg_integer()
+        }
+
   defexception [:message, :input, :position]
 
   def exception(opts) do

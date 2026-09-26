@@ -212,12 +212,9 @@ defmodule AvatarOptimizerTest do
   defp lookup(_), do: "unknown"
 
   defp static_lm(handler) when is_function(handler, 1) do
-    %{
-      module: Imp.LM.Static,
-      opts: [
-        handler: fn messages, _opts -> handler.(Enum.map_join(messages, "\n", & &1.content)) end
-      ]
-    }
+    Imp.LM.Static.new(
+      handler: fn messages, _opts -> handler.(Enum.map_join(messages, "\n", & &1.content)) end
+    )
   end
 
   defp static_lm(response), do: static_lm(fn _prompt -> response end)

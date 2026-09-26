@@ -126,7 +126,7 @@ defmodule ProgramOfThoughtFidelityTest do
       "x -> answer"
       |> Imp.program_of_thought(max_iters: 2)
       |> Imp.dump()
-      |> Imp.load()
+      |> Imp.load!()
       |> Imp.with_lm(lm)
 
     assert {:error, {:unknown_variable, "missing"}} = Imp.call(loaded, %{x: 1})
@@ -248,17 +248,14 @@ defmodule ProgramOfThoughtFidelityTest do
     key = make_ref()
     Process.put(key, outputs)
 
-    %{
-      module: Imp.LM.Static,
-      opts: [
-        handler: fn messages, _opts ->
-          send(owner, {:lm_messages, messages})
-          [output | rest] = Process.get(key)
-          Process.put(key, rest)
-          output
-        end
-      ]
-    }
+    Imp.LM.Static.new(
+      handler: fn messages, _opts ->
+        send(owner, {:lm_messages, messages})
+        [output | rest] = Process.get(key)
+        Process.put(key, rest)
+        output
+      end
+    )
   end
 
   defp collect_messages(count) do

@@ -162,8 +162,6 @@ defmodule OptimizerReportTest do
   defmodule ContextRetryLM do
     defstruct [:owner, fail_at_one?: false]
 
-    def generate(_messages, _opts), do: {:error, :instance_required}
-
     def generate(%__MODULE__{owner: owner} = lm, messages, opts) do
       prompt = Enum.map_join(messages, "\n", & &1.content)
       example_count = length(Regex.scan(~r/Input Fields:/, prompt))
@@ -182,18 +180,15 @@ defmodule OptimizerReportTest do
   end
 
   defp lm do
-    %{
-      module: Imp.LM.Static,
-      opts: [
-        handler: fn messages, _opts ->
-          prompt = Enum.map_join(messages, "\n", & &1.content)
+    Imp.LM.Static.new(
+      handler: fn messages, _opts ->
+        prompt = Enum.map_join(messages, "\n", & &1.content)
 
-          if prompt =~ "[[ ## answer ## ]]\nParis" or prompt =~ "Always answer Paris",
-            do: %{answer: "Paris"},
-            else: %{answer: "unknown"}
-        end
-      ]
-    }
+        if prompt =~ "[[ ## answer ## ]]\nParis" or prompt =~ "Always answer Paris",
+          do: %{answer: "Paris"},
+          else: %{answer: "unknown"}
+      end
+    )
   end
 
   defp sets do
@@ -969,7 +964,7 @@ defmodule OptimizerReportTest do
     program =
       "question -> answer"
       |> Imp.predict(lm: lm())
-      |> Imp.Predict.Predict.with_demos([existing_demo])
+      |> Imp.Predict.with_demos([existing_demo])
 
     compiled =
       Imp.Optimizer.LabeledFewShot.new(k: 1)
@@ -1131,7 +1126,7 @@ defmodule OptimizerReportTest do
     program =
       "question -> answer"
       |> Imp.predict(lm: lm())
-      |> Imp.Predict.Predict.with_demos([existing_demo])
+      |> Imp.Predict.with_demos([existing_demo])
 
     assert_raise Protocol.UndefinedError, fn ->
       Imp.Optimizer.BootstrapFewShot.new(Imp.Metrics.exact_match(:answer),
@@ -1236,7 +1231,7 @@ defmodule OptimizerReportTest do
     program = Imp.predict("question -> answer", lm: lm())
 
     assert_raise ArgumentError,
-                 ~r/Imp.Predict.Predict.with_demos\/2 expects demos as Imp.Example structs/,
+                 ~r/Imp.Predict.with_demos\/2 expects demos as Imp.Example structs/,
                  fn ->
                    Imp.Optimizer.InstructionSearch.compile(
                      program,
@@ -1259,7 +1254,7 @@ defmodule OptimizerReportTest do
       |> Imp.Optimizer.BetterTogether.new(%{p: Imp.Optimizer.LabeledFewShot.new(k: 1)})
       |> Imp.Optimizer.BetterTogether.compile(program, train, dev, strategy: "missing")
 
-    assert {:ok, prediction} = Imp.Predict.Predict.call(compiled, %{question: "Capital?"})
+    assert {:ok, prediction} = Imp.Predict.call(compiled, %{question: "Capital?"})
     assert Imp.Prediction.get(prediction, :answer) == "unknown"
 
     report = Imp.Optimizer.Report.fetch(compiled)
@@ -1331,7 +1326,7 @@ defmodule OptimizerReportTest do
       |> Imp.Optimizer.BetterTogether.new(%{bad: %ErrorOptimizer{}})
       |> Imp.Optimizer.BetterTogether.compile(program, train, dev, strategy: :bad)
 
-    assert {:ok, prediction} = Imp.Predict.Predict.call(compiled, %{question: "Capital?"})
+    assert {:ok, prediction} = Imp.Predict.call(compiled, %{question: "Capital?"})
     assert Imp.Prediction.get(prediction, :answer) == "unknown"
 
     report = Imp.Optimizer.Report.fetch(compiled)
@@ -1366,15 +1361,13 @@ defmodule OptimizerReportTest do
   end
 
   test "instruction proposer accepts LM-generated scored candidates" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           send(self(), {:proposer_messages, messages})
           ~s(["Always answer Paris.", "Mention evidence."])
         end
-      ]
-    }
+      )
 
     {train, _dev} = sets()
     program = Imp.predict("question -> answer", lm: lm)
@@ -1390,15 +1383,13 @@ defmodule OptimizerReportTest do
   end
 
   test "instruction proposer includes signatures from composed program wrappers" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           send(self(), {:wrapped_proposer_messages, messages})
           ~s(["Double the number using context."])
         end
-      ]
-    }
+      )
 
     {train, _dev} = sets()
 
@@ -1436,10 +1427,7 @@ defmodule OptimizerReportTest do
   end
 
   test "instruction proposer falls back when proposer LM crashes" do
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [handler: fn _messages, _opts -> raise "proposal provider offline" end]
-    }
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> raise "proposal provider offline" end)
 
     {train, _dev} = sets()
     program = Imp.predict("question -> answer", lm: lm())

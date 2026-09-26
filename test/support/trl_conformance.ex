@@ -3,7 +3,7 @@ defmodule Imp.Test.TRLConformanceLM do
   defstruct [:model]
 
   @impl true
-  def generate(messages, opts) do
+  def generate(_lm, messages, opts) do
     prompt = Enum.map_join(messages, "\n", &Map.get(&1, :content, ""))
     answer = if String.contains?(prompt, "alpha"), do: "alpha", else: "other"
     {:ok, %{answer: "#{answer}-#{Keyword.get(opts, :rollout_id, 0)}"}}

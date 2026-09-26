@@ -14,11 +14,16 @@ defmodule Imp.LM.Static do
     * `:n` — number of completions. `1`, the default, returns one output; an
       integer above 1 calls the handler that many times and returns a list.
       Any other value raises `ArgumentError`.
+
+  `new/1` also takes `:model`, a name for the model this client stands in
+  for. It is each request's model unless the call names another, the handler
+  sees it as `:model` in its options, and trainers read it as the model they
+  train.
   """
 
   @behaviour Imp.LM
 
-  defstruct opts: []
+  defstruct opts: [], model: nil
 
   @doc """
   Builds a configured static LM struct.
@@ -27,22 +32,28 @@ defmodule Imp.LM.Static do
       Imp.configure(lm: lm)
   """
   def new(opts \\ []) do
-    %__MODULE__{opts: validate_opts!(opts, "#{inspect(__MODULE__)}.new/1")}
+    {model, opts} = opts |> validate_opts!("#{inspect(__MODULE__)}.new/1") |> Keyword.pop(:model)
+    %__MODULE__{opts: opts, model: model}
   end
 
-  @doc "Generates through a configured `Imp.LM.Static` struct."
-  def generate(%__MODULE__{opts: configured}, messages, opts) do
-    generate(messages, Keyword.merge(configured, opts))
-  end
-
+  @doc """
+  Calls the handler. `lm` is a struct from `new/1`, whose options the call's
+  options override, or the module itself, which has none of its own.
+  """
   @impl true
-  def generate(messages, opts) do
-    opts = validate_opts!(opts, "#{inspect(__MODULE__)}.generate/2")
+  def generate(%__MODULE__{opts: configured, model: model}, messages, opts) do
+    opts = Keyword.merge(configured, opts)
+    opts = if is_nil(model), do: opts, else: Keyword.put_new(opts, :model, model)
+    generate(__MODULE__, messages, opts)
+  end
+
+  def generate(__MODULE__, messages, opts) do
+    opts = validate_opts!(opts, "#{inspect(__MODULE__)}.generate/3")
     handler = Keyword.get(opts, :handler, &default_handler/2)
 
     unless is_function(handler, 2) do
       raise ArgumentError,
-            "#{inspect(__MODULE__)}.generate/2 expects :handler to be a two-argument function, got: #{inspect(handler)}"
+            "#{inspect(__MODULE__)}.generate/3 expects :handler to be a two-argument function, got: #{inspect(handler)}"
     end
 
     # Multi-completion (DSPy `n=`): the handler is invoked once per requested
@@ -57,7 +68,7 @@ defmodule Imp.LM.Static do
 
       other ->
         raise ArgumentError,
-              "#{inspect(__MODULE__)}.generate/2 expects :n to be a positive integer, got: #{inspect(other)}"
+              "#{inspect(__MODULE__)}.generate/3 expects :n to be a positive integer, got: #{inspect(other)}"
     end
   end
 

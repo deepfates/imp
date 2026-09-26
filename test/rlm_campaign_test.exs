@@ -535,9 +535,11 @@ defmodule Imp.BenchmarkTruth.RLMCampaignTest do
 
     {:ok, usage_agent} = Agent.start_link(fn -> UsageFixture.empty(rates) end)
 
-    inner = fn _messages, _opts ->
-      {:error, %{usage: %{input_tokens: 9, output_tokens: 0, total_cost: 0.0}, reason: :rejected}}
-    end
+    inner =
+      Imp.Test.FunLM.new(fn _messages, _opts ->
+        {:error,
+         %{usage: %{input_tokens: 9, output_tokens: 0, total_cost: 0.0}, reason: :rejected}}
+      end)
 
     lm = %RLMRuntime.MeteredLM{
       inner: inner,
@@ -580,7 +582,11 @@ defmodule Imp.BenchmarkTruth.RLMCampaignTest do
 
     {:ok, usage_agent} = Agent.start_link(fn -> UsageFixture.empty(rates) end)
     secret = "sk-secret-request-body-123456789"
-    inner = fn _messages, _opts -> {:error, %{request_body: secret, response_body: secret}} end
+
+    inner =
+      Imp.Test.FunLM.new(fn _messages, _opts ->
+        {:error, %{request_body: secret, response_body: secret}}
+      end)
 
     lm = %RLMRuntime.MeteredLM{
       inner: inner,
@@ -617,9 +623,10 @@ defmodule Imp.BenchmarkTruth.RLMCampaignTest do
 
     {:ok, usage_agent} = Agent.start_link(fn -> UsageFixture.empty(rates) end)
 
-    inner = fn _messages, _opts ->
-      {:ok, %{usage: %{input_tokens: 9, output_tokens: 0, total_cost: 0.0}}}
-    end
+    inner =
+      Imp.Test.FunLM.new(fn _messages, _opts ->
+        {:ok, %{usage: %{input_tokens: 9, output_tokens: 0, total_cost: 0.0}}}
+      end)
 
     lm = %RLMRuntime.MeteredLM{
       inner: inner,
@@ -658,9 +665,10 @@ defmodule Imp.BenchmarkTruth.RLMCampaignTest do
 
     {:ok, usage_agent} = Agent.start_link(fn -> UsageFixture.empty(rates) end)
 
-    inner = fn _messages, _opts ->
-      {:ok, %{usage: %{input_tokens: 9, output_tokens: 2, total_cost: 0.0, cost: 0.25}}}
-    end
+    inner =
+      Imp.Test.FunLM.new(fn _messages, _opts ->
+        {:ok, %{usage: %{input_tokens: 9, output_tokens: 2, total_cost: 0.0, cost: 0.25}}}
+      end)
 
     lm = %RLMRuntime.MeteredLM{
       inner: inner,
@@ -698,17 +706,18 @@ defmodule Imp.BenchmarkTruth.RLMCampaignTest do
 
     {:ok, usage_agent} = Agent.start_link(fn -> UsageFixture.empty(rates) end)
 
-    inner = fn _messages, _opts ->
-      {:ok,
-       %{
-         usage: %{
-           input_tokens: 9,
-           output_tokens: 2,
-           total_cost: 0.0,
-           cost: %{total: 0.0}
-         }
-       }}
-    end
+    inner =
+      Imp.Test.FunLM.new(fn _messages, _opts ->
+        {:ok,
+         %{
+           usage: %{
+             input_tokens: 9,
+             output_tokens: 2,
+             total_cost: 0.0,
+             cost: %{total: 0.0}
+           }
+         }}
+      end)
 
     lm = %RLMRuntime.MeteredLM{
       inner: inner,
@@ -731,15 +740,16 @@ defmodule Imp.BenchmarkTruth.RLMCampaignTest do
   test "RLM controller adapter decodes ReqLLM metadata content after metering" do
     action = %{"reasoning" => "inspect", "code" => "submit(%{answer: \"yes\"})"}
 
-    inner = fn _messages, _opts ->
-      {:ok,
-       %{
-         __imp_lm_output__: action,
-         __imp_lm_metadata__: %{
-           req_llm: %{content: Jason.encode!(action), usage: %{input_tokens: 1}}
-         }
-       }}
-    end
+    inner =
+      Imp.Test.FunLM.new(fn _messages, _opts ->
+        {:ok,
+         %{
+           __imp_lm_output__: action,
+           __imp_lm_metadata__: %{
+             req_llm: %{content: Jason.encode!(action), usage: %{input_tokens: 1}}
+           }
+         }}
+      end)
 
     lm = %RLMRuntime.ControllerLM{inner: inner}
     assert {:ok, encoded} = RLMRuntime.ControllerLM.generate(lm, [], [])
@@ -749,14 +759,20 @@ defmodule Imp.BenchmarkTruth.RLMCampaignTest do
   test "RLM controller adapter accepts a single JSON markdown fence" do
     action = %{"reasoning" => "inspect", "code" => "submit(%{answer: \"yes\"})"}
     encoded = "```json\n#{Jason.encode!(action)}\n```"
-    lm = %RLMRuntime.ControllerLM{inner: fn _messages, _opts -> {:ok, encoded} end}
+
+    lm = %RLMRuntime.ControllerLM{
+      inner: Imp.Test.FunLM.new(fn _messages, _opts -> {:ok, encoded} end)
+    }
 
     assert {:ok, ^encoded} = RLMRuntime.ControllerLM.generate(lm, [], [])
   end
 
   test "RLM controller adapter accepts one exact constrained-Elixir fence" do
     encoded = "```elixir\ncontext = load(\"context\")\nprint(context)\n```"
-    lm = %RLMRuntime.ControllerLM{inner: fn _messages, _opts -> {:ok, encoded} end}
+
+    lm = %RLMRuntime.ControllerLM{
+      inner: Imp.Test.FunLM.new(fn _messages, _opts -> {:ok, encoded} end)
+    }
 
     assert {:ok, ^encoded} = RLMRuntime.ControllerLM.generate(lm, [], [])
   end

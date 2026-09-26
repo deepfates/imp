@@ -157,9 +157,8 @@ defmodule Mix.Tasks.Imp.Benchmark.AvatarActorDifferential do
     fixture = config["fixture"]
     {:ok, counter} = Agent.start_link(fn -> 0 end)
 
-    lm = %{
-      module: Imp.LM.Static,
-      opts: [
+    lm =
+      Imp.LM.Static.new(
         handler: fn messages, _opts ->
           prompt = Enum.map_join(messages, "\n", & &1.content)
           Agent.update(counter, &(&1 + 1))
@@ -180,8 +179,7 @@ defmodule Mix.Tasks.Imp.Benchmark.AvatarActorDifferential do
               }
           end
         end
-      ]
-    }
+      )
 
     tool =
       Imp.tool(:lookup, "Look up a capital", fn query ->

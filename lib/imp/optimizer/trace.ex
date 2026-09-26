@@ -8,7 +8,7 @@ defmodule Imp.Optimizer.Trace do
     :ok
   end
 
-  def capture(%Imp.Predict.Predict{metadata: metadata}, inputs, prediction) do
+  def capture(%Imp.Predict{metadata: metadata}, inputs, prediction) do
     case {Process.get(@key), Map.get(metadata, :optimizer_predictor_name)} do
       {steps, name} when is_list(steps) and not is_nil(name) ->
         step = %{

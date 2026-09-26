@@ -57,8 +57,6 @@ defmodule Imp.ModelResponseCostTest do
     defstruct [:measurements]
 
     @impl true
-    def generate(_messages, _opts), do: {:error, :telemetry_lm_instance_required}
-
     def generate(%__MODULE__{measurements: measurements}, _messages, _opts) do
       :telemetry.execute([:req_llm, :token_usage], measurements, %{})
       {:ok, %{answer: "ok"}}
