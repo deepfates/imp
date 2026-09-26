@@ -121,7 +121,7 @@ Enum.each(busy, &Task.await/1)
 refused
 ```
 
-The [deployment example](https://github.com/deepfates/imp/tree/main/examples/deployment)
+The [deployment example](https://github.com/deepfates/imp/tree/v0.5.0/examples/deployment)
 wraps the same pattern in a `ProgramServer` that also reloads parameters while
 serving.
 

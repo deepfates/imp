@@ -385,6 +385,26 @@ defmodule PublicAPIManifestTest do
     end
   end
 
+  test "shipped docs do not present excluded modules as supported" do
+    excluded =
+      Mix.Tasks.Imp.PublicApi.manifest()["excluded_modules"]
+      |> Enum.map(& &1["module"])
+      |> MapSet.new()
+
+    references =
+      (["README.md"] ++
+         Path.wildcard("docs/**/*.{md,cheatmd}") ++ Path.wildcard("livebooks/*.livemd"))
+      |> Enum.flat_map(fn path ->
+        path
+        |> File.read!()
+        |> then(&Regex.scan(~r/Imp(?:\.[A-Z][A-Za-z0-9_]*)+/, &1))
+        |> List.flatten()
+      end)
+      |> MapSet.new()
+
+    assert MapSet.intersection(excluded, references) == MapSet.new()
+  end
+
   test "policy fails closed for an unclassified documented package module" do
     policy = Jason.decode!(File.read!("priv/public_api_policy.json"))
 

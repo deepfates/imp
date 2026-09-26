@@ -341,8 +341,8 @@ Event families, each with `:start`, `:stop` and `:exception` unless noted:
 - `[:imp, :evaluate, ...]` and `[:imp, :optimizer, ...]`, plus
   `[:imp, :optimizer, :trial, ...]` for candidate evaluations and
   `[:imp, :optimizer, :progress]` for GEPA generations.
-- `[:imp, :adapter, :parse, :retry | :error]` when a model's answer does not
-  parse.
+- `[:imp, :adapter, :parse, :json_fallback | :retry | :error]` when a model's
+  answer does not parse.
 - `[:imp, :cache, :hit | :miss]` and the cache's coalescing events.
 
 Every span carries a `:call_id`, and a nested span its parent's
