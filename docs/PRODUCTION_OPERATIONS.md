@@ -59,6 +59,10 @@ The library avoids persisting provider secrets in saved program JSON.
 Security-sensitive defaults:
 
 - saved provider clients load without serialized credentials
+- a saved program holds no HTTP header, credential or not, so after loading
+  rebind the LM with `Imp.with_lm/2` or a scoped `Imp.context/2`, or requests
+  go out without the custom headers (a routing header such as `x-tenant`
+  included)
 - saved training-job checkpoints contain lifecycle state and checksums but no
   transport or API key; both must be reinjected explicitly on load
 - dispatch journals serialize callers using the same path within one BEAM node,
@@ -356,9 +360,12 @@ log it.
 `Imp.MCP.OAuth` says in full what that encryption protects (a copy of the
 credential file taken without the secret) and what it does not (anyone who can
 read the secret, the host's memory, or run code as the host's user). It also
-says where a token can still appear despite this module: once the header is
-handed to `ExMCP.Client` it lives in that client's transport state, and an OTP
-crash report prints it — as it does for a static `"headers"` entry.
+says where a token can still appear despite this module. Once the header is
+handed to `ExMCP.Client` it lives in that client's transport state, as a static
+`"headers"` entry does. The client's state prints every header value as
+`[REDACTED]`, so its crash report does not show the token; printing the raw
+state (`inspect(state, structs: false)`, Erlang's `~p`, a log handler that
+formats the raw report) does.
 
 A bearer token the host reads from its own environment:
 
