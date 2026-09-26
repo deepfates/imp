@@ -22,10 +22,10 @@ split a task into pieces.
 
 Each input field becomes a variable of the same name. The model sees only a
 description of each variable: its type, its length, and a preview, the first
-`max_preview_chars` characters of its printed value (2,000 by default). It sees more by
-writing code: slicing, splitting, filtering, and printing what it wants to
-read. A 900 KB log costs the model the preview until the model decides which
-lines matter.
+`max_preview_chars` characters of its printed value (2,000 by default). It
+sees more by writing code: slicing, splitting, filtering, and printing what it
+wants to read. A 900 KB log costs the model the preview until the model
+decides which lines matter.
 
 ### 2. It takes the same signature as any module
 
@@ -46,14 +46,14 @@ when the code calls `submit/1` with valid outputs, and runs for at most
 
 ### 4. Sub-model calls are the recursion
 
-The code can call a model. `llm_query(prompt)` asks the sub-model one
-question and returns its answer as a string; `llm_query_batched(prompts)`
-asks several at once and returns the answers in order. The usual shape is: find the relevant pieces
-with code, have the sub-model read each piece, combine the answers with code.
-`rlm_query(prompt)` goes one level deeper and runs the question as a child RLM
-with its own interpreter. `max_recursion_depth` (1 by default) is how many
-levels of children may start below the top one; at the limit `rlm_query`
-becomes a plain `llm_query`.
+The code can call a model. `llm_query(prompt)` asks the sub-model one question
+and returns its answer as a string; `llm_query_batched(prompts)` asks several
+at once and returns the answers in order. The usual shape is: find the
+relevant pieces with code, have the sub-model read each piece, combine the
+answers with code. `rlm_query(prompt)` goes one level deeper and runs the
+question as a child RLM with its own interpreter. `max_recursion_depth` (1 by
+default) is how many levels of children may start below the top one; at the
+limit `rlm_query` becomes a plain `llm_query`.
 
 The sub-model is `sub_lm:`, or the controller's own model when it is not
 given. A strong model steering and a cheaper one reading snippets is a good
@@ -175,13 +175,13 @@ prediction.metadata.rlm.sub_lm_calls
 
 ### What the model sees
 
-Every request starts with a system message: what the environment is, the
-reply format (one JSON object with `reasoning` and `code`), the built-in
-functions, and the language's rules and allowlist. Next come the task:
-the signature, your instructions, the required outputs and your tools. Each
-turn then adds one message with every variable's description and preview, and
-the turns, sub-model calls and time that are left. Earlier turns stay in the conversation as the
-model's code and what it printed.
+Every request starts with a system message: what the environment is, the reply
+format (one JSON object with `reasoning` and `code`), the built-in functions,
+and the language's rules and allowlist. Next come the task: the signature,
+your instructions, the required outputs and your tools. Each turn then adds
+one message with every variable's description and preview, and the turns,
+sub-model calls and time that are left. Earlier turns stay in the conversation
+as the model's code and what it printed.
 
 ### A log too long to read
 
