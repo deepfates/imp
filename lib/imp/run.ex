@@ -322,7 +322,9 @@ defmodule Imp.Run do
   A host running work of its own inside a run, such as an external request or
   a process it started, registers how to stop it, so `cancel/3` stops that work
   too. Work registered after the run was cancelled is stopped at once, and the
-  result is `nil`; outside a run nothing is registered and the result is `nil`.
+  result is `nil`; so is work registered after the run's control has ended,
+  whose `fun` is called with `{:run_control_ended, reason}`. Outside a run
+  nothing is registered and the result is `nil`.
   """
   @spec register_cancellable((term() -> term())) :: reference() | nil
   def register_cancellable(fun) when is_function(fun, 1) do
@@ -505,7 +507,24 @@ defmodule Imp.Run.Control do
   def events(pid), do: GenServer.call(pid, :events)
   def emit(pid, kind, attrs), do: GenServer.call(pid, {:emit, kind, attrs})
   def first_seen?(pid, key), do: GenServer.call(pid, {:first_seen, key})
-  def register(pid, fun), do: GenServer.call(pid, {:register, fun})
+  # A registration can reach a control that has already ended: a cancel
+  # releases the control as soon as the task is down, while a process the run
+  # started may still be registering. The control answers a register in the
+  # same step that takes it, so a call that exits unanswered was never taken,
+  # and nothing is left to cancel the work: it is cancelled here, as a
+  # registration after a cancel is. A timeout says nothing about whether the
+  # control took it, so that exit is left to the caller.
+  def register(pid, fun) do
+    GenServer.call(pid, {:register, fun})
+  catch
+    :exit, {reason, {GenServer, :call, _args}} when reason != :timeout ->
+      spawn(fn ->
+        call_cancellations([fun], {:run_control_ended, reason}, @cancellation_bound)
+      end)
+
+      nil
+  end
+
   def unregister(pid, ref), do: GenServer.call(pid, {:unregister, ref})
   # The control waits up to `timeout` for the cancellations; the call allows
   # for that and for the rest of its work.

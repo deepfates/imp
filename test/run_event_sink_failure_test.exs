@@ -378,7 +378,10 @@ defmodule Imp.RunEventSinkFailureTest do
   end
 
   # A cancellation registered after the cancel is called once, and a cancel
-  # still returns within about twice its timeout when it never returns.
+  # still returns within about twice its timeout when it never returns. The
+  # registration races the cancel's release of the control: taken by the
+  # control, it is called with the cancel's reason; arriving after, with the
+  # control's end (the next test makes that case certain).
   test "a cancellation registered after the cancel neither holds the cancel nor is lost" do
     {:ok, run} = Imp.Run.start(%LateEffect{}, %{owner: self()})
     on_exit(fn -> Process.exit(run.task.pid, :kill) end)
@@ -388,9 +391,28 @@ defmodule Imp.RunEventSinkFailureTest do
     assert {:ok, _events} = Imp.Run.cancel_with_events(run, :host_cancelled, 200)
     elapsed = System.monotonic_time(:millisecond) - started
 
-    assert_receive {:late_cancelled, :host_cancelled}, 1_000
+    assert_receive {:late_cancelled, reason}, 1_000
+    assert reason in [:host_cancelled, {:run_control_ended, :noproc}]
     refute_receive {:late_cancelled, _reason}, 200
     assert elapsed < 1_000, "the cancel took #{elapsed} ms"
+  end
+
+  test "a cancellation registered after the control has ended is called, not lost" do
+    {:ok, run} = Imp.Run.start(%Effects{effects: [:returns]}, %{owner: self()})
+    on_exit(fn -> Process.exit(run.task.pid, :kill) end)
+    assert_receive :waiting
+    assert {:ok, _events} = Imp.Run.cancel_with_events(run, :host_cancelled, 200)
+    refute Process.alive?(run.control)
+
+    owner = self()
+
+    registered =
+      Imp.Run.with_context(run.control, fn ->
+        Imp.Run.register_cancellable(&send(owner, {:after_release, &1}))
+      end)
+
+    assert registered == nil
+    assert_receive {:after_release, {:run_control_ended, :noproc}}, 1_000
   end
 
   # A cancellation's process can be ended by a signal no `catch` sees, the way
