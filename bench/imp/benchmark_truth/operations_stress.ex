@@ -255,7 +255,7 @@ defmodule Imp.BenchmarkTruth.OperationsStress do
   defp parallel_failure_isolation_check(max_concurrency) do
     results =
       Imp.Predict.Parallel.map(%IsolatedProgram{}, [:ok, :raise, :throw, :invalid],
-        max_concurrency: max_concurrency,
+        num_threads: max_concurrency,
         timeout: 5_000
       )
 

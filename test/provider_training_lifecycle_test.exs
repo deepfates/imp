@@ -377,7 +377,7 @@ defmodule ProviderTrainingLifecycleTest do
 
     unknown = Imp.Clients.TrainingJob.new(%{status: "provider-paused"})
 
-    assert Imp.Clients.TrainingJob.load(Imp.Clients.TrainingJob.dump(unknown)).status ==
+    assert Imp.Clients.TrainingJob.load!(Imp.Clients.TrainingJob.dump(unknown)).status ==
              {:unknown, "provider-paused"}
   end
 
@@ -444,7 +444,7 @@ defmodule ProviderTrainingLifecycleTest do
     whitespace = Imp.Clients.TrainingJob.new(%{status: "succeeded", result_model: "  "})
     assert whitespace.status == :artifact_missing
 
-    assert Imp.Clients.TrainingJob.load(Imp.Clients.TrainingJob.dump(whitespace)).status ==
+    assert Imp.Clients.TrainingJob.load!(Imp.Clients.TrainingJob.dump(whitespace)).status ==
              :artifact_missing
 
     raw_callback = fn _lm, _examples, _opts ->
@@ -622,7 +622,7 @@ defmodule ProviderTrainingLifecycleTest do
     refute persisted =~ "abcdefghijklmnop"
 
     resumed =
-      Imp.Clients.TrainingJob.load!(path,
+      Imp.Clients.TrainingJob.read!(path,
         transport: SecretRefreshTransport,
         api_key: "sk-test-secret-1234567890"
       )

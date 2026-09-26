@@ -111,7 +111,7 @@ defmodule Imp.BenchmarkTruth.Search do
         end
       end,
       mode: mode,
-      max_concurrency: max_concurrency,
+      num_threads: max_concurrency,
       tie_policy: :first
     )
   end

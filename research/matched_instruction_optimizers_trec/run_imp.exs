@@ -585,12 +585,12 @@ defmodule MatchedTRECImp.Runner do
       selection_strategy: :all_improvements,
       use_merge: false,
       reflection_record_mode: :gepa_v0_1_4,
-      max_concurrency: 1,
+      num_threads: 1,
       timeout: 120_000,
       proposal_timeout: 120_000,
       raise_on_exception: true
     )
-    |> GEPA.compile(program, examples(rows.train, true), examples(rows.selection, false))
+    |> then(&Imp.optimize!(program, &1, examples(rows.train, true), examples(rows.selection, false)))
   end
 
   defp compile("mipro_v2", program, rows, seed, optimizer_lm, task_lm, manifest, _meanings) do
@@ -613,12 +613,12 @@ defmodule MatchedTRECImp.Runner do
       view_data_batch_size: 10,
       prompt_lm: optimizer_lm,
       task_lm: task_lm,
-      max_concurrency: 1,
+      num_threads: 1,
       timeout: 120_000,
       max_errors: 0,
       seed: seed
     )
-    |> MIPROv2.compile(program, examples(rows.train, true), examples(rows.selection, false))
+    |> then(&Imp.optimize!(program, &1, examples(rows.train, true), examples(rows.selection, false)))
   end
 
   defp program(lm) do

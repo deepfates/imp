@@ -63,7 +63,7 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizerLift do
       [
         {"LabeledFewShot", :direct, &compile_labeled/3},
         {"BootstrapFewShot", :direct, &compile_bootstrap/3},
-        {"RandomSearch", :direct, &compile_random_search/3},
+        {"BootstrapFewShotWithRandomSearch", :direct, &compile_random_search/3},
         {"InstructionSearch", :imp_only, &compile_instruction_search/3},
         {"COPRO", :direct, &compile_copro/3},
         {"MIPROv2", :direct, &compile_mipro/3},
@@ -151,8 +151,11 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizerLift do
 
   defp compile_random_search(metric, program, {trainset, devset}),
     do:
-      Imp.Optimizer.RandomSearch.new(metric, candidates: 4, demos_per_candidate: 1)
-      |> Imp.Optimizer.RandomSearch.compile(program, trainset, devset)
+      Imp.Optimizer.BootstrapFewShotWithRandomSearch.new(metric,
+        num_candidate_programs: 4,
+        max_bootstrapped_demos: 1
+      )
+      |> Imp.Optimizer.BootstrapFewShotWithRandomSearch.compile(program, trainset, devset)
 
   defp compile_instruction_search(metric, program, {trainset, devset}) do
     # The second instruction is the parity fixture's designed winner: it

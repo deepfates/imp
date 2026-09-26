@@ -155,7 +155,7 @@ defmodule Imp.ExperimentTest do
              Imp.Experiment.check(program, %SelectableOptimizer{owner: owner}, data, metric,
                artifact_id: "selected-v1",
                optimizer_options: [custom_optimizer_control: :owned],
-               evaluation_options: [max_concurrency: 1, repetitions: 1, aggregation: :mean],
+               evaluation_options: [num_threads: 1, repetitions: 1, aggregation: :mean],
                compare_baseline_on_test: true,
                budget: budget
              )
@@ -422,7 +422,7 @@ defmodule Imp.ExperimentTest do
                evaluation_options: [
                  repetitions: [selection: 3, test: 1],
                  aggregation: :mean,
-                 max_concurrency: 1
+                 num_threads: 1
                ]
              )
 
@@ -729,7 +729,7 @@ defmodule Imp.ExperimentTest do
                Imp.exact_match(:answer),
                evaluation_options: [
                  failure_score: 0.0,
-                 max_concurrency: 1,
+                 num_threads: 1,
                  max_errors: :infinity
                ]
              )

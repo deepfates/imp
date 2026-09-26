@@ -161,7 +161,7 @@ defmodule HotPotQAGEPA do
         max_reflection_calls: 12,
         seed: seed,
         use_merge: false,
-        max_concurrency: 1,
+        num_threads: 1,
         timeout: 120_000
       )
 
@@ -207,7 +207,7 @@ defmodule HotPotQAGEPA do
           evaluation_options: [
             repetitions: 3,
             aggregation: :mean,
-            max_concurrency: 1,
+            num_threads: 1,
             max_errors: 10,
             failure_score: 0.0,
             timeout: 120_000

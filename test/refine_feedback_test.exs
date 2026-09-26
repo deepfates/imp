@@ -89,7 +89,7 @@ defmodule RefineFeedbackTest do
 
     assert {:ok, prediction} =
              Imp.Predict.Refine.new(%HintProgram{}, metric,
-               max_attempts: 2,
+               n: 2,
                feedback_fn: feedback
              )
              |> Imp.Predict.Refine.call(%{question: "q"})
@@ -130,7 +130,7 @@ defmodule RefineFeedbackTest do
     log =
       ExUnit.CaptureLog.capture_log(fn ->
         assert {:ok, prediction} =
-                 Imp.Predict.Refine.new(program, metric, max_attempts: 2)
+                 Imp.Predict.Refine.new(program, metric, n: 2)
                  |> Imp.Predict.Refine.call(%{question: "q", api_key: "sk-live-secret"})
 
         send(parent, {:refine_prediction, prediction})
@@ -167,7 +167,7 @@ defmodule RefineFeedbackTest do
 
     assert {:ok, prediction} =
              Imp.Predict.Refine.new(%ScriptedProgram{agent: events}, metric,
-               max_attempts: 3,
+               n: 3,
                fail_count: 1,
                feedback_fn: fn _history -> nil end
              )
@@ -185,7 +185,7 @@ defmodule RefineFeedbackTest do
 
     assert {:ok, prediction} =
              Imp.Predict.Refine.new(%ScriptedProgram{agent: events}, metric,
-               max_attempts: 4,
+               n: 4,
                fail_count: 2,
                feedback_fn: fn _history -> nil end
              )
@@ -221,7 +221,7 @@ defmodule RefineFeedbackTest do
     metric = fn _example, prediction -> Imp.Prediction.get(prediction, :answer) == "fixed" end
 
     assert {:ok, prediction} =
-             Imp.Predict.Refine.new(program, metric, max_attempts: 2)
+             Imp.Predict.Refine.new(program, metric, n: 2)
              |> Imp.Predict.Refine.call(%{question: "q"})
 
     assert Imp.Prediction.get(prediction, :answer) == "fixed"
@@ -235,7 +235,7 @@ defmodule RefineFeedbackTest do
 
     assert {:error, {:refine_fail_count_exceeded, :provider_unavailable}} =
              Imp.Predict.Refine.new(%CountingErrorProgram{agent: calls}, metric,
-               max_attempts: 3,
+               n: 3,
                fail_count: 1
              )
              |> Imp.call(%{})
@@ -247,7 +247,7 @@ defmodule RefineFeedbackTest do
     metric = fn _example, _prediction -> true end
 
     assert {:error, :no_attempts} =
-             Imp.Predict.Refine.new(%ExplodingProgram{}, metric, max_attempts: 0)
+             Imp.Predict.Refine.new(%ExplodingProgram{}, metric, n: 0)
              |> Imp.call(%{question: "q"})
   end
 
@@ -255,7 +255,7 @@ defmodule RefineFeedbackTest do
     metric = fn _example, _prediction -> true end
 
     assert {:error, :provider_unavailable} =
-             Imp.Predict.Refine.new(%ErrorProgram{}, metric, max_attempts: 1)
+             Imp.Predict.Refine.new(%ErrorProgram{}, metric, n: 1)
              |> Imp.call(%{question: "q"})
   end
 
@@ -265,7 +265,7 @@ defmodule RefineFeedbackTest do
     assert {:error,
             {:invalid_module_result, RefineFeedbackTest.InvalidResultProgram,
              ":not_a_module_result"}} =
-             Imp.Predict.Refine.new(%InvalidResultProgram{}, metric, max_attempts: 1)
+             Imp.Predict.Refine.new(%InvalidResultProgram{}, metric, n: 1)
              |> Imp.Predict.Refine.call(%{question: "q"})
   end
 
@@ -273,7 +273,7 @@ defmodule RefineFeedbackTest do
     metric = fn _example, _prediction -> raise "metric exploded" end
 
     assert {:ok, prediction} =
-             Imp.Predict.Refine.new(%HintProgram{}, metric, max_attempts: 1)
+             Imp.Predict.Refine.new(%HintProgram{}, metric, n: 1)
              |> Imp.Predict.Refine.call(%{question: "q"})
 
     assert Imp.Prediction.get(prediction, :answer) == "bad"
@@ -285,7 +285,7 @@ defmodule RefineFeedbackTest do
 
     assert {:ok, prediction} =
              Imp.Predict.Refine.new(%HintProgram{}, metric,
-               max_attempts: 2,
+               n: 2,
                feedback_fn: feedback
              )
              |> Imp.Predict.Refine.call(%{question: "q"})
@@ -299,7 +299,7 @@ defmodule RefineFeedbackTest do
 
     assert {:ok, prediction} =
              Imp.Predict.Refine.new(%SequenceProgram{agent: agent}, metric,
-               max_attempts: 3,
+               n: 3,
                threshold: 1.0
              )
              |> Imp.Predict.Refine.call(%{})
@@ -314,7 +314,7 @@ defmodule RefineFeedbackTest do
 
     assert {:ok, prediction} =
              Imp.Predict.Refine.new(%SequenceProgram{agent: agent}, metric,
-               max_attempts: 2,
+               n: 2,
                threshold: 0.5
              )
              |> Imp.Predict.Refine.call(%{})
@@ -417,7 +417,7 @@ defmodule RefineFeedbackTest do
     end
 
     assert_raise Imp.OperationalSafetyError, fn ->
-      Imp.Predict.Refine.new(%HintProgram{}, metric, max_attempts: 1)
+      Imp.Predict.Refine.new(%HintProgram{}, metric, n: 1)
       |> Imp.Predict.Refine.call(%{})
     end
   end
@@ -428,7 +428,7 @@ defmodule RefineFeedbackTest do
 
     assert_raise Imp.OperationalSafetyError, fn ->
       Imp.Predict.Refine.new(%HintProgram{}, metric,
-        max_attempts: 2,
+        n: 2,
         feedback_fn: fn _history -> raise safety end
       )
       |> Imp.Predict.Refine.call(%{})
@@ -513,9 +513,9 @@ defmodule RefineFeedbackTest do
                  end
 
     assert_raise ArgumentError,
-                 ~r/Imp\.Predict\.Refine\.new\/3: invalid value for :max_attempts option: expected non negative integer/,
+                 ~r/Imp\.Predict\.Refine\.new\/3: invalid value for :n option: expected non negative integer/,
                  fn ->
-                   Imp.Predict.Refine.new(%HintProgram{}, metric, max_attempts: -1)
+                   Imp.Predict.Refine.new(%HintProgram{}, metric, n: -1)
                  end
 
     assert_raise ArgumentError,

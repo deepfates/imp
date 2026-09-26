@@ -63,7 +63,7 @@ defmodule ImpDeployment.Workflow do
         data(),
         &metric/2,
         artifact_id: "deployment-support-pipeline-selected",
-        evaluation_options: [max_concurrency: 4]
+        evaluation_options: [num_threads: 4]
       )
     end)
   end

@@ -33,7 +33,7 @@ defmodule Imp.MCP do
       {:ok, import} = Imp.MCP.connect([server], trusted_servers: [server])
       agent = Imp.react("question -> answer", import.tools, lm: lm)
   """
-  @spec connect([Imp.MCP.Connections.server()], keyword()) ::
+  @spec connect([Imp.MCP.Connections.descriptor()], keyword()) ::
           {:ok, Imp.MCP.Import.t()} | {:error, term()}
   def connect(servers, opts \\ []), do: Imp.MCP.Connections.connect(servers, opts)
 
@@ -56,7 +56,14 @@ defmodule Imp.MCP do
   This is only what is read. The error term itself, which the loop records,
   keeps the whole envelope or reason.
 
-      iex> Imp.MCP.failure_text(Imp.MCP.CallFailure.returned("kite", "reply", :timeout))
+      iex> failure = %Imp.MCP.CallFailure{
+      ...>   outcome: :unknown,
+      ...>   index: 0,
+      ...>   server_name: "kite",
+      ...>   tool_name: "reply",
+      ...>   reason: :timeout
+      ...> }
+      iex> Imp.MCP.failure_text(failure)
       "no answer came back; it timed out, so it may have been carried out."
   """
   @may_have_run "so it may have been carried out."

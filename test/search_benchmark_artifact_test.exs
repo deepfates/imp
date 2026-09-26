@@ -5,7 +5,7 @@ defmodule SearchBenchmarkArtifactTest do
 
   test "source-checkout search artifact gates semantics but only measures latency" do
     artifact =
-      Imp.BenchmarkTruth.Search.run(iterations: 2, max_concurrency: 2, work_ms: 1)
+      Imp.BenchmarkTruth.Search.run(iterations: 2, num_threads: 2, work_ms: 1)
 
     assert artifact["summary"]["complete"]
     assert artifact["summary"]["passing"] == artifact["summary"]["total"]

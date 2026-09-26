@@ -20,8 +20,8 @@ defmodule Imp.LocalSIMBABanking77ExampleTest do
   test "front door keeps untouched rows outside SIMBA and uses the selected artifact" do
     source = File.read!(@source)
 
-    assert source =~ "SIMBA.compile(baseline, examples(rows.train), examples(rows.selection))"
-    refute source =~ "SIMBA.compile(baseline, examples(rows.test)"
+    assert source =~ "Imp.optimize!(baseline, &1, examples(rows.train), examples(rows.selection))"
+    refute source =~ "Imp.optimize!(baseline, &1, examples(rows.test)"
     assert source =~ "Artifact.from_optimized_program"
     assert source =~ "Artifact.apply(program!(job, observer))"
     assert source =~ "IMP_SIMBA_FRESH"

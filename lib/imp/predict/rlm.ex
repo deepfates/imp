@@ -77,8 +77,8 @@ defmodule Imp.Predict.RLM do
   - `:lm` - controller LM.
   - `:sub_lm` - LM used for `llm_query` calls; defaults to `:lm`.
   - `:tools` - list of `Imp.Tool` values available to tool calls.
-  - `:tool_policy` - `:allow`, a list of allowed tool names, or a predicate.
-  - `:max_iterations` / `:max_iters` - maximum controller turns.
+  - `:tool_policy` - which tools the model may call; see `Imp.ToolPolicy`.
+  - `:max_iterations` - maximum controller turns, as DSPy's `dspy.RLM` names it.
   - `:max_llm_calls` - shared limit for one-shot sub-LM calls. This includes
     `llm_query*`, depth-limit `rlm_query*` fallbacks, and sub-LM work inside
     recursive children; it excludes controller, extraction, and compaction calls.
@@ -104,7 +104,6 @@ defmodule Imp.Predict.RLM do
       default: :allow
     ],
     max_iterations: [type: :non_neg_integer, default: 20],
-    max_iters: [type: :non_neg_integer],
     max_llm_calls: [type: :non_neg_integer, default: 50],
     max_recursion_depth: [type: :non_neg_integer, default: 1],
     max_interpreter_steps: [type: :pos_integer, default: 10_000],
@@ -146,7 +145,7 @@ defmodule Imp.Predict.RLM do
       sub_lm: Keyword.get(opts, :sub_lm, opts[:lm]),
       tools: tools,
       tool_policy: opts[:tool_policy],
-      max_iterations: non_negative_integer(Keyword.get(opts, :max_iters, opts[:max_iterations])),
+      max_iterations: non_negative_integer(opts[:max_iterations]),
       max_llm_calls: non_negative_integer(opts[:max_llm_calls]),
       max_recursion_depth: non_negative_integer(opts[:max_recursion_depth]),
       max_interpreter_steps: opts[:max_interpreter_steps],
@@ -1870,7 +1869,7 @@ defmodule Imp.Predict.RLM do
           {:ran, call_known_tool(tool, args)}
 
         {:deny, reason} ->
-          {:refused, {:tool_authorization_denied, name, Imp.Redaction.redact(reason)}}
+          {:refused, {:tool_denied, name, Imp.Redaction.redact(reason)}}
 
         {:cancel, reason} ->
           {:cancel, reason}

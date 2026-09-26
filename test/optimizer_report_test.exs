@@ -21,7 +21,7 @@ defmodule OptimizerReportTest do
 
     code = """
     state = #{inspect(path)} |> File.read!() |> Jason.decode!()
-    report = Imp.Optimizer.Report.load(state)
+    report = Imp.Optimizer.Report.load!(state)
     File.write!(#{inspect(receipt)}, Atom.to_string(report.optimizer))
     """
 
@@ -261,7 +261,7 @@ defmodule OptimizerReportTest do
     refute encoded =~ "CANARY_REPORT_METADATA"
     assert encoded =~ "[REDACTED]"
 
-    restored = Imp.Optimizer.Report.load(dumped)
+    restored = Imp.Optimizer.Report.load!(dumped)
     assert restored.candidates == [%{api_key: "[REDACTED]", score: 1.0}]
     assert restored.metadata == %{authorization: "[REDACTED]", label: "kept"}
 
@@ -292,7 +292,7 @@ defmodule OptimizerReportTest do
         metadata: %{"alpha" => "alpha"}
       })
 
-    restored = report |> Imp.Optimizer.Report.dump() |> Imp.Optimizer.Report.load()
+    restored = report |> Imp.Optimizer.Report.dump() |> Imp.Optimizer.Report.load!()
 
     assert restored.optimizer == "alpha"
     assert restored.metadata == %{"alpha" => "alpha"}
@@ -326,7 +326,7 @@ defmodule OptimizerReportTest do
     assert_raise ArgumentError,
                  ~r/optimizer report state contains colliding key "optimizer"/,
                  fn ->
-                   Imp.Optimizer.Report.load(%{:optimizer => :one, "optimizer" => "two"})
+                   Imp.Optimizer.Report.load!(%{:optimizer => :one, "optimizer" => "two"})
                  end
   end
 
@@ -359,11 +359,11 @@ defmodule OptimizerReportTest do
     report_state = Imp.Optimizer.Report.dump(Imp.Optimizer.Report.new(optimizer: :alpha))
 
     assert_raise ArgumentError, ~r/malformed optimizer report state/, fn ->
-      Imp.Optimizer.Report.load(Map.put(report_state, "extra", true))
+      Imp.Optimizer.Report.load!(Map.put(report_state, "extra", true))
     end
 
     assert_raise ArgumentError, ~r/malformed optimizer report state/, fn ->
-      Imp.Optimizer.Report.load(Map.put(report_state, "candidate_count", "many"))
+      Imp.Optimizer.Report.load!(Map.put(report_state, "candidate_count", "many"))
     end
 
     assert_raise ArgumentError, ~r/malformed Imp optimizer report JSON tag/, fn ->
@@ -381,8 +381,11 @@ defmodule OptimizerReportTest do
 
     compiled =
       metric
-      |> Imp.Optimizer.RandomSearch.new(candidates: 3, demos_per_candidate: 1)
-      |> Imp.Optimizer.RandomSearch.compile(program, train, dev)
+      |> Imp.Optimizer.BootstrapFewShotWithRandomSearch.new(
+        num_candidate_programs: 3,
+        max_bootstrapped_demos: 1
+      )
+      |> Imp.Optimizer.BootstrapFewShotWithRandomSearch.compile(program, train, dev)
 
     report = Imp.Optimizer.Report.fetch(compiled)
 
@@ -397,17 +400,27 @@ defmodule OptimizerReportTest do
     assert report.metadata.candidate_seeds == [-3, -2, -1, 0, 1, 2]
   end
 
-  test "upstream bootstrap random-search aliases delegate to the canonical optimizer" do
+  test "bootstrap random search has one name and DSPy's option names" do
     metric = Imp.Metrics.exact_match(:answer)
 
-    assert %Imp.Optimizer.RandomSearch{candidates: 2, demos_per_candidate: 1} =
-             Imp.Optimizer.BootstrapRS.new(metric, candidates: 2, demos_per_candidate: 1)
-
-    assert %Imp.Optimizer.RandomSearch{candidates: 3, demos_per_candidate: 2} =
+    assert %Imp.Optimizer.BootstrapFewShotWithRandomSearch{
+             num_candidate_programs: 2,
+             max_bootstrapped_demos: 1
+           } =
              Imp.Optimizer.BootstrapFewShotWithRandomSearch.new(metric,
-               candidates: 3,
-               demos_per_candidate: 2
+               num_candidate_programs: 2,
+               max_bootstrapped_demos: 1
              )
+
+    refute Code.ensure_loaded?(Imp.Optimizer.RandomSearch)
+    refute Code.ensure_loaded?(Imp.Optimizer.BootstrapRS)
+
+    assert_raise ArgumentError, ~r/unknown options \[:candidates, :demos_per_candidate\]/, fn ->
+      Imp.Optimizer.BootstrapFewShotWithRandomSearch.new(metric,
+        candidates: 3,
+        demos_per_candidate: 2
+      )
+    end
   end
 
   test "InferRules retains deterministic pre-induced rules for replay" do
@@ -986,8 +999,11 @@ defmodule OptimizerReportTest do
 
     compiled =
       metric
-      |> Imp.Optimizer.RandomSearch.new(candidates: 0, demos_per_candidate: 1)
-      |> Imp.Optimizer.RandomSearch.compile(program, train, dev)
+      |> Imp.Optimizer.BootstrapFewShotWithRandomSearch.new(
+        num_candidate_programs: 0,
+        max_bootstrapped_demos: 1
+      )
+      |> Imp.Optimizer.BootstrapFewShotWithRandomSearch.compile(program, train, dev)
 
     report = Imp.Optimizer.Report.fetch(compiled)
 
@@ -1009,9 +1025,9 @@ defmodule OptimizerReportTest do
                  end
 
     assert_raise ArgumentError,
-                 ~r/Imp\.Optimizer\.RandomSearch\.new\/2: expected keyword options/,
+                 ~r/Imp\.Optimizer\.BootstrapFewShotWithRandomSearch\.new\/2: expected keyword options/,
                  fn ->
-                   Imp.Optimizer.RandomSearch.new(metric, %{candidates: 1})
+                   Imp.Optimizer.BootstrapFewShotWithRandomSearch.new(metric, %{candidates: 1})
                  end
 
     assert_raise ArgumentError,
@@ -1027,15 +1043,11 @@ defmodule OptimizerReportTest do
                  end
 
     assert_raise ArgumentError,
-                 ~r/Imp\.Optimizer\.RandomSearch\.new\/2: invalid value for :candidates option: expected non negative integer/,
+                 ~r/Imp\.Optimizer\.BootstrapFewShotWithRandomSearch\.new\/2: invalid value for :num_candidate_programs option: expected non negative integer/,
                  fn ->
-                   Imp.Optimizer.RandomSearch.new(metric, candidates: -1)
-                 end
-
-    assert_raise ArgumentError,
-                 ~r/Imp\.Optimizer\.RandomSearch\.new\/2: invalid value for :demos_per_candidate option: expected non negative integer/,
-                 fn ->
-                   Imp.Optimizer.RandomSearch.new(metric, demos_per_candidate: -1)
+                   Imp.Optimizer.BootstrapFewShotWithRandomSearch.new(metric,
+                     num_candidate_programs: -1
+                   )
                  end
 
     assert_raise ArgumentError,
@@ -1053,9 +1065,9 @@ defmodule OptimizerReportTest do
 
   test "search optimizer constructors reject invalid metric callbacks at the boundary" do
     assert_raise ArgumentError,
-                 ~r/Imp\.Optimizer\.RandomSearch\.new\/2 expects a metric function with arity 2 or 3/,
+                 ~r/Imp\.Optimizer\.BootstrapFewShotWithRandomSearch\.new\/2 expects a metric function with arity 2 or 3/,
                  fn ->
-                   Imp.Optimizer.RandomSearch.new(fn _example -> true end)
+                   Imp.Optimizer.BootstrapFewShotWithRandomSearch.new(fn _example -> true end)
                  end
 
     assert_raise ArgumentError,
@@ -1072,8 +1084,15 @@ defmodule OptimizerReportTest do
 
     assert_raise Protocol.UndefinedError, fn ->
       metric
-      |> Imp.Optimizer.RandomSearch.new(candidates: 2, demos_per_candidate: 1)
-      |> Imp.Optimizer.RandomSearch.compile(program, train, :not_an_enumerable_devset)
+      |> Imp.Optimizer.BootstrapFewShotWithRandomSearch.new(
+        num_candidate_programs: 2,
+        max_bootstrapped_demos: 1
+      )
+      |> Imp.Optimizer.BootstrapFewShotWithRandomSearch.compile(
+        program,
+        train,
+        :not_an_enumerable_devset
+      )
     end
   end
 

@@ -121,9 +121,9 @@ defmodule ImpTest do
                  end
 
     assert_raise ArgumentError,
-                 ~r/Imp.Signature.load\/1 expects a map with "inputs" and "outputs"/,
+                 ~r/Imp.Signature.load!\/1 expects a map with "inputs" and "outputs"/,
                  fn ->
-                   Imp.Signature.load(%{"input" => []})
+                   Imp.Signature.load!(%{"input" => []})
                  end
   end
 
@@ -358,9 +358,7 @@ defmodule ImpTest do
 
     results =
       Imp.context([lm: local], fn ->
-        Imp.Predict.Parallel.map(program, [%{question: "a"}, %{question: "b"}],
-          max_concurrency: 2
-        )
+        Imp.Predict.Parallel.map(program, [%{question: "a"}, %{question: "b"}], num_threads: 2)
       end)
 
     assert [{:ok, first}, {:ok, second}] = results
@@ -537,7 +535,7 @@ defmodule ImpTest do
     result =
       devset
       |> Imp.Evaluate.new(Imp.Metrics.exact_match(:answer),
-        max_concurrency: 2,
+        num_threads: 2,
         max_errors: :infinity,
         timeout: 10
       )
@@ -580,7 +578,7 @@ defmodule ImpTest do
       ExUnit.CaptureLog.with_log(fn ->
         devset
         |> Imp.Evaluate.new(Imp.Metrics.exact_match(:answer),
-          max_concurrency: 2,
+          num_threads: 2,
           max_errors: :infinity,
           timeout: 100
         )

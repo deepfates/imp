@@ -1,6 +1,6 @@
 # Local RandomSearch / BootstrapRS Banking77 program
 
-This ordinary consumer runs `Imp.Optimizer.RandomSearch` against the retained,
+This ordinary consumer runs `Imp.Optimizer.BootstrapFewShotWithRandomSearch` against the retained,
 verified MLX-fused Qwen Banking77 classifier and uses a separate pinned local
 `llama3.2:3b` program as the real bootstrap teacher. Sixteen training rows are
 available to the optimizer, eight separate rows rank the fixed DSPy-style

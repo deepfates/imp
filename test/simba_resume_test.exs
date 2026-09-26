@@ -428,7 +428,7 @@ defmodule Imp.Optimizer.SIMBA.ResumeTest do
         max_steps: 3,
         max_demos: 0,
         prompt_lm: prompt_lm,
-        max_concurrency: 1,
+        num_threads: 1,
         seed: 41,
         metric_identity: identity
       )

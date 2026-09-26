@@ -129,7 +129,7 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
         fewshot_aware_proposer: false,
         proposer_fidelity: :dspy_3_2_1,
         max_errors: 0,
-        max_concurrency: 1,
+        num_threads: 1,
         seed: 9
       )
 
@@ -175,7 +175,7 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
                  }}
             }} =
              Imp.Experiment.check(program, optimizer, data, &__MODULE__.metric/2,
-               evaluation_options: [max_errors: :infinity, max_concurrency: 1]
+               evaluation_options: [max_errors: :infinity, num_threads: 1]
              )
 
     assert public_failure.stage == :mipro_bootstrap
@@ -1051,7 +1051,7 @@ defmodule Imp.Optimizer.MIPROv2.UpstreamProposerFidelityTest do
         data_aware_proposer: true,
         tip_aware_proposer: true,
         fewshot_aware_proposer: false,
-        max_concurrency: 1,
+        num_threads: 1,
         max_errors: 10,
         seed: 9
       )

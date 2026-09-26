@@ -184,7 +184,12 @@ defmodule Imp.MCPCallOutcomeTest do
       {_imported, tools} = http_tools(http_server())
 
       assert {:error,
-              %CallFailure{outcome: :refused, server: "outcome", tool: "no_method"} = failure} =
+              %CallFailure{
+                outcome: :refused,
+                index: 0,
+                server_name: "outcome",
+                tool_name: "no_method"
+              } = failure} =
                result = call(tools, "no_method")
 
       assert %{"code" => -32_601} = failure.reason
@@ -212,9 +217,9 @@ defmodule Imp.MCPCallOutcomeTest do
             {:malformed_tool_call, %{}},
             {:missing_required, ["uri"]},
             {:schema_validation, [%{field: "limit", message: "must be <= 100"}]},
-            {:tool_authorization_denied, :post, :client_denied},
-            {:tool_authorization_denied, :post, :tool_policy},
-            {:rlm_tool_error, {:tool_authorization_denied, :post, :tool_policy}}
+            {:tool_denied, :post, :client_denied},
+            {:tool_denied, :post, :tool_policy},
+            {:rlm_tool_error, {:tool_denied, :post, :tool_policy}}
           ] do
         assert Imp.Tool.outcome({:error, reason}) == :result, inspect(reason)
       end
@@ -316,7 +321,12 @@ defmodule Imp.MCPCallOutcomeTest do
       assert {:error, :timeout = reason} =
                ExMCP.Client.call_tool(client, "answer", %{}, [timeout: 300] ++ options)
 
-      assert %CallFailure{outcome: :unknown} = CallFailure.returned("outcome", "answer", reason)
+      assert %CallFailure{outcome: :unknown} =
+               CallFailure.returned(
+                 %{index: 0, server_name: "outcome", tool_name: "answer"},
+                 reason
+               )
+
       refute_received {:ran, "answer"}
       assert_receive {:ran, "answer"}, 5_000
     end
@@ -422,14 +432,21 @@ defmodule Imp.MCPCallOutcomeTest do
       ]
 
       for {reason, expected} <- cases do
-        assert CallFailure.returned("s", "t", reason).outcome == expected, inspect(reason)
+        assert CallFailure.returned(%{index: 0, server_name: "s", tool_name: "t"}, reason).outcome ==
+                 expected,
+               inspect(reason)
       end
 
-      assert CallFailure.exited("s", "t", {:noproc, {GenServer, :call, []}}).outcome ==
+      assert CallFailure.exited(
+               %{index: 0, server_name: "s", tool_name: "t"},
+               {:noproc, {GenServer, :call, []}}
+             ).outcome ==
                :not_sent
 
       for exit <- [{:normal, {GenServer, :call, []}}, {:killed, {GenServer, :call, []}}, :timeout] do
-        assert CallFailure.exited("s", "t", exit).outcome == :unknown, inspect(exit)
+        assert CallFailure.exited(%{index: 0, server_name: "s", tool_name: "t"}, exit).outcome ==
+                 :unknown,
+               inspect(exit)
       end
     end
   end
@@ -519,8 +536,8 @@ defmodule Imp.MCPCallOutcomeTest do
         )
 
       policy = fn
-        :post, _args -> {:error, :not_today}
-        _name, _args -> true
+        :post, _args -> {:deny, :not_today}
+        _name, _args -> :allow
       end
 
       program =
@@ -553,8 +570,8 @@ defmodule Imp.MCPCallOutcomeTest do
           lm: lm,
           tools: [echo, post],
           tool_policy: fn
-            :post, _args -> {:error, :not_today}
-            _name, _args -> true
+            :post, _args -> {:deny, :not_today}
+            _name, _args -> :allow
           end,
           max_iterations: 3
         )
@@ -563,12 +580,14 @@ defmodule Imp.MCPCallOutcomeTest do
     end
 
     test "an MCP call failure serializes with its outcome beside the untouched reason" do
-      failure = CallFailure.returned("kite", "reply", :timeout)
+      failure =
+        CallFailure.returned(%{index: 0, server_name: "kite", tool_name: "reply"}, :timeout)
 
       assert %{
                "outcome" => "unknown",
-               "server" => "kite",
-               "tool" => "reply",
+               "index" => 0,
+               "server_name" => "kite",
+               "tool_name" => "reply",
                "reason" => "timeout"
              } =
                Imp.Run.Event.to_map(%Imp.Run.Event{

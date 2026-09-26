@@ -63,6 +63,28 @@ defmodule Imp.Optimizer.GEPA.CallbackTest do
     end
   end
 
+  defmodule BareRecorder do
+    @behaviour Callback
+
+    @impl true
+    def on_optimization_end(payload, context),
+      do: send(payload.owner_for_test, {:bare_callback, context})
+  end
+
+  test "every hook takes (event, context); a bare module's context is nil" do
+    assert :ok =
+             Callback.notify([BareRecorder], :on_optimization_end, %{owner_for_test: self()})
+
+    assert_received {:bare_callback, nil}
+
+    assert :ok =
+             Callback.notify([{BareRecorder, :ctx}], :on_optimization_end, %{
+               owner_for_test: self()
+             })
+
+    assert_received {:bare_callback, :ctx}
+  end
+
   test "emits the observational lifecycle synchronously in meaningful engine order" do
     state =
       Engine.run(

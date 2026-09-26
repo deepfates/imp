@@ -333,7 +333,7 @@ defmodule TaskSupervisionTest do
       )
 
     results =
-      Imp.Predict.Parallel.map(program, [%{question: "a"}, %{question: "b"}], max_concurrency: 2)
+      Imp.Predict.Parallel.map(program, [%{question: "a"}, %{question: "b"}], num_threads: 2)
 
     assert [{:ok, first}, {:ok, second}] = results
     assert Imp.get(first, :answer) != Imp.get(second, :answer)

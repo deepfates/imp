@@ -536,7 +536,7 @@ defmodule Imp.Optimizer.COPROFidelityTest do
         proposer_lm: proposer,
         breadth: 4,
         depth: 1,
-        proposal_max_concurrency: 2
+        proposal_concurrency: 2
       )
       |> COPRO.compile(constant_program(), trainset(), [])
       |> Report.fetch()

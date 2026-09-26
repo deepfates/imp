@@ -8,9 +8,9 @@ defmodule Imp.LocalSignatureOptimizerBanking77ExampleTest do
     source = File.read!(@source)
 
     assert source =~
-             "SignatureOptimizer.compile(baseline, examples(rows.train), examples(rows.selection))"
+             "Imp.optimize!(baseline, &1, examples(rows.train), examples(rows.selection))"
 
-    refute source =~ "SignatureOptimizer.compile(baseline, examples(rows.test)"
+    refute source =~ "Imp.optimize!(baseline, &1, examples(rows.test)"
     assert source =~ "Artifact.from_optimized_program"
     assert source =~ "Artifact.apply(program!(job, observer))"
     assert source =~ "IMP_SIGNATURE_FRESH"

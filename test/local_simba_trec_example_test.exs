@@ -57,9 +57,9 @@ defmodule Imp.LocalSIMBATRECExampleTest do
     source = File.read!(@source)
 
     assert source =~
-             "SIMBA.compile(baseline, examples(rows.train), examples(rows.validation))"
+             "Imp.optimize!(baseline, &1, examples(rows.train), examples(rows.validation))"
 
-    refute source =~ "SIMBA.compile(baseline, examples(rows.held_out)"
+    refute source =~ "Imp.optimize!(baseline, &1, examples(rows.held_out)"
     assert source =~ "Artifact.from_optimized_program"
     assert source =~ "Imp.save!(source, paths.program)"
     assert source =~ "source = Imp.read!(paths.program)"

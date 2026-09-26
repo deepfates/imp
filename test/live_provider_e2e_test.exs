@@ -269,7 +269,7 @@ defmodule LiveProviderE2ETest do
           %{question: "Return JSON with answer exactly alpha."},
           %{question: "Return JSON with answer exactly beta."}
         ],
-        max_concurrency: 2
+        num_threads: 2
       )
 
     assert [{:ok, alpha}, {:ok, beta}] = parallel_results

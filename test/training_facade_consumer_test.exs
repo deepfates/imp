@@ -151,7 +151,7 @@ defmodule Imp.TrainingFacadeConsumerTest do
 
     assert :ok = TrainingJob.save!(job, checkpoint)
 
-    resumed = TrainingJob.load!(checkpoint, transport: status_transport)
+    resumed = TrainingJob.read!(checkpoint, transport: status_transport)
     assert {:ok, completed} = TrainingJob.refresh(resumed)
     assert completed.status == :succeeded
     assert completed.result_model == "local/sft-resumed"

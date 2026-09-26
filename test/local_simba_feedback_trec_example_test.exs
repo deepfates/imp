@@ -98,7 +98,7 @@ defmodule Imp.LocalSIMBAFeedbackTRECExampleTest do
     assert source =~ "examples(rows.validation, rows.contract, false)"
 
     refute source =~
-             "SIMBA.compile(\n          optimizer,\n          baseline,\n          examples(rows.held_out"
+             "Imp.optimize!(\n          baseline,\n          optimizer,\n          examples(rows.held_out"
 
     assert source =~ "max_demos: config[\"max_demos\"]"
     assert source =~ "stage.mutated_rule_finalists > 0"

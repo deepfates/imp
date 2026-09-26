@@ -235,7 +235,7 @@ defmodule SchemaConstraintsTest do
       |> Imp.Signature.dump()
       |> Jason.encode!()
       |> Jason.decode!()
-      |> Imp.Signature.load()
+      |> Imp.Signature.load!()
 
     assert {:error, errors} =
              Imp.Schema.validate_fields(loaded.outputs, %{score: 2, meta: %{count: 0}})

@@ -1,7 +1,7 @@
 defmodule Imp.ClassicalOptimizerFrontDoorTest do
   use ExUnit.Case, async: false
 
-  alias Imp.Optimizer.{Artifact, BootstrapFewShot, RandomSearch, Report}
+  alias Imp.Optimizer.{Artifact, BootstrapFewShot, BootstrapFewShotWithRandomSearch, Report}
 
   setup do
     path =
@@ -14,7 +14,7 @@ defmodule Imp.ClassicalOptimizerFrontDoorTest do
     %{path: path}
   end
 
-  test "RandomSearch routes source-defined compile options through Imp.optimize! and persists teacher demos",
+  test "BootstrapFewShotWithRandomSearch routes source-defined compile options through Imp.optimize! and persists teacher demos",
        %{path: path} do
     owner = self()
     student = program("student")
@@ -25,7 +25,7 @@ defmodule Imp.ClassicalOptimizerFrontDoorTest do
     optimized =
       student
       |> Imp.optimize!(
-        RandomSearch.new(&exact_answer/2,
+        BootstrapFewShotWithRandomSearch.new(&exact_answer/2,
           num_candidate_programs: 1,
           max_bootstrapped_demos: 1,
           max_labeled_demos: 0,
@@ -91,14 +91,14 @@ defmodule Imp.ClassicalOptimizerFrontDoorTest do
     validation = [example("selection", "student")]
 
     random =
-      RandomSearch.new(&exact_answer/2,
+      BootstrapFewShotWithRandomSearch.new(&exact_answer/2,
         num_candidate_programs: 1,
         max_bootstrapped_demos: 1,
         max_labeled_demos: 0
       )
 
     assert_raise ArgumentError, ~r/unknown options.*techer/, fn ->
-      RandomSearch.compile(random, student, trainset, validation,
+      BootstrapFewShotWithRandomSearch.compile(random, student, trainset, validation,
         teacher: teacher,
         techer: teacher
       )

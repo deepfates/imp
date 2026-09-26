@@ -108,7 +108,7 @@ defmodule MetricContractTest do
     result =
       Imp.context([tenant: :eval_test], fn ->
         devset
-        |> Imp.Evaluate.new(metric, max_concurrency: 2)
+        |> Imp.Evaluate.new(metric, num_threads: 2)
         |> Imp.Evaluate.run(program)
       end)
 
@@ -169,9 +169,9 @@ defmodule MetricContractTest do
                  end
 
     assert_raise ArgumentError,
-                 ~r/:max_concurrency.*expected.*positive integer/s,
+                 ~r/:num_threads.*expected.*positive integer/s,
                  fn ->
-                   Imp.Evaluate.new(devset, metric, max_concurrency: 0)
+                   Imp.Evaluate.new(devset, metric, num_threads: 0)
                  end
   end
 
@@ -452,7 +452,7 @@ defmodule MetricContractTest do
 
     assert {:ok, refined} =
              refine_program
-             |> Imp.Predict.Refine.new(metric, max_attempts: 1)
+             |> Imp.Predict.Refine.new(metric, n: 1)
              |> Imp.Predict.Refine.call(%{})
 
     assert Imp.Prediction.get(refined, :answer) == "good"

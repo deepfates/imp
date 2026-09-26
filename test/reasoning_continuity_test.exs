@@ -293,7 +293,7 @@ defmodule ReasoningContinuityTest do
     do: Imp.tool(:lookup, "Read an immutable fixture", fn %{query: "fixture"} -> "found" end)
 
   defp reload(history),
-    do: history |> Imp.History.dump() |> Jason.encode!() |> Jason.decode!() |> Imp.History.load()
+    do: history |> Imp.History.dump() |> Jason.encode!() |> Jason.decode!() |> Imp.History.load!()
 
   defp scripted_lm(provider, field, value, script) do
     owner = self()

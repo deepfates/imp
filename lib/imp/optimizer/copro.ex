@@ -38,7 +38,7 @@ defmodule Imp.Optimizer.COPRO do
     init_temperature: 1.4,
     track_stats: false,
     extra_instructions: [],
-    proposal_max_concurrency: 4,
+    proposal_concurrency: 4,
     proposal_response_format: :off
   ]
 
@@ -49,7 +49,7 @@ defmodule Imp.Optimizer.COPRO do
     track_stats: [type: :boolean, default: false],
     proposer_lm: [type: {:custom, Imp.LM, :validate_lm, []}, default: nil],
     extra_instructions: [type: {:list, :string}, default: []],
-    proposal_max_concurrency: [type: :pos_integer, default: 4],
+    proposal_concurrency: [type: :pos_integer, default: 4],
     proposal_response_format: [type: {:in, [:off, :auto, :required]}, default: :off]
   ]
 
@@ -440,7 +440,7 @@ defmodule Imp.Optimizer.COPRO do
         end
       end,
       ordered: true,
-      max_concurrency: min(missing, optimizer.proposal_max_concurrency),
+      max_concurrency: min(missing, optimizer.proposal_concurrency),
       timeout: :infinity
     )
     |> Enum.map(fn
@@ -687,7 +687,7 @@ defmodule Imp.Optimizer.COPRO do
     result =
       try do
         Imp.Evaluate.new(trainset, metric,
-          max_concurrency: max_concurrency,
+          num_threads: max_concurrency,
           max_errors: max_errors
         )
         |> Imp.Evaluate.run(program)

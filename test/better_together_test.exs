@@ -645,7 +645,7 @@ defmodule BetterTogetherTest do
           breadth: 2,
           depth: 1,
           proposer_lm: proposer_lm,
-          proposal_max_concurrency: 1
+          proposal_concurrency: 1
         )
 
       assert {:ok, direct_copro} =
@@ -669,7 +669,7 @@ defmodule BetterTogetherTest do
         |> BetterTogether.compile(program(), examples(), examples(),
           strategy: [:p, :after_p],
           max_errors: 1,
-          max_concurrency: 1,
+          num_threads: 1,
           shuffle_trainset_between_steps: false,
           optimizer_compile_args: %{
             p: [num_threads: 1, max_errors: :infinity],

@@ -169,7 +169,7 @@ defmodule Imp.BenchmarkTruth.SupportTicketLiftCampaign do
           compiled,
           context.dataset.test,
           Imp.exact_match(:team),
-          max_concurrency: 1,
+          num_threads: 1,
           max_errors: if(context.strict?, do: 1, else: :infinity),
           timeout: 120_000
         )

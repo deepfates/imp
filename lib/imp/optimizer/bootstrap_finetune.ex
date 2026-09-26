@@ -57,7 +57,7 @@ defmodule Imp.Optimizer.BootstrapFinetune do
   DSPy 3.2.1 accidentally shadows its `pred_ind` filter and feeds every call
   to every predictor-specific job. Imp intentionally corrects that bug by
   attributing trace calls to stable `Imp.ProgramParameters` predictor names.
-  `:max_concurrency` is the BEAM-native `num_threads` boundary: it controls
+  `:num_threads`, DSPy's name for it, controls
   teacher trace workers and must also cover the number of provider jobs.
 
   `timeout` bounds each teacher trace-collection execution (default 5000ms) and
@@ -80,7 +80,7 @@ defmodule Imp.Optimizer.BootstrapFinetune do
     :teacher,
     :adapter,
     max_demos: :infinity,
-    max_concurrency: 8,
+    num_threads: 8,
     multitask: true,
     exclude_demos: false,
     train_kwargs: [],
@@ -95,7 +95,7 @@ defmodule Imp.Optimizer.BootstrapFinetune do
     teacher: [type: {:custom, __MODULE__, :validate_teacher, []}, default: nil],
     adapter: [type: {:custom, __MODULE__, :validate_adapter_config, []}, default: nil],
     max_demos: [type: {:custom, __MODULE__, :validate_demo_limit, []}, default: :infinity],
-    max_concurrency: [type: :pos_integer, default: 8],
+    num_threads: [type: :pos_integer, default: 8],
     multitask: [type: :boolean, default: true],
     exclude_demos: [type: :boolean, default: false],
     train_kwargs: [type: {:custom, __MODULE__, :validate_train_kwargs, []}, default: []],
@@ -287,14 +287,14 @@ defmodule Imp.Optimizer.BootstrapFinetune do
              teachers,
              trainset,
              trajectory_metric(optimizer.metric),
-             optimizer.max_concurrency,
+             optimizer.num_threads,
              optimizer.timeout
            ),
          {selected, candidates} <- select_trace_data(trace_data, optimizer.max_demos),
          {:ok, rows} <- trace_rows(selected, teachers, predictors, optimizer.exclude_demos),
          plan <- build_plan(optimizer, predictors, rows, teachers, trace_data, selected),
          {:ok, plan} <- configure_plan(plan, optimizer),
-         :ok <- validate_job_concurrency(plan, optimizer.max_concurrency),
+         :ok <- validate_job_concurrency(plan, optimizer.num_threads),
          prepared <- attach_report(program, optimizer, trainset, teachers, plan, candidates) do
       notify_lifecycle(optimizer, {:plan, plan})
       start_training(optimizer, prepared, plan)
@@ -552,7 +552,7 @@ defmodule Imp.Optimizer.BootstrapFinetune do
     %TrainingPlan{
       multitask: optimizer.multitask,
       entries: entries,
-      max_concurrency: optimizer.max_concurrency,
+      max_concurrency: optimizer.num_threads,
       teacher_count: length(teachers),
       trace_count: length(trace_data),
       selected_trace_count: length(selected)
@@ -629,7 +629,7 @@ defmodule Imp.Optimizer.BootstrapFinetune do
           trainset_size: length(trainset),
           teacher_count: length(teachers),
           training_job_count: length(plan.entries),
-          max_concurrency: optimizer.max_concurrency,
+          max_concurrency: optimizer.num_threads,
           launch_timeout: optimizer.launch_timeout,
           cancellation_timeout: optimizer.cancellation_timeout,
           launch_timeout_semantics:

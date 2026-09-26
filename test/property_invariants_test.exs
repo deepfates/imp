@@ -46,7 +46,7 @@ defmodule PropertyInvariantsTest do
   property "signature dump/load round-trips the serialized contract" do
     check all(spec <- signature_spec(), max_runs: 100) do
       signature = Imp.signature(spec)
-      loaded = signature |> Imp.Signature.dump() |> Imp.Signature.load()
+      loaded = signature |> Imp.Signature.dump() |> Imp.Signature.load!()
 
       assert Imp.Signature.dump(loaded) == Imp.Signature.dump(signature)
       assert Imp.Signature.input_names(loaded) == Imp.Signature.input_names(signature)

@@ -1,7 +1,7 @@
 defmodule RandomSearchPolicyTest do
   use ExUnit.Case, async: true
 
-  alias Imp.Optimizer.{RandomSearch, Report}
+  alias Imp.Optimizer.{BootstrapFewShotWithRandomSearch, Report}
 
   defmodule ReportAwareProgram do
     defstruct [:main]
@@ -30,14 +30,14 @@ defmodule RandomSearchPolicyTest do
   end
 
   defp compile(opts \\ []) do
-    RandomSearch.new(
+    BootstrapFewShotWithRandomSearch.new(
       Imp.Metrics.exact_match(:answer),
       Keyword.merge(
         [num_candidate_programs: 3, max_bootstrapped_demos: 3, max_labeled_demos: 2],
         opts
       )
     )
-    |> RandomSearch.compile(program(), trainset(), trainset())
+    |> BootstrapFewShotWithRandomSearch.compile(program(), trainset(), trainset())
   end
 
   defp compiled_report_aware_program do
@@ -80,8 +80,10 @@ defmodule RandomSearchPolicyTest do
 
   test "zero-shot resets demos and the compiled marker before evaluation" do
     result =
-      RandomSearch.new(Imp.Metrics.exact_match(:answer), num_candidate_programs: 0)
-      |> RandomSearch.compile(
+      BootstrapFewShotWithRandomSearch.new(Imp.Metrics.exact_match(:answer),
+        num_candidate_programs: 0
+      )
+      |> BootstrapFewShotWithRandomSearch.compile(
         compiled_report_aware_program(),
         report_reset_rows(),
         report_reset_rows(),
@@ -96,11 +98,11 @@ defmodule RandomSearchPolicyTest do
 
   test "labels-only resets the compiled marker before attaching labels" do
     result =
-      RandomSearch.new(Imp.Metrics.exact_match(:answer),
+      BootstrapFewShotWithRandomSearch.new(Imp.Metrics.exact_match(:answer),
         num_candidate_programs: 0,
         max_labeled_demos: 1
       )
-      |> RandomSearch.compile(
+      |> BootstrapFewShotWithRandomSearch.compile(
         compiled_report_aware_program(),
         report_reset_rows(),
         report_reset_rows(),
@@ -128,8 +130,10 @@ defmodule RandomSearchPolicyTest do
     ]
 
     report =
-      RandomSearch.new(Imp.Metrics.exact_match(:answer), num_candidate_programs: 0)
-      |> RandomSearch.compile(program(), trainset(), valset, restrict: [-3])
+      BootstrapFewShotWithRandomSearch.new(Imp.Metrics.exact_match(:answer),
+        num_candidate_programs: 0
+      )
+      |> BootstrapFewShotWithRandomSearch.compile(program(), trainset(), valset, restrict: [-3])
       |> Report.fetch()
 
     assert report.best_score == 50.0
@@ -145,8 +149,10 @@ defmodule RandomSearchPolicyTest do
       end)
 
     report =
-      RandomSearch.new(Imp.Metrics.exact_match(:answer), num_candidate_programs: 0)
-      |> RandomSearch.compile(program(), trainset(), valset, restrict: [-3])
+      BootstrapFewShotWithRandomSearch.new(Imp.Metrics.exact_match(:answer),
+        num_candidate_programs: 0
+      )
+      |> BootstrapFewShotWithRandomSearch.compile(program(), trainset(), valset, restrict: [-3])
       |> Report.fetch()
 
     assert report.best_score == 3.12
@@ -154,15 +160,19 @@ defmodule RandomSearchPolicyTest do
 
   test "fails scoring when both valset and fallback trainset are empty" do
     assert_raise ArithmeticError, ~r/cannot score an empty dataset/, fn ->
-      RandomSearch.new(Imp.Metrics.exact_match(:answer), num_candidate_programs: 0)
-      |> RandomSearch.compile(program(), [], [], restrict: [-3])
+      BootstrapFewShotWithRandomSearch.new(Imp.Metrics.exact_match(:answer),
+        num_candidate_programs: 0
+      )
+      |> BootstrapFewShotWithRandomSearch.compile(program(), [], [], restrict: [-3])
     end
   end
 
   test "an empty valset falls back to trainset like Python's falsy list" do
     report =
-      RandomSearch.new(Imp.Metrics.exact_match(:answer), num_candidate_programs: 0)
-      |> RandomSearch.compile(program(), trainset(), [], restrict: [-3])
+      BootstrapFewShotWithRandomSearch.new(Imp.Metrics.exact_match(:answer),
+        num_candidate_programs: 0
+      )
+      |> BootstrapFewShotWithRandomSearch.compile(program(), trainset(), [], restrict: [-3])
       |> Report.fetch()
 
     assert report.best_score == 100.0
@@ -181,8 +191,12 @@ defmodule RandomSearchPolicyTest do
 
   test "restrict selects source candidate seeds rather than an ordinal trial number" do
     report =
-      RandomSearch.new(Imp.Metrics.exact_match(:answer), num_candidate_programs: 4)
-      |> RandomSearch.compile(program(), trainset(), trainset(), restrict: [-2, 1])
+      BootstrapFewShotWithRandomSearch.new(Imp.Metrics.exact_match(:answer),
+        num_candidate_programs: 4
+      )
+      |> BootstrapFewShotWithRandomSearch.compile(program(), trainset(), trainset(),
+        restrict: [-2, 1]
+      )
       |> Report.fetch()
 
     assert report.metadata.candidate_seeds == [-2, 1]
@@ -190,13 +204,21 @@ defmodule RandomSearchPolicyTest do
 
   test "restricting out every source seed fails instead of returning an unevaluated student" do
     assert_raise RuntimeError, ~r/restrict excluded every DSPy candidate seed/, fn ->
-      RandomSearch.new(Imp.Metrics.exact_match(:answer), num_candidate_programs: 0)
-      |> RandomSearch.compile(program(), trainset(), trainset(), restrict: [99])
+      BootstrapFewShotWithRandomSearch.new(Imp.Metrics.exact_match(:answer),
+        num_candidate_programs: 0
+      )
+      |> BootstrapFewShotWithRandomSearch.compile(program(), trainset(), trainset(),
+        restrict: [99]
+      )
     end
   end
 
   test "inherits DSPy's default error budget and aborts at the configured threshold" do
-    optimizer = RandomSearch.new(Imp.Metrics.exact_match(:answer), num_candidate_programs: 0)
+    optimizer =
+      BootstrapFewShotWithRandomSearch.new(Imp.Metrics.exact_match(:answer),
+        num_candidate_programs: 0
+      )
+
     assert optimizer.max_errors == nil
     assert optimizer.num_threads == nil
 
@@ -206,27 +228,33 @@ defmodule RandomSearchPolicyTest do
       )
 
     assert_raise RuntimeError, ~r/error budget exhausted: 1 errors \(maximum 1\)/, fn ->
-      RandomSearch.new(Imp.Metrics.exact_match(:answer),
+      BootstrapFewShotWithRandomSearch.new(Imp.Metrics.exact_match(:answer),
         num_candidate_programs: 0,
         max_errors: 1
       )
-      |> RandomSearch.compile(failing, trainset(), [hd(trainset())], restrict: [-3])
+      |> BootstrapFewShotWithRandomSearch.compile(failing, trainset(), [hd(trainset())],
+        restrict: [-3]
+      )
     end
 
     assert_raise RuntimeError, ~r/error budget exhausted: 1 errors \(maximum 0\)/, fn ->
-      RandomSearch.new(Imp.Metrics.exact_match(:answer),
+      BootstrapFewShotWithRandomSearch.new(Imp.Metrics.exact_match(:answer),
         num_candidate_programs: 0,
         max_errors: 0
       )
-      |> RandomSearch.compile(failing, trainset(), [hd(trainset())], restrict: [-3])
+      |> BootstrapFewShotWithRandomSearch.compile(failing, trainset(), [hd(trainset())],
+        restrict: [-3]
+      )
     end
 
     report =
-      RandomSearch.new(Imp.Metrics.exact_match(:answer),
+      BootstrapFewShotWithRandomSearch.new(Imp.Metrics.exact_match(:answer),
         num_candidate_programs: 0,
         max_errors: :infinity
       )
-      |> RandomSearch.compile(failing, trainset(), [hd(trainset())], restrict: [-3])
+      |> BootstrapFewShotWithRandomSearch.compile(failing, trainset(), [hd(trainset())],
+        restrict: [-3]
+      )
       |> Report.fetch()
 
     assert report.metadata.max_errors == :infinity
@@ -236,7 +264,7 @@ defmodule RandomSearchPolicyTest do
 
   test "compatibility seed still validates as an integer" do
     assert_raise ArgumentError, ~r/invalid value for :seed option: expected integer/, fn ->
-      RandomSearch.new(Imp.Metrics.exact_match(:answer), seed: 1.5)
+      BootstrapFewShotWithRandomSearch.new(Imp.Metrics.exact_match(:answer), seed: 1.5)
     end
   end
 end
@@ -244,7 +272,7 @@ end
 defmodule RandomSearchGlobalSettingsTest do
   use ExUnit.Case, async: false
 
-  alias Imp.Optimizer.{RandomSearch, Report}
+  alias Imp.Optimizer.{BootstrapFewShotWithRandomSearch, Report}
 
   setup do
     Imp.Settings.reset()
@@ -259,13 +287,13 @@ defmodule RandomSearchGlobalSettingsTest do
     metric = Imp.Metrics.exact_match(:answer)
 
     defaulted =
-      RandomSearch.new(metric, num_candidate_programs: 0)
-      |> RandomSearch.compile(program, rows, rows, restrict: [-3])
+      BootstrapFewShotWithRandomSearch.new(metric, num_candidate_programs: 0)
+      |> BootstrapFewShotWithRandomSearch.compile(program, rows, rows, restrict: [-3])
       |> Report.fetch()
 
     explicit =
-      RandomSearch.new(metric, num_candidate_programs: 0, max_errors: 8)
-      |> RandomSearch.compile(program, rows, rows, restrict: [-3])
+      BootstrapFewShotWithRandomSearch.new(metric, num_candidate_programs: 0, max_errors: 8)
+      |> BootstrapFewShotWithRandomSearch.compile(program, rows, rows, restrict: [-3])
       |> Report.fetch()
 
     assert {defaulted.metadata.max_errors, defaulted.metadata.max_errors_source} == {10, :default}

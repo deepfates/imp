@@ -159,7 +159,7 @@ defmodule DeploymentBanking77MIPROExampleTest do
         data_aware_proposer: true,
         tip_aware_proposer: true,
         fewshot_aware_proposer: true,
-        max_concurrency: 1,
+        num_threads: 1,
         max_errors: 10,
         seed: hd(Banking77MIPRO.seeds())
       )
@@ -274,7 +274,7 @@ defmodule DeploymentBanking77MIPROExampleTest do
         tip_aware_proposer: true,
         fewshot_aware_proposer: true,
         view_data_batch_size: 10,
-        max_concurrency: 1,
+        num_threads: 1,
         max_errors: 10,
         seed: 9
       )
@@ -289,7 +289,7 @@ defmodule DeploymentBanking77MIPROExampleTest do
                  artifact_id: "finite-error-selected",
                  evaluation_options: [
                    failure_score: 0.0,
-                   max_concurrency: 1,
+                   num_threads: 1,
                    max_errors: 10,
                    repetitions: 3,
                    aggregation: :mean
