@@ -64,7 +64,7 @@ Imp.evaluate(improved, examples.(data["test"]), metric).score
 ```
 
 The optimizer added eight solved tickets from the training set to the program.
-In three runs with `gpt-5.4-mini` the router went from 20–40% to 75–85% on
+In six runs with `gpt-5.4-mini` the router went from 20–45% to 75–85% on
 tickets it never saw, for about a cent each. The improvement is data you can
 read (`improved.demos`), save with the program, and review like any other
 change. Stronger optimizers search over instructions and examples when a task
