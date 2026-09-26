@@ -186,13 +186,13 @@ defmodule Imp.Predict.Refine do
   defp maybe_add_hint(inputs, {:per_predictor, advice}) do
     inputs
     |> Map.new()
-    |> Map.put(:hint_, advice)
+    |> Imp.FieldMap.put(:hint_, advice)
   end
 
   defp maybe_add_hint(inputs, advice) do
     inputs
     |> Map.new()
-    |> Map.put(:hint_, advice)
+    |> Imp.FieldMap.put(:hint_, advice)
   end
 
   defp maybe_extend_hint_signature(program, nil), do: program

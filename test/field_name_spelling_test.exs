@@ -157,4 +157,37 @@ defmodule FieldNameSpellingTest do
              field: field
            ) == "a"
   end
+
+  # `:hint_` exists once Refine is loaded, so a signature parsed earlier holds
+  # the name as a string; build that signature directly.
+  test "Refine passes its advice to a string hint_ input the caller also filled" do
+    signature = Imp.signature("question, hint_ -> answer")
+
+    signature = %{
+      signature
+      | inputs: Enum.map(signature.inputs, &%{&1 | name: to_string(&1.name)})
+    }
+
+    parent = self()
+
+    lm =
+      static_lm(fn messages, _opts ->
+        send(parent, {:prompt, prompt(messages)})
+        %{answer: "bad"}
+      end)
+
+    refine =
+      Imp.Predict.Refine.new(Imp.Predict.Predict.new(signature, lm: lm), fn _, _ -> false end,
+        max_attempts: 2,
+        feedback_fn: fn _history -> "repair advice" end
+      )
+
+    Imp.Predict.Refine.call(refine, %{"question" => "q", "hint_" => "caller hint"})
+
+    assert_received {:prompt, first}
+    assert_received {:prompt, second}
+    assert first =~ "caller hint"
+    assert second =~ "repair advice"
+    refute second =~ "caller hint"
+  end
 end
