@@ -151,7 +151,7 @@ defmodule ImpFacadeTest do
 
     assert %{demos: [^demo]} = Imp.with_demos(Imp.example(question: "q"), demo)
 
-    tool = Imp.tool(:lookup, "lookup", fn %{key: "x"} -> "y" end)
+    tool = Imp.tool(:lookup, "lookup", fn %{"key" => "x"} -> "y" end)
     assert Imp.Tool.call(tool, %{key: "x"}) == "y"
   end
 

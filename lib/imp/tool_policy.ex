@@ -9,7 +9,8 @@ defmodule Imp.ToolPolicy do
     * `:allow` — every tool (the default).
     * a tool name, or a list of tool names — only those tools. Names compare as
       strings, so `:lookup` and `"lookup"` are the same tool.
-    * a function of the tool name and the call's arguments that returns
+    * a function of the tool name and the call's arguments (the string-keyed
+      map the tool receives) that returns
       `:allow` or `{:deny, reason}`, the vocabulary `Imp.Run`'s `:authorize`
       and `Imp.ACP`'s `:permission_policy` use too.
 

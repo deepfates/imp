@@ -181,8 +181,8 @@ validates the signature, so the loop cannot bypass the output contract:
 case live_lm.(max_tokens: 400) do
   {:ok, lm} ->
     lookup =
-      Imp.tool(:lookup, "Look up a fact by query.", fn args ->
-        case args[:query] || args["query"] do
+      Imp.tool(:lookup, "Look up a fact by query.", fn %{"query" => query} ->
+        case query do
           "capital-france" -> "Paris"
           other -> {:error, {:unknown_query, other}}
         end

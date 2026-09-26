@@ -14,7 +14,7 @@ defmodule AvatarTest do
       end)
 
     lookup =
-      Imp.tool(:lookup, "Look up a country capital", fn %{country: "France"} -> "Paris" end)
+      Imp.tool(:lookup, "Look up a country capital", fn %{"country" => "France"} -> "Paris" end)
 
     avatar = Imp.avatar("question -> answer", [lookup], lm: lm, max_iters: 3)
 

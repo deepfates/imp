@@ -2,7 +2,7 @@ defmodule AvatarPersistenceTest do
   use ExUnit.Case, async: true
 
   test "Avatar round-trips portable actor state through named callbacks" do
-    runner = fn %{query: query} -> "found #{query}" end
+    runner = fn %{"query" => query} -> "found #{query}" end
 
     policy = fn name, _arguments ->
       if name in [:lookup, "lookup"], do: :allow, else: {:deny, :not_lookup}

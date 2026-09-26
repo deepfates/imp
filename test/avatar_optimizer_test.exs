@@ -208,7 +208,7 @@ defmodule AvatarOptimizerTest do
     end)
   end
 
-  defp lookup(%{country: "France"}), do: "Paris"
+  defp lookup(%{"country" => "France"}), do: "Paris"
   defp lookup(_), do: "unknown"
 
   defp static_lm(handler) when is_function(handler, 1) do

@@ -100,7 +100,7 @@ defmodule OptimizeAnythingTest do
   end
 
   test "exports component candidates onto fresh trusted executable code" do
-    selected_runner = fn %{query: query} -> "selected:" <> query end
+    selected_runner = fn %{"query" => query} -> "selected:" <> query end
 
     selected_tool =
       Imp.Tool.new(:lookup, "Search vaguely", selected_runner,
@@ -137,7 +137,7 @@ defmodule OptimizeAnythingTest do
 
     artifact = Anything.to_program_artifact(result, program)
 
-    fresh_runner = fn %{query: query} -> "fresh:" <> query end
+    fresh_runner = fn %{"query" => query} -> "fresh:" <> query end
 
     fresh_tool =
       Imp.Tool.new(:lookup, "Search vaguely", fresh_runner,
