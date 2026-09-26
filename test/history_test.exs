@@ -137,10 +137,10 @@ defmodule Imp.HistoryTest do
     assert_raise ArgumentError, fn -> String.to_existing_atom(name) end
     assert_raise ArgumentError, fn -> Imp.Optimizer.Report.decode_term(tag) end
     state = %{"messages" => [%{"result" => tag}]}
-    assert [%{result: ^name}] = Imp.History.load(state) |> Imp.History.messages()
+    assert [%{"result" => ^name}] = Imp.History.load(state) |> Imp.History.messages()
     assert_raise ArgumentError, fn -> String.to_existing_atom(name) end
     dumped = Imp.History.load(state) |> Imp.History.dump()
-    assert [%{result: ^name}] = Imp.Optimizer.Report.decode_term(dumped["messages"])
+    assert [%{"result" => ^name}] = Imp.Optimizer.Report.decode_term(dumped["messages"])
 
     collision = %{"__imp_type__" => "map", "entries" => [[tag, 1], [name, 2]]}
 

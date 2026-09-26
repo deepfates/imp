@@ -19,7 +19,7 @@ trying to byte-match Python prompt templates.
   a real XML parser. DSPy `TwoStepAdapter` sends a
   free-form main prompt, then runs a second extraction LM with `ChatAdapter`
   over a synthesized `text -> outputs` signature. `Imp.Adapter.TwoStep` ports
-  that shape faithfully (dee-qt5r): both stages are byte-parity-measured in
+  that shape faithfully (dee-qt5r): both stages are parity-measured in
   the golden differential (`two_step_*` cases), and the extraction LM threads
   through `two_step_extraction_lm` settings (mapping DSPy's
   `TwoStepAdapter(extraction_model=...)`).
@@ -60,24 +60,28 @@ Those are provider transport concerns in Imp and are handled by
 format/parse behaviours and keeps side-effectful tool execution under explicit
 program modules.
 
-The historical prompt corpus is byte-identical to DSPy 3.2.1 across the measured surface
-(epic dee-8zev, 2026-07-18): 39 of 42 golden differential cases match real DSPy
-byte-for-byte on BOTH the rendered messages and the per-call request envelope
-(`mix imp.benchmark.trace` vs the pinned `dspy==3.2.1` venv) — predict,
-ChainOfThought, typed/enum/list/dict fields, few-shot demos, conversation
-history, multi-line/CRLF/unicode instructions, RAG list inputs, DSPy-faithful
-ReAct (`mode: :dspy_3_2_1`), the XML adapter (dee-ovd3: basic, typed,
-enum, multi-output, and the parse-failure JSON fallback), the TwoStep adapter
-(dee-qt5r: both the persona main call and the extraction call), and
-capability-gated `response_format`. The only 3 non-matching cases are Imp's DEFAULT
-provider-native ReAct mode, an intentional design choice (native function-tool
-calling); the byte-faithful `:dspy_3_2_1` mode ships alongside it. Byte-parity
-is enforced per-PR in CI (`mix parity.check`, dee-3e4v) so it cannot silently
-regress. Known, ticketed limitations:
+Prompts name types in neutral words, not Python annotations: `` `team` (one
+of: atlas, harbor) `` where DSPy writes `` `team` (Literal['atlas', 'harbor']) ``,
+"string", "integer", "true or false", "list of strings" and "object" for
+`str`, `int`, `bool`, `list[str]` and `dict[str, Any]`, and ReAct's
+`:dspy_3_2_1` mode lists tool arguments as JSON. `Imp.Adapter.FieldType`
+declares the wording once. DSPy parity means the same behaviour and the same
+information in the prompt, not DSPy's text (`decisions.md`). The golden
+differential (`mix imp.benchmark.trace` against the pinned `dspy==3.2.1` venv)
+compares prompts after putting DSPy's annotations into Imp's words
+(`Imp.DSPyWording`), so everything else is still compared byte for byte:
+39 of 42 cases match DSPy 3.2.1 on the rendered messages and the per-call
+request envelope — predict, ChainOfThought, typed/enum/list/dict fields,
+few-shot demos, conversation history, multi-line/CRLF/unicode instructions,
+RAG list inputs, ReAct `mode: :dspy_3_2_1`, the XML adapter, the TwoStep
+adapter (both calls), and capability-gated `response_format`. The 3 that do
+not are Imp's default provider-native ReAct mode, an intentional design
+choice. `mix parity.check` runs it; it needs the pinned DSPy environment and
+is not part of `mix check`. Known limitations:
 real-model `response_format` decisions follow the ReqLLM/LLMDB registry and match
 DSPy only where it agrees with litellm (dee-7r2t); parse leniency is stricter
 than DSPy's `json_repair` (dee-q2w2); multi-key dict value ordering (dee-1fd0).
-Beyond byte-parity, the semantic contract (field names, delimiter structure,
+Beyond prompt text, the semantic contract (field names, delimiter structure,
 demo/history turn shape, parse errors, retry feedback, provider option intent)
 remains stable and tested.
 

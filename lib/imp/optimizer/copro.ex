@@ -67,10 +67,12 @@ defmodule Imp.Optimizer.COPRO do
     struct(__MODULE__, Map.new(opts) |> Map.put(:metric, metric))
   end
 
+  @doc false
   def validate_optional_positive(nil), do: {:ok, nil}
   def validate_optional_positive(value) when is_integer(value) and value > 0, do: {:ok, value}
   def validate_optional_positive(_value), do: {:error, "expected nil or a positive integer"}
 
+  @doc false
   def validate_optional_max_errors(nil), do: {:ok, nil}
   def validate_optional_max_errors(value), do: Imp.Evaluate.validate_max_errors(value)
 
@@ -108,6 +110,7 @@ defmodule Imp.Optimizer.COPRO do
 
   # `devset` remains accepted for the Imp optimizer contract. DSPy's COPRO
   # scores coordinate candidates on `trainset`, so it is not used for selection.
+  @doc false
   def compile(%__MODULE__{} = optimizer, program, trainset, _devset \\ [], eval_opts \\ []) do
     optimizer = %{optimizer | proposer_lm: resolve_proposer_lm!(optimizer)}
     trainset = Enum.to_list(trainset)
@@ -771,12 +774,11 @@ defmodule Imp.Optimizer.COPRO do
     end)
   end
 
-  defp resolve_max_errors!(nil), do: resolve_settings_max_errors!()
+  defp resolve_max_errors!(nil), do: default_max_errors()
   defp resolve_max_errors!(value), do: {validate_max_errors!(value), :explicit}
 
-  defp resolve_settings_max_errors! do
-    {Imp.Settings.fetch!(:max_errors) |> validate_max_errors!(), :settings}
-  end
+  defp default_max_errors,
+    do: {Imp.Evaluate.default_optimizer_max_errors(), :default}
 
   defp validate_max_errors!(value) do
     case Imp.Evaluate.validate_max_errors(value) do
@@ -784,7 +786,7 @@ defmodule Imp.Optimizer.COPRO do
         max_errors
 
       {:error, message} ->
-        raise ArgumentError, "invalid effective :max_errors setting: #{message}"
+        raise ArgumentError, "invalid :max_errors: #{message}"
     end
   end
 

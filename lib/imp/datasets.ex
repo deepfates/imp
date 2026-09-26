@@ -121,6 +121,7 @@ defmodule Imp.Datasets do
     Enum.split(shuffled, count)
   end
 
+  @doc false
   def validate_train_fraction(value) when is_number(value) and value >= 0 and value <= 1,
     do: {:ok, value}
 

@@ -109,7 +109,7 @@ defmodule Imp.Adapter.TwoStep do
       [prefix] ++
         Enum.flat_map(signature.inputs, fn field ->
           case fetch_present(inputs, field.name) do
-            {:ok, value} -> ["#{field.name}: #{py_str(value)}"]
+            {:ok, value} -> ["#{field.name}: #{Imp.Adapter.Chat.format_value(value)}"]
             :error -> []
           end
         end) ++ [""]
@@ -124,7 +124,7 @@ defmodule Imp.Adapter.TwoStep do
     signature.outputs
     |> Enum.flat_map(fn field ->
       case fetch_present(outputs, field.name) do
-        {:ok, value} -> ["#{field.name}: #{py_str(value)}"]
+        {:ok, value} -> ["#{field.name}: #{Imp.Adapter.Chat.format_value(value)}"]
         :error -> []
       end
     end)
@@ -178,15 +178,20 @@ defmodule Imp.Adapter.TwoStep do
     extractor_signature = extractor_signature(signature)
     messages = Imp.Adapter.Chat.format(extractor_signature, %{text: completion}, demos: [])
 
-    with {:ok, raw} <- Imp.LM.generate(extraction_lm, messages, []),
-         {:ok, output, _lm_metadata} <- Imp.LM.Result.split(raw),
-         {:ok, prediction} <- Imp.Adapter.Chat.parse(extractor_signature, output, []) do
-      {:ok, prediction}
-    else
-      {:error, reason} ->
-        # DSPy's extraction call goes through ChatAdapter.__call__, which
-        # retries a failure through JSONAdapter before giving up.
-        json_fallback(extractor_signature, completion, extraction_lm, reason)
+    # The extraction LM's own failure is returned as it is, as `Imp.Predict.Predict`
+    # returns its LM's: it is not a parse failure, and whether it may be retried
+    # is the caller's to read. DSPy wraps it in the same ValueError as a parse
+    # failure, which would hide a 429 behind a parse error.
+    with {:ok, raw} <- Imp.LM.generate(extraction_lm, messages, []) do
+      with {:ok, output, _lm_metadata} <- Imp.LM.Result.split(raw),
+           {:ok, prediction} <- Imp.Adapter.Chat.parse(extractor_signature, output, []) do
+        {:ok, prediction}
+      else
+        {:error, reason} ->
+          # DSPy's extraction call goes through ChatAdapter.__call__, which
+          # retries a failure through JSONAdapter before giving up.
+          json_fallback(extractor_signature, completion, extraction_lm, reason)
+      end
     end
   end
 
@@ -200,15 +205,16 @@ defmodule Imp.Adapter.TwoStep do
         Imp.LM.response_format_capability(extraction_lm)
       )
 
-    with {:ok, raw} <- Imp.LM.generate(extraction_lm, retry_messages, retry_opts),
-         {:ok, output, _lm_metadata} <- Imp.LM.Result.split(raw),
-         {:ok, prediction} <- Imp.Adapter.JSON.parse(extractor_signature, output, []) do
-      {:ok, prediction}
-    else
-      {:error, _retry_reason} ->
-        # Mirrors DSPy's ValueError("Failed to parse response from the
-        # original completion: ...") — loud, and the completion is retained.
-        {:error, {:two_step_extraction_failed, original_reason, completion}}
+    with {:ok, raw} <- Imp.LM.generate(extraction_lm, retry_messages, retry_opts) do
+      with {:ok, output, _lm_metadata} <- Imp.LM.Result.split(raw),
+           {:ok, prediction} <- Imp.Adapter.JSON.parse(extractor_signature, output, []) do
+        {:ok, prediction}
+      else
+        {:error, _retry_reason} ->
+          # Mirrors DSPy's ValueError("Failed to parse response from the
+          # original completion: ...") — loud, and the completion is retained.
+          {:error, extraction_failed(original_reason, completion)}
+      end
     end
   end
 
@@ -248,7 +254,26 @@ defmodule Imp.Adapter.TwoStep do
   end
 
   defp require_text(raw) when is_binary(raw), do: {:ok, raw}
-  defp require_text(raw), do: {:error, {:unsupported_lm_output, raw}}
+  defp require_text(raw), do: {:error, Imp.AdapterParseError.unsupported_output(raw)}
+
+  # The extraction's own failure keeps its kind when it was a parse failure;
+  # anything else the extraction could not read is `:other`, with that as the reason.
+  defp extraction_failed(reason, completion) do
+    kind =
+      case reason do
+        %Imp.AdapterParseError{kind: kind} when not is_nil(kind) -> kind
+        _other -> :other
+      end
+
+    %Imp.AdapterParseError{
+      kind: kind,
+      message:
+        "Failed to parse response from the original completion: " <>
+          if(is_exception(reason), do: Exception.message(reason), else: inspect(reason)),
+      reason: reason,
+      trace: %{raw: completion}
+    }
+  end
 
   defp present?(fields, name), do: match?({:ok, _value}, fetch_present(fields, name))
 
@@ -261,11 +286,6 @@ defmodule Imp.Adapter.TwoStep do
       true -> :error
     end
   end
-
-  # Python `str(...)` as DSPy's f-strings apply it: None/True/False keep their
-  # Python spelling and floats render in repr form (1000000.0, not 1.0e6).
-  defp py_str(value) when is_float(value), do: Imp.PyFloat.repr(value)
-  defp py_str(value), do: Imp.Adapter.Chat.format_value(value)
 
   defp validate_opts!(opts, schema, context) when is_list(opts) do
     if Keyword.keyword?(opts) do

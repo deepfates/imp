@@ -150,9 +150,9 @@ defmodule Imp.Run do
   one of its runs ends. The limit is read on each start, so a host that changes
   its setting passes the new one. A run in a named pool does not count against
   the machine-wide pool. Tasks it starts inside itself take places in the
-  machine-wide pool as usual, except a stream the run enumerates itself
-  (`Imp.Tasks.async_stream/3`), which runs one item at a time on the run's own
-  place, as it does for any run.
+  machine-wide pool as usual, except a stream of Imp tasks the run enumerates
+  itself, which runs one item at a time on the run's own place, as it does for
+  any run.
 
   An option this function does not know raises `ArgumentError`, so a
   misspelled `:authorize` cannot start a run whose tool calls nobody is asked
@@ -280,7 +280,16 @@ defmodule Imp.Run do
     Control.stop(control)
   end
 
-  @doc false
+  @doc """
+  Sends `{:imp_run_barrier, tag}` to `receiver` once every event the run
+  emitted before this call has been handed to its `:event_sink`.
+
+  A host that needs its sink to have seen a run's events before it acts, such
+  as one that stores them and then reports the turn finished, waits for this
+  message. The call exits when the run's control process is gone, and then the
+  message never comes.
+  """
+  @spec barrier(t(), pid(), term()) :: :ok
   def barrier(%__MODULE__{control: control}, receiver, tag) when is_pid(receiver) do
     Control.barrier(control, receiver, tag)
   end
@@ -306,7 +315,16 @@ defmodule Imp.Run do
     end
   end
 
-  @doc false
+  @doc """
+  Registers `fun` to be called with the cancel reason when the current run is
+  cancelled, and returns a reference for `unregister_cancellable/1`.
+
+  A host running work of its own inside a run, such as an external request or
+  a process it started, registers how to stop it, so `cancel/3` stops that work
+  too. Work registered after the run was cancelled is stopped at once, and the
+  result is `nil`; outside a run nothing is registered and the result is `nil`.
+  """
+  @spec register_cancellable((term() -> term())) :: reference() | nil
   def register_cancellable(fun) when is_function(fun, 1) do
     case context() do
       control when is_pid(control) -> Control.register(control, fun)
@@ -314,7 +332,8 @@ defmodule Imp.Run do
     end
   end
 
-  @doc false
+  @doc "Removes a registration `register_cancellable/1` made; `nil` is accepted and ignored."
+  @spec unregister_cancellable(reference() | nil) :: :ok
   def unregister_cancellable(nil), do: :ok
 
   def unregister_cancellable(ref) when is_reference(ref) do
@@ -342,7 +361,14 @@ defmodule Imp.Run do
     end
   end
 
-  @doc false
+  @doc """
+  Returns a new random identifier, `prefix` followed by `_` and 16 URL-safe
+  characters, of the kind Imp gives runs, model calls and tool calls.
+
+  A host recording its own events beside a run's uses it so its identifiers
+  have the same shape.
+  """
+  @spec new_event_id(String.t()) :: String.t()
   def new_event_id(prefix \\ "event") when is_binary(prefix) do
     prefix <> "_" <> Base.url_encode64(:crypto.strong_rand_bytes(12), padding: false)
   end

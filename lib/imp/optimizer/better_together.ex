@@ -23,7 +23,8 @@ defmodule Imp.Optimizer.BetterTogether do
   default weight optimizer has no inferred provider: callers must replace it or
   configure a BootstrapFinetune trainer before a weight-bearing strategy can run.
 
-  `max_errors` and `max_concurrency` on `compile/5` control BetterTogether's
+  `max_errors` and `max_concurrency`, given to `Imp.optimize/5` as invocation
+  options, control BetterTogether's
   baseline and prefix-selection evaluations. Child-specific compile options go
   in `optimizer_compile_args`; for example, COPRO's internal trainset evaluation
   accepts `num_threads` and `max_errors` there. Declared child options are
@@ -114,6 +115,7 @@ defmodule Imp.Optimizer.BetterTogether do
      )}
   end
 
+  @doc false
   def compile(%__MODULE__{} = bt, student, trainset, valset, opts \\ []) do
     opts = Imp.Options.validate!(opts, @option_schema, "Imp.Optimizer.BetterTogether.compile/5")
     steps = strategy_steps(opts[:strategy])
@@ -184,6 +186,7 @@ defmodule Imp.Optimizer.BetterTogether do
     )
   end
 
+  @doc false
   def validate_strategy(strategy) do
     case strategy_steps(strategy) do
       [_ | _] = steps ->
@@ -198,12 +201,14 @@ defmodule Imp.Optimizer.BetterTogether do
     end
   end
 
+  @doc false
   def validate_valset_ratio(value) when is_number(value) and value >= 0 and value < 1,
     do: {:ok, value}
 
   def validate_valset_ratio(value),
     do: {:error, "expected a number in the range [0, 1), got: #{inspect(value)}"}
 
+  @doc false
   def validate_optimizer_compile_args(value) do
     value
     |> Map.new()
@@ -724,7 +729,7 @@ defmodule Imp.Optimizer.BetterTogether do
   rescue
     error ->
       Imp.OperationalSafetyError.raise_if_present!(error)
-      {:error, {:optimizer_failed, module, Exception.message(error)}}
+      {:error, {:optimizer_failed, module, error}}
   catch
     kind, reason ->
       Imp.OperationalSafetyError.raise_if_present!({kind, reason})

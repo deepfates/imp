@@ -32,8 +32,8 @@ defmodule AdversarialSecurityStressTest do
   test "parallel prediction records per-input crashes and invalid returns" do
     assert [
              {:ok, %Imp.Prediction{} = ok_prediction},
-             {:error, {:parallel_program_failed, "parallel exploded"}},
-             {:error, {:parallel_program_failed, "{:throw, :parallel_thrown}"}},
+             {:error, {:parallel_program_failed, %RuntimeError{message: "parallel exploded"}}},
+             {:error, {:parallel_program_failed, {:throw, :parallel_thrown}}},
              {:error,
               {:invalid_module_result, AdversarialSecurityStressTest.ExplodingProgram,
                ":not_a_module_result"}}

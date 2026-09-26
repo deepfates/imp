@@ -47,15 +47,15 @@ defmodule Imp.MCPStdioEnvironmentTest do
     File.write!(script, server_script(report))
 
     client =
-      MCP.StdioClient.new("python3",
+      Imp.Test.MCPConnect.stdio!("python3",
         args: [script],
         env: [{"IMP_TEST_DECLARED", "declared"}],
         timeout: 15_000
       )
 
-    assert [%{name: name}] = MCP.StdioClient.list_tools(client)
+    assert [%{name: name}] = client.tools
     assert to_string(name) == "noop"
-    MCP.StdioClient.close(client)
+    client.cleanup.()
 
     environment = report |> File.read!() |> Jason.decode!()
     entries = String.split(environment["PATH"], ":")
@@ -78,11 +78,11 @@ defmodule Imp.MCPStdioEnvironmentTest do
 
     script = Path.join(tmp_dir, "server.py")
     File.write!(script, server_script(Path.join(tmp_dir, "environment.json")))
-    client = MCP.StdioClient.new("python3", args: [script], timeout: 15_000)
+    client = Imp.Test.MCPConnect.stdio!("python3", args: [script], timeout: 15_000)
 
-    assert [%{name: name}] = MCP.StdioClient.list_tools(client)
+    assert [%{name: name}] = client.tools
     assert to_string(name) == "noop"
-    MCP.StdioClient.close(client)
+    client.cleanup.()
   end
 
   defp server_script(report) do

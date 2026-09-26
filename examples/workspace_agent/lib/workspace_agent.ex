@@ -112,7 +112,7 @@ defmodule WorkspaceAgent do
 
       {program_kind, provider}
       |> build_program(tools)
-      |> attach_cleanup(mcp.cleanup, mcp.tool_kinds)
+      |> attach_cleanup(mcp.cleanup, Imp.ACP.ToolKind.derive_all(mcp.annotations))
     end
   end
 
@@ -125,7 +125,7 @@ defmodule WorkspaceAgent do
     servers = Map.get(session, :mcp_servers, [])
     authorize = Keyword.get(opts, :mcp_authorize, mcp_authorizer())
 
-    Imp.ACP.MCP.import_tools(servers,
+    Imp.MCP.connect(servers,
       cwd: session.cwd,
       authorize: authorize,
       result_mode: :text,

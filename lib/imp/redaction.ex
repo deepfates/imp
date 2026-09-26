@@ -7,6 +7,12 @@ defmodule Imp.Redaction do
   those artifacts. `redact/2` walks ordinary Elixir maps, lists, tuples, and structs,
   replacing known secret fields and secret-looking string values with
   `"[REDACTED]"`.
+
+  Clients, retrievers and trackers that hold a credential print through a
+  redacting `Inspect` implementation, which hides every header value and the
+  query, fragment and user info of every URL as well;
+  `inspect(term, structs: false)`, Erlang's `~p`, and a credential kept
+  outside those structs (a bare keyword list in a process's state) bypass it.
   """
 
   @default_redact_keys [
@@ -109,24 +115,127 @@ defmodule Imp.Redaction do
   def credential_key?(_key), do: false
 
   @doc false
+  # What a client, retriever or tracker prints: `redact/1`, then every header
+  # value whatever the header is called, and the query, fragment and user info
+  # of every URL. A header's name says nothing reliable about its value
+  # (`X-Subscription-Token`, `Cookie`), and a URL's query often carries a key.
+  def redact_for_print(value), do: value |> redact() |> hide_headers_and_urls()
+
+  @doc false
+  # What a saved program may hold: no header at all. A header value is a
+  # credential more often than not, and a saved file outlives the process.
+  def drop_headers(value) when is_struct(value), do: value
+
+  def drop_headers(value) when is_map(value) do
+    value
+    |> Map.reject(fn {key, _value} -> header_key?(key) end)
+    |> Map.new(fn {key, nested} -> {key, drop_headers(nested)} end)
+  end
+
+  def drop_headers(value) when is_list(value) do
+    value
+    |> Enum.reject(fn
+      {key, _value} -> header_key?(key)
+      [key, _value] -> header_key?(key)
+      _item -> false
+    end)
+    |> Enum.map(fn
+      {key, nested} -> {key, drop_headers(nested)}
+      [key, nested] when is_atom(key) or is_binary(key) -> [key, drop_headers(nested)]
+      item -> drop_headers(item)
+    end)
+  end
+
+  def drop_headers(value), do: value
+
+  @doc false
+  # True for a URL whose query, fragment or user info may carry a credential.
+  def url_with_secret_parts?(%URI{} = uri), do: secret_parts?(uri)
+
+  def url_with_secret_parts?(value) when is_binary(value) do
+    case url(value) do
+      %URI{} = uri -> secret_parts?(uri)
+      nil -> false
+    end
+  end
+
+  def url_with_secret_parts?(_value), do: false
+
+  defp secret_parts?(%URI{} = uri),
+    do: uri.query not in [nil, ""] or uri.fragment not in [nil, ""] or uri.userinfo != nil
+
+  defp hide_headers_and_urls(value) when is_struct(value), do: value
+
+  defp hide_headers_and_urls(value) when is_map(value) do
+    Map.new(value, fn {key, nested} ->
+      if header_key?(key),
+        do: {key, hide_header_values(nested)},
+        else: {key, hide_headers_and_urls(nested)}
+    end)
+  end
+
+  defp hide_headers_and_urls(value) when is_list(value) do
+    Enum.map(value, fn
+      {key, nested} when is_atom(key) or is_binary(key) ->
+        if header_key?(key),
+          do: {key, hide_header_values(nested)},
+          else: {key, hide_headers_and_urls(nested)}
+
+      item ->
+        hide_headers_and_urls(item)
+    end)
+  end
+
+  defp hide_headers_and_urls(value) when is_tuple(value),
+    do: value |> Tuple.to_list() |> hide_headers_and_urls() |> List.to_tuple()
+
+  defp hide_headers_and_urls(value) when is_binary(value) do
+    with %URI{} = uri <- url(value), true <- secret_parts?(uri) do
+      uri
+      |> Map.put(:query, if(uri.query in [nil, ""], do: uri.query, else: "[REDACTED]"))
+      |> Map.put(:fragment, if(uri.fragment in [nil, ""], do: uri.fragment, else: "[REDACTED]"))
+      |> Map.put(:userinfo, if(uri.userinfo, do: "[REDACTED]"))
+      |> URI.to_string()
+    else
+      _other -> value
+    end
+  end
+
+  defp hide_headers_and_urls(value), do: value
+
+  defp hide_header_values(headers) when is_list(headers) do
+    Enum.map(headers, fn
+      {name, _value} -> {name, "[REDACTED]"}
+      [name, _value] -> [name, "[REDACTED]"]
+      %{} = header -> hide_header_values(header)
+      _other -> "[REDACTED]"
+    end)
+  end
+
+  defp hide_header_values(%{} = headers) do
+    if Map.has_key?(headers, "value") or Map.has_key?(headers, :value),
+      do: headers |> Map.replace("value", "[REDACTED]") |> Map.replace(:value, "[REDACTED]"),
+      else: Map.new(headers, fn {name, _value} -> {name, "[REDACTED]"} end)
+  end
+
+  defp hide_header_values(_headers), do: "[REDACTED]"
+
+  defp header_key?(key), do: key in [:headers, "headers"]
+
+  defp url(value) do
+    if String.starts_with?(value, ["http://", "https://"]) do
+      URI.parse(value)
+    end
+  rescue
+    _error -> nil
+  end
+
+  @doc false
   def credential_entry?(key, value) do
     credential_key?(key) and not semantic_schema_descriptor?(value)
   end
 
-  @doc """
-  Validates custom redaction keys.
-
-  Redaction keys must be atoms or strings because Imp compares them with map
-  keys after normalizing ordinary Elixir key names.
-
-      iex> Imp.Redaction.validate_keys([:api_key, "authorization"])
-      {:ok, [:api_key, "authorization"]}
-
-      iex> {:error, message} = Imp.Redaction.validate_keys([:api_key, 123])
-      iex> message =~ "expected a list of atom or string key names"
-      true
-
-  """
+  @doc false
   def validate_keys(keys) when is_list(keys) do
     case Enum.find(keys, &(not valid_key?(&1))) do
       nil ->
@@ -187,6 +296,16 @@ defmodule Imp.Redaction do
         metadata: redact(report.metadata, keys)
     }
   end
+
+  # An exception keeps its type, so a redacted failure still matches as the
+  # failure it is; only its fields are redacted.
+  def redact(value, keys) when is_exception(value) do
+    struct(value.__struct__, value |> Map.from_struct() |> redact(keys))
+  end
+
+  # A URI is redacted as the URL it spells, so its query, fragment and user
+  # info are hidden the same way whether it was given as a string or a struct.
+  def redact(%URI{} = uri, keys), do: uri |> URI.to_string() |> redact(keys)
 
   def redact(value, keys) when is_struct(value) do
     value
@@ -492,14 +611,12 @@ defmodule Imp.Redaction do
     values = [Map.get(value, "value"), Map.get(value, :value)]
     schema_types = [Map.get(value, "type"), Map.get(value, :type)]
 
-    allowed_keys = MapSet.new(["__imp_type__", :__imp_type__, "value", :value])
-
     (Enum.any?(types, &(&1 in ["atom", :atom])) and
        Enum.any?(
          values,
          &(&1 in ~w(string integer float number boolean object map list array any))
        ) and
-       Enum.all?(Map.keys(value), &MapSet.member?(allowed_keys, &1))) or
+       Enum.all?(Map.keys(value), &(&1 in ["__imp_type__", :__imp_type__, "value", :value]))) or
       (Enum.any?(
          schema_types,
          &(&1 in ([
@@ -609,4 +726,22 @@ defmodule Imp.Redaction do
       ~r/(?:\A|[?&;,\s])session\s*=\s*[A-Za-z0-9._~+\/-]{8,}={0,2}(?=\z|[?&;,\s])/i
     )
   end
+end
+
+# Structs that can hold a credential print it redacted: an LM client's
+# `api_key` or headers, a retriever's or tracker's headers. A program prints
+# its LM, so a program in IEx, a log line or a crash report would otherwise
+# carry the key.
+defimpl Inspect,
+  for: [
+    Imp.Clients.ReqLLM,
+    Imp.Retrievers.HTTP,
+    Imp.Tracking.MLflow,
+    Imp.Tracking.WandB,
+    Imp.Optimize.Anything.Config.Tracking
+  ] do
+  # `redact_for_print/1` returns a struct's fields as a map; merging them back
+  # keeps the struct, so it prints as one.
+  def inspect(struct, opts),
+    do: Inspect.Any.inspect(Map.merge(struct, Imp.Redaction.redact_for_print(struct)), opts)
 end

@@ -39,7 +39,7 @@ defmodule Imp.Optimizer.SIMBA.SearchContractTest do
       ]
     }
 
-    program = Imp.predict("question -> answer", lm: task_lm)
+    program = Imp.predict("question -> answer: enum[Paris,unknown]", lm: task_lm)
 
     trainset =
       for question <- ["Capital of France?", "Eiffel Tower city?"] do
@@ -85,6 +85,9 @@ defmodule Imp.Optimizer.SIMBA.SearchContractTest do
     refute reflection_prompt =~ "defmodule Imp.Predict.Predict"
     assert reflection_prompt =~ "Module main"
     assert reflection_prompt =~ "Input Fields"
+    # The program listing names each field's type in words, so an enum shows
+    # its allowed values rather than its storage type.
+    assert reflection_prompt =~ "\t\tanswer: one of: Paris, unknown"
     assert reflection_prompt =~ "better_program_trajectory"
 
     task_messages =

@@ -228,12 +228,12 @@ defmodule RefineFeedbackTest do
     {:ok, calls} = Agent.start_link(fn -> 0 end)
     metric = fn _example, _prediction -> true end
 
-    assert {:error, {:refine_fail_count_exceeded, :provider_unavailable}, []} =
+    assert {:error, {:refine_fail_count_exceeded, :provider_unavailable}} =
              Imp.Predict.Refine.new(%CountingErrorProgram{agent: calls}, metric,
                max_attempts: 3,
                fail_count: 1
              )
-             |> Imp.Predict.Refine.call(%{})
+             |> Imp.call(%{})
 
     assert Agent.get(calls, & &1) == 2
   end
@@ -241,17 +241,17 @@ defmodule RefineFeedbackTest do
   test "Refine with zero attempts does not call the wrapped program" do
     metric = fn _example, _prediction -> true end
 
-    assert {:error, :no_attempts, []} =
+    assert {:error, :no_attempts} =
              Imp.Predict.Refine.new(%ExplodingProgram{}, metric, max_attempts: 0)
-             |> Imp.Predict.Refine.call(%{question: "q"})
+             |> Imp.call(%{question: "q"})
   end
 
   test "Refine preserves wrapped program errors with history context" do
     metric = fn _example, _prediction -> true end
 
-    assert {:error, :provider_unavailable, []} =
+    assert {:error, :provider_unavailable} =
              Imp.Predict.Refine.new(%ErrorProgram{}, metric, max_attempts: 1)
-             |> Imp.Predict.Refine.call(%{question: "q"})
+             |> Imp.call(%{question: "q"})
   end
 
   test "Refine converts invalid program returns into contract errors" do
@@ -259,7 +259,7 @@ defmodule RefineFeedbackTest do
 
     assert {:error,
             {:invalid_module_result, RefineFeedbackTest.InvalidResultProgram,
-             ":not_a_module_result"}, []} =
+             ":not_a_module_result"}} =
              Imp.Predict.Refine.new(%InvalidResultProgram{}, metric, max_attempts: 1)
              |> Imp.Predict.Refine.call(%{question: "q"})
   end

@@ -1250,6 +1250,11 @@ defmodule Imp.BenchmarkTruth.MultimodalRunner do
     )
   end
 
+  # The provider's own error describes the failure; `Imp.LMError` carries it
+  # under `:reason` alongside Imp's classification.
+  defp scrub_failure(%Imp.LMError{reason: reason}, api_key) when is_exception(reason),
+    do: failure_envelope(reason, api_key)
+
   defp scrub_failure(value, api_key), do: failure_envelope(value, api_key)
 
   defp failure_envelope(value, api_key) do

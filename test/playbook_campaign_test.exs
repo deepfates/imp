@@ -128,7 +128,11 @@ defmodule Imp.Optimizer.Playbook.CampaignTest do
     decode = %Jason.DecodeError{position: 0, token: nil, data: "{"}
 
     assert {:ok, "adapter_decode_failure", %{"raw_sha256" => digest}} =
-             Campaign.classify_model_failure(%{reason: {:error, decode}, trace: %{raw: "{"}})
+             Campaign.classify_model_failure(%Imp.AdapterParseError{
+               kind: :other,
+               reason: decode,
+               trace: %{raw: "{"}
+             })
 
     assert byte_size(digest) == 64
     assert :unknown = Campaign.classify_model_failure({:http_error, 503})

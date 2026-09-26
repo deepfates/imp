@@ -100,6 +100,14 @@ Ordinary Imp startup starts no protocol endpoint.
   `Imp.ACP.Local.start_link/1` raise `ArgumentError` for an option they do
   not know. A transport's own options for `Imp.ACP` go in
   `:transport_options`, and `:capabilities` is spelled `:agent_capabilities`.
+- `Imp.predict/2`, `Imp.chain_of_thought/2` and `Imp.configure/1` raise
+  `ArgumentError` for an option or setting they do not know. Request options
+  such as `:temperature` go under `config:`; a setting of your own goes
+  through `Imp.context/2`.
+- `:max_errors` and `:retriever` are no longer settings, and
+  `Imp.configure/1` and `Imp.context/2` refuse them. Pass `:max_errors` to
+  BootstrapFewShot, RandomSearch or COPRO (10 when not given) and a retriever
+  to the program.
 - ReActV2 emits no `:final` event; `:run_finished` carries the prediction.
   `Imp.Trajectory.to_atif/2`'s `extra.outcome` is `extra.terminal_event`, and
   a tool result's `extra.outcome` is the recorded `Imp.Tool.outcome/1`
@@ -115,6 +123,28 @@ Ordinary Imp startup starts no protocol endpoint.
   answered.
 - For a signature with one `:string` output, `ReActV2` offers no `submit`
   tool, and a step answered in text with no tool call ends the turn.
+- Errors have one shape per tag, with the reason as a term. A failed
+  `Imp.Clients.ReqLLM` request is `%Imp.LMError{}` (with `status`,
+  `retryable` and `context_window_exceeded`; `Imp.ContextWindowExceededError`
+  is gone), and a completion that cannot be parsed is
+  `%Imp.AdapterParseError{kind: ...}`, which `Imp.Predict.Predict` returns
+  directly instead of `%{reason: {:error, _}, trace: _}`. A raise inside a
+  client, program, tool, tool policy, retriever, optimizer or ACP callback
+  keeps the exception struct where 0.4.0 kept its message.
+  `{:tool_denied, tool}` is `{:tool_authorization_denied, tool,
+  :tool_policy}`; `Refine` and `Assertions` return `{:error, reason}`;
+  `Imp.optimize!` raises `Imp.Error` for a failed optimization. The CHANGELOG
+  lists every tag that changed.
+- `Imp.Example` and `Imp.Prediction` keep string keys as strings. Code that
+  read a field of data loaded from JSON with `map.field` or `map[:field]`
+  reads it with `Imp.Example.get/2` or by its string key.
+- `Imp.MCP.Client`, `Imp.MCP.HTTPClient`, `Imp.MCP.StreamableHTTPClient`,
+  `Imp.MCP.StdioClient`, `Imp.MCP.Catalog`, `Imp.MCP.import_tools`,
+  `Imp.ACP.MCP` and `Imp.Core.ToolCall`/`ToolResult` are gone.
+  `Imp.MCP.connect/2` imports tools; `Imp.ACP.ToolKind.derive_all/1` gives an
+  import's ACP tool kinds.
+- An optimizer's `compile/N` is no longer documented where `Imp.optimize` or
+  `Imp.train` runs the optimizer; call those.
 
 ## Upgrade path
 
@@ -131,7 +161,11 @@ Ordinary Imp startup starts no protocol endpoint.
 6. Change `"type" => "sse"` descriptors for Streamable HTTP servers to
    `"http"`. A server that needs credentials is reached over Streamable HTTP;
    an `sse` descriptor takes none.
-7. Run your held-out evaluation and application smoke test against the new
+7. Match LM failures on `%Imp.LMError{}` (or ask `Imp.Errors.retryable?/1`
+   and `Imp.Errors.context_window_exceeded?/1`), parse failures on
+   `%Imp.AdapterParseError{kind: ...}`, and exception reasons on the struct
+   rather than its text.
+8. Run your held-out evaluation and application smoke test against the new
    release; a one-text-output ReActV2 program now ends turns differently.
 
 The [CHANGELOG](CHANGELOG.md) records every user-visible change in this

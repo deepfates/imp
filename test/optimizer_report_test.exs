@@ -170,7 +170,7 @@ defmodule OptimizerReportTest do
       send(owner, {:infer_rules_retry, example_count, prompt, opts[:rollout_id]})
 
       if example_count > 1 or lm.fail_at_one? do
-        {:error, %Imp.ContextWindowExceededError{message: "controlled overflow"}}
+        {:error, %Imp.LMError{context_window_exceeded: true, message: "controlled overflow"}}
       else
         {:ok,
          %{

@@ -12,12 +12,12 @@ defmodule Imp.MCPStdioLifecycleTest do
     {pid_file, client} = fake_server(tmp_dir, "eof_ignoring", ignore_sigterm: false)
 
     assert [%{"name" => "noop"}] =
-             Enum.map(MCP.StdioClient.list_tools(client), fn tool ->
+             Enum.map(client.tools, fn tool ->
                %{"name" => to_string(tool.name)}
              end)
 
     os_pid = read_pid!(pid_file)
-    MCP.StdioClient.close(client)
+    client.cleanup.()
     assert os_process_dead?(os_pid), "stdio server #{os_pid} survived teardown as an orphan"
   end
 
@@ -25,24 +25,24 @@ defmodule Imp.MCPStdioLifecycleTest do
     {pid_file, client} = fake_server(tmp_dir, "term_ignoring", ignore_sigterm: true)
 
     assert [%{"name" => "noop"}] =
-             Enum.map(MCP.StdioClient.list_tools(client), fn tool ->
+             Enum.map(client.tools, fn tool ->
                %{"name" => to_string(tool.name)}
              end)
 
     os_pid = read_pid!(pid_file)
-    MCP.StdioClient.close(client)
+    client.cleanup.()
     assert os_process_dead?(os_pid), "stdio server #{os_pid} survived TERM and KILL escalation"
   end
 
   test "tool calls reuse a connection until explicit close reaps it", %{tmp_dir: tmp_dir} do
     {pid_file, client} = fake_server(tmp_dir, "tool_call", ignore_sigterm: false)
 
-    [tool] = MCP.import_tools(client)
+    [tool] = client.tools
 
     assert %{"ok" => true} = Imp.Tool.call(tool, %{})
 
     os_pid = read_pid!(pid_file)
-    MCP.StdioClient.close(client)
+    client.cleanup.()
     assert os_process_dead?(os_pid), "stdio tool-call server #{os_pid} survived teardown"
   end
 
@@ -58,7 +58,7 @@ defmodule Imp.MCPStdioLifecycleTest do
         block_tool_call: {started_file, child_pid_file}
       )
 
-    [tool] = MCP.import_tools(client)
+    [tool] = client.tools
 
     lm =
       Imp.LM.Static.new(
@@ -82,7 +82,7 @@ defmodule Imp.MCPStdioLifecycleTest do
     cancellation = Task.async(fn -> Imp.cancel_run(run, :probe_cancel, 200) end)
     assert :ok = Task.await(cancellation, 5_000)
 
-    MCP.StdioClient.close(client)
+    client.cleanup.()
 
     assert os_process_dead?(os_pid),
            "stdio tool-call server #{os_pid} survived Run cancellation"
@@ -129,7 +129,14 @@ defmodule Imp.MCPStdioLifecycleTest do
 
     Process.exit(client, :kill)
 
-    assert os_process_dead?(os_pid), "stdio server #{os_pid} outlived its killed client"
+    # Nothing waits for the group here, as `close/1` does: erlexec sends it
+    # SIGTERM, which this server ignores, and SIGKILL only after the kill
+    # timeout. The poll starts at the kill, so it has to outlast that grace
+    # before the time it allows for scheduling and reaping counts.
+    within = Imp.MCP.OwnedStdio.kill_timeout_ms() + 4_000
+
+    assert os_process_dead?(os_pid, within),
+           "stdio server #{os_pid} outlived its killed client"
 
     assert os_process_dead?(child_pid),
            "stdio server child #{child_pid} outlived its killed client"
@@ -204,7 +211,7 @@ defmodule Imp.MCPStdioLifecycleTest do
   defp fake_server(tmp_dir, label, opts) do
     {pid_file, script} = server_script(tmp_dir, label, opts)
     python = System.find_executable("python3") || raise "python3 required for this regression"
-    {pid_file, MCP.StdioClient.new(python, args: [script], timeout: 15_000)}
+    {pid_file, Imp.Test.MCPConnect.stdio!(python, args: [script], timeout: 15_000)}
   end
 
   defp server_script(tmp_dir, label, opts) do

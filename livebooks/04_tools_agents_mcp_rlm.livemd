@@ -1,4 +1,4 @@
-# Imp 04: Tools, Agents, MCP, And RLM
+# Imp 04: Tools, agents, MCP and RLM
 
 ```elixir
 imp_checkout? = fn path ->
@@ -77,7 +77,7 @@ lookup =
 Imp.Tool.call(lookup, %{query: "capital-france"})
 ```
 
-## Owning The Loop Yourself
+## Owning the loop yourself
 
 The packaged agent surface is the react-family spectrum above. When you want
 a loop the framework does not ship, compose the same pieces in ordinary
@@ -93,7 +93,7 @@ Policy lives where the model chooses actions: any react-family program takes
 instead of an execution. The ReAct section below shows the action loop; use a
 deny policy when you want to exercise this boundary directly.
 
-## Tools From An MCP Server
+## Tools from an MCP server
 
 MCP (the Model Context Protocol) is a standard way for a program to offer
 tools to a model client. `Imp.MCP.connect/2` starts or dials the servers you
@@ -194,7 +194,7 @@ react = Imp.react("question -> answer", [lookup], lm: lm, max_iters: 2, tool_pol
 Imp.to_map(pred)
 ```
 
-## Run ReAct With A Live Provider
+## Run ReAct with a live provider
 
 This cell proves the provider tool-call path with a real LM only when
 `LIVE_PROVIDER=1` and provider credentials are present.
@@ -285,7 +285,7 @@ Process.delete(:rlm_actions)
 {Imp.to_map(pred), pred.metadata.rlm_trace}
 ```
 
-## RLM Lazy Context Loading
+## RLM lazy context loading
 
 Use a serializable handle when a value is too large or expensive to show in the
 first controller prompt. The controller loads it only if needed.
@@ -320,7 +320,7 @@ Process.delete(:rlm_lazy_actions)
 {Imp.to_map(lazy_pred), lazy_pred.metadata.rlm_trace}
 ```
 
-## RLM Batched Subqueries
+## RLM batched subqueries
 
 RLM code can ask a sub-LM several ordered questions and retain the results as
 ordinary environment values. Each batch item counts against `max_llm_calls`.
@@ -368,7 +368,7 @@ Process.delete(:rlm_batch_actions)
 {Imp.to_map(batch_pred), batch_pred.metadata.rlm_trace}
 ```
 
-## RLM Budget Failure
+## RLM budget failure
 
 ```elixir
 loop_lm =
@@ -386,7 +386,7 @@ rlm = Imp.rlm("question -> answer", lm: loop_lm, max_iterations: 1)
 Imp.call(rlm, %{question: "loop?"})
 ```
 
-## Run RLM With A Live Provider
+## Run RLM with a live provider
 
 This example asks the controller to emit constrained Elixir and submit from
 the persistent environment.

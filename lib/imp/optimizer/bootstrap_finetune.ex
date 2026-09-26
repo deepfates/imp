@@ -159,6 +159,7 @@ defmodule Imp.Optimizer.BootstrapFinetune do
   def validate_adapter_config(_value),
     do: {:error, "expected an adapter module or an LM-keyed map of adapter modules"}
 
+  @doc false
   def validate_teacher(nil), do: {:ok, nil}
 
   def validate_teacher([_ | _] = teachers) do
@@ -276,6 +277,7 @@ defmodule Imp.Optimizer.BootstrapFinetune do
     {%{plan | entries: entries}, Enum.reverse(outcomes)}
   end
 
+  @doc false
   def compile(%__MODULE__{} = optimizer, program, trainset) do
     with {:ok, trainset} <- materialize_trainset(trainset),
          {:ok, predictors} <- validate_student(program, optimizer.trainer),

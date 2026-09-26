@@ -358,7 +358,7 @@ defmodule Imp.ACP.Host do
   defp request(fun) do
     fun.()
   rescue
-    exception -> {:error, {:host_request_failed, Exception.message(exception)}}
+    exception -> {:error, {:host_request_failed, exception}}
   catch
     :exit, {:timeout, _details} -> {:error, :host_request_timeout}
     :exit, reason -> {:error, {:host_request_exit, Imp.Redaction.redact(reason)}}

@@ -97,11 +97,13 @@ defmodule Imp.MCP.OAuth do
   descriptor, and hides its key material and the pending transaction from
   `inspect/1`.
 
-  It makes no such promise about the token once it has been handed over. The
-  header is passed to `ExMCP.Client`, which keeps it in its transport state; if
-  that client crashes, the standard OTP crash report prints that state and the
-  header with it. The same is true of a static `"headers"` entry. Redacting a
-  client's transport headers is ExMCP's to do, and it does not do it today.
+  Once handed over, the header lives in the `ExMCP.Client` process's transport
+  state, as a static `"headers"` entry does. Imp's `Inspect` implementation for
+  `ExMCP.Client` and `ExMCP.Transport.HTTP` prints every header value as
+  `[REDACTED]`, so the client's crash report and `inspect(:sys.get_state(pid))`
+  do not show it. Anything that prints the state without that implementation
+  does: `inspect(state, structs: false)`, Erlang's `~p`, a log handler that
+  formats the raw report, and anyone who can read the host's memory.
 
   ## Concurrency
 

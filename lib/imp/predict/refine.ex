@@ -6,6 +6,12 @@ defmodule Imp.Predict.Refine do
   for bounded repair advice after a below-threshold attempt. The advice is
   passed to the next attempt as `:hint_`. An explicit callback selects custom
   feedback generation and takes precedence over automatic feedback.
+
+  Like every `Imp.Module`, `call/2` returns `{:ok, prediction}` or
+  `{:error, reason}`. With `max_attempts: 0` the reason is `:no_attempts`; when
+  more attempts fail than `:fail_count` allows it is
+  `{:refine_fail_count_exceeded, reason}`; when every attempt failed it is the
+  last attempt's reason.
   """
 
   alias Imp.Predict.Attempt
@@ -43,6 +49,7 @@ defmodule Imp.Predict.Refine do
     }
   end
 
+  @doc false
   def validate_feedback_fn(nil), do: {:ok, nil}
   def validate_feedback_fn(feedback_fn) when is_function(feedback_fn, 1), do: {:ok, feedback_fn}
 
@@ -50,7 +57,7 @@ defmodule Imp.Predict.Refine do
     {:error, "expected nil or a unary function, got: #{inspect(feedback_fn)}"}
   end
 
-  def call(%__MODULE__{max_attempts: 0}, _inputs), do: {:error, :no_attempts, []}
+  def call(%__MODULE__{max_attempts: 0}, _inputs), do: {:error, :no_attempts}
 
   def call(%__MODULE__{} = refine, inputs) do
     rollout_ids = Attempt.rollout_ids(refine.program, refine.max_attempts)
@@ -70,7 +77,7 @@ defmodule Imp.Predict.Refine do
          _failed_calls,
          _failure_budget
        ),
-       do: {:error, :no_attempts, []}
+       do: {:error, :no_attempts}
 
   defp run_attempts(
          refine,
@@ -122,12 +129,12 @@ defmodule Imp.Predict.Refine do
         failed_calls = failed_calls + 1
 
         if failed_calls > failure_budget do
-          {:error, {:refine_fail_count_exceeded, safe_reason(reason)}, []}
+          {:error, {:refine_fail_count_exceeded, safe_reason(reason)}}
         else
           case rest do
             [] ->
               case best do
-                nil -> {:error, safe_reason(reason), []}
+                nil -> {:error, safe_reason(reason)}
                 _best -> {:ok, attach_history(best.prediction, outcomes)}
               end
 

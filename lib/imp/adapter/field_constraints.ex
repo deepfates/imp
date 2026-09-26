@@ -41,7 +41,7 @@ defmodule Imp.Adapter.FieldConstraints do
       for {key, phrase} <- @phrases,
           value = Map.get(constraints, key),
           value != nil,
-          do: phrase <> py_str(value)
+          do: phrase <> Imp.Adapter.Chat.format_value(value)
 
     case parts do
       [] -> nil
@@ -86,10 +86,4 @@ defmodule Imp.Adapter.FieldConstraints do
        do: String.to_existing_atom(key)
 
   defp normalize_key(key), do: key
-
-  # Python f"{value}" as _translate_pydantic_field_constraints applies it.
-  defp py_str(true), do: "True"
-  defp py_str(false), do: "False"
-  defp py_str(value) when is_float(value), do: Imp.PyFloat.repr(value)
-  defp py_str(value), do: to_string(value)
 end

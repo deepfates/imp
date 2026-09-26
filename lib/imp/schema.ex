@@ -407,24 +407,7 @@ defmodule Imp.Schema do
 
   # Datetimes travel the wire as ISO 8601 strings (JSON has no datetime type);
   # the chat adapter parses them back into DateTime/NaiveDateTime structs.
-  defp json_type(:datetime), do: "string"
-  defp json_type("datetime"), do: "string"
-  defp json_type(:integer), do: "integer"
-  defp json_type(:float), do: "number"
-  defp json_type(:number), do: "number"
-  defp json_type(:boolean), do: "boolean"
-  defp json_type(:array), do: "array"
-  defp json_type(:object), do: "object"
-  defp json_type("integer"), do: "integer"
-  defp json_type("float"), do: "number"
-  defp json_type("number"), do: "number"
-  defp json_type("boolean"), do: "boolean"
-  defp json_type("array"), do: "array"
-  defp json_type("object"), do: "object"
-  defp json_type("string"), do: "string"
-  defp json_type(:null), do: "null"
-  defp json_type("null"), do: "null"
-  defp json_type(_), do: "string"
+  defp json_type(type), do: Imp.Adapter.FieldType.json_type(type)
 
   defp nested_type(spec, default) do
     case fetch_meta(spec, :type, default) do

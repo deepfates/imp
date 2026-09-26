@@ -8,8 +8,10 @@ defmodule UpstreamExam.AdaptersTest do
 
   Rules of this file:
     * assertions check the SAME behavior as upstream, not a look-alike;
-    * exact prompt strings are used exactly (Imp claims byte-compatible
-      rendered prompts for chat/json/xml/two_step);
+    * prompt strings are checked exactly, except that Imp names types in
+      neutral words ("string", "one of: a, b") where DSPy prints Python type
+      annotations; DSPy parity means the same fields, order, constraints and
+      parse results, not the same text (`decisions.md`);
     * a failing port is a FINDING: it gets tagged @tag :upstream_fail and
       skipped with the failure output preserved in a comment until the
       divergence is fixed in lib (never by weakening the assertion). The
@@ -57,14 +59,20 @@ defmodule UpstreamExam.AdaptersTest do
 
   describe "test_adapter_utils.py" do
     # Upstream: tests/adapters/test_adapter_utils.py::test_parse_value_str_annotation
-    # (was a finding; fixed by dee-jbav — str-annotated fields render through
-    # Python str(): True -> "True", None -> "None", [1, 2, 3] -> "[1, 2, 3]".)
+    # A string field accepts a non-string value, as upstream does, as the
+    # value's JSON text rather than Python's str() spelling; a null is no
+    # value, so a required field reports it missing and an optional one is nil.
     test "parse_value str annotation" do
       assert parse_one(%{name: :value, type: :string}, 123) == {:ok, "123"}
-      assert parse_one(%{name: :value, type: :string}, true) == {:ok, "True"}
+      assert parse_one(%{name: :value, type: :string}, true) == {:ok, "true"}
       assert parse_one(%{name: :value, type: :string}, "hello") == {:ok, "hello"}
-      assert parse_one(%{name: :value, type: :string}, nil) == {:ok, "None"}
       assert parse_one(%{name: :value, type: :string}, [1, 2, 3]) == {:ok, "[1, 2, 3]"}
+
+      assert parse_one(%{name: :value, type: :string}, %{"a" => true, "b" => ["x", "y"]}) ==
+               {:ok, ~s({"a": true, "b": ["x", "y"]})}
+
+      assert parse_one(%{name: :value, type: :string, optional: true}, nil) == {:ok, nil}
+      assert {:error, _missing} = parse_one(%{name: :value, type: :string}, nil)
     end
 
     # Upstream: tests/adapters/test_adapter_utils.py::test_parse_value_basic_types
@@ -146,19 +154,19 @@ defmodule UpstreamExam.AdaptersTest do
 
   describe "test_chat_adapter.py" do
     # Upstream: tests/adapters/test_chat_adapter.py::test_chat_adapter_quotes_literals_as_expected
-    # (scenarios 1-4: string-valued Literals with quote mixes)
-    test "chat adapter quotes literals as expected (string literals)" do
+    # (scenarios 1-4: string-valued Literals with quote mixes). Imp names the
+    # allowed values in words rather than as a Python `Literal[...]`, so the
+    # upstream behaviour kept here is that every member reaches the prompt
+    # exactly, quotes included, in declared order.
+    test "chat adapter names enum members exactly (string members)" do
       scenarios = [
-        {["one", "two", ~s(three")], ["four", "five", ~s(six")],
-         ~s(Literal['one', 'two', 'three"']), ~s(Literal['four', 'five', 'six"'])},
-        {["she's here", "okay", "test"], ["done", "maybe'soon", "later"],
-         ~s(Literal["she's here", 'okay', 'test']), ~s(Literal['done', "maybe'soon", 'later'])},
-        {[~s(both"and'), "another"], [~s(yet"another'), "plain"],
-         ~s(Literal['both"and\\'', 'another']), ~s(Literal['yet"another\\'', 'plain'])},
-        {["foo", "bar"], ["baz", "qux"], ~s(Literal['foo', 'bar']), ~s(Literal['baz', 'qux'])}
+        {["one", "two", ~s(three")], ["four", "five", ~s(six")]},
+        {["she's here", "okay", "test"], ["done", "maybe'soon", "later"]},
+        {[~s(both"and'), "another"], [~s(yet"another'), "plain"]},
+        {["foo", "bar"], ["baz", "qux"]}
       ]
 
-      for {input_values, output_values, expected_input, expected_output} <- scenarios do
+      for {input_values, output_values} <- scenarios do
         signature =
           Imp.Signature.new(%{
             inputs: [%{name: :input_text, type: :string, constraints: %{enum: input_values}}],
@@ -168,16 +176,16 @@ defmodule UpstreamExam.AdaptersTest do
         [%{role: :system, content: content} | _rest] =
           Imp.Adapter.Chat.format(signature, %{input_text: hd(input_values)}, [])
 
-        assert content =~ expected_input
-        assert content =~ expected_output
+        assert content =~ "`input_text` (one of: " <> Enum.join(input_values, ", ") <> ")"
+        assert content =~ "`output_text` (one of: " <> Enum.join(output_values, ", ") <> ")"
+        assert content =~ "one of: " <> Enum.join(output_values, "; ") <> "\n"
       end
     end
 
     # Upstream: tests/adapters/test_chat_adapter.py::test_chat_adapter_quotes_literals_as_expected
-    # (scenario 5: mixed-type Literal[1, 'bar'] / Literal[True, 3, 'foo'].
-    # Was a finding; fixed by dee-xyhv — non-string Literal members render
-    # bare via Python str(), only string members are quoted.)
-    test "chat adapter quotes literals as expected (mixed-type literal)" do
+    # (scenario 5: mixed-type Literal[1, 'bar'] / Literal[True, 3, 'foo']).
+    # Non-string members take their JSON spelling.
+    test "chat adapter names enum members exactly (mixed-type members)" do
       signature =
         Imp.Signature.new(%{
           inputs: [%{name: :input_text, type: :string, constraints: %{enum: [1, "bar"]}}],
@@ -187,8 +195,8 @@ defmodule UpstreamExam.AdaptersTest do
       [%{role: :system, content: content} | _rest] =
         Imp.Adapter.Chat.format(signature, %{input_text: "bar"}, [])
 
-      assert content =~ "Literal[1, 'bar']"
-      assert content =~ "Literal[True, 3, 'foo']"
+      assert content =~ "(one of: 1, bar)"
+      assert content =~ "(one of: true, 3, foo)"
     end
 
     # Upstream: tests/adapters/test_chat_adapter.py::test_chat_adapter_sync_call
@@ -217,9 +225,9 @@ defmodule UpstreamExam.AdaptersTest do
       assert length(messages) == 2
       assert [%{role: :system, content: system}, %{role: :user, content: user}] = messages
 
-      assert system =~ "1. `input1` (str)"
-      assert system =~ "2. `input2` (int)"
-      assert system =~ "1. `output` (str)"
+      assert system =~ "1. `input1` (string)"
+      assert system =~ "2. `input2` (integer)"
+      assert system =~ "1. `output` (string)"
       assert system =~ "[[ ## input1 ## ]]\n{input1}"
       assert system =~ "[[ ## input2 ## ]]\n{input2}"
       assert system =~ "[[ ## output ## ]]\n{output}"
@@ -392,10 +400,10 @@ defmodule UpstreamExam.AdaptersTest do
         Enum.join(
           [
             "Your input fields are:",
-            "1. `question` (str):",
+            "1. `question` (string):",
             "Your output fields are:",
-            "1. `answers` (list[str]): ",
-            "2. `scores` (list[float]):",
+            "1. `answers` (list of strings): ",
+            "2. `scores` (list of numbers):",
             "All interactions will be structured in the following way, with the appropriate values filled in.",
             "",
             "[[ ## question ## ]]",
@@ -614,10 +622,10 @@ defmodule UpstreamExam.AdaptersTest do
         Enum.join(
           [
             "Your input fields are:",
-            "1. `question` (str):",
+            "1. `question` (string):",
             "Your output fields are:",
-            "1. `answers` (list[str]): ",
-            "2. `scores` (list[float]):",
+            "1. `answers` (list of strings): ",
+            "2. `scores` (list of numbers):",
             "All interactions will be structured in the following way, with the appropriate values filled in.",
             "",
             "Inputs will have the following structure:",
@@ -693,7 +701,7 @@ defmodule UpstreamExam.AdaptersTest do
     test "a missing required output remains a loud error" do
       signature = optional_output_signature()
 
-      assert {:error, {:missing_output_fields, [:answer]}} =
+      assert {:error, %Imp.AdapterParseError{kind: :missing_fields, reason: [:answer]}} =
                Imp.Adapter.JSON.parse(signature, ~s({"note":"present"}), [])
     end
 
@@ -764,7 +772,7 @@ defmodule UpstreamExam.AdaptersTest do
     test "xml adapter parse errors on missing field" do
       signature = Imp.signature("question -> answer, explanation")
 
-      assert {:error, {:missing_output_fields, [:explanation]}} =
+      assert {:error, %Imp.AdapterParseError{kind: :missing_fields, reason: [:explanation]}} =
                Imp.Adapter.XML.parse(signature, "<answer>Paris</answer>", [])
     end
 
@@ -1016,10 +1024,10 @@ defmodule UpstreamExam.AdaptersTest do
         Enum.join(
           [
             "Your input fields are:",
-            "1. `question` (str):",
+            "1. `question` (string):",
             "Your output fields are:",
-            "1. `answers` (list[str]): ",
-            "2. `scores` (list[float]):",
+            "1. `answers` (list of strings): ",
+            "2. `scores` (list of numbers):",
             "All interactions will be structured in the following way, with the appropriate values filled in.",
             "",
             "<question>",
@@ -1088,9 +1096,9 @@ defmodule UpstreamExam.AdaptersTest do
       assert length(main_messages) == 2
 
       assert %{role: :system, content: main_system} = Enum.at(main_messages, 0)
-      assert main_system =~ "1. `question` (str)"
-      assert main_system =~ "1. `solution` (str)"
-      assert main_system =~ "2. `answer` (float)"
+      assert main_system =~ "1. `question` (string)"
+      assert main_system =~ "1. `solution` (string)"
+      assert main_system =~ "2. `answer` (number)"
 
       assert %{role: :user, content: main_user} = Enum.at(main_messages, 1)
       assert String.downcase(main_user) =~ "question:"
@@ -1101,9 +1109,9 @@ defmodule UpstreamExam.AdaptersTest do
       assert length(extraction_messages) == 2
 
       assert %{role: :system, content: extraction_system} = Enum.at(extraction_messages, 0)
-      assert extraction_system =~ "`text` (str)"
-      assert extraction_system =~ "`solution` (str)"
-      assert extraction_system =~ "`answer` (float)"
+      assert extraction_system =~ "`text` (string)"
+      assert extraction_system =~ "`solution` (string)"
+      assert extraction_system =~ "`answer` (number)"
 
       assert %{role: :user, content: extraction_user} = Enum.at(extraction_messages, 1)
       assert extraction_user =~ "text from main LM"
@@ -1148,12 +1156,17 @@ defmodule UpstreamExam.AdaptersTest do
     # Upstream: tests/adapters/test_two_step_adapter.py::test_two_step_adapter_parse_errors
     # (was a finding; fixed by dee-coia — strict chat parse rejects the
     # unusable extraction text, the JSON retry also fails, and the loud
-    # two_step_extraction_failed error surfaces, matching DSPy's ValueError.)
+    # extraction failure surfaces, matching DSPy's ValueError.)
     test "two step adapter parse errors" do
       extraction_lm = fn _messages, _opts -> {:ok, "invalid response"} end
       signature = Imp.signature("question -> answer")
 
-      assert {:error, {:two_step_extraction_failed, _reason, _completion}} =
+      assert {:error,
+              %Imp.AdapterParseError{
+                kind: :missing_fields,
+                message: "Failed to parse response from the original completion: " <> _,
+                trace: %{raw: "main LM response"}
+              }} =
                Imp.Adapter.TwoStep.parse(signature, "main LM response",
                  extraction_lm: extraction_lm
                )
@@ -1336,7 +1349,7 @@ defmodule UpstreamExam.AdaptersTest do
         [%{role: :system, content: system} | _] =
           adapter.format(output_signature, %{question: "hello"}, [])
 
-        assert system =~ "(Code_elixir):"
+        assert system =~ "(code in elixir):"
         assert system =~ Types.Code.description("elixir")
         refute system =~ "must adhere to the JSON schema"
 
@@ -1501,7 +1514,7 @@ defmodule UpstreamExam.AdaptersTest do
       refute Map.has_key?(nil_language_metadata, "language")
 
       assert Imp.Adapter.Chat.field_description_string(nil_language_signature.outputs) =~
-               "Code_python"
+               "code in python"
 
       assert {:ok, nil_language_prediction} =
                Imp.Adapter.Chat.parse(

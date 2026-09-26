@@ -75,7 +75,7 @@ defmodule Imp.Retrieve do
     end
   rescue
     safety in Imp.OperationalSafetyError -> {:error, safety}
-    error -> {:error, {:retriever_failed, retriever_name(retriever), error_message(error)}}
+    error -> {:error, {:retriever_failed, retriever_name(retriever), error}}
   catch
     kind, reason ->
       case Imp.OperationalSafetyError.find({kind, reason}) do
@@ -83,7 +83,7 @@ defmodule Imp.Retrieve do
           {:error, safety}
 
         nil ->
-          {:error, {:retriever_failed, retriever_name(retriever), error_message({kind, reason})}}
+          {:error, {:retriever_failed, retriever_name(retriever), {kind, reason}}}
       end
   end
 
@@ -112,9 +112,6 @@ defmodule Imp.Retrieve do
   defp retriever_name(fun) when is_function(fun), do: :anonymous_retriever
   defp retriever_name(%module{}), do: module
   defp retriever_name(other), do: other
-
-  defp error_message(%_{} = exception), do: Exception.message(exception)
-  defp error_message(error), do: inspect(error)
 
   defmodule Memory do
     @moduledoc """

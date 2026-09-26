@@ -25,7 +25,7 @@ defmodule ToolSchemaRuntimeTest do
     assert "unchanged" = Imp.Tool.call(untyped, "unchanged")
 
     [mcp_tool] =
-      Imp.MCP.import_tools([
+      Imp.MCP.ToolSchemas.to_tools!([
         %{
           name: :mcp_lookup,
           description: "lookup",
@@ -196,17 +196,17 @@ defmodule ToolSchemaRuntimeTest do
       %{
         name: "ok",
         description: "d",
-        input_schema: %{"type" => "object"},
+        inputSchema: %{"type" => "object"},
         run: fn _ -> :ok end
       },
       %{
         name: "never_an_atom_#{System.unique_integer([:positive])}",
         description: "d",
-        input_schema: %{"type" => "object"},
+        inputSchema: %{"type" => "object"},
         run: fn _ -> :ok end
       }
     ]
 
-    assert Enum.all?(Imp.MCP.import_tools(catalog), &is_binary(&1.name))
+    assert Enum.all?(Imp.MCP.ToolSchemas.to_tools!(catalog), &is_binary(&1.name))
   end
 end

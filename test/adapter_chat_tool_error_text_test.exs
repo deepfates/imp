@@ -223,7 +223,7 @@ defmodule Imp.Adapter.ChatToolErrorTextTest do
     end
 
     test "a denied tool and an unreadable call say so" do
-      assert Chat.format_tool_result({:error, {:tool_denied, :post}}) ==
+      assert Chat.format_tool_result({:error, {:tool_authorization_denied, :post, :tool_policy}}) ==
                "Error: post is not allowed."
 
       assert Chat.format_tool_result({:error, {:malformed_tool_call, %{"function" => nil}}}) ==

@@ -932,16 +932,16 @@ defmodule Imp.ACPTest do
       "env" => []
     }
 
-    assert {:error, {:mcp_server_not_authorized, "untrusted"}} =
-             Imp.ACP.MCP.import_tools([server], cwd: File.cwd!())
+    assert {:error, {:mcp_server_not_authorized, "untrusted", :not_trusted}} =
+             Imp.MCP.connect([server], cwd: File.cwd!())
   end
 
   test "authorized stdio MCP tools cross ExMCP transport into Imp.Tool values" do
     server = demo_mcp_server()
     workspace_name = Path.basename(File.cwd!())
 
-    assert {:ok, %Imp.ACP.MCP.Import{tools: [tool], cleanup: cleanup}} =
-             Imp.ACP.MCP.import_tools([server],
+    assert {:ok, %Imp.MCP.Import{tools: [tool], cleanup: cleanup}} =
+             Imp.MCP.connect([server],
                cwd: File.cwd!(),
                trusted_servers: [server]
              )
@@ -973,8 +973,8 @@ defmodule Imp.ACPTest do
       "headers" => []
     }
 
-    assert {:ok, %Imp.ACP.MCP.Import{} = import} =
-             Imp.ACP.MCP.import_tools([server],
+    assert {:ok, %Imp.MCP.Import{} = import} =
+             Imp.MCP.connect([server],
                cwd: File.cwd!(),
                trusted_servers: [server]
              )
@@ -990,7 +990,7 @@ defmodule Imp.ACPTest do
 
     refute Map.has_key?(import.annotations, "unannotated")
 
-    assert import.tool_kinds == %{
+    assert Imp.ACP.ToolKind.derive_all(import.annotations) == %{
              "annotated_read" => "read",
              "annotated_local_read" => "think",
              "annotated_write" => "execute",
@@ -1024,8 +1024,8 @@ defmodule Imp.ACPTest do
 
     # A name the program has already taken refuses rather than being renamed,
     # so the declaration is what says to call this server's tools something else.
-    assert {:error, {:mcp_tool_name_collision, "annotated_destructive", ["annotated"]}} =
-             Imp.ACP.MCP.import_tools([server],
+    assert {:error, {:mcp_tool_name_reserved, "annotated_destructive", ["annotated"]}} =
+             Imp.MCP.connect([server],
                cwd: File.cwd!(),
                trusted_servers: [server],
                reserved_tool_names: ["annotated_destructive"]
@@ -1033,8 +1033,8 @@ defmodule Imp.ACPTest do
 
     prefixed = Map.put(server, "tool_prefix", "note_")
 
-    assert {:ok, %Imp.ACP.MCP.Import{} = import} =
-             Imp.ACP.MCP.import_tools([prefixed],
+    assert {:ok, %Imp.MCP.Import{} = import} =
+             Imp.MCP.connect([prefixed],
                cwd: File.cwd!(),
                trusted_servers: [prefixed],
                reserved_tool_names: ["annotated_destructive"]
@@ -1042,9 +1042,12 @@ defmodule Imp.ACPTest do
 
     on_exit(import.cleanup)
 
-    refute Map.has_key?(import.tool_kinds, "annotated_destructive")
-    assert import.tool_kinds["note_annotated_destructive"] == "delete"
-    assert import.tool_kinds["note_annotated_read"] == "read"
+    refute Map.has_key?(Imp.ACP.ToolKind.derive_all(import.annotations), "annotated_destructive")
+
+    assert Imp.ACP.ToolKind.derive_all(import.annotations)["note_annotated_destructive"] ==
+             "delete"
+
+    assert Imp.ACP.ToolKind.derive_all(import.annotations)["note_annotated_read"] == "read"
     assert :ok = import.cleanup.()
   end
 
@@ -1169,8 +1172,8 @@ defmodule Imp.ACPTest do
       "headers" => []
     }
 
-    assert {:ok, %Imp.ACP.MCP.Import{tools: [tool], cleanup: cleanup}} =
-             Imp.ACP.MCP.import_tools([server],
+    assert {:ok, %Imp.MCP.Import{tools: [tool], cleanup: cleanup}} =
+             Imp.MCP.connect([server],
                cwd: File.cwd!(),
                trusted_servers: [server]
              )
@@ -1182,8 +1185,8 @@ defmodule Imp.ACPTest do
 
     # A name the program has already taken is refused, not renamed: the tool a
     # caller addresses must be the one its declaration named.
-    assert {:error, {:mcp_tool_name_collision, "external_workspace_name", ["imp-acp-demo-http"]}} =
-             Imp.ACP.MCP.import_tools([server],
+    assert {:error, {:mcp_tool_name_reserved, "external_workspace_name", ["imp-acp-demo-http"]}} =
+             Imp.MCP.connect([server],
                cwd: File.cwd!(),
                trusted_servers: [server],
                reserved_tool_names: ["external_workspace_name"]
@@ -1192,8 +1195,8 @@ defmodule Imp.ACPTest do
     # The declaration says what to call it instead.
     prefixed = Map.put(server, "tool_prefix", "demo_")
 
-    assert {:ok, %Imp.ACP.MCP.Import{tools: [prefixed_tool], cleanup: prefixed_cleanup}} =
-             Imp.ACP.MCP.import_tools([prefixed],
+    assert {:ok, %Imp.MCP.Import{tools: [prefixed_tool], cleanup: prefixed_cleanup}} =
+             Imp.MCP.connect([prefixed],
                cwd: File.cwd!(),
                trusted_servers: [prefixed],
                reserved_tool_names: ["external_workspace_name"]
@@ -1245,8 +1248,8 @@ defmodule Imp.ACPTest do
       "headers" => [%{"name" => "Authorization", "value" => "Bearer " <> token}]
     }
 
-    assert {:ok, %Imp.ACP.MCP.Import{tools: [tool], cleanup: cleanup}} =
-             Imp.ACP.MCP.import_tools([server],
+    assert {:ok, %Imp.MCP.Import{tools: [tool], cleanup: cleanup}} =
+             Imp.MCP.connect([server],
                cwd: File.cwd!(),
                trusted_servers: [server]
              )
@@ -1266,7 +1269,7 @@ defmodule Imp.ACPTest do
         Process.flag(:trap_exit, true)
 
         result =
-          Imp.ACP.MCP.import_tools([rejected],
+          Imp.MCP.connect([rejected],
             cwd: File.cwd!(),
             trusted_servers: [rejected]
           )
@@ -1323,7 +1326,7 @@ defmodule Imp.ACPTest do
     # Undeclared, one name claimed twice is a defect in the declaration and
     # refuses, naming both servers and the tool rather than renaming either.
     assert {:error, {:mcp_tool_name_collision, "external_workspace_name", names}} =
-             Imp.ACP.MCP.import_tools(servers, cwd: File.cwd!(), trusted_servers: servers)
+             Imp.MCP.connect(servers, cwd: File.cwd!(), trusted_servers: servers)
 
     assert names == ["alpha-tools", "beta.tools"]
 
@@ -1331,8 +1334,8 @@ defmodule Imp.ACPTest do
       Enum.zip(servers, ["alpha_", "beta_"])
       |> Enum.map(fn {server, prefix} -> Map.put(server, "tool_prefix", prefix) end)
 
-    assert {:ok, %Imp.ACP.MCP.Import{tools: tools, cleanup: cleanup}} =
-             Imp.ACP.MCP.import_tools(servers,
+    assert {:ok, %Imp.MCP.Import{tools: tools, cleanup: cleanup}} =
+             Imp.MCP.connect(servers,
                cwd: File.cwd!(),
                trusted_servers: servers
              )
@@ -1380,7 +1383,7 @@ defmodule Imp.ACPTest do
     {importer, mon} =
       spawn_monitor(fn ->
         result =
-          Imp.ACP.MCP.import_tools([server],
+          Imp.MCP.connect([server],
             cwd: File.cwd!(),
             trusted_servers: [server],
             owner: owner
@@ -1389,7 +1392,7 @@ defmodule Imp.ACPTest do
         send(parent, {result_ref, result})
       end)
 
-    assert_receive {^result_ref, {:ok, %Imp.ACP.MCP.Import{tools: [tool], cleanup: cleanup}}},
+    assert_receive {^result_ref, {:ok, %Imp.MCP.Import{tools: [tool], cleanup: cleanup}}},
                    30_000
 
     on_exit(cleanup)
@@ -1428,8 +1431,8 @@ defmodule Imp.ACPTest do
     {:ok, owner} = Agent.start(fn -> :ok end)
     owner_mon = Process.monitor(owner)
 
-    assert {:ok, %Imp.ACP.MCP.Import{tools: [tool], cleanup: cleanup}} =
-             Imp.ACP.MCP.import_tools([server],
+    assert {:ok, %Imp.MCP.Import{tools: [tool], cleanup: cleanup}} =
+             Imp.MCP.connect([server],
                cwd: File.cwd!(),
                trusted_servers: [server],
                owner: owner
@@ -1481,8 +1484,8 @@ defmodule Imp.ACPTest do
       "headers" => []
     }
 
-    assert {:ok, %Imp.ACP.MCP.Import{tools: [tool], cleanup: cleanup}} =
-             Imp.ACP.MCP.import_tools([server],
+    assert {:ok, %Imp.MCP.Import{tools: [tool], cleanup: cleanup}} =
+             Imp.MCP.connect([server],
                cwd: File.cwd!(),
                trusted_servers: [server],
                owner: self()
@@ -1507,7 +1510,7 @@ defmodule Imp.ACPTest do
     assert Process.alive?(self())
 
     assert {:error, _reason} =
-             Imp.ACP.MCP.import_tools([server],
+             Imp.MCP.connect([server],
                cwd: File.cwd!(),
                trusted_servers: [server],
                timeout: 1_000,
@@ -1522,8 +1525,8 @@ defmodule Imp.ACPTest do
     workspace_name = Path.basename(File.cwd!())
 
     factory = fn %{cwd: cwd, mcp_servers: servers} ->
-      with {:ok, %Imp.ACP.MCP.Import{tools: tools, cleanup: cleanup}} <-
-             Imp.ACP.MCP.import_tools(servers,
+      with {:ok, %Imp.MCP.Import{tools: tools, cleanup: cleanup}} <-
+             Imp.MCP.connect(servers,
                cwd: cwd,
                trusted_servers: [server]
              ) do
@@ -1823,6 +1826,16 @@ submit(%{answer: observed <> ":" <> scratch})|
              Client.prompt(client, session_id, "second")
 
     assert {:ok, %{}} = Client.close_session(client, session_id)
+  end
+
+  test "an ACP agent introduces itself as imp at the version it is" do
+    {client, _agent} = start_pair(fn _session -> echo_program(self()) end)
+    assert_eventually(fn -> :sys.get_state(client).status == :ready end)
+
+    assert :sys.get_state(client).agent_info == %{
+             "name" => "imp",
+             "version" => to_string(Application.spec(:imp, :vsn))
+           }
   end
 
   test "cold stdio startup emits only ACP JSON on stdout" do

@@ -104,7 +104,7 @@ defmodule Imp.NativeReasoningContractTest do
 
     # The fixture's native branch intentionally omits the manual field. If Imp
     # really keeps the ordinary contract, parsing must fail loudly.
-    assert {:error, %{reason: {:error, {:missing_output_fields, [:reasoning]}}}} =
+    assert {:error, %Imp.AdapterParseError{kind: :missing_fields, reason: [:reasoning]}} =
              Imp.call(program, %{question: "Capital of France?"})
 
     assert_received {:request, messages, opts}

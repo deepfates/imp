@@ -41,7 +41,7 @@ defmodule Imp.Optimizer.BootstrapFewShot do
 
   @option_schema [
     metric_threshold: [type: {:custom, __MODULE__, :validate_optional_number, []}, default: nil],
-    teacher_settings: [type: :keyword_list, default: []],
+    teacher_settings: [type: {:custom, Imp.Settings, :validate_overrides, []}, default: []],
     max_bootstrapped_demos: [type: :non_neg_integer, default: 4],
     max_labeled_demos: [type: :non_neg_integer, default: 16],
     max_rounds: [type: :non_neg_integer, default: 1],
@@ -72,10 +72,12 @@ defmodule Imp.Optimizer.BootstrapFewShot do
     struct(__MODULE__, Map.new(opts) |> Map.put(:metric, metric))
   end
 
+  @doc false
   def validate_optional_number(nil), do: {:ok, nil}
   def validate_optional_number(value) when is_number(value), do: {:ok, value}
   def validate_optional_number(_value), do: {:error, "expected nil, an integer, or a float"}
 
+  @doc false
   def validate_optional_max_errors(nil), do: {:ok, nil}
   def validate_optional_max_errors(value), do: Imp.Evaluate.validate_max_errors(value)
 
@@ -108,6 +110,7 @@ defmodule Imp.Optimizer.BootstrapFewShot do
     error in ArgumentError -> {:error, Exception.message(error)}
   end
 
+  @doc false
   def compile(%__MODULE__{} = optimizer, student, trainset, opts \\ []) when is_list(opts) do
     opts = validate_compile_options!(opts)
     trainset = Enum.to_list(trainset)
@@ -514,16 +517,8 @@ defmodule Imp.Optimizer.BootstrapFewShot do
     end)
   end
 
-  defp resolve_optimizer_max_errors!(%__MODULE__{max_errors: nil} = optimizer) do
-    source =
-      if Keyword.has_key?(optimizer.teacher_settings, :max_errors),
-        do: :teacher_settings,
-        else: :settings
-
-    Imp.Settings.context(optimizer.teacher_settings, fn ->
-      {Imp.Settings.fetch!(:max_errors) |> validate_max_errors!(), source}
-    end)
-  end
+  defp resolve_optimizer_max_errors!(%__MODULE__{max_errors: nil}),
+    do: {Imp.Evaluate.default_optimizer_max_errors(), :default}
 
   defp resolve_optimizer_max_errors!(%__MODULE__{max_errors: value}),
     do: {validate_max_errors!(value), :explicit}
@@ -534,7 +529,7 @@ defmodule Imp.Optimizer.BootstrapFewShot do
         max_errors
 
       {:error, message} ->
-        raise ArgumentError, "invalid effective :max_errors setting: #{message}"
+        raise ArgumentError, "invalid :max_errors: #{message}"
     end
   end
 

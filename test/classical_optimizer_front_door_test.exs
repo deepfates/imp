@@ -132,8 +132,10 @@ defmodule Imp.ClassicalOptimizerFrontDoorTest do
     :ok = Artifact.write!(artifact, path)
     applied = path |> Artifact.read!() |> Artifact.apply(fresh)
 
-    assert Enum.map(applied.demos, &Imp.Example.to_map/1) ==
-             Enum.map(optimized.demos, &Imp.Example.to_map/1)
+    # A demo field the signature does not declare (BootstrapFewShot's
+    # `augmented` marker) is read back under the string key the artifact
+    # stores; keys are compared by text.
+    assert Enum.map(applied.demos, &text_keys/1) == Enum.map(optimized.demos, &text_keys/1)
 
     assert applied.lm == fresh.lm
     applied_report = Report.fetch(applied)
@@ -209,4 +211,7 @@ defmodule Imp.ClassicalOptimizerFrontDoorTest do
 
   defp exact_answer(example, prediction),
     do: Imp.Example.get(example, :answer) == Imp.Prediction.get(prediction, :answer)
+
+  defp text_keys(example),
+    do: Map.new(Imp.Example.to_map(example), fn {key, value} -> {to_string(key), value} end)
 end

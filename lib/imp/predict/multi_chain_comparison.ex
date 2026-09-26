@@ -51,11 +51,21 @@ defmodule Imp.Predict.MultiChainComparison do
   time and must be a positive integer.
   """
   def new(signature, opts \\ []) do
-    opts = Imp.Options.validate!(opts, @option_schema, "Imp.Predict.MultiChainComparison.new/2")
+    opts =
+      Imp.Predict.Options.validate!(
+        opts,
+        @option_schema,
+        "Imp.Predict.MultiChainComparison.new/2"
+      )
+
     signature = Imp.Signature.ensure(signature)
     last_key = signature |> Imp.Signature.output_names() |> List.last()
     m = Keyword.get(opts, :m, Keyword.get(opts, :M, 3))
-    predict_opts = Keyword.put(opts, :config, Keyword.put_new(opts[:config], :temperature, 0.7))
+
+    predict_opts =
+      opts
+      |> Imp.Predict.Options.take()
+      |> Keyword.put(:config, Keyword.put_new(opts[:config], :temperature, 0.7))
 
     comparison_signature =
       Enum.reduce(1..m, signature, fn index, acc ->
@@ -74,6 +84,7 @@ defmodule Imp.Predict.MultiChainComparison do
     }
   end
 
+  @doc false
   def validate_m(m) when is_integer(m) and m > 0, do: {:ok, m}
 
   def validate_m(m) do
