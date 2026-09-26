@@ -222,9 +222,8 @@ defmodule Imp.MixProject do
   # The example's own tests run in a source checkout; a package consumer
   # reads the example, not its test suite.
   defp workspace_agent_example_files do
-    Path.wildcard("examples/workspace_agent/**/*") --
-      (Path.wildcard("examples/workspace_agent/test/**/*") --
-         ["examples/workspace_agent/test"])
+    Path.wildcard("examples/workspace_agent/**/*")
+    |> Enum.reject(&String.starts_with?(&1, "examples/workspace_agent/test"))
   end
 
   defp deployment_example_files do
