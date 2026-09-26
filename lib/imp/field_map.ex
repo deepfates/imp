@@ -1,6 +1,7 @@
 defmodule Imp.FieldMap do
   @moduledoc """
-  Internal. The field maps of `Imp.Example` and `Imp.Prediction`.
+  Internal. The field maps of `Imp.Example` and `Imp.Prediction`, and the one
+  place signature field names are compared.
 
   A key keeps the type it was given: an atom stays an atom and a string stays a
   string, whatever atoms happen to exist in the VM. Every lookup compares keys
@@ -34,6 +35,33 @@ defmodule Imp.FieldMap do
       :error -> fetch_other(fields, key)
     end
   end
+
+  @doc "Whether a field is stored under either spelling of `key`."
+  def has_key?(fields, key), do: match?({:ok, _value}, fetch(fields, key))
+
+  @doc "Gets a field by the text of its key, or `default`."
+  def get(fields, key, default \\ nil) do
+    case fetch(fields, key) do
+      {:ok, value} -> value
+      :error -> default
+    end
+  end
+
+  @doc "Whether two field names have the same text."
+  def same_name?(left, right)
+      when (is_atom(left) or is_binary(left)) and (is_atom(right) or is_binary(right)),
+      do: to_string(left) == to_string(right)
+
+  def same_name?(_left, _right), do: false
+
+  @doc "Whether two lists of field names have the same texts in the same order."
+  def same_names?(left, right),
+    do:
+      length(left) == length(right) and
+        Enum.all?(Enum.zip(left, right), fn {l, r} -> same_name?(l, r) end)
+
+  @doc "The name in `names` with the same text as `name`, or `nil`."
+  def find_name(names, name), do: Enum.find(names, &same_name?(&1, name))
 
   @doc "Sets a field. A field already stored under the other spelling keeps its key."
   def put(fields, key, value), do: Map.put(fields, stored_key(fields, key), value)

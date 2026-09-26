@@ -108,7 +108,7 @@ defmodule Imp.Adapter.TwoStep do
     parts =
       [prefix] ++
         Enum.flat_map(signature.inputs, fn field ->
-          case fetch_present(inputs, field.name) do
+          case Imp.FieldMap.fetch(inputs, field.name) do
             {:ok, value} -> ["#{field.name}: #{Imp.Adapter.Chat.format_value(value)}"]
             :error -> []
           end
@@ -123,7 +123,7 @@ defmodule Imp.Adapter.TwoStep do
   defp assistant_message_content(signature, outputs) do
     signature.outputs
     |> Enum.flat_map(fn field ->
-      case fetch_present(outputs, field.name) do
+      case Imp.FieldMap.fetch(outputs, field.name) do
         {:ok, value} -> ["#{field.name}: #{Imp.Adapter.Chat.format_value(value)}"]
         :error -> []
       end
@@ -142,7 +142,7 @@ defmodule Imp.Adapter.TwoStep do
 
         complete? =
           Enum.all?(all_fields, fn field ->
-            match?({:ok, value} when not is_nil(value), fetch_present(demo, field.name))
+            match?({:ok, value} when not is_nil(value), Imp.FieldMap.fetch(demo, field.name))
           end)
 
         has_input? = Enum.any?(signature.inputs, &present?(demo, &1.name))
@@ -275,17 +275,7 @@ defmodule Imp.Adapter.TwoStep do
     }
   end
 
-  defp present?(fields, name), do: match?({:ok, _value}, fetch_present(fields, name))
-
-  defp fetch_present(fields, name) do
-    string_name = to_string(name)
-
-    cond do
-      Map.has_key?(fields, name) -> {:ok, Map.fetch!(fields, name)}
-      Map.has_key?(fields, string_name) -> {:ok, Map.fetch!(fields, string_name)}
-      true -> :error
-    end
-  end
+  defp present?(fields, name), do: Imp.FieldMap.has_key?(fields, name)
 
   defp validate_opts!(opts, schema, context) when is_list(opts) do
     if Keyword.keyword?(opts) do

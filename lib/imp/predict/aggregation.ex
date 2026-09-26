@@ -82,7 +82,7 @@ defmodule Imp.Predict.Aggregation do
     do: Imp.Prediction.get(prediction, field)
 
   defp value_for(map, field) when is_map(map) and not is_nil(field),
-    do: Map.get(map, field) || Map.get(map, to_string(field))
+    do: Imp.FieldMap.get(map, field)
 
   defp value_for(value, _field), do: value
 

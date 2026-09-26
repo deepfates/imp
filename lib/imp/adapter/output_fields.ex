@@ -6,7 +6,7 @@ defmodule Imp.Adapter.OutputFields do
   def complete(signature, present) when is_map(present) do
     {completed, missing} =
       Enum.reduce(signature.outputs, {%{}, []}, fn field, {completed, missing} ->
-        case fetch_present(present, field.name) do
+        case Imp.FieldMap.fetch(present, field.name) do
           {:ok, value} ->
             {Map.put(completed, field.name, value), missing}
 
@@ -37,11 +37,4 @@ defmodule Imp.Adapter.OutputFields do
   end
 
   def required?(field), do: not optional?(field) and fetch_default(field) == :error
-
-  defp fetch_present(values, name) do
-    case Map.fetch(values, name) do
-      {:ok, value} -> {:ok, value}
-      :error -> Map.fetch(values, to_string(name))
-    end
-  end
 end
