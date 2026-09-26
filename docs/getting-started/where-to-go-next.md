@@ -22,17 +22,17 @@ works the way it does:
 
 - [Signatures](../diving-deeper/signatures.md): types, constraints, and how
   a signature is checked.
-- [Adapters](../diving-deeper/adapters.md): how a signature becomes messages,
-  and a reply becomes fields.
 - [Modules and composition](../diving-deeper/modules-and-composition.md): the
   built-in modules, and writing your own.
 - [RLM](../diving-deeper/rlm.md): inputs too large for a prompt, explored
   with code and a sub-model.
+- [Adapters](../diving-deeper/adapters.md): how a signature becomes messages,
+  and a reply becomes fields.
+- [ReAct](../diving-deeper/react.md): how the agent loop runs and ends.
 - [Tools and MCP](../diving-deeper/tools-and-mcp.md): tools, policies, and MCP
   servers.
 - [Retrieval](../diving-deeper/retrieval.md): retrievers, retrieval before a
   prediction, and search as a tool.
-- [ReAct](../diving-deeper/react.md): how the agent loop runs and ends.
 - [Metrics and evaluation](../diving-deeper/metrics-and-evaluation.md):
   metrics beyond exact match, and reading an evaluation.
 - [Choosing an optimizer](../diving-deeper/choosing-an-optimizer.md): which
