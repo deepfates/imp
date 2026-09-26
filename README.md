@@ -78,6 +78,12 @@ supervised process with bounded concurrency and timeouts. The same pieces grow
 into tools and agents, retrieval, multi-step programs, and a dozen optimizers,
 when a task needs them.
 
+The core is stable: the `Imp` facade, signatures, adapters, `Imp.predict`,
+`Imp.chain_of_thought` and `Imp.react`, evaluation, tools, telemetry and
+saving. The reference groups the other optimizers, agent loops, training
+integrations and runs under **Experimental optimizers and advanced
+workflows**; those may change before 1.0.
+
 ## Install
 
 ```elixir
