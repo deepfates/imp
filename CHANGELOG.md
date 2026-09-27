@@ -27,7 +27,11 @@ User-visible changes to Imp are recorded here.
   true`, the text was kept but the tool calls were lost, all of them when text
   arrived and all but the last otherwise. Both now return the text and every
   tool call, and the adapter reads the text as it reads a text reply, into
-  `next_thought` for ReActV2, as DSPy does.
+  `next_thought` for ReActV2, as DSPy does. So when a ReActV2 run reaches
+  `max_iters` and its last reply has text beside tool calls it did not run,
+  that text is now the answer, where the answer was `nil`; the calls are still
+  listed as unexecuted. The text also appears in history turns and in the ATIF
+  model step.
 - An Avatar tool ends with its caller. Its task kept running after the
   caller was killed, after `Imp.Run.cancel/3` and after the run's owner died;
   it now ends when the caller does. It still runs unlinked, so a crash is an
