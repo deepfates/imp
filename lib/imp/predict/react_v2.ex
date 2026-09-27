@@ -156,6 +156,7 @@ defmodule Imp.Predict.ReActV2 do
     :react,
     :last_request_note,
     tools: %{},
+    tool_order: [],
     max_iters: 20,
     tool_policy: :allow,
     finish_on: %{}
@@ -248,6 +249,7 @@ defmodule Imp.Predict.ReActV2 do
     opts =
       Imp.Predict.Options.validate!(opts, @option_schema, "Imp.Predict.ReActV2.new/3")
 
+    tool_order = declared_order(tools)
     tools = Imp.Tool.index_tools!(tools, "Imp.Predict.ReActV2.new/3")
 
     if Imp.Tool.resolve_name(tools, :submit) do
@@ -277,7 +279,7 @@ defmodule Imp.Predict.ReActV2 do
         metadata: %{text_field: :next_thought}
       }
 
-    config = Keyword.merge(opts[:config], provider_tool_config(tools, signature))
+    config = Keyword.merge(opts[:config], provider_tool_config(tools, tool_order, signature))
 
     # The roster goes to the provider once, natively, in `config`. The loop's
     # guidance goes to the adapter as data. Nothing about tools is written into
@@ -297,6 +299,7 @@ defmodule Imp.Predict.ReActV2 do
           |> Keyword.merge(config: config, adapter_opts: adapter_opts)
         ),
       tools: tools,
+      tool_order: tool_order,
       max_iters: opts[:max_iters],
       tool_policy: opts[:tool_policy],
       last_request_note: opts[:last_request_note],
@@ -384,7 +387,11 @@ defmodule Imp.Predict.ReActV2 do
 
     react = %{
       react
-      | config: Keyword.merge(react.config, provider_tool_config(agent.tools, agent.signature)),
+      | config:
+          Keyword.merge(
+            react.config,
+            provider_tool_config(agent.tools, agent.tool_order, agent.signature)
+          ),
         adapter_opts:
           Keyword.merge(react.adapter_opts, loop_adapter_opts(agent.signature, agent.tools)),
         signature: %{react.signature | metadata: metadata}
@@ -399,7 +406,11 @@ defmodule Imp.Predict.ReActV2 do
 
     react = %{
       agent.react
-      | config: Keyword.merge(agent.react.config, provider_tool_config(tools, agent.signature)),
+      | config:
+          Keyword.merge(
+            agent.react.config,
+            provider_tool_config(tools, agent.tool_order, agent.signature)
+          ),
         adapter_opts:
           Keyword.put(agent.react.adapter_opts, :guidance, guidance(agent.signature, tools))
     }
@@ -441,6 +452,7 @@ defmodule Imp.Predict.ReActV2 do
       # so extra keys would vanish silently here; warn at this boundary the same
       # way Imp.Predict does (:history is a documented call-time key).
       :ok = Imp.Predict.warn_extra_inputs(react.signature, inputs, [:history])
+      react = with_native_tools(react)
 
       pending =
         react.signature
@@ -774,7 +786,10 @@ defmodule Imp.Predict.ReActV2 do
       react.react
       | config:
           Keyword.merge(react.react.config,
-            tools: Enum.map(Map.values(react.tools), &tool_description(&1, react.signature)),
+            tools:
+              react.tools
+              |> ordered_tools(react.tool_order)
+              |> Enum.map(&tool_description(&1, react.signature)),
             tool_choice: tool_choice,
             reasoning_effort: nil
           )
@@ -895,14 +910,19 @@ defmodule Imp.Predict.ReActV2 do
   defp error_text(value), do: inspect(value)
 
   # Every step sends its roster natively. Whether the model answers that
-  # natively is the LM's to say, per call, since the LM can come from
-  # `Imp.Settings`: when it does, the step asks for tool calls or plain text
-  # and the prompt describes no written `tool_calls` field; when it does not,
-  # the prompt keeps the field structure so the model can write its calls.
-  defp predict(program, _react, history, pending) do
+  # natively is the LM's to say, once per call of the loop, since the LM can
+  # come from `Imp.Settings`: when it does, the step asks for tool calls or
+  # plain text and the prompt describes no written `tool_calls` field; when it
+  # does not, the prompt keeps the field structure so the model can write its
+  # calls. Asking once keeps a registry lookup (and its warning for a model the
+  # registry does not know) to one per call rather than one per step.
+  defp with_native_tools(%__MODULE__{react: program} = react) do
     native? = program |> Imp.Predict.resolve_lm() |> Imp.LM.tool_calling_capability()
-    program = %{program | adapter_opts: Keyword.put(program.adapter_opts, :native_tools, native?)}
+    adapter_opts = Keyword.put(program.adapter_opts, :native_tools, native?)
+    %{react | react: %{program | adapter_opts: adapter_opts}}
+  end
 
+  defp predict(program, _react, history, pending) do
     context_call(history, fn projected ->
       Imp.Predict.call(program, Map.put(pending, :history, projected))
     end)
@@ -1365,12 +1385,41 @@ defmodule Imp.Predict.ReActV2 do
     }
   end
 
-  defp provider_tool_config(tools, signature) do
+  defp provider_tool_config(tools, order, signature) do
     [
-      tools: Enum.map(Map.values(tools), &tool_description(&1, signature)),
+      tools: tools |> ordered_tools(order) |> Enum.map(&tool_description(&1, signature)),
       tool_choice: "auto"
     ]
   end
+
+  # The roster is sent in the order the tools were declared, then `submit`.
+  # A map's order would be the order the tool names' atoms were created in,
+  # which differs between processes and would change the prompt a provider
+  # caches. A name missing from the order (a program saved before it was
+  # recorded) comes after the declared ones, sorted.
+  defp ordered_tools(tools, order) do
+    declared = Enum.filter(order, &Map.has_key?(tools, &1))
+
+    rest =
+      tools
+      |> Map.keys()
+      |> Enum.reject(&(&1 in declared or &1 == :submit))
+      |> Enum.sort_by(&to_string/1)
+
+    submit = if Map.has_key?(tools, :submit), do: [:submit], else: []
+    Enum.map(declared ++ rest ++ submit, &Map.fetch!(tools, &1))
+  end
+
+  defp declared_order(tools) when is_list(tools),
+    do:
+      tools
+      |> Enum.flat_map(fn
+        %Imp.Tool{name: name} -> [name]
+        _other -> []
+      end)
+      |> Enum.uniq()
+
+  defp declared_order(_tools), do: []
 
   defp tool_description(%Imp.Tool{name: :submit} = tool, signature),
     do:

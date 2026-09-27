@@ -569,8 +569,18 @@ defmodule Imp.LM.Budgeted do
     end
   end
 
+  # A decorator is the LM it wraps as far as capabilities go: what the inner
+  # client can do is what a request through this one can do.
+  @doc false
   def response_format_capability(%__MODULE__{inner: inner}),
     do: Imp.LM.response_format_capability(inner)
+
+  @doc false
+  def reasoning_capability(%__MODULE__{inner: inner}), do: Imp.LM.reasoning_capability(inner)
+
+  @doc false
+  def tool_calling_capability(%__MODULE__{inner: inner}),
+    do: Imp.LM.tool_calling_capability(inner)
 
   defp bound_output_tokens(nil, opts), do: {:ok, opts}
 

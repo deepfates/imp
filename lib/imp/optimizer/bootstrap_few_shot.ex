@@ -578,5 +578,13 @@ defmodule Imp.Optimizer.BootstrapFewShot do
     @impl true
     def generate(%__MODULE__{lm: lm, round: round}, messages, opts),
       do: Imp.LM.generate(lm, messages, Keyword.merge(opts, rollout_id: round, temperature: 1.0))
+
+    # The rollout is the teacher's LM with two options changed, so it can do
+    # what that LM can.
+    def response_format_capability(%__MODULE__{lm: lm}),
+      do: Imp.LM.response_format_capability(lm)
+
+    def reasoning_capability(%__MODULE__{lm: lm}), do: Imp.LM.reasoning_capability(lm)
+    def tool_calling_capability(%__MODULE__{lm: lm}), do: Imp.LM.tool_calling_capability(lm)
   end
 end

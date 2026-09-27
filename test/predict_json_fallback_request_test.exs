@@ -98,11 +98,14 @@ defmodule PredictJSONFallbackRequestTest do
 
     for line <- [
           "You are an Agent. Use the supplied tools to produce `answer` from `intent`.",
-          "When the final answer is ready, write it as plain text without calling a tool.",
+          "When the final answer is ready, write it in `next_thought` and leave `tool_calls` empty.",
           "The available tools are: `look`."
         ] do
       assert fallback_system.content =~ line
     end
+
+    refute fallback_system.content =~ "plain text"
+    assert prediction.metadata.termination_reason == :answered
 
     # The same history, then the requirements as their own user message; the
     # tool result is not rewritten to carry them.
@@ -176,5 +179,104 @@ defmodule PredictJSONFallbackRequestTest do
       assert metadata.adapter == adapter
       assert metadata.fallback_adapter == Imp.Adapter.JSON
     end
+  end
+
+  # A renderer that builds on the default builds on the format of the request
+  # it is rendering, so a fallback never asks for two formats.
+  test "a system renderer that builds on the default gets the fallback's format" do
+    renderer = fn signature, opts ->
+      "Be terse.\n" <> opts[:adapter].render_system(signature, opts)
+    end
+
+    program =
+      Imp.predict("question -> answer",
+        lm: scripted_lm(self(), ["no markers here", ~s({"answer": "Paris"})]),
+        adapter: Imp.Adapter.Chat,
+        adapter_opts: [system_renderer: renderer]
+      )
+
+    assert {:ok, _prediction} = Imp.call(program, %{question: "Capital of France?"})
+    [first_system | _] = request(1)
+    [fallback_system | _] = request(2)
+
+    assert first_system.content =~ "Be terse.\nYour input fields are:"
+    assert first_system.content =~ "[[ ## answer ## ]]"
+    assert fallback_system.content =~ "Be terse.\nYour input fields are:"
+    assert fallback_system.content =~ "Outputs will be a JSON object"
+    refute fallback_system.content =~ "[[ ## answer ## ]]"
+    refute fallback_system.content =~ "[[ ## completed ## ]]"
+  end
+
+  test "an output renderer that builds on the default gets the fallback's format" do
+    renderer = fn signature, outputs, missing, opts ->
+      opts[:adapter].render_outputs(signature, outputs, missing)
+    end
+
+    program =
+      Imp.predict("question -> answer",
+        lm: scripted_lm(self(), ["no markers here", ~s({"answer": "Paris"})]),
+        adapter: Imp.Adapter.Chat,
+        adapter_opts: [output_renderer: renderer],
+        demos: [%{question: "Capital of Spain?", answer: "Madrid"}]
+      )
+
+    assert {:ok, _prediction} = Imp.call(program, %{question: "Capital of France?"})
+    demo_turn = fn messages -> Enum.find(messages, &(&1.role == :assistant)).content end
+
+    assert demo_turn.(request(1)) == "[[ ## answer ## ]]\nMadrid\n\n[[ ## completed ## ]]\n"
+    fallback = request(2)
+    assert Jason.decode!(demo_turn.(fallback)) == %{"answer" => "Madrid"}
+    refute Enum.any?(fallback, &(&1.content =~ "[[ ## answer ## ]]"))
+    refute Enum.any?(fallback, &(&1.content =~ "[[ ## completed ## ]]"))
+  end
+
+  test "the XML adapter honors a system renderer and the loop guidance" do
+    look = Imp.tool(:look, "Look at a thing", fn _ -> %{"seen" => [1]} end)
+
+    lm =
+      scripted_lm(self(), [
+        "<next_thought>It holds 1.</next_thought>\n<tool_calls>[]</tool_calls>"
+      ])
+
+    renderer = fn signature, opts ->
+      "XML host.\n" <> opts[:adapter].render_system(signature, opts)
+    end
+
+    program =
+      Imp.react("intent -> answer", [look],
+        lm: lm,
+        adapter: Imp.Adapter.XML,
+        adapter_opts: [system_renderer: renderer]
+      )
+
+    assert {:ok, prediction} = Imp.call(program, %{intent: "what is in it?"})
+    assert Imp.get(prediction, :answer) == "It holds 1."
+    assert prediction.metadata.termination_reason == :answered
+
+    [system | _] = request(1)
+    assert system.content =~ "XML host.\nYour input fields are:"
+    assert system.content =~ "The available tools are: `look`."
+
+    assert system.content =~
+             "When the final answer is ready, write it in `next_thought` and leave `tool_calls` empty."
+  end
+
+  # A JSON step cannot be plain text, so the guidance says where the answer
+  # goes in JSON, and a reply that follows it is the answer.
+  test "a JSON-primary agent with one text output is told where its answer goes" do
+    look = Imp.tool(:look, "Look at a thing", fn _ -> %{"seen" => [1]} end)
+    lm = scripted_lm(self(), [~s({"next_thought": "It holds 1.", "tool_calls": []})])
+    program = Imp.react("intent -> answer", [look], lm: lm, adapter: Imp.Adapter.JSON)
+
+    assert {:ok, prediction} = Imp.call(program, %{intent: "what is in it?"})
+    assert Imp.get(prediction, :answer) == "It holds 1."
+    assert prediction.metadata.termination_reason == :answered
+
+    [system | _] = request(1)
+
+    assert system.content =~
+             "When the final answer is ready, write it in `next_thought` and leave `tool_calls` empty."
+
+    refute system.content =~ "plain text"
   end
 end

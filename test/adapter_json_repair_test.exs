@@ -27,21 +27,44 @@ defmodule AdapterJSONRepairTest do
       end
     end
 
-    test "decode Python's \\x escape and the shared single-character escapes" do
-      assert JSONRepair.decode("{'answer': 'caf#{@b}xe9'}") == {:ok, %{"answer" => "café"}}
-
-      assert JSONRepair.decode("{'a': 'it#{@b}'s #{@b}\"x#{@b}\" #{@b}#{@b} a#{@b}/b#{@b}n'}") ==
-               {:ok, %{"a" => "it's \"x\" \\ a/b\n"}}
+    # Each expected value is what Python's `ast.literal_eval` returns for the
+    # same string literal (Python 3.12).
+    test "read escapes as Python's literal_eval does" do
+      for {body, expected} <- [
+            {"caf#{@b}xe9", "café"},
+            {"it#{@b}'s #{@b}\"x#{@b}\" #{@b}#{@b} end#{@b}n", "it's \"x\" \\ end\n"},
+            {"#{@b}d+", "\\d+"},
+            {"C:#{@b}path", "C:\\path"},
+            {"#{@b}q", "\\q"},
+            {"a#{@b}/b", "a\\/b"},
+            {"#{@b}a#{@b}v#{@b}0", <<7, 11, 0>>},
+            {"#{@b}7", <<7>>},
+            {"#{@b}101#{@b}x41#{@b}u0041", "AAA"},
+            {"#{@b}1234", "S4"},
+            {"a#{@b}\nb", "ab"},
+            {"a#{@b}\r\nb", "ab"}
+          ] do
+        assert JSONRepair.decode("{'answer': '#{body}'}") == {:ok, %{"answer" => expected}}, body
+      end
     end
 
-    test "fail on an escape they cannot read, never drop its backslash" do
+    # Python decodes `\N{name}` by the Unicode name table, which OTP does not
+    # have; `json_repair`, the first rung of DSPy's ladder, keeps it as written.
+    test "keep \\N{name} as written" do
+      body = "#{@b}N{LATIN SMALL LETTER E WITH ACUTE}"
+      assert JSONRepair.decode("{'answer': '#{body}'}") == {:ok, %{"answer" => body}}
+    end
+
+    test "fail where Python's literal has a syntax error, or on a lone surrogate" do
       for body <- [
-            "a#{@b}qb",
             "#{@b}u00g9",
+            "#{@b}u12",
+            "#{@b}x4",
+            "#{@b}U0001f6",
+            "#{@b}U00110000",
             "#{@b}ud83d alone",
             "#{@b}ude00",
-            "#{@b}ud83d#{@b}u0041",
-            "#{@b}U00110000"
+            "#{@b}ud83d#{@b}u0041"
           ] do
         assert JSONRepair.decode("{'answer': '#{body}'}") == :error, body
       end
@@ -67,7 +90,7 @@ defmodule AdapterJSONRepairTest do
 
     test "is a loud error for an escape it cannot read", %{signature: signature} do
       assert {:error, %Imp.AdapterParseError{kind: :malformed}} =
-               Imp.Adapter.JSON.parse(signature, "{'answer': 'a#{@b}qb'}", [])
+               Imp.Adapter.JSON.parse(signature, "{'answer': 'a#{@b}x4'}", [])
     end
   end
 end

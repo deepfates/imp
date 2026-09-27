@@ -54,13 +54,15 @@ defmodule Imp.Adapter.JSON do
     # A host's renderers are the program's, and a JSON-fallback request is the
     # same request in this format: a `:system_renderer` writes the system
     # message and an `:output_renderer` the assistant turns, as they do for
-    # Chat, and loop `:guidance` is part of the objective. The request always
-    # ends with a user message, since it carries the output requirements, so
-    # `:omit_empty_request` never drops it.
+    # Chat, told `adapter: Imp.Adapter.JSON` so one that builds on the
+    # default builds on this format's; loop `:guidance` is part of the
+    # objective. The request always ends with a user message, since it carries
+    # the output requirements, so `:omit_empty_request` never drops it.
     format_opts =
       opts
+      |> Keyword.put(:adapter, __MODULE__)
       |> Keyword.put(:response_instruction, false)
-      |> Keyword.put_new(:output_renderer, &render_assistant_json/3)
+      |> Keyword.put_new(:output_renderer, &render_outputs/3)
       |> Keyword.put(:omit_empty_request, false)
 
     {system_renderer, format_opts} = Keyword.pop(format_opts, :system_renderer)
@@ -69,7 +71,7 @@ defmodule Imp.Adapter.JSON do
     system_content =
       case system_renderer do
         nil ->
-          render_system(signature, opts)
+          render_system(signature, format_opts)
 
         renderer when is_function(renderer, 2) ->
           renderer.(signature, format_opts)
@@ -102,7 +104,15 @@ defmodule Imp.Adapter.JSON do
   # DSPy JSONAdapter system message: format_field_description (inherited from
   # ChatAdapter) + JSONAdapter.format_field_structure + format_task_description.
   # ------------------------------------------------------------------
-  defp render_system(signature, opts) do
+  @doc """
+  The default system message: the field listing, the JSON structure and the
+  objective, with `opts[:guidance]` added to it. For a `:system_renderer` to
+  build on; see "Extending the default rendering" in `Imp.Adapter.Chat`.
+  """
+  @spec render_system(Imp.Signature.t(), keyword()) :: String.t()
+  def render_system(signature, opts \\ []) do
+    opts = Keyword.put_new(opts, :adapter, __MODULE__)
+
     field_description(signature) <>
       "\n" <> field_structure(signature) <> "\n" <> task_description(signature, opts)
   end
@@ -200,7 +210,13 @@ defmodule Imp.Adapter.JSON do
   #   json.dumps(serialize_for_json(d), indent=2, ensure_ascii=False)
   # Value resolution (key-presence, present-nil kept) is shared with Chat so the
   # two adapters differ only in serialization: markers here become a JSON object.
-  defp render_assistant_json(signature, outputs, missing_field_message) do
+  @doc """
+  The assistant side of a demo or stored turn, in this adapter's format: the
+  outputs as one JSON object, `missing_field_message` standing in for an
+  output the turn does not have. The default `:output_renderer`.
+  """
+  @spec render_outputs(Imp.Signature.t(), map(), String.t()) :: String.t()
+  def render_outputs(signature, outputs, missing_field_message) do
     signature
     |> Imp.Adapter.Chat.resolve_demo_outputs(outputs, missing_field_message)
     |> Enum.map(fn {name, value} -> {to_string(name), json_value(value)} end)

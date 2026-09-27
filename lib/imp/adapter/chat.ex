@@ -38,6 +38,24 @@ defmodule Imp.Adapter.Chat do
   delivered, the account's allowance ran out), not a rewrite of what happened,
   so the record the loop keeps is unchanged. Options outside that list
   are ignored; anything that is not a keyword list raises `ArgumentError`.
+
+  ## Extending the default rendering
+
+  A renderer runs for whichever adapter formats the request, which is not
+  always the one a program names: a Chat reply that cannot be parsed is asked
+  again through `Imp.Adapter.JSON` with the same renderers. So a renderer is
+  told the adapter in use as `opts[:adapter]`, and one that adds to the
+  default rendering delegates to that adapter, never to a fixed one:
+
+      system_renderer = fn signature, opts ->
+        "Answer tersely.\n\n" <> opts[:adapter].render_system(signature, opts)
+      end
+
+  `render_system/2` and `render_outputs/3` exist on `Imp.Adapter.Chat`,
+  `Imp.Adapter.JSON` and `Imp.Adapter.XML`. An `:output_renderer` of arity 4
+  receives the same options as its fourth argument, for the same purpose:
+  `opts[:adapter].render_outputs(signature, outputs, missing)`. A renderer
+  that writes a format of its own writes it whatever the adapter.
   """
 
   @behaviour Imp.Adapter
@@ -49,17 +67,18 @@ defmodule Imp.Adapter.Chat do
     ],
     response_instruction: [type: :boolean, default: true],
     # Renderer for demo/history ASSISTANT turns: (signature, outputs,
-    # missing_message). A delegating adapter substitutes its own serialization
-    # while reusing Chat's message assembly.
-    output_renderer: [type: {:fun, 3}],
+    # missing_message), or with these format options as a fourth argument. A
+    # delegating adapter substitutes its own serialization while reusing Chat's
+    # message assembly.
+    output_renderer: [type: {:or, [{:fun, 3}, {:fun, 4}]}],
     # Renderer for one INPUT-field section in user-facing turns (main request,
     # demos, history): (field, formatted_value), where formatted_value is
     # Chat's field-aware formatted string. The renderer only wraps it in the
     # adapter's dialect.
     input_section_renderer: [type: {:fun, 2}],
     # Renderer for the SYSTEM message: (signature, opts), where opts are these
-    # format options, so a renderer can read `:guidance`. Default:
-    # `render_system/2`. Replacing it leaves parsing unchanged.
+    # format options, so a renderer can read `:guidance` and `:adapter`.
+    # Default: `render_system/2`. Replacing it leaves parsing unchanged.
     system_renderer: [type: {:fun, 2}],
     # Renderer for one TOOL result message: (result, call), where call is
     # `%{id:, name:}` for the call that produced it. Default:
@@ -86,7 +105,11 @@ defmodule Imp.Adapter.Chat do
     # calls or plain text, so the default system message describes the inputs
     # and the objective and no output field structure: a prompt that also
     # spelled out the step's outputs would ask for a second format.
-    native_tools: [type: :boolean, default: false]
+    native_tools: [type: :boolean, default: false],
+    # The adapter formatting this request, for renderers: this one, or an
+    # adapter that reuses this message assembly (`Imp.Adapter.JSON`,
+    # `Imp.Adapter.XML`) and says so.
+    adapter: [type: :atom, default: __MODULE__]
   ]
 
   @impl true
@@ -96,7 +119,13 @@ defmodule Imp.Adapter.Chat do
     response_instruction? = opts[:response_instruction]
     # Chat's own renderer emits `[[ ## field ## ]]` markers; the JSON adapter
     # passes one that emits a JSON object instead.
-    output_renderer = Keyword.get(opts, :output_renderer) || (&render_demo_outputs/3)
+    output_renderer =
+      case Keyword.get(opts, :output_renderer) do
+        nil -> &render_outputs/3
+        renderer when is_function(renderer, 4) -> &renderer.(&1, &2, &3, opts)
+        renderer -> renderer
+      end
+
     input_renderer = Keyword.get(opts, :input_section_renderer) || (&chat_input_section/2)
     system_renderer = Keyword.get(opts, :system_renderer) || (&render_system/2)
 
@@ -526,7 +555,15 @@ defmodule Imp.Adapter.Chat do
   # stripped once rather than per field, so interior trailing whitespace
   # survives; the trailing `\n\n[[ ## completed ## ]]\n` marker is always
   # appended.
-  defp render_demo_outputs(signature, outputs, missing_field_message) do
+  @doc """
+  The assistant side of a demo or stored turn, in this adapter's format: each
+  output under its `[[ ## name ## ]]` marker, then `[[ ## completed ## ]]`.
+  `missing_field_message` stands in for an output the turn does not have. The
+  default `:output_renderer`, for a renderer to build on (see "Extending the
+  default rendering").
+  """
+  @spec render_outputs(Imp.Signature.t(), map(), String.t()) :: String.t()
+  def render_outputs(signature, outputs, missing_field_message) do
     body =
       signature
       |> resolve_demo_outputs(outputs, missing_field_message)
@@ -557,11 +594,14 @@ defmodule Imp.Adapter.Chat do
     end)
   end
 
-  # The default system message: the field listing, the marker template and the
-  # objective, or, with `:native_tools`, the input listing and the objective.
-  # Public so a custom `:system_renderer` can fall back to it;
-  # an internal seam, not packaged API.
-  @doc false
+  @doc """
+  The default system message: the field listing, the `[[ ## name ## ]]`
+  interaction template and the objective, or, with `native_tools: true`, the
+  input listing and the objective. `opts` are the format options; `:guidance`
+  is added to the objective. For a `:system_renderer` to build on (see
+  "Extending the default rendering").
+  """
+  @spec render_system(Imp.Signature.t(), keyword()) :: String.t()
   def render_system(signature, opts \\ []) do
     objective = objective(signature, opts)
 
@@ -577,12 +617,13 @@ defmodule Imp.Adapter.Chat do
     end
   end
 
-  # The objective: the program's instructions followed by any loop guidance.
-  # Shared with the JSON adapter, so a request in either format says the same.
+  # The objective: the program's instructions followed by any loop guidance,
+  # worded for the format of the request (`opts[:adapter]`). Shared with the
+  # JSON and XML adapters, so a request in any format says the same.
   @doc false
   def objective(signature, opts) do
     signature.instructions
-    |> with_guidance(Keyword.get(opts, :guidance))
+    |> with_guidance(Keyword.get(opts, :guidance), signature, Keyword.get(opts, :adapter))
     |> Imp.Adapter.Instructions.objective_text()
   end
 
@@ -607,15 +648,21 @@ defmodule Imp.Adapter.Chat do
   # inside `submit`'s schema; and a `submit_tool` of nil means the loop has no
   # finish tool and the answer is the text the model writes when it stops
   # calling tools, so that line says so instead (`Imp.Predict.ReActV2`).
-  defp with_guidance(instructions, nil), do: instructions
+  #
+  # With no finish tool the answer is text, and where text goes depends on the
+  # format: this adapter reads a marker-free reply as the signature's
+  # `:text_field`, so the model writes plain text; a JSON or XML reply has to
+  # be that format, so the model puts the answer in the text field and leaves
+  # the other outputs (the tool calls) empty, which the loop reads the same way.
+  defp with_guidance(instructions, nil, _signature, _adapter), do: instructions
 
-  defp with_guidance(instructions, %{} = guidance) do
+  defp with_guidance(instructions, %{} = guidance, signature, adapter) do
     names = fn key -> guidance |> Map.get(key, []) |> Enum.map_join(", ", &"`#{&1}`") end
 
     finish =
       case Map.get(guidance, :submit_tool, :submit) do
         nil ->
-          "When the final answer is ready, write it as plain text without calling a tool."
+          text_answer(signature, adapter)
 
         tool ->
           "When the final answer is ready, call `#{tool}` with #{names.(:output_names)}."
@@ -636,6 +683,28 @@ defmodule Imp.Adapter.Chat do
     """
     |> String.trim()
   end
+
+  defp text_answer(signature, adapter) when adapter not in [nil, __MODULE__] do
+    case output_field(signature, text_field_name(signature)) do
+      %{name: text} ->
+        rest =
+          signature.outputs
+          |> Enum.reject(&(&1.name == text))
+          |> Enum.map_join(" and ", &"`#{&1.name}`")
+
+        "When the final answer is ready, write it in `#{text}`" <>
+          if(rest == "", do: ".", else: " and leave #{rest} empty.")
+
+      nil ->
+        text_answer(signature, nil)
+    end
+  end
+
+  defp text_answer(_signature, _chat),
+    do: "When the final answer is ready, write it as plain text without calling a tool."
+
+  defp text_field_name(signature),
+    do: Map.get(signature.metadata, :text_field, Map.get(signature.metadata, "text_field"))
 
   # The field listing, shared with the TwoStep adapter's persona prompt.
   # Internal cross-adapter seam, not public API.

@@ -38,24 +38,40 @@ User-visible changes to Imp are recorded here.
   output the object became the answer. An LM whose client says it cannot call
   tools (a ReqLLM model the registry lists without tool calling,
   `Imp.Clients.TRLLM`) keeps the field structure, so it can still write its
-  calls.
+  calls. `Imp.LM.Budgeted` and BootstrapFewShot's rollout LM answer for the LM
+  they wrap, for this and for reasoning and response-format support.
+- With the JSON or XML adapter, an `Imp.react` agent whose answer is text is
+  told to write it in `next_thought` and leave `tool_calls` empty, which that
+  format can say, instead of to write plain text without calling a tool.
+- `Imp.react` sends its tool roster in the order the tools were declared, then
+  `submit`, and a saved agent keeps that order. It was the order of the tool
+  names' atoms, which can differ between processes and changed the prompt a
+  provider caches.
 - The JSON fallback after an unparseable Chat or XML reply sends the same
   request in JSON: the program's `adapter_opts` renderers (`:system_renderer`,
   `:output_renderer`), an agent loop's guidance and the demos go with it.
   Before, it sent the stock JSON prompt, so a host that shapes its prompt with
   renderers got a different prompt on every fallback, and an `Imp.react` step
-  lost its tool guidance. `Imp.Adapter.JSON` now honors `:system_renderer`,
-  `:output_renderer` and `:guidance` whenever it is used, and ends a request
-  whose inputs are all in the history with the output requirements as a user
-  message of their own instead of appending them to the last tool result.
+  lost its tool guidance. `Imp.Adapter.JSON` and `Imp.Adapter.XML` now honor
+  `:system_renderer`, `:output_renderer` and `:guidance` whenever they are
+  used, and end a request whose inputs are all in the history with the output
+  requirements as a user message of their own instead of appending them to the
+  last tool result. A renderer is told the adapter formatting the request as
+  `opts[:adapter]`, and one that builds on the default calls that adapter's
+  `render_system/2` or `render_outputs/3`, which Chat, JSON and XML each
+  have, so a fallback never asks for two formats. An `:output_renderer` may
+  take the options as a fourth argument.
 - The `[:imp, :adapter, :parse, :json_fallback]` event names the adapter whose
   reply failed as `:adapter` (it always said `Imp.Adapter.Chat`, also for
   XML) and the adapter that retried as `:fallback_adapter`.
 - Repairing a Python-style completion keeps its text: `{'answer': 'caf\u00e9'}`
   reads as `café`, not `cafu00e9`, and emoji written as `\ud83d\ude00` or
-  `\U0001f600` read as the emoji. An escape the repair cannot read makes the
-  parse an `Imp.AdapterParseError` instead of dropping its backslash. This
-  reaches the Chat, JSON and XML adapters and GEPA's instruction proposal.
+  `\U0001f600` read as the emoji. Escapes are read as Python reads a string
+  literal: `'\d+'` and `'C:\path'` keep their backslash, `\a`, `\v`, `\0` and
+  octal escapes decode, and a backslash before a newline is dropped. A
+  malformed `\x`, `\u` or `\U` escape or a lone surrogate makes the parse an
+  `Imp.AdapterParseError` instead of dropping its backslash. This reaches the
+  Chat, JSON and XML adapters and GEPA's instruction proposal.
 
 ### Documentation
 

@@ -188,6 +188,33 @@ a JSON object with the fields in order. The single-field adapter's is shorter:
 the objective, the inputs, the one output with its type, and an instruction
 to return only the value.
 
+### Shaping the prompt yourself
+
+`adapter_opts` replaces parts of the prompt without changing how the reply is
+read: `:system_renderer` writes the system message, `:output_renderer` the
+assistant side of demos and stored turns, `:input_section_renderer` each
+input. A renderer is told which adapter is formatting the request as
+`opts[:adapter]`. That is not always the program's adapter, since a Chat reply
+that cannot be parsed is asked again through the JSON adapter with the same
+renderers, so a renderer that adds to the default builds on that adapter's
+rendering rather than naming one:
+
+```elixir
+terse = fn signature, opts ->
+  "Answer in one word.\n\n" <> opts[:adapter].render_system(signature, opts)
+end
+
+router = Imp.predict(signature, lm: lm, adapter_opts: [system_renderer: terse])
+{:ok, prediction} = Imp.call(router, %{ticket: "We were charged twice this month."})
+
+String.starts_with?(hd(prediction.metadata.trace.messages).content, "Answer in one word.")
+#=> true
+```
+
+The Chat, JSON and XML adapters each have `render_system/2` and
+`render_outputs/3`, and an `:output_renderer` that takes a fourth argument
+receives the same options.
+
 ### When the answer does not fit
 
 A reply that cannot be read as the signature's outputs, after any retry,

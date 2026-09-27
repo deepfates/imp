@@ -34,18 +34,38 @@ defmodule Imp.Adapter.XML do
     # XML input-section and assistant renderers injected, then substituting
     # the XML system message and appending the XML output requirements to the
     # main-request user message.
+    #
+    # A host's renderers are honored as in `Imp.Adapter.JSON`: a
+    # `:system_renderer` and an `:output_renderer` are told
+    # `adapter: Imp.Adapter.XML`, loop `:guidance` is part of the objective, and
+    # the request always ends on the output requirements. The input sections
+    # are this format's dialect.
     format_opts =
       opts
+      |> Keyword.put(:adapter, __MODULE__)
       |> Keyword.put(:response_instruction, false)
-      |> Keyword.put(:output_renderer, &render_assistant_xml/3)
+      |> Keyword.put_new(:output_renderer, &render_outputs/3)
       |> Keyword.put(:input_section_renderer, &xml_input_section/2)
+      |> Keyword.put(:omit_empty_request, false)
 
+    {system_renderer, format_opts} = Keyword.pop(format_opts, :system_renderer)
     [_chat_system | rest] = Imp.Adapter.Chat.format(signature, inputs, format_opts)
 
-    [
-      %{role: :system, content: render_system(signature)}
-      | append_output_requirements(rest, signature)
-    ]
+    system_content =
+      case system_renderer do
+        nil ->
+          render_system(signature, format_opts)
+
+        renderer when is_function(renderer, 2) ->
+          renderer.(signature, format_opts)
+
+        other ->
+          raise ArgumentError,
+                "#{inspect(__MODULE__)}.format/3: :system_renderer must be a " <>
+                  "two-argument function, got: #{inspect(other)}"
+      end
+
+    [%{role: :system, content: system_content} | append_output_requirements(rest, signature)]
   end
 
   @impl true
@@ -72,7 +92,13 @@ defmodule Imp.Adapter.XML do
   #   format_field_with_value({field: outputs.get(k, missing_field_message)})
   # -> `<name>\nvalue\n</name>` blocks joined by blank lines, stripped once,
   # with NO trailing `[[ ## completed ## ]]` marker (that is Chat's dialect).
-  defp render_assistant_xml(signature, outputs, missing_field_message) do
+  @doc """
+  The assistant side of a demo or stored turn, in this adapter's format: each
+  output wrapped in its field tag, `missing_field_message` standing in for an
+  output the turn does not have. The default `:output_renderer`.
+  """
+  @spec render_outputs(Imp.Signature.t(), map(), String.t()) :: String.t()
+  def render_outputs(signature, outputs, missing_field_message) do
     resolved =
       Map.new(Imp.Adapter.Chat.resolve_demo_outputs(signature, outputs, missing_field_message))
 
@@ -99,6 +125,9 @@ defmodule Imp.Adapter.XML do
     init ++ [Map.update!(last, :content, &append_text(&1, tail))]
   end
 
+  # A blank request (a tool loop whose inputs are all in the history) is the
+  # output requirements alone.
+  defp append_text("", suffix), do: String.trim_leading(suffix)
   defp append_text(content, suffix) when is_binary(content), do: content <> suffix
   defp append_text(content, suffix) when is_list(content), do: content ++ [suffix]
 
@@ -123,9 +152,17 @@ defmodule Imp.Adapter.XML do
   # XMLAdapter.format_field_structure + ChatAdapter.format_task_description,
   # joined with single newlines (base.Adapter.format_system_message).
   # ------------------------------------------------------------------
-  defp render_system(signature) do
+  @doc """
+  The default system message: the field listing, the XML structure and the
+  objective, with `opts[:guidance]` added to it. For a `:system_renderer` to
+  build on; see "Extending the default rendering" in `Imp.Adapter.Chat`.
+  """
+  @spec render_system(Imp.Signature.t(), keyword()) :: String.t()
+  def render_system(signature, opts \\ []) do
+    opts = Keyword.put_new(opts, :adapter, __MODULE__)
+
     field_description(signature) <>
-      "\n" <> field_structure(signature) <> "\n" <> task_description(signature)
+      "\n" <> field_structure(signature) <> "\n" <> task_description(signature, opts)
   end
 
   # ChatAdapter.format_field_description / utils.get_field_description_string.
@@ -191,9 +228,9 @@ defmodule Imp.Adapter.XML do
   defp translate_field_type(field, kind), do: Imp.Adapter.FieldType.placeholder(field, kind)
 
   # ChatAdapter.format_task_description (inherited by XMLAdapter).
-  defp task_description(signature) do
+  defp task_description(signature, opts) do
     "In adhering to this structure, your objective is: " <>
-      Imp.Adapter.Instructions.objective_text(signature.instructions)
+      Imp.Adapter.Chat.objective(signature, opts)
   end
 
   # ------------------------------------------------------------------

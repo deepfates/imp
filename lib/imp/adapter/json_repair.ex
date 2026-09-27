@@ -13,9 +13,9 @@ defmodule Imp.Adapter.JSONRepair do
   #   * then Python-literal forms: single-quoted strings, `True`/`False`/`None`,
   #     nested dicts/lists, trailing commas.
   #
-  # Text is kept byte for byte, and an escape is decoded to the character it
-  # names (`\u00e9`, a `\ud83d\ude00` surrogate pair, Python's `\U0001f600`
-  # and `\xe9`) or the decode fails.
+  # Text is kept byte for byte, and escapes are read as Python reads them
+  # (see `parse_string_body/3`): a changed value is never reported as a
+  # successful decode.
   #
   # It is NOT a general Python parser: anything outside those forms is a loud
   # `:error`, so schema validation reports the honest failure instead of a
@@ -169,13 +169,24 @@ defmodule Imp.Adapter.JSONRepair do
 
   defp parse_string_body(<<>>, _quote, _acc), do: :error
 
-  # The escapes JSON and Python string literals share, plus Python's `\x`
-  # and `\U`. A `\u` pair that spells a surrogate pair is one character, as
-  # it is in JSON. Any other escape is one this module cannot read with
-  # certainty, so the whole decode is `:error` rather than a string with its
-  # backslash dropped.
+  # Escapes read as Python's `ast.literal_eval` reads them in a string
+  # literal, with one addition from JSON: a `\u` surrogate pair is one
+  # character. A backslash before a newline continues the line and is dropped.
+  # `\x`, `\u` and `\U` take exactly 2, 4 and 8 hex digits, and a code
+  # point past U+10FFFF is refused; each of those is a syntax error in Python
+  # and makes the decode `:error`. So does a lone surrogate, which Python keeps
+  # but an Elixir string cannot hold. An escape Python does
+  # not define (`\d`, `\p`, `\/`) keeps its backslash, as Python keeps it.
+  # `\N{name}` is kept as written: OTP has no Unicode name table to decode
+  # it by, and `json_repair`, the first rung of DSPy's ladder, keeps it too.
+  defp parse_string_body(<<?\\, ?\r, ?\n, rest::binary>>, quote, acc),
+    do: parse_string_body(rest, quote, acc)
+
+  defp parse_string_body(<<?\\, ?\n, rest::binary>>, quote, acc),
+    do: parse_string_body(rest, quote, acc)
+
   defp parse_string_body(<<?\\, escaped, rest::binary>>, quote, acc)
-       when escaped in [?\\, ?', ?", ?/, ?n, ?t, ?r, ?b, ?f] do
+       when escaped in [?\\, ?', ?", ?n, ?t, ?r, ?b, ?f, ?a, ?v] do
     resolved =
       case escaped do
         ?n -> ?\n
@@ -183,6 +194,8 @@ defmodule Imp.Adapter.JSONRepair do
         ?r -> ?\r
         ?b -> ?\b
         ?f -> ?\f
+        ?a -> 7
+        ?v -> 11
         other -> other
       end
 
@@ -210,13 +223,26 @@ defmodule Imp.Adapter.JSONRepair do
     end
   end
 
+  defp parse_string_body(<<?\\, ?u, _short::binary>>, _quote, _acc), do: :error
+
   defp parse_string_body(<<?\\, ?U, hex::binary-size(8), rest::binary>>, quote, acc),
     do: escaped_codepoint(hex, rest, quote, acc)
+
+  defp parse_string_body(<<?\\, ?U, _short::binary>>, _quote, _acc), do: :error
 
   defp parse_string_body(<<?\\, ?x, hex::binary-size(2), rest::binary>>, quote, acc),
     do: escaped_codepoint(hex, rest, quote, acc)
 
-  defp parse_string_body(<<?\\, _escaped::binary>>, _quote, _acc), do: :error
+  defp parse_string_body(<<?\\, ?x, _short::binary>>, _quote, _acc), do: :error
+
+  defp parse_string_body(<<?\\, rest::binary>>, quote, acc)
+       when binary_part(rest, 0, 1) in ~w(0 1 2 3 4 5 6 7) do
+    {digits, rest} = take_octal(rest, [])
+    parse_string_body(rest, quote, [<<List.to_integer(digits, 8)::utf8>> | acc])
+  end
+
+  defp parse_string_body(<<?\\, rest::binary>>, quote, acc) when rest != "",
+    do: parse_string_body(rest, quote, [?\\ | acc])
 
   defp parse_string_body(<<char, rest::binary>>, quote, acc) do
     if char == quote do
@@ -225,6 +251,11 @@ defmodule Imp.Adapter.JSONRepair do
       parse_string_body(rest, quote, [char | acc])
     end
   end
+
+  defp take_octal(<<digit, rest::binary>>, digits) when digit in ?0..?7 and length(digits) < 3,
+    do: take_octal(rest, [digit | digits])
+
+  defp take_octal(rest, digits), do: {Enum.reverse(digits), rest}
 
   defp escaped_codepoint(hex, rest, quote, acc) do
     case hex_codepoint(hex) do
