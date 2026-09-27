@@ -24,10 +24,9 @@ User-visible changes to Imp are recorded here.
   become maps, and pids, references and functions become their `inspect/1`
   text. Redaction runs first, as before.
 - A binary that is not valid UTF-8 renders as
-  `%{"__imp_type__" => "binary", "bytes" => size, "sha256" => prefix}`, the
-  first 12 hex characters of its SHA-256, and never as its content; a map key
-  that is not valid UTF-8 takes the same form inside the map's `entries`. This
-  applies to `Imp.inspect_history/2` and
+  `%{"__imp_type__" => "binary", "bytes" => size}`, never as its content or a
+  digest of it; a map key that is not valid UTF-8 takes the same form inside
+  the map's `entries`. This applies to `Imp.inspect_history/2` and
   `Imp.Observability.render_inspection/2`, which raised `Jason.EncodeError` on
   such a binary, and to `Imp.Run.Event.to_map/1` and
   `Imp.Trajectory.to_atif/2`, which returned the raw bytes, so encoding their
@@ -38,7 +37,15 @@ User-visible changes to Imp are recorded here.
   and `Imp.MCP.OAuth.Flow` (the authorization URL, PKCE transaction and
   registered client), keeping each struct and its other fields. They were
   walked as plain maps, whose field names are not credential names, so the
-  store's key reached any redacted output that held a store.
+  store's key reached any redacted output that held a store. `code_verifier`
+  is a credential name, so a PKCE transaction map is redacted on its own too.
+- `Imp.Redaction.redact/2` hides a connection struct's header values and the
+  query, fragment and user info of its URLs, as `inspect/1` already did:
+  `Imp.Clients.ReqLLM`, `Imp.Retrievers.HTTP`, `Imp.Tracking.MLflow`,
+  `Imp.Tracking.WandB`, `Imp.Optimize.Anything.Config.Tracking`,
+  `ExMCP.Client` and `ExMCP.Transport.HTTP`. A retriever in a tool result kept
+  an `X-Subscription-Token` header, a cookie and a `?key=` URL in
+  `render_inspection/2`, run-event JSON and ATIF.
 - A call streamed with `Imp.stream(program, inputs, provider_stream: true)`
   is recorded in its run like any other model call: a `:model_request` event
   with the request's `:purpose`, and a `:model_response` event with the usage

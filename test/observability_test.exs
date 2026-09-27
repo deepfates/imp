@@ -99,7 +99,7 @@ defmodule ObservabilityTest do
     assert turn["owner"] == Kernel.inspect(self())
     assert turn["ref"] == Kernel.inspect(ref)
     assert turn["callback"] == Kernel.inspect(&String.upcase/1)
-    fingerprint = %{"__imp_type__" => "binary", "bytes" => 2, "sha256" => "b3d510ef0427"}
+    fingerprint = %{"__imp_type__" => "binary", "bytes" => 2}
     assert turn["bytes"] == fingerprint
     refute rendered =~ "<<255, 254>>"
     assert turn["range"] == %{"first" => 1, "last" => 3, "step" => 1}
@@ -121,15 +121,22 @@ defmodule ObservabilityTest do
     assert unredacted =~ "plain-secret"
   end
 
-  test "an MCP OAuth store a tool returns never shows its key in any rendering" do
+  test "an OAuth store and a retriever a tool returns show no secret in any rendering" do
     directory = Path.join(System.tmp_dir!(), "imp-oauth-#{System.unique_integer([:positive])}")
     store = Imp.MCP.OAuth.store(directory: directory, secret: String.duplicate("s", 32))
     key = store.key
-    key_fingerprint = Imp.Observability.Inspection.json_safe(key)["sha256"]
+
+    retriever =
+      Imp.Retrievers.HTTP.new("https://retriever.example/search?key=query-key-value",
+        headers: [
+          {"x-subscription-token", "subscription-token-value"},
+          {"cookie", "session-cookie-value"}
+        ]
+      )
 
     {:ok, script} =
       Agent.start_link(fn ->
-        [%{tool_calls: [%{id: "s1", name: "credentials", arguments: %{}}]}, "done"]
+        [%{tool_calls: [%{id: "s1", name: "connections", arguments: %{}}]}, "done"]
       end)
 
     lm =
@@ -139,10 +146,14 @@ defmodule ObservabilityTest do
         end
       )
 
-    credentials = Imp.tool(:credentials, "credentials", fn _arguments -> %{store: store} end)
-    program = Imp.react("question -> answer", [credentials], lm: lm)
+    connections =
+      Imp.tool(:connections, "connections", fn _arguments ->
+        %{store: store, retriever: retriever}
+      end)
 
-    {:ok, run} = Imp.Run.start(program, %{question: "Which store?"})
+    program = Imp.react("question -> answer", [connections], lm: lm)
+
+    {:ok, run} = Imp.Run.start(program, %{question: "Which connections?"})
     assert {:ok, prediction} = Task.await(run.task)
     events = Imp.Run.events(run)
     Imp.Run.stop(run)
@@ -156,11 +167,24 @@ defmodule ObservabilityTest do
       events |> Imp.Trajectory.to_atif() |> Jason.encode!()
     ]
 
+    secrets = [
+      key,
+      Kernel.inspect(key),
+      Base.encode16(key, case: :lower),
+      Base.encode16(key, case: :upper),
+      "query-key-value",
+      "subscription-token-value",
+      "session-cookie-value"
+    ]
+
     for rendered <- renderings do
       assert rendered =~ directory
-      refute :binary.match(rendered, key) != :nomatch
-      refute rendered =~ Kernel.inspect(key)
-      refute rendered =~ key_fingerprint
+      assert rendered =~ "https://retriever.example/search"
+      assert rendered =~ "x-subscription-token"
+
+      for secret <- secrets do
+        assert :binary.match(rendered, secret) == :nomatch
+      end
     end
   end
 

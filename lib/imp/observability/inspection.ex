@@ -54,12 +54,11 @@ defmodule Imp.Observability.Inspection do
   and atoms other than `nil`, `true` and `false` become strings.
 
   A binary that is not valid UTF-8, as a value or as a map key, becomes
-  `%{"__imp_type__" => "binary", "bytes" => size, "sha256" => prefix}`, where
-  `prefix` is the first 12 hex characters of its SHA-256. Its content is never
-  rendered: such bytes are most often key material, ciphertext or random
-  values, and the size and fingerprint still tell two of them apart. Anything
-  else that is not a number or a UTF-8 binary, such as a pid, a reference or
-  a function, becomes its `inspect/1` text.
+  `%{"__imp_type__" => "binary", "bytes" => size}`. Neither its content nor a
+  digest of it is rendered: such bytes are most often key material, ciphertext
+  or random values, and a digest of a short one gives it back by trying every
+  candidate. Anything else that is not a number or a UTF-8 binary, such as a
+  pid, a reference or a function, becomes its `inspect/1` text.
 
   Nothing is redacted here; pass a value through `Imp.Redaction.redact/1`
   first when it may carry secrets.
@@ -105,16 +104,9 @@ defmodule Imp.Observability.Inspection do
   def json_safe(value) when is_number(value), do: value
 
   def json_safe(value) when is_binary(value) do
-    if String.valid?(value) do
-      value
-    else
-      %{
-        "__imp_type__" => "binary",
-        "bytes" => byte_size(value),
-        "sha256" =>
-          :sha256 |> :crypto.hash(value) |> Base.encode16(case: :lower) |> binary_part(0, 12)
-      }
-    end
+    if String.valid?(value),
+      do: value,
+      else: %{"__imp_type__" => "binary", "bytes" => byte_size(value)}
   end
 
   def json_safe(value), do: Kernel.inspect(value)

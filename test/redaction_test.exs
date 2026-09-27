@@ -452,4 +452,26 @@ defmodule Imp.RedactionTest do
     refute printed =~ Kernel.inspect(store.key)
     assert Imp.Redaction.redact(%{pending | state: nil}).state == nil
   end
+
+  test "a bare PKCE transaction map loses its verifier" do
+    transaction = %{"code_verifier" => "v2", code_verifier: "verifier-value", state: "s"}
+    redacted = Imp.Redaction.redact(transaction)
+
+    assert redacted.code_verifier == "[REDACTED]"
+    assert redacted["code_verifier"] == "[REDACTED]"
+  end
+
+  test "a connection struct redacts as it prints" do
+    retriever =
+      Imp.Retrievers.HTTP.new("https://retriever.example/search?key=query-key-value",
+        headers: [{"x-subscription-token", "subscription-token-value"}]
+      )
+
+    redacted = Imp.Redaction.redact(retriever)
+
+    assert %Imp.Retrievers.HTTP{} = redacted
+    assert redacted.headers == [{"x-subscription-token", "[REDACTED]"}]
+    refute redacted.url =~ "query-key-value"
+    assert Kernel.inspect(retriever) == Kernel.inspect(redacted)
+  end
 end
