@@ -16,6 +16,15 @@ User-visible changes to Imp are recorded here.
 
 ### Fixed
 
+- `Imp.inspect_history/2` renders any history. A turn holding a term JSON has
+  no encoding for, such as the `{:error, {:unknown_tool, name}}` result a
+  ReActV2 history keeps for a call to a tool that does not exist, raised
+  `Protocol.UndefinedError`. Turns now render through the same conversion
+  `Imp.Observability.render_inspection/2` uses: tuples become lists, structs
+  become maps, and pids, references, functions and binaries that are not valid
+  UTF-8 become their `inspect/1` text, which `render_inspection/2` now also
+  does for such binaries instead of raising `Jason.EncodeError`. Redaction is
+  unchanged.
 - A call streamed with `Imp.stream(program, inputs, provider_stream: true)`
   is recorded in its run like any other model call: a `:model_request` event
   with the request's `:purpose`, and a `:model_response` event with the usage
