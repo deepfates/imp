@@ -200,6 +200,55 @@ defmodule OptimizerBehavioralCorpusTest do
     assert report.metadata.generations == 0
   end
 
+  test "GEPA reports metric feedback as feedback, not as failed program calls" do
+    # Feedback of any shape - text, a map, a tagged tuple - is the metric's
+    # judgement of a row that ran, not a failure.
+    for feedback_for <- [
+          fn score -> "This trajectory got a score of #{score}." end,
+          fn score -> %{verdict: "wrong", score: score} end,
+          fn _score -> {:error, "judge says wrong"} end
+        ] do
+      feedback_metric = fn example, prediction ->
+        score = Imp.Metrics.normalize_result(metric().(example, prediction)).score
+        %{score: score, feedback: feedback_for.(score)}
+      end
+
+      report =
+        Imp.Optimizer.GEPA.new(feedback_metric,
+          execution_profile: :beam_native,
+          generations: 1,
+          reflection_lm: reflection_lm("Answer in one word."),
+          feedback_fn: fn _trainset -> "Answer in one word." end
+        )
+        |> Imp.Optimizer.GEPA.compile(france_program(), trainset(), devset())
+        |> Imp.Optimizer.Report.fetch()
+
+      assert report.metadata.rejected_candidates > 0
+      assert report.errors == []
+      assert report.metadata.status == :ok
+      assert Enum.all?(report.candidates, &(&1.diagnostics == []))
+      refute Enum.any?(report.candidates, &(&1.mutation =~ "Program call failed"))
+    end
+  end
+
+  test "GEPA reports a metric result it cannot read as an error" do
+    for {value, expected} <- [
+          {{:ok, 1.0}, "invalid metric result: {:ok, 1.0}"},
+          {nil, "invalid metric result: nil"}
+        ] do
+      report =
+        Imp.Optimizer.GEPA.new(fn _example, _prediction -> value end,
+          execution_profile: :beam_native,
+          generations: 0
+        )
+        |> Imp.Optimizer.GEPA.compile(france_program(), trainset(), devset())
+        |> Imp.Optimizer.Report.fetch()
+
+      assert report.metadata.status == :with_errors
+      assert [%{candidate_id: "baseline", diagnostics: [^expected]}] = report.errors
+    end
+  end
+
   test "GEPA records program failures diagnostically without using them as instruction advice" do
     broken_program =
       Imp.predict("question -> answer",
@@ -219,6 +268,8 @@ defmodule OptimizerBehavioralCorpusTest do
 
     assert report.optimizer == :gepa
     assert report.best_score == 0.0
+    assert report.metadata.status == :with_errors
+    assert [%{candidate_id: "baseline", diagnostics: ["offline_candidate"]}] = report.errors
 
     assert Enum.any?(report.candidates, fn candidate ->
              candidate.mutation =~ "Program call failed"
@@ -227,6 +278,86 @@ defmodule OptimizerBehavioralCorpusTest do
     refute Enum.any?(report.candidates, fn candidate ->
              candidate.instruction =~ "Program call failed"
            end)
+  end
+
+  test "GEPA reports a program that raises as an error" do
+    raising_program =
+      Imp.predict("question -> answer",
+        lm: Imp.Test.FunLM.new(fn _messages, _opts -> raise "candidate crashed" end)
+      )
+
+    report =
+      Imp.Optimizer.GEPA.new(metric(),
+        execution_profile: :beam_native,
+        generations: 1,
+        reflection_lm: reflection_lm("Answer in one word.")
+      )
+      |> Imp.Optimizer.GEPA.compile(raising_program, trainset(), devset())
+      |> Imp.Optimizer.Report.fetch()
+
+    assert report.metadata.status == :with_errors
+    assert [%{candidate_id: "baseline", diagnostics: [diagnostic]}] = report.errors
+    assert diagnostic =~ "candidate crashed"
+  end
+
+  test "GEPA reports a metric that raises, throws or exits as an error, redacted" do
+    for {metric, expected} <- [
+          {fn _example, _prediction -> throw(:judge_down) end, "{:throw, :judge_down}"},
+          {fn _example, _prediction -> exit(:judge_gone) end, "{:exit, :judge_gone}"},
+          {fn _example, _prediction -> throw("judge down") end, ~s({:throw, "judge down"})},
+          {fn _example, _prediction -> throw(%{api_key: "sk-judge-secret"}) end,
+           ~s({:throw, %{api_key: "[REDACTED]"}})},
+          {fn _example, _prediction -> raise "judge rejected sk-judge-secret0" end, "[REDACTED]"}
+        ] do
+      report =
+        Imp.Optimizer.GEPA.new(metric, execution_profile: :beam_native, generations: 0)
+        |> Imp.Optimizer.GEPA.compile(france_program(), trainset(), devset())
+        |> Imp.Optimizer.Report.fetch()
+
+      assert report.metadata.status == :with_errors
+      assert [%{candidate_id: "baseline", diagnostics: [^expected]}] = report.errors
+    end
+  end
+
+  test "GEPA names a failed proposal as a proposal failure, not a program call failure" do
+    program =
+      Imp.predict("question -> answer",
+        lm:
+          Imp.LM.Static.new(
+            handler: fn messages, _opts ->
+              prompt = Enum.map_join(messages, "\n", & &1.content)
+              if prompt =~ "Answer in one word", do: %{answer: "one"}, else: %{answer: "unknown"}
+            end
+          )
+      )
+
+    # The proposed program's rows carry objective scores GEPA cannot accept, so
+    # evaluating the proposal raises; with `raise_on_exception: false` the
+    # proposal is rejected with that error and the run continues.
+    metric = fn _example, prediction ->
+      if Imp.Prediction.get(prediction, :answer) == "one",
+        do: %{score: 0.0, metadata: %{objective_scores: %{accuracy: "not a number"}}},
+        else: 0.0
+    end
+
+    report =
+      Imp.Optimizer.GEPA.new(metric,
+        execution_profile: :beam_native,
+        generations: 1,
+        proposal_concurrency: 2,
+        raise_on_exception: false,
+        reflection_lm: reflection_lm("Answer in one word.")
+      )
+      |> Imp.Optimizer.GEPA.compile(program, trainset(), devset())
+      |> Imp.Optimizer.Report.fetch()
+
+    assert [%{instruction: "Answer in one word."} = rejected] =
+             Enum.reject(report.candidates, &(&1.id == "baseline"))
+
+    assert rejected.diagnostics == ["GEPA objective scores must be maps with numeric values"]
+
+    assert rejected.mutation ==
+             "Proposal failed: GEPA objective scores must be maps with numeric values"
   end
 
   test "GEPA keeps truncated multibyte diagnostics valid UTF-8" do

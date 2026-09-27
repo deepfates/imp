@@ -14,8 +14,17 @@ defmodule Imp.Predict.RLM.Budget do
           cancelled: term() | nil
         }
 
-  def start_link(opts) do
-    GenServer.start_link(__MODULE__, opts)
+  # Starts a budget owned by the calling process, or by `opts[:owner]`.
+  #
+  # The budget lives while its owner does. When the owner dies, as when a
+  # caller outside a run is killed, the budget kills its effects and stops, and
+  # each effect has linked itself to the budget, so none keeps running or keeps
+  # its place in the task pool. The budget traps exits, so an effect that ends,
+  # however it ends, is only recorded; and it monitors its owner rather than
+  # linking to it, so a killed owner stops it with `:shutdown`, which logs
+  # nothing.
+  def start(opts) do
+    GenServer.start(__MODULE__, Keyword.put_new(opts, :owner, self()))
   end
 
   def reserve_lm(pid, count) when is_integer(count) and count >= 0,
@@ -51,6 +60,8 @@ defmodule Imp.Predict.RLM.Budget do
 
   @impl true
   def init(opts) do
+    Process.flag(:trap_exit, true)
+    owner_monitor = Process.monitor(Keyword.fetch!(opts, :owner))
     started_at = System.monotonic_time(:millisecond)
     max_time_ms = Keyword.get(opts, :max_time_ms)
 
@@ -64,7 +75,8 @@ defmodule Imp.Predict.RLM.Budget do
        effects: %{},
        started_at: started_at,
        deadline: if(max_time_ms, do: started_at + max_time_ms),
-       cancelled: nil
+       cancelled: nil,
+       owner_monitor: owner_monitor
      }}
   end
 
@@ -165,6 +177,9 @@ defmodule Imp.Predict.RLM.Budget do
   end
 
   @impl true
+  def handle_info({:DOWN, monitor, :process, _owner, _reason}, %{owner_monitor: monitor} = state),
+    do: {:stop, :shutdown, state}
+
   def handle_info({:DOWN, monitor, :process, pid, _reason}, state) do
     effects =
       case Map.get(state.effects, pid) do
@@ -174,6 +189,8 @@ defmodule Imp.Predict.RLM.Budget do
 
     {:noreply, %{state | effects: effects}}
   end
+
+  def handle_info({:EXIT, _effect, _reason}, state), do: {:noreply, state}
 
   @impl true
   def terminate(_reason, state) do

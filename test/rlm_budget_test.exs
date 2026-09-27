@@ -4,7 +4,7 @@ defmodule RLMBudgetTest do
   alias Imp.Predict.RLM.Budget
 
   test "atomically reserves calls and shares recursion depth" do
-    {:ok, budget} = Budget.start_link(max_lm_calls: 3, max_recursion_depth: 2)
+    {:ok, budget} = Budget.start(max_lm_calls: 3, max_recursion_depth: 2)
 
     assert {:ok, 2} = Budget.reserve_lm(budget, 2)
     assert {:error, {:rlm_max_llm_calls, 3}} = Budget.reserve_lm(budget, 2)
@@ -18,7 +18,7 @@ defmodule RLMBudgetTest do
   end
 
   test "sibling recursion depth is branch scoped" do
-    {:ok, budget} = Budget.start_link(max_lm_calls: 1, max_recursion_depth: 1)
+    {:ok, budget} = Budget.start(max_lm_calls: 1, max_recursion_depth: 1)
 
     assert {:ok, 1} = Budget.enter_recursion(budget, 0)
     assert {:ok, 1} = Budget.enter_recursion(budget, 0)
@@ -26,7 +26,7 @@ defmodule RLMBudgetTest do
   end
 
   test "LM leases reserve capacity and charge only committed calls" do
-    {:ok, budget} = Budget.start_link(max_lm_calls: 3)
+    {:ok, budget} = Budget.start(max_lm_calls: 3)
 
     assert {:ok, lease} = Budget.lease_lm(budget, 3)
     assert {:error, {:rlm_max_llm_calls, 3}} = Budget.reserve_lm(budget, 1)
@@ -38,7 +38,7 @@ defmodule RLMBudgetTest do
   end
 
   test "LM lease commit atomically rejects cancellation without consuming the lease" do
-    {:ok, budget} = Budget.start_link(max_lm_calls: 2)
+    {:ok, budget} = Budget.start(max_lm_calls: 2)
     {:ok, lease} = Budget.lease_lm(budget, 2)
 
     assert :ok = Budget.cancel(budget, :caller_stopped)
@@ -48,7 +48,7 @@ defmodule RLMBudgetTest do
   end
 
   test "LM lease commit atomically rejects an expired deadline without consuming the lease" do
-    {:ok, budget} = Budget.start_link(max_lm_calls: 1, max_time_ms: 60_000)
+    {:ok, budget} = Budget.start(max_lm_calls: 1, max_time_ms: 60_000)
     {:ok, lease} = Budget.lease_lm(budget, 1)
 
     :sys.replace_state(budget, fn state ->
@@ -60,7 +60,7 @@ defmodule RLMBudgetTest do
   end
 
   test "cancellation is sticky and prevents new work" do
-    {:ok, budget} = Budget.start_link(max_lm_calls: 1)
+    {:ok, budget} = Budget.start(max_lm_calls: 1)
 
     assert :ok = Budget.cancel(budget, :caller_stopped)
     assert :ok = Budget.cancel(budget, :later_reason)
@@ -70,7 +70,7 @@ defmodule RLMBudgetTest do
   end
 
   test "cancellation terminates registered in-flight effects" do
-    {:ok, budget} = Budget.start_link(max_lm_calls: 1)
+    {:ok, budget} = Budget.start(max_lm_calls: 1)
     effect = spawn(fn -> Process.sleep(:infinity) end)
     monitor = Process.monitor(effect)
 
@@ -80,7 +80,7 @@ defmodule RLMBudgetTest do
   end
 
   test "an effect registered after cancellation is rejected and terminated" do
-    {:ok, budget} = Budget.start_link(max_lm_calls: 1)
+    {:ok, budget} = Budget.start(max_lm_calls: 1)
     assert :ok = Budget.cancel(budget, :caller_stopped)
 
     effect = spawn(fn -> Process.sleep(:infinity) end)
@@ -93,7 +93,7 @@ defmodule RLMBudgetTest do
   end
 
   test "deadline is observable and enforced" do
-    {:ok, budget} = Budget.start_link(max_lm_calls: 1, max_time_ms: 0)
+    {:ok, budget} = Budget.start(max_lm_calls: 1, max_time_ms: 0)
     Process.sleep(2)
 
     assert {:error, :rlm_time_budget_exceeded} = Budget.check(budget)
@@ -101,8 +101,8 @@ defmodule RLMBudgetTest do
   end
 
   test "deadline-free task waits use infinity instead of an implicit timeout" do
-    {:ok, unlimited} = Budget.start_link(max_lm_calls: 1)
-    {:ok, bounded} = Budget.start_link(max_lm_calls: 1, max_time_ms: 60_000)
+    {:ok, unlimited} = Budget.start(max_lm_calls: 1)
+    {:ok, bounded} = Budget.start(max_lm_calls: 1, max_time_ms: 60_000)
 
     assert Budget.task_timeout(unlimited) == :infinity
     assert Budget.task_timeout(bounded) in 1..60_000
