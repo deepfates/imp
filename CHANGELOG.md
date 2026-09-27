@@ -24,6 +24,21 @@ User-visible changes to Imp are recorded here.
   recorded in the calling process, which made parallel work that process
   started afterwards (`Imp.Predict.Parallel.map/3`, `Imp.Evaluate.run/2`) run
   one item at a time.
+- `Imp.Example.inputs/1` and `labels/1` raise `ArgumentError` naming
+  `Imp.with_inputs/2` when the example never declared its inputs, as DSPy
+  raises `ValueError`. They returned every field as inputs, labels included,
+  so a program was given the answer and scored on it. `Imp.evaluate/4` and
+  every optimizer that runs a program on examples raise before calling the
+  program; a devset row that is a plain map or field pair list, which cannot
+  declare inputs, raises the same way instead of being evaluated.
+- `Imp.Example.new/1` and `Imp.Prediction.new/2` raise when a field is given
+  twice, as an atom and a string or repeated; one value was silently dropped.
+- `Imp.Signature.new/2` (and `Imp.signature/2`) applies new instructions to an
+  existing signature; it returned the signature unchanged.
+- An instruction an optimizer sets on `Imp.Predict.ProgramOfThought` or
+  `Imp.Predict.CodeAct` reaches the extraction step, which kept the old
+  instructions when GEPA, MIPROv2, COPRO, SIMBA or InferRules set it.
+  `Imp.Optimizer.InstructionSearch` sets instructions the same way.
 
 ### Documentation
 

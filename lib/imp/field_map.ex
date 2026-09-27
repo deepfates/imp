@@ -9,11 +9,24 @@ defmodule Imp.FieldMap do
   other way round. No string is ever turned into a new atom.
   """
 
-  @doc "Builds a field map from a map or a list of `{key, value}` pairs."
+  @doc """
+  Builds a field map from a map or a list of `{key, value}` pairs.
+
+  Raises `ArgumentError` when two entries name the same field, as `:answer` and
+  `"answer"` do: keeping one would silently drop the other's value.
+  """
   def new!(fields, context, owner) when is_map(fields) or is_list(fields) do
     Enum.reduce(fields, %{}, fn
       {key, value}, acc ->
-        put(acc, key!(key, owner), value)
+        key = key!(key, owner)
+
+        if has_key?(acc, key) do
+          raise ArgumentError,
+                "#{context} got the field #{inspect(to_string(key))} more than once " <>
+                  "(as an atom and a string, or repeated); give each field once"
+        end
+
+        put(acc, key, value)
 
       entry, _acc ->
         raise ArgumentError,

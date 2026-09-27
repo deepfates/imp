@@ -202,6 +202,7 @@ defmodule Imp.Optimizer.GRPO do
   def compile(%__MODULE__{} = optimizer, program, trainset, opts) when is_list(opts) do
     with {:ok, trainset} <- materialize_dataset(trainset, :trainset),
          {:ok, valset} <- materialize_dataset(Keyword.get(opts, :valset), :valset),
+         :ok <- Imp.Example.require_inputs!(trainset ++ List.wrap(valset)),
          :ok <- validate_compile_inputs(optimizer, program, trainset, valset),
          :ok <- validate_durable_callbacks(optimizer),
          :ok <- Trainer.supports_method(optimizer.trainer, :grpo) do

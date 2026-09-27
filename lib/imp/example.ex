@@ -85,17 +85,60 @@ defmodule Imp.Example do
   def with_inputs(%__MODULE__{} = example, keys),
     do: %{example | input_keys: keys |> List.wrap() |> Enum.map(&key!/1)}
 
-  @doc "Returns an example containing only the marked input fields."
-  def inputs(%__MODULE__{input_keys: nil} = example), do: example
+  @doc """
+  Returns an example containing only the marked input fields.
 
+  Raises `ArgumentError` when `with_inputs/2` was never called: without a
+  declared split every field, labels included, would reach the program.
+  """
   def inputs(%__MODULE__{} = example),
-    do: %{example | fields: Imp.FieldMap.take(example.fields, example.input_keys)}
+    do: %{example | fields: Imp.FieldMap.take(example.fields, input_keys!(example, "inputs"))}
 
-  @doc "Returns an example containing label fields, excluding marked inputs."
-  def labels(%__MODULE__{input_keys: nil}), do: new(%{})
+  @doc """
+  Returns an example containing label fields, excluding marked inputs.
 
+  Raises `ArgumentError` when `with_inputs/2` was never called, as `inputs/1`
+  does.
+  """
   def labels(%__MODULE__{} = example),
-    do: %{example | fields: Imp.FieldMap.drop(example.fields, example.input_keys)}
+    do: %{example | fields: Imp.FieldMap.drop(example.fields, input_keys!(example, "labels"))}
+
+  @doc false
+  # Raises the error `inputs/1` would for the first row of `rows` that cannot
+  # say which of its fields are inputs. Evaluation and optimizers call it
+  # before running anything, outside the per-row recovery that would otherwise
+  # record the error as a failed, scored row. A plain map or field pair list
+  # cannot declare inputs. Any other row, or a `rows` that is not enumerable,
+  # is left to the caller's own checks.
+  def require_inputs!(rows) do
+    if Enumerable.impl_for(rows), do: Enum.each(rows, &require_row_inputs!/1)
+    :ok
+  end
+
+  defp require_row_inputs!(row) do
+    case row do
+      %__MODULE__{} = example ->
+        input_keys!(example, "inputs")
+
+      row when (is_map(row) and not is_struct(row)) or is_list(row) ->
+        raise ArgumentError,
+              "a plain map or field pair list cannot declare which fields are inputs; build " <>
+                "the row with Imp.example/1 and call Imp.with_inputs/2 on it. Got: " <>
+                inspect(row)
+
+      _row ->
+        :ok
+    end
+  end
+
+  defp input_keys!(%__MODULE__{input_keys: nil} = example, function) do
+    raise ArgumentError,
+          "Imp.Example.#{function}/1 needs the example's inputs declared; call " <>
+            "Imp.with_inputs/2 (Imp.Example.with_inputs/2) first. Example keys: " <>
+            inspect(keys(example))
+  end
+
+  defp input_keys!(%__MODULE__{input_keys: keys}, _function), do: keys
 
   @doc "Attaches demonstrations to an example."
   def with_demos(%__MODULE__{} = example, demos),

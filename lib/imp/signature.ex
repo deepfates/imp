@@ -58,10 +58,19 @@ defmodule Imp.Signature do
   descriptions, enums, and answer-shape aliases. Maps accept atom or string keys
   and are useful when signatures are loaded from JSON or built from structured
   configuration.
+
+  `instructions`, when given, replaces the spec's own: an existing signature
+  gets the new instructions, and a map's `:instructions` key is overridden.
   """
   def new(spec, instructions \\ nil)
 
-  def new(%__MODULE__{} = signature, _instructions), do: signature
+  def new(%__MODULE__{} = signature, nil), do: signature
+
+  def new(%__MODULE__{} = signature, instructions),
+    do: %{
+      signature
+      | instructions: resolve_instructions(instructions, signature.inputs, signature.outputs)
+    }
 
   def new(spec, instructions) when is_binary(spec) do
     {inputs, outputs} = Imp.Signature.Parser.parse(spec)

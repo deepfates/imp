@@ -89,7 +89,7 @@
   # :rand seed format ([first | second]) at the seed_s call
   {"lib/imp/optimizer/sampling.ex", :improper_list_constr, {24, 11}},
   # defensive clause for non-covered bucket shapes
-  {"lib/imp/optimizer/simba.ex", :pattern_match_cov, {698, 8}},
+  {"lib/imp/optimizer/simba.ex", :pattern_match_cov, {700, 8}},
   # defensive clause for non-covered trace entries
   {"lib/imp/optimizer/trajectory.ex", :pattern_match_cov, {270, 8}},
   # defensive error clause on an always-ok retriever call

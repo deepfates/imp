@@ -195,7 +195,11 @@ defmodule Imp.Evaluate do
   `%Imp.Metrics.Result{}`. An arity-3 metric receives `nil` as its trace here,
   as in DSPy (see `Imp.Metrics`).
   Program and metric failures are recorded as failed rows so optimizers can keep
-  searching and report diagnostics.
+  searching and report diagnostics. A row whose inputs were never declared with
+  `Imp.with_inputs/2` is not a failed row: `run/2` raises `ArgumentError` before
+  calling the program, because every field, labels included, would otherwise
+  reach it. A plain map or field pair list cannot declare inputs, so a devset of
+  them raises the same way.
 
   The per-row `:timeout` defaults to `:infinity`, matching DSPy's `Evaluate`
   (which imposes no per-example deadline). When a finite `:timeout` kills a row
@@ -288,6 +292,8 @@ defmodule Imp.Evaluate do
   end
 
   defp run_traced(evaluator, program) do
+    Imp.Example.require_inputs!(evaluator.devset)
+
     case run_rows(evaluator, program) do
       {:completed, rows, errors} ->
         rows = Enum.reverse(rows)
@@ -473,18 +479,11 @@ defmodule Imp.Evaluate do
       devset
     else
       raise ArgumentError,
-            "Imp.Evaluate.new/3 expects devset to be an enumerable (Enumerable) of examples, maps, or field pair lists; got: #{inspect(devset)}"
+            "Imp.Evaluate.new/3 expects devset to be an enumerable (Enumerable) of Imp.Example rows with declared inputs; got: #{inspect(devset)}"
     end
   end
 
   defp normalize_example(%Imp.Example{} = example), do: {:ok, example}
-
-  defp normalize_example(example) when is_map(example) or is_list(example) do
-    {:ok, Imp.Example.new(example)}
-  rescue
-    error -> {:error, {:invalid_evaluation_example, error_message(error)}}
-  end
-
   defp normalize_example(example), do: {:error, {:invalid_evaluation_example, inspect(example)}}
 
   defp failed_row_data(index, example, failure_score, reason) do
