@@ -7,12 +7,16 @@ User-visible changes to Imp are recorded here.
 ### Documentation
 
 - The install instructions ask for a C and a C++ compiler: jaxon builds native
-  code from C and erlexec from C++. They asked for a C++ compiler only.
+  code from C and erlexec from C++. They asked for a C++ compiler only. They
+  also say the first compile needs network access, for erlexec's rebar3
+  plugins.
 - The package's Changelog link opens the changelog on HexDocs, and the 0.4.0
   entry links the benchmark pages as they were at v0.4.0, not on `main`.
-- Each Livebook's first cell is four lines: `Mix.install` from Hex, or from
-  the checkout `IMP_PATH` names. It no longer searches for a source checkout.
-- The MCP example on the Tools and agents page defines everything it uses.
+- Each Livebook's setup cell only installs Imp: from Hex, or from the
+  checkout `IMP_PATH` names. It no longer searches for a source checkout.
+- The MCP example on the Tools and agents page defines its server and its
+  imported tools, where it used an undefined `imported`, and closes the
+  server when the call fails.
 
 ## 0.5.0 — 2026-09-26
 

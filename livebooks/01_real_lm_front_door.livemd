@@ -1,12 +1,19 @@
 # Imp 01: Real LM front door
 
 ```elixir
-# Set IMP_PATH to run this notebook against a local Imp checkout.
-case System.get_env("IMP_PATH") do
-  nil -> Mix.install([{:imp, "~> 0.5"}])
-  path -> Mix.install([{:imp, path: path}], lockfile: Path.join(path, "mix.lock"))
+# To use a local Imp checkout, set IMP_PATH in the environment Livebook starts
+# in. A Livebook secret does not work: it arrives as LB_IMP_PATH.
+imp_path = System.get_env("IMP_PATH")
+lockfile = imp_path && Path.join(imp_path, "mix.lock")
+
+cond do
+  is_nil(imp_path) -> Mix.install([{:imp, "~> 0.5"}])
+  File.regular?(lockfile) -> Mix.install([{:imp, path: imp_path}], lockfile: lockfile)
+  true -> Mix.install([{:imp, path: imp_path}])
 end
 ```
+
+## Setup
 
 ```elixir
 api_key = System.get_env("OPENAI_API_KEY") || System.get_env("LB_OPENAI_API_KEY")

@@ -149,7 +149,8 @@ text or JSON you can score, such as an agent's tool descriptions.
 ```
 
 Imp needs Elixir 1.19 or later and a C and C++ compiler, for the native code
-in two dependencies (jaxon and erlexec). It reaches models through
+in two dependencies (jaxon and erlexec). The first compile needs network
+access, because erlexec's build fetches rebar3 plugins. It reaches models through
 [ReqLLM](https://hex.pm/packages/req_llm), so any provider ReqLLM supports
 works.
 

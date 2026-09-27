@@ -17,7 +17,8 @@ Mix.install([{:imp, "~> 0.5"}])
 ~~~
 
 Imp needs Elixir 1.19 and a C and C++ compiler, for the native code in two
-dependencies (jaxon and erlexec).
+dependencies (jaxon and erlexec). The first compile needs network access,
+because erlexec's build fetches rebar3 plugins.
 
 ## Connecting to a model
 

@@ -16,12 +16,24 @@ defmodule LivebookContractTest do
 
     for {path, install} <- installs do
       assert install =~ ~s[System.get_env("IMP_PATH")], path
-      assert install =~ "Mix.install([{:imp, path: path}]", path
+      assert install =~ "Mix.install([{:imp, path: imp_path}]", path
       assert install =~ ~s(Mix.install([{:imp, "~> ), path
     end
 
     assert installs |> Map.values() |> Enum.uniq() |> length() == 1,
            "Livebooks install Imp differently: #{inspect(Map.keys(installs))}"
+  end
+
+  test "every Livebook has only its title and one cell before its first section" do
+    # Livebook imports the cells before the first `##` heading as the setup
+    # cell only when there is exactly one cell and no other text there;
+    # otherwise it makes an unnamed section and leaves the setup cell empty.
+    for path <- livebooks() do
+      [preamble | _] = Regex.split(~r/^## /m, File.read!(path), parts: 2)
+
+      assert Regex.match?(~r/\A# [^\n]+\s+```elixir\n(?:(?!```).)*\n```\s*\z/s, preamble),
+             "#{path} must have only its title and one elixir cell before its first section"
+    end
   end
 
   @tag timeout: 180_000
