@@ -151,15 +151,16 @@ defmodule Imp.Datasets do
     end
   end
 
-  defp require_csv_header!([], path) do
+  defp require_csv_header!([], path), do: raise_no_csv_header!(path)
+  defp require_csv_header!(rows, _path), do: rows
+
+  defp raise_no_csv_header!(path) do
     raise Error,
       message: "invalid CSV dataset at #{path}: expected header row",
       path: path,
       line: 1,
       record: nil
   end
-
-  defp require_csv_header!(rows, _path), do: rows
 
   # The whole file is parsed at once. `Imp.CSV` takes CRLF, LF and a bare CR
   # as line breaks, so a file with rows after its header yields them whatever
@@ -211,7 +212,7 @@ defmodule Imp.Datasets do
       end)
 
     case Task.await(task, :infinity) do
-      {:ok, {nil, _rows}} -> require_csv_header!([], path)
+      {:ok, {nil, _rows}} -> raise_no_csv_header!(path)
       {:ok, table} -> table
       {:raise, error, stacktrace} -> reraise error, stacktrace
     end
