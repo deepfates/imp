@@ -94,15 +94,17 @@ defmodule ReActV2ToolRosterTest do
   # Every step asks whether the LM calls tools. A ReqLLM model the registry
   # does not know warns on each lookup, so the client keeps its answer.
   test "a ReqLLM model's tool calling is looked up once" do
-    lm =
-      Imp.req_llm("openai:imp-uncatalogued-#{System.unique_integer([:positive])}", api_key: "k")
+    spec = "openai:imp-uncatalogued-#{System.unique_integer([:positive])}"
+
+    lm = Imp.req_llm(spec, api_key: "k")
 
     warnings =
       ExUnit.CaptureIO.capture_io(:stderr, fn ->
         for _step <- 1..3, do: assert(Imp.LM.tool_calling_capability(lm))
       end)
 
-    assert length(String.split(warnings, "Using unverified model")) == 2
+    # Other tests may warn while this one captures stderr; count this model's.
+    assert length(String.split(warnings, "Using unverified model: #{spec}\n")) == 2
   end
 
   test "a wrapped LM answers for the LM it wraps" do
