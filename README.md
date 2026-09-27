@@ -16,8 +16,8 @@ reliability and concurrency of OTP.
 
 DSPy makes each call to a model a declared, typed function that you can
 measure and improve. On the BEAM, an agent is a process: it keeps its own
-state, receives messages, and runs under a supervisor alongside thousands
-of others. With both, you can build anything from one typed call
+state, receives messages, and runs under a supervisor alongside the rest
+of your application. With both, you can build anything from one typed call
 to many long-running agents, and improve each part by measuring it.
 
 ## Declare a task
