@@ -92,16 +92,32 @@ defmodule Imp.Optimizer.GEPA.AgentReflectionTest do
     assert report.metadata.execution_profile == :gepa_v0_1_4_merge
     assert [prompt | _rest] = prompts(ctx.prompts)
 
-    # The tool result and the final answer come from later turns than the
-    # first step, so they reach the prompt only through the finished history.
-    assert prompt =~ "### Context\n```json\n  0: "
-    assert prompt =~ "PAGE-BODY-MARKER 1.2.3"
-    assert prompt =~ "FINAL-ANSWER-MARKER"
-    assert prompt =~ ~s("url": "https://example.com/v")
-    assert prompt =~ "### tools\n"
-    assert prompt =~ ~s("name": "fetch")
-    assert prompt =~ "Read a web page as text."
-    assert prompt =~ "## Feedback\nThis trajectory got a score of 0.0."
+    # Every example shows the whole run, whichever step was drawn: the tool
+    # result and the final answer come after the first step, and the answer
+    # after the last, so they reach the prompt only through the finished
+    # history.
+    examples = prompt |> String.split("# Example ") |> tl()
+    assert length(examples) == 3
+
+    for example <- examples do
+      assert example =~ "### Context\n```json\n  0: "
+      assert example =~ ~s("result": "PAGE-BODY-MARKER 1.2.3")
+      assert example =~ ~s("answer": "FINAL-ANSWER-MARKER")
+      assert example =~ ~s("url": "https://example.com/v")
+
+      assert example =~
+               ~s(### tools\n[{"name": "fetch", "description": "Read a web page as text.", "args": {"url": {"type": "string"}}}])
+
+      assert example =~ "## Feedback\nThis trajectory got a score of 0.0."
+    end
+
+    # The reflected step is drawn among the loop's steps, not always the
+    # first: with seed 0 one of these examples reflects on the answering step.
+    assert Enum.any?(
+             examples,
+             &(&1 =~ "## Generated Outputs\n### next_thought\nFINAL-ANSWER-MARKER")
+           )
+
     refute prompt =~ "%Imp."
   end
 
