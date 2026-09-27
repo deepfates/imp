@@ -6,15 +6,22 @@ defmodule Imp.Clients.ReqLLMBatch do
   receives each normalized request plus attempt metadata and must return one of:
 
     * `{:ok, output}`
-    * `{:transient, reason}`
+    * `{:transient, reason}` - the request did not run and may be sent again
     * `{:terminal, reason}`
     * `{:malformed, reason}`
+    * `{:ambiguous, reason}` - the request may have run; it is not sent again
+
+  A request that may already have run is never re-dispatched: sending it again
+  could run and bill it twice. Only a `:transient` outcome is retried, up to
+  `:max_attempts`. A dispatcher that raises, throws or exits, or that is still
+  running at `:timeout`, may have sent its request first, so its outcome is
+  `:ambiguous`.
 
   The checkpoint is an auditable JSON document. Every dispatch intent and
   outcome is appended to its event history before execution continues. Writes
   use a synced temporary file followed by an atomic rename. On resume, a
   request that was dispatched but has no committed outcome becomes
-  `:ambiguous` and is never replayed automatically.
+  `:ambiguous` for the same reason.
   """
 
   alias Imp.Clients.ReqLLM
@@ -26,6 +33,7 @@ defmodule Imp.Clients.ReqLLMBatch do
           | {:transient, term()}
           | {:terminal, term()}
           | {:malformed, term()}
+          | {:ambiguous, term()}
   @type dispatcher :: (request(), context() -> outcome())
 
   @type summary :: %{
@@ -99,6 +107,12 @@ defmodule Imp.Clients.ReqLLMBatch do
   Request payloads may be a message list or `%{"messages" => messages}`. The
   adapter is provider-neutral because provider and model selection remain in
   the client (`"openai:..."`, `"anthropic:..."`, or `"gemini:..."`).
+
+  A failed call's `Imp.LMError` decides its outcome. A request that never
+  reached the provider (the connection was refused, or no pooled connection
+  was free) and one the provider answered with a status that says try later
+  are `:transient`. Any other status is `:terminal`. A timeout or closed
+  connection with no response may have run, so it is `:ambiguous`.
   """
   @spec req_llm_dispatcher(ReqLLM.t(), keyword()) :: dispatcher()
   def req_llm_dispatcher(%ReqLLM{} = client, call_opts \\ []) when is_list(call_opts) do
@@ -114,12 +128,23 @@ defmodule Imp.Clients.ReqLLMBatch do
         messages when is_list(messages) ->
           case ReqLLM.generate(client, messages, call_opts) do
             {:ok, output} -> {:ok, output}
-            {:error, reason} -> {:transient, reason}
+            {:error, error} -> {classify_lm_error(error), error}
           end
 
         _other ->
           {:malformed, :req_llm_batch_messages_required}
       end
+    end
+  end
+
+  defp classify_lm_error(%Imp.LMError{status: status} = error) when is_integer(status),
+    do: if(Imp.Errors.retryable?(error), do: :transient, else: :terminal)
+
+  defp classify_lm_error(%Imp.LMError{} = error) do
+    cond do
+      ReqLLM.not_sent?(error) -> :transient
+      Imp.Errors.retryable?(error) -> :ambiguous
+      true -> :terminal
     end
   end
 
@@ -157,7 +182,7 @@ defmodule Imp.Clients.ReqLLMBatch do
       outcome =
         case task_result do
           {:ok, outcome} -> outcome
-          {:exit, reason} -> {:transient, normalize_json({:dispatcher_exit, inspect(reason)})}
+          {:exit, reason} -> {:ambiguous, normalize_json({:dispatcher_exit, inspect(reason)})}
         end
 
       {request["id"], request["attempts"], outcome}
@@ -171,9 +196,9 @@ defmodule Imp.Clients.ReqLLMBatch do
     dispatcher.(public_request, context)
     |> normalize_outcome(validator)
   rescue
-    error -> {:transient, normalize_json({:dispatcher_exception, Exception.message(error)})}
+    error -> {:ambiguous, normalize_json({:dispatcher_exception, Exception.message(error)})}
   catch
-    kind, reason -> {:transient, normalize_json({:dispatcher_throw, kind, inspect(reason)})}
+    kind, reason -> {:ambiguous, normalize_json({:dispatcher_throw, kind, inspect(reason)})}
   end
 
   defp normalize_outcome({:ok, output}, nil), do: normalize_success(output)
@@ -198,6 +223,9 @@ defmodule Imp.Clients.ReqLLMBatch do
 
   defp normalize_outcome({:malformed, reason}, _validator),
     do: {:malformed, normalize_json(reason)}
+
+  defp normalize_outcome({:ambiguous, reason}, _validator),
+    do: {:ambiguous, normalize_json(reason)}
 
   defp normalize_outcome(other, _validator),
     do: {:malformed, normalize_json({:invalid_dispatcher_return, other})}
@@ -227,6 +255,7 @@ defmodule Imp.Clients.ReqLLMBatch do
         {:transient, reason} -> {"transient_failure", "reason", reason}
         {:terminal, reason} -> {"terminal_failure", "reason", reason}
         {:malformed, reason} -> {"malformed_output", "reason", reason}
+        {:ambiguous, reason} -> {"ambiguous", "reason", reason}
       end
 
     state

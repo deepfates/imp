@@ -36,6 +36,56 @@ defmodule DatasetsContractTest do
     cleanup_tmp("ragged.csv")
   end
 
+  test "CSV loader reads quoted commas, escaped quotes, empty quoted fields and quoted newlines" do
+    path = tmp_path("quoted.csv")
+
+    File.write!(
+      path,
+      ~s(question,answer\r\n"a, b",x\r\ny,"a, b"\r\n"",z\r\n"say ""hi""",q\r\n"two\nlines",w\r\n\r\nlast,row)
+    )
+
+    rows = path |> Datasets.csv([:question]) |> Enum.map(& &1.fields)
+
+    assert rows == [
+             %{"question" => "a, b", "answer" => "x"},
+             %{"question" => "y", "answer" => "a, b"},
+             %{"question" => "", "answer" => "z"},
+             %{"question" => ~s(say "hi"), "answer" => "q"},
+             %{"question" => "two\nlines", "answer" => "w"},
+             %{"question" => "last", "answer" => "row"}
+           ]
+  after
+    cleanup_tmp("quoted.csv")
+  end
+
+  test "CSV loader names the line of a row after a quoted newline" do
+    path = tmp_path("ragged-after-newline.csv")
+    File.write!(path, ~s(question,answer\n"two\nlines",w\n2+2?,4,extra\n))
+
+    assert_raise Datasets.Error, ~r/invalid CSV row .*:4: expected 2 fields, got 3/, fn ->
+      Datasets.csv(path, [:question])
+    end
+  after
+    cleanup_tmp("ragged-after-newline.csv")
+  end
+
+  test "CSV loader rejects malformed quoting with the line it starts on" do
+    path = tmp_path("malformed.csv")
+    File.write!(path, ~s(question,answer\nok,1\nbad,x"y"\n))
+
+    error = assert_raise Datasets.Error, fn -> Datasets.csv(path, [:question]) end
+    assert error.line == 3
+    assert error.message =~ ~r/invalid CSV at .*:3: /
+
+    File.write!(path, ~s(question,answer\nok,1\n"unclosed,1\nnext,2\n))
+
+    error = assert_raise Datasets.Error, fn -> Datasets.csv(path, [:question]) end
+    assert error.line == 3
+    assert error.message =~ ~r/invalid CSV at .*:3: quoted field is not closed/
+  after
+    cleanup_tmp("malformed.csv")
+  end
+
   test "CSV loader rejects empty files with dataset context" do
     path = tmp_path("empty.csv")
     File.write!(path, "")

@@ -66,23 +66,87 @@ defmodule ReqLLMBatchTest do
     assert Enum.count(checkpoint_state["events"], &(&1["kind"] == "attempt_outcome")) == 7
   end
 
-  test "dispatcher crashes are transient and consume retry attempts" do
+  test "a dispatcher that crashes after it may have sent is ambiguous and not re-dispatched" do
     checkpoint = checkpoint_path("dispatcher-crash")
     {:ok, counter} = Agent.start_link(fn -> 0 end)
 
     dispatcher = fn _request, _context ->
-      attempt = Agent.get_and_update(counter, fn count -> {count + 1, count + 1} end)
-      if attempt == 1, do: raise("provider process failed"), else: {:ok, "recovered"}
+      Agent.update(counter, &(&1 + 1))
+      raise "provider process failed"
     end
 
     assert {:ok, summary} =
              ReqLLMBatch.run([%{id: "one", payload: []}], dispatcher,
                checkpoint: checkpoint,
-               max_attempts: 2
+               max_attempts: 3
              )
 
-    assert %{status: :succeeded, attempts: 2, output: "recovered"} =
-             find_request(summary, "one")
+    assert Agent.get(counter, & &1) == 1
+    assert %{status: :ambiguous, attempts: 1} = find_request(summary, "one")
+    assert summary.complete?
+  end
+
+  test "a dispatch still running at the timeout is ambiguous and not re-dispatched" do
+    checkpoint = checkpoint_path("dispatcher-timeout")
+    {:ok, counter} = Agent.start_link(fn -> 0 end)
+
+    dispatcher = fn _request, _context ->
+      Agent.update(counter, &(&1 + 1))
+      Process.sleep(:infinity)
+    end
+
+    assert {:ok, summary} =
+             ReqLLMBatch.run([%{id: "slow", payload: []}], dispatcher,
+               checkpoint: checkpoint,
+               max_attempts: 3,
+               timeout: 50
+             )
+
+    assert Agent.get(counter, & &1) == 1
+    assert %{status: :ambiguous, attempts: 1} = find_request(summary, "slow")
+  end
+
+  test "req_llm_dispatcher retries only failures that say the request did not run" do
+    checkpoint = checkpoint_path("lm-errors")
+    {:ok, calls} = Agent.start_link(fn -> %{} end)
+
+    client =
+      ReqLLMClient.new("anthropic:test",
+        req_module: __MODULE__.FailingStub,
+        calls: calls
+      )
+
+    requests =
+      Enum.map(
+        ~w(timeout closed refused pool rate_limited unauthorized),
+        &%{id: &1, payload: %{"messages" => [%{"role" => "user", "content" => &1}]}}
+      )
+
+    assert {:ok, summary} =
+             ReqLLMBatch.run(requests, ReqLLMBatch.req_llm_dispatcher(client),
+               checkpoint: checkpoint,
+               max_attempts: 3
+             )
+
+    invocations = Agent.get(calls, & &1)
+
+    # Sent with no answer: it may have run, so it is sent once.
+    assert invocations["timeout"] == 1
+    assert %{status: :ambiguous, attempts: 1} = find_request(summary, "timeout")
+    assert invocations["closed"] == 1
+    assert %{status: :ambiguous, attempts: 1} = find_request(summary, "closed")
+
+    # Never sent, or refused by the provider with try-later: retried.
+    assert invocations["refused"] == 2
+    assert %{status: :succeeded, attempts: 2} = find_request(summary, "refused")
+    assert invocations["pool"] == 2
+    assert %{status: :succeeded, attempts: 2} = find_request(summary, "pool")
+    assert invocations["rate_limited"] == 2
+    assert %{status: :succeeded, attempts: 2} = find_request(summary, "rate_limited")
+
+    # Refused for good: not retried.
+    assert invocations["unauthorized"] == 1
+    assert %{status: :terminal_failure, attempts: 1} = find_request(summary, "unauthorized")
   end
 
   test "resume fails closed for an uncommitted post-dispatch request" do
@@ -274,6 +338,44 @@ defmodule ReqLLMBatchTest do
              %ReqLLM.Message{role: :assistant, content: [%{text: "Previously: Paris."}]},
              %ReqLLM.Message{role: :user, content: [%{text: "Capital of Peru?"}]}
            ] = transport_messages
+  end
+
+  defmodule FailingStub do
+    # Fails each request's first call in the way its content names, then
+    # answers.
+    def generate_text(model, [message], opts) do
+      [%{text: kind}] = message.content
+
+      call =
+        Agent.get_and_update(Keyword.fetch!(opts, :calls), fn calls ->
+          next = Map.get(calls, kind, 0) + 1
+          {next, Map.put(calls, kind, next)}
+        end)
+
+      if call == 1, do: {:error, failure(kind)}, else: answer(model, [message])
+    end
+
+    defp failure("timeout"), do: %Req.TransportError{reason: :timeout}
+    defp failure("closed"), do: %Mint.TransportError{reason: :closed}
+    defp failure("refused"), do: %Req.TransportError{reason: :econnrefused}
+    defp failure("pool"), do: %Req.TransportError{reason: :pool_not_available}
+
+    defp failure("rate_limited"),
+      do: %ReqLLM.Error.API.Request{reason: "slow down", status: 429}
+
+    defp failure("unauthorized"),
+      do: %ReqLLM.Error.API.Request{reason: "bad key", status: 401}
+
+    defp answer(model, messages) do
+      {:ok,
+       %ReqLLM.Response{
+         id: "after-failure",
+         model: model,
+         context: ReqLLM.Context.new(messages),
+         message: ReqLLM.Context.assistant(~s({"answer":"pong"})),
+         object: %{"answer" => "pong"}
+       }}
+    end
   end
 
   defmodule MessageCapturingStub do

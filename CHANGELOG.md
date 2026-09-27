@@ -24,6 +24,20 @@ User-visible changes to Imp are recorded here.
   recorded in the calling process, which made parallel work that process
   started afterwards (`Imp.Predict.Parallel.map/3`, `Imp.Evaluate.run/2`) run
   one item at a time.
+- `Imp.Clients.ReqLLMBatch` no longer sends a request again when it may
+  already have run. A dispatch that timed out, crashed, threw or exited was
+  retried as transient, so one request could run and be billed several times;
+  it is now `:ambiguous` and final, as an uncommitted dispatch already was on
+  resume. `req_llm_dispatcher/2` retries only a request that never reached
+  the provider (connection refused, no pooled connection) or that the
+  provider answered with a try-later status; a timeout or closed connection
+  with no response is `:ambiguous`, and any other status is terminal. A
+  dispatcher may return `{:ambiguous, reason}` itself.
+- `Imp.Datasets.csv/3` reads quoted fields. It raised `FunctionClauseError`
+  on any quoted field and could not read a quoted line break. It now parses
+  RFC 4180 CSV with NimbleCSV, a new dependency (`nimble_csv ~> 1.3`), and a
+  malformed file raises `Imp.Datasets.Error` naming the line its record
+  starts on.
 
 ### Documentation
 

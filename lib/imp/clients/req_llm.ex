@@ -401,10 +401,23 @@ defmodule Imp.Clients.ReqLLM do
   # One rule for `retryable` (see `Imp.LMError`): a status that says try
   # later, a status that says no, ReqLLM's own `retryable` where the status
   # does not decide, and otherwise the transport failure. `:timeout` and
-  # `:closed` are retryable even though the request may have run.
+  # `:closed` are retryable even though the request may have run; only the
+  # not-sent reasons say it never left.
   @try_later_statuses [408, 425, 429]
-  @transport_reasons [:econnrefused, :pool_not_available, :closed, :timeout]
+  @not_sent_reasons [:econnrefused, :pool_not_available]
+  @transport_reasons @not_sent_reasons ++ [:closed, :timeout]
   @transport_errors [Req.TransportError, Mint.TransportError, Finch.TransportError]
+
+  @doc false
+  # Whether a failed request provably never reached the provider: no response
+  # came back and the transport failed before sending. A caller may send it
+  # again without risking a second run; any other failure without a status
+  # may have run.
+  @spec not_sent?(Imp.LMError.t()) :: boolean()
+  def not_sent?(%Imp.LMError{status: nil, reason: reason}),
+    do: transport_reason(reason) in @not_sent_reasons
+
+  def not_sent?(%Imp.LMError{}), do: false
 
   defp retryable?(reason) do
     case {status(reason), reason} do
@@ -425,13 +438,14 @@ defmodule Imp.Clients.ReqLLM do
     end
   end
 
-  defp transport_retryable?(%module{reason: reason}) when module in @transport_errors,
-    do: reason in @transport_reasons
+  defp transport_retryable?(reason), do: transport_reason(reason) in @transport_reasons
 
-  defp transport_retryable?(%ReqLLM.Error.API.Request{cause: cause}) when not is_nil(cause),
-    do: transport_retryable?(cause)
+  defp transport_reason(%module{reason: reason}) when module in @transport_errors, do: reason
 
-  defp transport_retryable?(_reason), do: false
+  defp transport_reason(%ReqLLM.Error.API.Request{cause: cause}) when not is_nil(cause),
+    do: transport_reason(cause)
+
+  defp transport_reason(_reason), do: nil
 
   # OpenAI-compatible providers name this refusal in the structured error code.
   # General HTTP 400s and prose mentioning context are not that signal.

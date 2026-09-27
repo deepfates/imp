@@ -67,20 +67,24 @@ defmodule Imp.Datasets do
     |> from_records(input_keys, Keyword.put_new(opts, :source, path))
   end
 
+  @doc """
+  Loads examples from a CSV file whose first record is the header.
+
+  The file is read as RFC 4180 CSV: a quoted field may contain commas,
+  doubled quotes and line breaks. Blank lines are skipped. Each record becomes
+  a map from the header's strings to the record's fields. A file that is not
+  valid CSV, or a record whose field count differs from the header's, raises
+  `Imp.Datasets.Error` naming the line the record starts on.
+  """
   def csv(path, input_keys, opts \\ []) do
     opts = Imp.Options.validate!(opts, @file_records_option_schema, "Imp.Datasets.csv/3")
     path = validate_path!(path, "Imp.Datasets.csv/3")
 
-    rows =
-      path
-      |> File.read!()
-      |> String.split(~r/\R/, trim: true)
-      |> Enum.map(&parse_csv_line/1)
+    rows = path |> csv_records() |> Enum.to_list()
 
-    [header | rows] = require_csv_header!(rows, path)
+    [{header, _line} | rows] = require_csv_header!(rows, path)
 
     rows
-    |> Enum.with_index(2)
     |> Enum.map(fn {row, line_number} ->
       validate_csv_row!(row, header, path, line_number)
       header |> Enum.zip(row) |> Map.new()
@@ -160,12 +164,52 @@ defmodule Imp.Datasets do
 
   defp require_csv_header!(rows, _path), do: rows
 
-  defp parse_csv_line(line) do
-    Regex.scan(~r/(?:^|,)(?:"([^"]*(?:""[^"]*)*)"|([^,]*))/, line)
-    |> Enum.map(fn
-      [_all, quoted, ""] -> String.replace(quoted, "\"\"", "\"")
-      [_all, "", bare] -> bare
+  # NimbleCSV parses each record. The file is handed to it one record at a
+  # time, so an error can name the line the record starts on: a record ends
+  # at a line break outside quotes, which is where the text read so far holds
+  # an even number of quote characters.
+  defp csv_records(path) do
+    path
+    |> File.stream!()
+    |> Stream.with_index(1)
+    |> Stream.concat([:eof])
+    |> Stream.transform(nil, fn
+      :eof, nil ->
+        {[], nil}
+
+      :eof, {start, _text, _quotes} ->
+        raise Error,
+          message: "invalid CSV at #{path}:#{start}: quoted field is not closed",
+          path: path,
+          line: start,
+          record: nil
+
+      {line, _line_number}, nil when line in ["\n", "\r\n"] ->
+        {[], nil}
+
+      {line, line_number}, pending ->
+        {start, text, quotes} = pending || {line_number, "", 0}
+        text = text <> line
+        quotes = quotes + count_quotes(line)
+
+        if rem(quotes, 2) == 0,
+          do: {[{parse_csv_record!(text, path, start), start}], nil},
+          else: {[], {start, text, quotes}}
     end)
+  end
+
+  defp count_quotes(line), do: length(:binary.matches(line, "\""))
+
+  defp parse_csv_record!(text, path, line_number) do
+    [record] = NimbleCSV.RFC4180.parse_string(text, skip_headers: false)
+    record
+  rescue
+    error in NimbleCSV.ParseError ->
+      raise Error,
+        message: "invalid CSV at #{path}:#{line_number}: #{Exception.message(error)}",
+        path: path,
+        line: line_number,
+        record: text
   end
 
   defp decode_jsonl_line!(line, path, line_number) do
