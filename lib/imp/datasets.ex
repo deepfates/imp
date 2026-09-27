@@ -71,16 +71,18 @@ defmodule Imp.Datasets do
   Loads examples from a CSV file whose first record is the header.
 
   The file is read as RFC 4180 CSV: a quoted field may contain commas,
-  doubled quotes and line breaks. Blank lines are skipped. Each record becomes
+  doubled quotes and line breaks. A line break is CRLF, LF or a bare CR, a
+  leading byte order mark is dropped, and blank lines are skipped. Each record becomes
   a map from the header's strings to the record's fields. A file that is not
   valid CSV, or a record whose field count differs from the header's, raises
-  `Imp.Datasets.Error` naming the line the record starts on.
+  `Imp.Datasets.Error` naming the line the record starts on, with the start
+  of the record that could not be read.
   """
   def csv(path, input_keys, opts \\ []) do
     opts = Imp.Options.validate!(opts, @file_records_option_schema, "Imp.Datasets.csv/3")
     path = validate_path!(path, "Imp.Datasets.csv/3")
 
-    rows = path |> csv_records() |> Enum.to_list()
+    rows = csv_records(path)
 
     [{header, _line} | rows] = require_csv_header!(rows, path)
 
@@ -164,56 +166,71 @@ defmodule Imp.Datasets do
 
   defp require_csv_header!(rows, _path), do: rows
 
-  # NimbleCSV parses each record. The file is handed to it one record at a
-  # time, so an error can name the line the record starts on: a record ends
-  # at a line break outside quotes, which is where the text read so far holds
-  # an even number of quote characters.
+  # `Imp.CSV` parses each record. The file is split into records first, so
+  # an error can name the line a record starts on: a record ends at a line
+  # break (CRLF, LF or a bare CR) outside quotes. Every line break outside
+  # quotes ends a record, so a file with rows after its header always yields
+  # them, whichever line endings it uses.
   defp csv_records(path) do
-    path
-    |> File.stream!()
-    |> Stream.with_index(1)
-    |> Stream.concat([:eof])
-    |> Stream.transform(nil, fn
-      :eof, nil ->
-        {[], nil}
+    text = File.read!(path)
 
-      :eof, {start, _text, _quotes} ->
-        raise Error,
-          message: "invalid CSV at #{path}:#{start}: quoted field is not closed",
-          path: path,
-          line: start,
-          record: nil
+    {records, from, start_line, _line, quoted?} =
+      text
+      |> :binary.matches(["\r\n", "\n", "\r", "\""])
+      |> Enum.reduce({[], 0, 1, 1, false}, fn {at, length},
+                                              {records, from, start, line, quoted?} ->
+        cond do
+          binary_part(text, at, length) == "\"" ->
+            {records, from, start, line, not quoted?}
 
-      {line, _line_number}, nil when line in ["\n", "\r\n"] ->
-        {[], nil}
+          quoted? ->
+            {records, from, start, line + 1, quoted?}
 
-      {line, line_number}, pending ->
-        {start, text, quotes} = pending || {line_number, "", 0}
-        text = text <> line
-        quotes = quotes + count_quotes(line)
+          true ->
+            record = binary_part(text, from, at - from)
+            {[{record, start} | records], at + length, line + 1, line + 1, quoted?}
+        end
+      end)
 
-        if rem(quotes, 2) == 0,
-          do: {[{parse_csv_record!(text, path, start), start}], nil},
-          else: {[], {start, text, quotes}}
+    if quoted? do
+      raise Error,
+        message:
+          "invalid CSV at #{path}:#{start_line}: a quote opened on this line is never closed",
+        path: path,
+        line: start_line,
+        record: truncate(binary_part(text, from, byte_size(text) - from))
+    end
+
+    last = {binary_part(text, from, byte_size(text) - from), start_line}
+
+    [last | records]
+    |> Enum.reverse()
+    |> Enum.reject(fn {record, _line} -> record == "" end)
+    |> Enum.flat_map(fn {record, line} ->
+      record |> parse_csv_record!(path, line) |> Enum.map(&{&1, line})
     end)
   end
 
-  defp count_quotes(line), do: length(:binary.matches(line, "\""))
-
   defp parse_csv_record!(text, path, line_number) do
-    [record] = NimbleCSV.RFC4180.parse_string(text, skip_headers: false)
-    record
+    Imp.CSV.parse_string(text, skip_headers: false)
   rescue
     error in NimbleCSV.ParseError ->
       reraise Error,
               [
-                message: "invalid CSV at #{path}:#{line_number}: #{Exception.message(error)}",
+                message:
+                  "invalid CSV at #{path}:#{line_number}: " <>
+                    truncate(Exception.message(error)),
                 path: path,
                 line: line_number,
-                record: text
+                record: truncate(text)
               ],
               __STACKTRACE__
   end
+
+  @record_limit 200
+
+  defp truncate(text) when byte_size(text) <= @record_limit, do: text
+  defp truncate(text), do: String.slice(text, 0, @record_limit) <> "..."
 
   defp decode_jsonl_line!(line, path, line_number) do
     case Jason.decode(line) do

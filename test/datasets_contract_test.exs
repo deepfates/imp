@@ -81,7 +81,7 @@ defmodule DatasetsContractTest do
 
     error = assert_raise Datasets.Error, fn -> Datasets.csv(path, [:question]) end
     assert error.line == 3
-    assert error.message =~ ~r/invalid CSV at .*:3: quoted field is not closed/
+    assert error.message =~ ~r/invalid CSV at .*:3: a quote opened on this line is never closed/
   after
     cleanup_tmp("malformed.csv")
   end
@@ -89,7 +89,14 @@ defmodule DatasetsContractTest do
   test "rows written by Evaluate.Result.save_as_csv read back equal through Datasets.csv" do
     path = tmp_path("round-trip.csv")
 
-    questions = ["a, b", ~s(say "hi"), "two\nlines", "naïve café 漢字 ✓", "plain"]
+    questions = [
+      "a, b",
+      ~s(say "hi"),
+      "two\nlines",
+      "carriage\rreturn",
+      "naïve café 漢字 ✓",
+      "plain"
+    ]
 
     rows =
       Enum.map(questions, fn question ->
@@ -116,6 +123,43 @@ defmodule DatasetsContractTest do
              end)
   after
     cleanup_tmp("round-trip.csv")
+  end
+
+  test "CSV loader reads bare-CR line endings and drops a byte order mark" do
+    path = tmp_path("line-endings.csv")
+
+    File.write!(path, "q,a\r1,2\r3,4\r")
+    rows = path |> Datasets.csv([:q]) |> Enum.map(& &1.fields)
+    assert rows == [%{"q" => "1", "a" => "2"}, %{"q" => "3", "a" => "4"}]
+
+    File.write!(path, "\uFEFFq,a\r\n1,2\n3,4\r5,6")
+    rows = path |> Datasets.csv([:q]) |> Enum.map(& &1.fields)
+
+    assert rows == [
+             %{"q" => "1", "a" => "2"},
+             %{"q" => "3", "a" => "4"},
+             %{"q" => "5", "a" => "6"}
+           ]
+  after
+    cleanup_tmp("line-endings.csv")
+  end
+
+  test "CSV loader bounds the record an error carries" do
+    path = tmp_path("long-unclosed.csv")
+    File.write!(path, "q,a\n\"" <> String.duplicate("x", 10_000) <> ",1\n")
+
+    error = assert_raise Datasets.Error, fn -> Datasets.csv(path, [:q]) end
+    assert error.line == 2
+    assert byte_size(error.record) <= 210
+
+    File.write!(path, "q,a\n" <> String.duplicate("y", 10_000) <> ~s(" by 3",1\n))
+
+    error = assert_raise Datasets.Error, fn -> Datasets.csv(path, [:q]) end
+    assert error.line == 2
+    assert byte_size(error.record) <= 210
+    assert byte_size(error.message) <= 210 + byte_size(path) + 40
+  after
+    cleanup_tmp("long-unclosed.csv")
   end
 
   test "CSV loader rejects empty files with dataset context" do
