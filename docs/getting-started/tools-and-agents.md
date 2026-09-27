@@ -109,16 +109,34 @@ publish tools to models: `Imp.MCP.connect/2` turns a server's tools into
 `Imp.Tool` values that work here unchanged. A server may publish twenty tools
 when a program should use two. `tool_policy:` names the tools a program may
 call, and anything else is refused before it runs. `submit` is a tool like
-the others, so the list must name it too:
+the others, so the list must name it too. The MCP filesystem server (it needs
+Node.js) publishes tools that read, write and move files in the current
+directory; this agent may use two of them:
 
-~~~elixir
-Imp.react(
-  "question -> answer: string, source: string",
-  imported.tools,
-  lm: lm,
-  tool_policy: ["search_docs", "read_page", :submit]
-)
-~~~
+```elixir
+files_server = %{
+  "name" => "files",
+  "command" => "npx",
+  "args" => ["-y", "@modelcontextprotocol/server-filesystem", File.cwd!()]
+}
+
+{:ok, files} = Imp.MCP.connect([files_server], trusted_servers: [files_server])
+
+try do
+  files_agent =
+    Imp.react(
+      "question -> answer: string, source: string",
+      files.tools,
+      lm: lm,
+      tool_policy: ["list_directory", "read_text_file", :submit]
+    )
+
+  {:ok, answer} = Imp.call(files_agent, %{question: "What does this project's README say it is?"})
+  Imp.get(answer, :answer)
+after
+  files.cleanup.()
+end
+```
 
 [Tools and MCP](../diving-deeper/tools-and-mcp.md) and
 [ReAct](../diving-deeper/react.md) go further: tool schemas, policies, MCP

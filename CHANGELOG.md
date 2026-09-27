@@ -10,9 +10,11 @@ User-visible changes to Imp are recorded here.
   caller was killed, after `Imp.Run.cancel/3` and after the run's owner died;
   it now ends when the caller does. It still runs unlinked, so a crash is an
   observation, and takes no place in the task pool. It sees the caller's
-  `Imp.context/2` settings, run context and deadline, which it did not. A
-  tool that timed out, or whose task exited, reads as `:unknown` in
-  `Imp.Tool.outcome/1` rather than `:result`, since it may have acted.
+  `Imp.context/2` settings, run context and deadline, which it did not, and
+  parallel work it starts runs on the caller's place in the pool when the
+  caller has one. A tool that timed out, or whose task exited, reads as
+  `:unknown` in `Imp.Tool.outcome/1` rather than `:result`, since it may have
+  acted.
   Inside a run, Avatar records each tool call as `:tool_call` and
   `:tool_result` events with `metadata.outcome`, and arguments that fail the
   tool's schema are refused before the tool starts.
@@ -22,6 +24,20 @@ User-visible changes to Imp are recorded here.
   recorded in the calling process, which made parallel work that process
   started afterwards (`Imp.Predict.Parallel.map/3`, `Imp.Evaluate.run/2`) run
   one item at a time.
+
+### Documentation
+
+- The install instructions ask for a C and a C++ compiler: jaxon builds native
+  code from C and erlexec from C++. They asked for a C++ compiler only. They
+  also say the first compile needs network access, for erlexec's rebar3
+  plugins.
+- The package's Changelog link opens the changelog on HexDocs, and the 0.4.0
+  entry links the benchmark pages as they were at v0.4.0, not on `main`.
+- Each Livebook's setup cell only installs Imp: from Hex, or from the
+  checkout `IMP_PATH` names. It no longer searches for a source checkout.
+- The MCP example on the Tools and agents page defines its server and its
+  imported tools, where it used an undefined `imported`, and closes the
+  server when the call fails.
 
 ## 0.5.0 — 2026-09-26
 
@@ -939,8 +955,8 @@ Every change here is breaking for code that matches on the old shape.
 - Removed the evidence-certification bookkeeping from the source checkout. It
   never shipped in the package, so a consumer sees no change; the benchmark
   harness it wrapped is unchanged.
-- Added [Benchmarks](https://github.com/deepfates/imp/blob/main/research/BENCHMARKS.md)
-  and its [results table](https://github.com/deepfates/imp/blob/main/research/RESULTS.md).
+- Added [Benchmarks](https://github.com/deepfates/imp/blob/v0.4.0/docs/BENCHMARKS.md)
+  and its [results table](https://github.com/deepfates/imp/blob/v0.4.0/benchmarks/RESULTS.md).
   Every number this repository publishes is one row in that table, carrying
   the dataset and its license, the model, the provider, the date, the commit,
   and the command that produced it; prose elsewhere cites a row rather than
