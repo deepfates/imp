@@ -34,7 +34,7 @@ defmodule Imp.LMError do
       status it is ReqLLM's own `retryable` when ReqLLM set one, and `false`
       otherwise; a 409 is never retryable. It is also `true` for a stream
       that failed after it started. A timeout, a closed connection, a 5xx
-      other than 529 and a failed stream may follow a request that ran and
+      other than 503 or 529 and a failed stream may follow a request that ran and
       was billed, and a retried stream repeats the chunks the caller already
       has; `retryable` says a retry may succeed, not that it is safe. A
       response or stream of a shape ReqLLM never returns is `false`.
@@ -180,13 +180,15 @@ defmodule Imp.Errors do
   # deciding whether sending it again could run it twice:
   #
   #   * `:try_later` - the server did not process the request and says it may
-  #     succeed later: 408, 425, 429, and 529 (a provider's overload refusal).
+  #     succeed later: 408, 425, 429, 503 (RFC 9110: the server cannot handle
+  #     the request now; providers answer overload with it) and 529 (a
+  #     provider's overload refusal).
   #   * `:refused` - the server rejected the request without processing it:
   #     any other 4xx.
-  #   * `:unknown` - anything else. A 5xx can come from a gateway or a server
-  #     that failed after the request ran.
+  #   * `:unknown` - anything else. A 500, a 502 or 504 from a gateway, and
+  #     any other 5xx can follow a request that ran.
   @spec status_outcome(integer()) :: :try_later | :refused | :unknown
-  def status_outcome(status) when status in [408, 425, 429, 529], do: :try_later
+  def status_outcome(status) when status in [408, 425, 429, 503, 529], do: :try_later
   def status_outcome(status) when status in 400..499, do: :refused
   def status_outcome(_status), do: :unknown
 

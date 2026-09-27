@@ -35,15 +35,28 @@ User-visible changes to Imp are recorded here.
     attempt, so a single attempt could send a request four times.
   - retries only a request that never reached the provider (connection
     refused, or no pooled connection free, as Req reports it) or that the
-    provider answered with 408, 425, 429 or 529.
+    provider answered with 408, 425, 429, 503 or 529.
   - treats any other 4xx as terminal.
-  - treats a 5xx other than 529 (500 included), and a timeout or closed
-    connection with no response, as `:ambiguous`. A 5xx was retried.
+  - treats a 500, 502, 504 or any other 5xx but 503 and 529, and a timeout
+    or closed connection with no response, as `:ambiguous`. A 5xx was
+    retried.
+  Before a retry the batch waits: for the provider's `retry-after` (seconds
+  or an HTTP date) when it sent one, otherwise with exponential backoff and
+  jitter, capped by the new `:max_retry_wait` option (default 60 s). A
+  waiting request takes no dispatch slot from the others. When the provider
+  asks for longer than `:max_retry_wait`, or the wait would pass the
+  `Imp.Deadline` in force, the request is not retried in that run: it stays
+  `:transient_failure`, the summary is not `complete?`, and `resume/3`
+  retries it. `Imp.Clients.ReqLLM` keeps an error response's headers on the
+  `ReqLLM.Error.API.Request` it returns (ReqLLM's decoding dropped them), so
+  `retry-after` reaches the caller.
   A checkpoint written by 0.5.0 is rewritten at schema version 2 on resume,
   and its `:transient_failure` requests become `:ambiguous`, since 0.5.0
   recorded timeouts and dispatcher crashes that way.
-- An MCP call the server answers with HTTP 529 is `:refused`, like a 429,
-  where it was `:unknown`. MCP and language-model calls read a status the
+- An MCP call the server answers with HTTP 503 or 529 is `:refused`, like a
+  429, where it was `:unknown`: RFC 9110 defines 503 as the server being
+  unable to handle the request, and providers answer overload with 503 or
+  529. MCP and language-model calls read a status the
   same way.
 - `Imp.Datasets.csv/3` reads quoted fields. It raised `FunctionClauseError`
   on any quoted field and could not read a quoted line break. It now parses

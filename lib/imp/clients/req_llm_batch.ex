@@ -17,6 +17,18 @@ defmodule Imp.Clients.ReqLLMBatch do
   running at `:timeout`, may have sent its request first, so its outcome is
   `:ambiguous`.
 
+  The batch owns the wait before a retry as well as the retry. When the
+  failure carries the provider's `retry-after` header (seconds or an HTTP
+  date), the request is not sent again before then; otherwise the wait grows
+  exponentially with the attempt, with jitter. A request that is waiting holds
+  no dispatch slot: other requests are sent meanwhile, and the batch sleeps
+  only when every remaining request is waiting. Backoff is capped at
+  `:max_retry_wait`. When the provider asks for longer than `:max_retry_wait`,
+  or the wait would end after the `Imp.Deadline` bound to the calling
+  process, the request is not retried in this run: it stays
+  `:transient_failure` with the attempts it has used, the summary is not
+  `complete?`, and `resume/3` retries it.
+
   The checkpoint is an auditable JSON document. Every dispatch intent and
   outcome is appended to its event history before execution continues. Writes
   use a synced temporary file followed by an atomic rename. On resume, a
@@ -70,9 +82,18 @@ defmodule Imp.Clients.ReqLLMBatch do
 
     * `:checkpoint` - destination for the atomic JSON checkpoint
 
-  Runtime options are `:num_threads` (default `4`), `:max_attempts`
-  (default `3`), `:timeout` (default `30_000`), and `:validate_output`, an
-  optional arity-one callback returning `:ok` or `{:error, reason}`.
+  Runtime options:
+
+    * `:num_threads` - requests dispatched at once (default `4`)
+    * `:max_attempts` - sends per request, retries included (default `3`)
+    * `:timeout` - milliseconds one dispatch may run (default `30_000`)
+    * `:validate_output` - an optional arity-one callback returning `:ok` or
+      `{:error, reason}`
+    * `:max_retry_wait` - the longest wait, in milliseconds, before a retry
+      (default `60_000`)
+    * `:clock` - the time source and sleep the retry wait uses, a map of
+      `:now` (monotonic milliseconds), `:utc_now` (a `DateTime`) and `:sleep`
+      (milliseconds) functions; it exists so tests need not wait
   """
   @spec run([map()], dispatcher(), keyword()) :: {:ok, summary()} | {:error, term()}
   def run(requests, dispatcher, opts) when is_list(requests) and is_function(dispatcher, 2) do
@@ -91,8 +112,9 @@ defmodule Imp.Clients.ReqLLMBatch do
   Resumes a batch from its checkpoint.
 
   Persisted requests, attempts, and retry policy are authoritative. Resume
-  accepts only runtime options: `:num_threads`, `:timeout`, and
-  `:validate_output`.
+  accepts only runtime options: `:num_threads`, `:timeout`,
+  `:validate_output`, `:max_retry_wait` and `:clock`. A request whose retry
+  was stopped by a long `retry-after` or a deadline is retried.
   """
   @spec resume(Path.t(), dispatcher(), keyword()) :: {:ok, summary()} | {:error, term()}
   def resume(checkpoint, dispatcher, opts \\ [])
@@ -103,7 +125,11 @@ defmodule Imp.Clients.ReqLLMBatch do
          {:ok, state} <- read_checkpoint(checkpoint),
          {:ok, state} <- migrate_checkpoint(state, checkpoint),
          {:ok, state} <- reconcile_ambiguous(state, checkpoint) do
-      execute(state, dispatcher, runtime)
+      state
+      |> update_in(["requests"], fn requests ->
+        Enum.map(requests, &Map.delete(&1, "retry_stopped"))
+      end)
+      |> execute(dispatcher, runtime)
     end
   end
 
@@ -124,10 +150,10 @@ defmodule Imp.Clients.ReqLLMBatch do
     * `:transient` - the request never reached the provider (the connection
       was refused, or no pooled connection was free), or the provider
       answered that it did not process it and to try later (408, 425, 429,
-      529).
+      503, 529).
     * `:terminal` - the provider rejected it with any other 4xx status, or
       the call failed with no status and no transport reason.
-    * `:ambiguous` - it may have run: a 5xx status other than 529 (500
+    * `:ambiguous` - it may have run: a 5xx status other than 503 or 529 (500
       included), any other status, or a timeout or closed connection with no
       response.
   """
@@ -172,24 +198,144 @@ defmodule Imp.Clients.ReqLLMBatch do
     end
   end
 
-  defp execute(state, dispatcher, runtime) do
-    case runnable_requests(state) do
-      [] ->
+  # `waits` maps a request waiting to be retried to the monotonic time it may
+  # be sent again. It lives only in this run.
+  defp execute(state, dispatcher, runtime, waits \\ %{}) do
+    now = runtime.clock.now.()
+    runnable = runnable_requests(state)
+    ready = Enum.filter(runnable, &(Map.get(waits, &1["id"], now) <= now))
+
+    cond do
+      runnable == [] ->
         {:ok, summarize(state, runtime.checkpoint)}
 
-      runnable ->
-        wave = Enum.take(runnable, runtime.num_threads)
+      ready == [] ->
+        earliest = runnable |> Enum.map(&Map.fetch!(waits, &1["id"])) |> Enum.min()
+        runtime.clock.sleep.(earliest - now)
+        execute(state, dispatcher, runtime, waits)
+
+      true ->
+        wave = Enum.take(ready, runtime.num_threads)
         {state, dispatched} = mark_dispatched(state, wave)
 
         with :ok <- write_checkpoint(runtime.checkpoint, state) do
           results = dispatch_wave(dispatched, dispatcher, runtime)
 
-          case commit_results(state, results, runtime) do
-            {:ok, state} -> execute(state, dispatcher, runtime)
-            {:error, _reason} = error -> error
+          with {:ok, state} <- commit_results(state, results, runtime),
+               {:ok, state, waits} <- schedule_retries(state, results, runtime, waits) do
+            execute(state, dispatcher, runtime, waits)
           end
         end
     end
+  end
+
+  # For each request that failed transiently and has attempts left, decide
+  # when it may be sent again, or stop retrying it in this run.
+  defp schedule_retries(state, results, runtime, waits) do
+    now = runtime.clock.now.()
+    remaining = Imp.Deadline.remaining(Imp.Deadline.current())
+    max_attempts = state["max_attempts"]
+
+    Enum.reduce_while(results, {:ok, state, waits}, fn
+      {id, attempt, {:transient, _reason}, raw}, {:ok, current, waits}
+      when attempt < max_attempts ->
+        case retry_wait(raw, attempt, runtime, remaining) do
+          {:wait, wait} ->
+            {:cont, {:ok, current, Map.put(waits, id, now + wait)}}
+
+          {:stop, why, wait} ->
+            stopped = %{"reason" => why, "wait_ms" => wait}
+
+            next =
+              current
+              |> update_request(id, &Map.put(&1, "retry_stopped", stopped))
+              |> append_event(id, "retry_stopped", "transient_failure", attempt, stopped)
+
+            case write_checkpoint(runtime.checkpoint, next) do
+              :ok -> {:cont, {:ok, next, Map.delete(waits, id)}}
+              {:error, _reason} = error -> {:halt, error}
+            end
+        end
+
+      _result, acc ->
+        {:cont, acc}
+    end)
+  end
+
+  @backoff_base 500
+
+  defp retry_wait(raw, attempt, runtime, remaining) do
+    wait =
+      case retry_after(raw, runtime.clock) do
+        nil -> {:backoff, min(backoff(attempt), runtime.max_retry_wait)}
+        wait -> {:retry_after, wait}
+      end
+
+    case wait do
+      {:retry_after, wait} when wait > runtime.max_retry_wait ->
+        {:stop, "retry_after_exceeds_max_retry_wait", wait}
+
+      {_source, wait} when remaining != :infinity and wait >= remaining ->
+        {:stop, "deadline", wait}
+
+      {_source, wait} ->
+        {:wait, wait}
+    end
+  end
+
+  # Exponential with equal jitter: attempt n waits between half of and the
+  # whole of base * 2^(n - 1), so a later attempt never waits less.
+  defp backoff(attempt) do
+    ceiling = @backoff_base * Integer.pow(2, attempt - 1)
+    half = div(ceiling, 2)
+    half + :rand.uniform(half + 1) - 1
+  end
+
+  # The provider's `retry-after`, in milliseconds, from the failure's HTTP
+  # headers: `Imp.LMError` keeps ReqLLM's error, which keeps the response's.
+  defp retry_after(%Imp.LMError{reason: reason}, clock), do: retry_after(reason, clock)
+
+  defp retry_after(%{headers: headers}, clock) when is_map(headers) or is_list(headers) do
+    Enum.find_value(headers, fn
+      {name, value} ->
+        if String.downcase(to_string(name)) == "retry-after",
+          do: parse_retry_after(List.wrap(value), clock)
+
+      _other ->
+        nil
+    end)
+  end
+
+  defp retry_after(_reason, _clock), do: nil
+
+  defp parse_retry_after([value | _rest], clock) when is_binary(value) do
+    value = String.trim(value)
+
+    case Integer.parse(value) do
+      {seconds, ""} when seconds >= 0 -> seconds * 1000
+      _not_seconds -> http_date_wait(value, clock)
+    end
+  end
+
+  defp parse_retry_after(_value, _clock), do: nil
+
+  @months ~w(Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec)
+
+  # An IMF-fixdate, the form RFC 9110 requires of a sender:
+  # `Sun, 06 Nov 1994 08:49:37 GMT`.
+  defp http_date_wait(value, clock) do
+    with [_day, day, month, year, time, "GMT"] <- String.split(value, ~r/,?\s+/),
+         month when is_integer(month) <- Enum.find_index(@months, &(&1 == month)),
+         {:ok, date} <-
+           Date.new(String.to_integer(year), month + 1, String.to_integer(day)),
+         {:ok, time} <- Time.from_iso8601(time),
+         {:ok, at} <- DateTime.new(date, time, "Etc/UTC") do
+      max(DateTime.diff(at, clock.utc_now.(), :millisecond), 0)
+    else
+      _unreadable -> nil
+    end
+  rescue
+    ArgumentError -> nil
   end
 
   defp dispatch_wave(requests, dispatcher, runtime) do
@@ -203,13 +349,16 @@ defmodule Imp.Clients.ReqLLMBatch do
     )
     |> Enum.zip(requests)
     |> Enum.map(fn {task_result, request} ->
-      outcome =
+      {outcome, raw} =
         case task_result do
-          {:ok, outcome} -> outcome
-          {:exit, reason} -> {:ambiguous, normalize_json({:dispatcher_exit, inspect(reason)})}
+          {:ok, result} ->
+            result
+
+          {:exit, reason} ->
+            {{:ambiguous, normalize_json({:dispatcher_exit, inspect(reason)})}, nil}
         end
 
-      {request["id"], request["attempts"], outcome}
+      {request["id"], request["attempts"], outcome, raw}
     end)
   end
 
@@ -217,12 +366,18 @@ defmodule Imp.Clients.ReqLLMBatch do
     public_request = %{id: request["id"], payload: request["payload"]}
     context = %{request_id: request["id"], attempt: request["attempts"]}
 
-    dispatcher.(public_request, context)
-    |> normalize_outcome(validator)
+    # The raw transient reason goes back with the outcome: its HTTP headers
+    # may say how long to wait before a retry.
+    case dispatcher.(public_request, context) do
+      {:transient, raw} = outcome -> {normalize_outcome(outcome, validator), raw}
+      outcome -> {normalize_outcome(outcome, validator), nil}
+    end
   rescue
-    error -> {:ambiguous, normalize_json({:dispatcher_exception, Exception.message(error)})}
+    error ->
+      {{:ambiguous, normalize_json({:dispatcher_exception, Exception.message(error)})}, nil}
   catch
-    kind, reason -> {:ambiguous, normalize_json({:dispatcher_throw, kind, inspect(reason)})}
+    kind, reason ->
+      {{:ambiguous, normalize_json({:dispatcher_throw, kind, inspect(reason)})}, nil}
   end
 
   defp normalize_outcome({:ok, output}, nil), do: normalize_success(output)
@@ -262,7 +417,7 @@ defmodule Imp.Clients.ReqLLMBatch do
   end
 
   defp commit_results(state, results, runtime) do
-    Enum.reduce_while(results, {:ok, state}, fn {id, attempt, outcome}, {:ok, current} ->
+    Enum.reduce_while(results, {:ok, state}, fn {id, attempt, outcome, _raw}, {:ok, current} ->
       next = commit_outcome(current, id, attempt, outcome)
 
       case write_checkpoint(runtime.checkpoint, next) do
@@ -316,7 +471,8 @@ defmodule Imp.Clients.ReqLLMBatch do
 
     Enum.filter(state["requests"], fn request ->
       request["status"] == "pending" or
-        (request["status"] == "transient_failure" and request["attempts"] < max_attempts)
+        (request["status"] == "transient_failure" and request["attempts"] < max_attempts and
+           not Map.has_key?(request, "retry_stopped"))
     end)
   end
 
@@ -515,7 +671,7 @@ defmodule Imp.Clients.ReqLLMBatch do
   end
 
   defp validate_runtime_options(opts, extra_keys) when is_list(opts) do
-    allowed = [:num_threads, :timeout, :validate_output | extra_keys]
+    allowed = [:num_threads, :timeout, :validate_output, :max_retry_wait, :clock | extra_keys]
 
     with true <- Keyword.keyword?(opts),
          [] <- Keyword.keys(opts) -- allowed,
@@ -524,14 +680,34 @@ defmodule Imp.Clients.ReqLLMBatch do
          timeout when timeout == :infinity or (is_integer(timeout) and timeout > 0) <-
            Keyword.get(opts, :timeout, 30_000),
          validator when is_nil(validator) or is_function(validator, 1) <-
-           Keyword.get(opts, :validate_output) do
-      {:ok, %{num_threads: num_threads, timeout: timeout, validate_output: validator}}
+           Keyword.get(opts, :validate_output),
+         max_retry_wait when is_integer(max_retry_wait) and max_retry_wait >= 0 <-
+           Keyword.get(opts, :max_retry_wait, 60_000),
+         %{now: now, utc_now: utc_now, sleep: sleep} = clock
+         when is_function(now, 0) and is_function(utc_now, 0) and is_function(sleep, 1) <-
+           Keyword.get_lazy(opts, :clock, &system_clock/0) do
+      {:ok,
+       %{
+         num_threads: num_threads,
+         timeout: timeout,
+         validate_output: validator,
+         max_retry_wait: max_retry_wait,
+         clock: clock
+       }}
     else
       _other -> {:error, :invalid_batch_options}
     end
   end
 
   defp validate_runtime_options(_opts, _extra_keys), do: {:error, :invalid_batch_options}
+
+  defp system_clock do
+    %{
+      now: fn -> System.monotonic_time(:millisecond) end,
+      utc_now: &DateTime.utc_now/0,
+      sleep: &Process.sleep/1
+    }
+  end
 
   defp checkpoint_must_not_exist(path) do
     if File.exists?(path), do: {:error, :checkpoint_already_exists}, else: :ok

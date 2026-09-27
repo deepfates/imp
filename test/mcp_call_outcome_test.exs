@@ -335,10 +335,18 @@ defmodule Imp.MCPCallOutcomeTest do
       server = http_server()
       {_imported, tools} = http_tools(server)
 
-      for status <- [500, 502, 503, 504] do
+      for status <- [500, 502, 504] do
         gate(server, status)
         assert {:error, %CallFailure{outcome: :unknown}} = call(tools, "answer")
       end
+    end
+
+    test "a 503, the server saying it cannot handle the request now, is refused" do
+      server = http_server()
+      {_imported, tools} = http_tools(server)
+
+      gate(server, 503)
+      assert {:error, %CallFailure{outcome: :refused}} = call(tools, "answer")
     end
 
     @tag :tmp_dir
@@ -410,6 +418,7 @@ defmodule Imp.MCPCallOutcomeTest do
         {{:transport_error, {:http_error, 403, ""}}, :refused},
         {{:transport_error, {:http_error, 429, ""}}, :refused},
         {{:transport_error, {:http_error, 502, ""}}, :unknown},
+        {{:transport_error, {:http_error, 503, ""}}, :refused},
         {{:transport_error, {:http_error, 529, ""}}, :refused},
         {{:transport_error, {:http_receive_failed, %Mint.TransportError{reason: :closed}}},
          :unknown},

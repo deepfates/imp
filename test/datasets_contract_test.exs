@@ -144,6 +144,17 @@ defmodule DatasetsContractTest do
     cleanup_tmp("line-endings.csv")
   end
 
+  test "CSV loader names the line of a bad row in a bare-CR file after a quoted line break" do
+    path = tmp_path("bare-cr-error.csv")
+    File.write!(path, ~s(q,a\r"x\ry",2\r3,4,5\r))
+
+    error = assert_raise Datasets.Error, fn -> Datasets.csv(path, [:q]) end
+    assert error.line == 4
+    assert error.message =~ ~r/invalid CSV row .*:4: expected 2 fields, got 3/
+  after
+    cleanup_tmp("bare-cr-error.csv")
+  end
+
   test "CSV loader bounds the record an error carries" do
     path = tmp_path("long-unclosed.csv")
     File.write!(path, "q,a\n\"" <> String.duplicate("x", 10_000) <> ",1\n")

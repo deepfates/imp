@@ -82,15 +82,10 @@ defmodule Imp.Datasets do
     opts = Imp.Options.validate!(opts, @file_records_option_schema, "Imp.Datasets.csv/3")
     path = validate_path!(path, "Imp.Datasets.csv/3")
 
-    rows = csv_records(path)
-
-    [{header, _line} | rows] = require_csv_header!(rows, path)
+    {header, rows} = path |> File.read!() |> csv_table(path)
 
     rows
-    |> Enum.map(fn {row, line_number} ->
-      validate_csv_row!(row, header, path, line_number)
-      header |> Enum.zip(row) |> Map.new()
-    end)
+    |> Enum.map(&(header |> Enum.zip(&1) |> Map.new()))
     |> from_records(input_keys, Keyword.put_new(opts, :source, path))
   end
 
@@ -166,14 +161,33 @@ defmodule Imp.Datasets do
 
   defp require_csv_header!(rows, _path), do: rows
 
-  # `Imp.CSV` parses each record. The file is split into records first, so
-  # an error can name the line a record starts on: a record ends at a line
-  # break (CRLF, LF or a bare CR) outside quotes. Every line break outside
-  # quotes ends a record, so a file with rows after its header always yields
-  # them, whichever line endings it uses.
-  defp csv_records(path) do
-    text = File.read!(path)
+  # The whole file is parsed at once. `Imp.CSV` takes CRLF, LF and a bare CR
+  # as line breaks, so a file with rows after its header yields them whatever
+  # line endings it uses. A blank line parses as `[""]` and is skipped.
+  defp csv_rows(text, path) do
+    text
+    |> Imp.CSV.parse_string(skip_headers: false)
+    |> Enum.reject(&(&1 == [""]))
+  rescue
+    NimbleCSV.ParseError -> raise_csv_error!(text, path)
+  end
 
+  # A failure is located in a tail call, so the rows parsed so far are
+  # garbage by then rather than held through a second pass over the file.
+  defp csv_table(text, path) do
+    [header | rows] = text |> csv_rows(path) |> require_csv_header!(path)
+    width = length(header)
+
+    if Enum.all?(rows, &(length(&1) == width)),
+      do: {header, rows},
+      else: raise_csv_error!(text, path)
+  end
+
+  # Only for a file that failed: splits it into records, each with the line it
+  # starts on, and raises for the first record that cannot be parsed or whose
+  # field count differs from the header's. A record ends at a line break
+  # outside quotes.
+  defp raise_csv_error!(text, path) do
     {records, from, start_line, _line, quoted?} =
       text
       |> :binary.matches(["\r\n", "\n", "\r", "\""])
@@ -192,23 +206,41 @@ defmodule Imp.Datasets do
         end
       end)
 
+    rest = binary_part(text, from, byte_size(text) - from)
+
     if quoted? do
       raise Error,
         message:
           "invalid CSV at #{path}:#{start_line}: a quote opened on this line is never closed",
         path: path,
         line: start_line,
-        record: truncate(binary_part(text, from, byte_size(text) - from))
+        record: truncate(rest)
     end
 
-    last = {binary_part(text, from, byte_size(text) - from), start_line}
-
-    [last | records]
+    # Each record is checked as it is parsed and nothing parsed is kept: a
+    # list of every parsed row makes each garbage collection slower as it
+    # grows.
+    [{rest, start_line} | records]
     |> Enum.reverse()
-    |> Enum.reject(fn {record, _line} -> record == "" end)
-    |> Enum.flat_map(fn {record, line} ->
-      record |> parse_csv_record!(path, line) |> Enum.map(&{&1, line})
+    |> Enum.reduce(nil, fn {record, line}, header ->
+      record
+      |> parse_csv_record!(path, line)
+      |> Enum.reject(&(&1 == [""]))
+      |> Enum.reduce(header, fn
+        row, nil ->
+          row
+
+        row, header ->
+          validate_csv_row!(row, header, path, line)
+          header
+      end)
     end)
+
+    raise Error,
+      message: "invalid CSV at #{path}: the file could not be read as CSV",
+      path: path,
+      line: nil,
+      record: truncate(text)
   end
 
   defp parse_csv_record!(text, path, line_number) do
@@ -304,7 +336,7 @@ defmodule Imp.Datasets do
           "invalid CSV row at #{path}:#{line_number}: expected #{length(header)} fields, got #{length(row)}",
         path: path,
         line: line_number,
-        record: row
+        record: Enum.map(row, &truncate/1)
     end
 
     :ok

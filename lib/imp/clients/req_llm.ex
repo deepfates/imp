@@ -326,6 +326,7 @@ defmodule Imp.Clients.ReqLLM do
       |> encode_openrouter_reasoning(lm.model)
       |> cap_transport_timeouts()
       |> bind_to_caller()
+      |> keep_error_headers()
       |> enforce_explicit_no_retry()
 
     send_generate(lm, messages, opts)
@@ -1351,6 +1352,60 @@ defmodule Imp.Clients.ReqLLM do
 
     request
   end
+
+  # ReqLLM's default provider decoding turns an HTTP error response into an
+  # `ReqLLM.Error.API.Response`, which has no headers, so the error a call
+  # returns has lost the response's `retry-after` (ReqLLM's own retry step
+  # reads it from the response before that). A caller that retries needs it:
+  # `Imp.Clients.ReqLLMBatch` waits for it. The request step below runs after
+  # every provider step is attached; it keeps an error response's headers and
+  # puts them back on the `ReqLLM.Error.API.Request` the call returns. It is
+  # unnecessary once ReqLLM keeps the headers on the errors it decodes.
+  defp keep_error_headers(opts) do
+    http_opts = Keyword.get(opts, :req_http_options, [])
+
+    if Keyword.keyword?(http_opts) and is_list(Keyword.get(http_opts, :plugins, [])) do
+      plugins = Keyword.get(http_opts, :plugins, []) ++ [&__MODULE__.plug_error_headers/1]
+      Keyword.put(opts, :req_http_options, Keyword.put(http_opts, :plugins, plugins))
+    else
+      opts
+    end
+  end
+
+  @doc false
+  def plug_error_headers(%Req.Request{} = request) do
+    Req.Request.append_request_steps(request,
+      imp_error_headers: &__MODULE__.install_error_headers/1
+    )
+  end
+
+  @doc false
+  def install_error_headers(%Req.Request{} = request) do
+    request
+    |> Req.Request.prepend_response_steps(
+      imp_keep_error_headers: &__MODULE__.keep_error_response_headers/1
+    )
+    |> Req.Request.append_error_steps(
+      imp_restore_error_headers: &__MODULE__.restore_error_headers/1
+    )
+  end
+
+  @doc false
+  def keep_error_response_headers({request, %Req.Response{status: status} = response})
+      when status >= 400,
+      do: {Req.Request.put_private(request, :imp_error_headers, response.headers), response}
+
+  def keep_error_response_headers(pair), do: pair
+
+  @doc false
+  def restore_error_headers({request, %ReqLLM.Error.API.Request{headers: nil} = error}) do
+    case Req.Request.get_private(request, :imp_error_headers) do
+      nil -> {request, error}
+      headers -> {request, %{error | headers: headers}}
+    end
+  end
+
+  def restore_error_headers(pair), do: pair
 
   # An explicit caller no-retry policy is applied again in a final request step
   # at the adapter boundary, after every ReqLLM and Req step has run, so no

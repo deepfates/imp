@@ -35,7 +35,8 @@ defmodule ReqLLMBatchTest do
              ReqLLMBatch.run(requests, dispatcher,
                checkpoint: checkpoint,
                max_attempts: 3,
-               num_threads: 2
+               num_threads: 2,
+               clock: fake_clock()
              )
 
     assert summary.complete?
@@ -148,7 +149,6 @@ defmodule ReqLLMBatchTest do
       {"server_error", 1, :ambiguous},
       {"bad_gateway", 1, :ambiguous},
       {"gateway_timeout", 1, :ambiguous},
-      {"unavailable", 1, :ambiguous},
       # Never sent, or not processed and try later: retried.
       {"refused", 2, :succeeded},
       {"pool", 2, :succeeded},
@@ -156,6 +156,7 @@ defmodule ReqLLMBatchTest do
       {"rate_limited", 2, :succeeded},
       {"request_timeout", 2, :succeeded},
       {"overloaded", 2, :succeeded},
+      {"unavailable", 2, :succeeded},
       # Rejected without running, and a retry will not help.
       {"unauthorized", 1, :terminal_failure},
       {"bad_request", 1, :terminal_failure}
@@ -172,7 +173,8 @@ defmodule ReqLLMBatchTest do
     assert {:ok, summary} =
              ReqLLMBatch.run(requests, ReqLLMBatch.req_llm_dispatcher(client),
                checkpoint: checkpoint,
-               max_attempts: 3
+               max_attempts: 3,
+               clock: fake_clock()
              )
 
     invocations = Agent.get(calls, & &1)
@@ -273,6 +275,154 @@ defmodule ReqLLMBatchTest do
              event["request_id"] == "timed-out" and event["kind"] == "schema_migration" and
                event["status"] == "ambiguous"
            end)
+  end
+
+  describe "the wait before a retry" do
+    test "honours retry-after in seconds and as an HTTP date" do
+      clock = fake_clock()
+
+      {dispatcher, sent} =
+        scripted_dispatcher(clock, %{
+          "seconds" => [rate_limited(%{"retry-after" => ["2"]}), {:ok, "done"}],
+          "date" => [
+            rate_limited([{"Retry-After", "Sun, 27 Sep 2026 12:00:07 GMT"}]),
+            {:ok, "done"}
+          ]
+        })
+
+      assert {:ok, summary} =
+               ReqLLMBatch.run(
+                 [%{id: "seconds", payload: []}, %{id: "date", payload: []}],
+                 dispatcher,
+                 checkpoint: checkpoint_path("retry-after"),
+                 num_threads: 2,
+                 clock: clock
+               )
+
+      assert summary.counts == %{succeeded: 2}
+      # Both failed at 0; the batch slept until each could be sent again.
+      assert sent.() == [{"seconds", 0}, {"date", 0}, {"seconds", 2_000}, {"date", 7_000}]
+      assert sleeps(clock) == [2_000, 5_000]
+    end
+
+    test "a waiting request holds no dispatch slot" do
+      clock = fake_clock()
+
+      {dispatcher, sent} =
+        scripted_dispatcher(clock, %{
+          "limited" => [rate_limited(%{"retry-after" => ["5"]}), {:ok, "done"}],
+          "other" => [{:ok, "done"}]
+        })
+
+      assert {:ok, _summary} =
+               ReqLLMBatch.run(
+                 [%{id: "limited", payload: []}, %{id: "other", payload: []}],
+                 dispatcher,
+                 checkpoint: checkpoint_path("no-slot"),
+                 num_threads: 1,
+                 clock: clock
+               )
+
+      assert sent.() == [{"limited", 0}, {"other", 0}, {"limited", 5_000}]
+    end
+
+    test "backs off exponentially, with jitter, when the provider gives no wait" do
+      clock = fake_clock()
+      failures = List.duplicate({:transient, :overloaded}, 4)
+      {dispatcher, sent} = scripted_dispatcher(clock, %{"backoff" => failures})
+
+      assert {:ok, summary} =
+               ReqLLMBatch.run([%{id: "backoff", payload: []}], dispatcher,
+                 checkpoint: checkpoint_path("backoff"),
+                 max_attempts: 4,
+                 clock: clock
+               )
+
+      assert %{status: :transient_failure, attempts: 4} = find_request(summary, "backoff")
+      assert length(sent.()) == 4
+      [first, second, third] = sleeps(clock)
+      assert first in 250..500
+      assert second in 500..1_000
+      assert third in 1_000..2_000
+    end
+
+    test "backoff is capped by :max_retry_wait" do
+      clock = fake_clock()
+
+      {dispatcher, _sent} =
+        scripted_dispatcher(clock, %{"capped" => List.duplicate({:transient, :x}, 4)})
+
+      assert {:ok, _summary} =
+               ReqLLMBatch.run([%{id: "capped", payload: []}], dispatcher,
+                 checkpoint: checkpoint_path("capped"),
+                 max_attempts: 4,
+                 max_retry_wait: 300,
+                 clock: clock
+               )
+
+      assert Enum.all?(sleeps(clock), &(&1 <= 300))
+    end
+
+    test "a retry-after past the deadline stops retrying, and resume retries it" do
+      clock = fake_clock()
+
+      {dispatcher, sent} =
+        scripted_dispatcher(clock, %{
+          "limited" => [rate_limited(%{"retry-after" => ["30"]}), {:ok, "done"}]
+        })
+
+      checkpoint = checkpoint_path("deadline")
+
+      assert {:ok, summary} =
+               Imp.Deadline.with_deadline(10_000, fn ->
+                 ReqLLMBatch.run([%{id: "limited", payload: []}], dispatcher,
+                   checkpoint: checkpoint,
+                   clock: clock
+                 )
+               end)
+
+      assert sleeps(clock) == []
+      assert sent.() == [{"limited", 0}]
+      assert %{status: :transient_failure, attempts: 1} = find_request(summary, "limited")
+      refute summary.complete?
+
+      state = checkpoint |> File.read!() |> Jason.decode!()
+
+      assert Enum.any?(state["events"], fn event ->
+               event["kind"] == "retry_stopped" and event["details"]["reason"] == "deadline"
+             end)
+
+      assert {:ok, resumed} = ReqLLMBatch.resume(checkpoint, dispatcher, clock: clock)
+      assert %{status: :succeeded, attempts: 2} = find_request(resumed, "limited")
+    end
+
+    test "a retry-after longer than :max_retry_wait stops retrying" do
+      clock = fake_clock()
+
+      {dispatcher, sent} =
+        scripted_dispatcher(clock, %{"limited" => [rate_limited(%{"retry-after" => ["120"]})]})
+
+      assert {:ok, summary} =
+               ReqLLMBatch.run([%{id: "limited", payload: []}], dispatcher,
+                 checkpoint: checkpoint_path("over-cap"),
+                 clock: clock
+               )
+
+      assert sleeps(clock) == []
+      assert sent.() == [{"limited", 0}]
+      assert %{status: :transient_failure, attempts: 1} = find_request(summary, "limited")
+      refute summary.complete?
+    end
+
+    test "a 429 through the Req transport waits for its retry-after" do
+      clock = fake_clock()
+      limited = {429, [{"retry-after", "2"}]}
+      {summary, sends} = run_through_transport([limited, limited, limited], clock)
+
+      assert sends == 3
+      assert %{status: :transient_failure, attempts: 3} = find_request(summary, "only")
+      assert sleeps(clock) == [2_000, 2_000]
+    end
   end
 
   test "resume fails closed for an uncommitted post-dispatch request" do
@@ -549,7 +699,7 @@ defmodule ReqLLMBatchTest do
   # Runs one request through a real ReqLLM client whose Req adapter fails each
   # send with the next reason in `failures`, and returns the summary and the
   # number of sends that reached the adapter.
-  defp run_through_transport(failures) do
+  defp run_through_transport(failures, clock \\ fake_clock()) do
     {:ok, script} = Agent.start_link(fn -> %{failures: failures, sends: 0} end)
 
     adapter = fn request ->
@@ -558,10 +708,11 @@ defmodule ReqLLMBatchTest do
           {next, %{failures: rest, sends: sends + 1}}
         end)
 
-      exception =
-        if is_atom(failure), do: %Req.TransportError{reason: failure}, else: failure
-
-      {request, exception}
+      case failure do
+        reason when is_atom(reason) -> {request, %Req.TransportError{reason: reason}}
+        {status, headers} -> {request, Req.Response.new(status: status, headers: headers)}
+        exception -> {request, exception}
+      end
     end
 
     client =
@@ -576,10 +727,54 @@ defmodule ReqLLMBatchTest do
         [%{id: "only", payload: %{"messages" => [%{"role" => "user", "content" => "hi"}]}}],
         ReqLLMBatch.req_llm_dispatcher(client),
         checkpoint: checkpoint_path("transport"),
-        max_attempts: 3
+        max_attempts: 3,
+        clock: clock
       )
 
     {summary, Agent.get(script, & &1.sends)}
+  end
+
+  # A clock that moves only when the batch sleeps, and records each sleep.
+  defp fake_clock do
+    {:ok, agent} = Agent.start_link(fn -> %{now: 0, sleeps: []} end)
+
+    %{
+      now: fn -> Agent.get(agent, & &1.now) end,
+      utc_now: fn ->
+        DateTime.add(~U[2026-09-27 12:00:00Z], Agent.get(agent, & &1.now), :millisecond)
+      end,
+      sleep: fn ms ->
+        Agent.update(agent, &%{&1 | now: &1.now + ms, sleeps: &1.sleeps ++ [ms]})
+      end,
+      agent: agent
+    }
+  end
+
+  defp sleeps(clock), do: Agent.get(clock.agent, & &1.sleeps)
+
+  defp rate_limited(headers) do
+    {:transient,
+     %Imp.LMError{
+       status: 429,
+       retryable: true,
+       reason: %ReqLLM.Error.API.Request{reason: "slow down", status: 429, headers: headers}
+     }}
+  end
+
+  # Records each dispatch with the clock's time, and answers with the next
+  # outcome scripted for the request.
+  defp scripted_dispatcher(clock, script) do
+    {:ok, log} = Agent.start_link(fn -> %{script: script, sent: []} end)
+
+    dispatcher = fn request, _context ->
+      Agent.get_and_update(log, fn %{script: script, sent: sent} = state ->
+        [outcome | rest] = Map.fetch!(script, request.id)
+        sent = sent ++ [{request.id, clock.now.()}]
+        {outcome, %{state | script: Map.put(script, request.id, rest), sent: sent}}
+      end)
+    end
+
+    {dispatcher, fn -> Agent.get(log, & &1.sent) end}
   end
 
   defp checkpoint_path(name) do
