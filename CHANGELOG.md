@@ -6,12 +6,13 @@ User-visible changes to Imp are recorded here.
 
 ### Fixed
 
-- An Avatar tool ends with its caller. It ran in a task of its own that kept
-  running after the caller was killed, after `Imp.Run.cancel/3` and after the
-  run's owner died; it now runs in an `Imp.Tasks` task linked to the caller,
-  so it also sees the caller's `Imp.context/2` settings, run context and
-  deadline. A tool that timed out, or whose task exited, reads as `:unknown`
-  in `Imp.Tool.outcome/1` rather than `:result`, since it may have acted.
+- An Avatar tool ends with its caller. Its task kept running after the
+  caller was killed, after `Imp.Run.cancel/3` and after the run's owner died;
+  it now ends when the caller does. It still runs unlinked, so a crash is an
+  observation, and takes no place in the task pool. It sees the caller's
+  `Imp.context/2` settings, run context and deadline, which it did not. A
+  tool that timed out, or whose task exited, reads as `:unknown` in
+  `Imp.Tool.outcome/1` rather than `:result`, since it may have acted.
   Inside a run, Avatar records each tool call as `:tool_call` and
   `:tool_result` events with `metadata.outcome`, and arguments that fail the
   tool's schema are refused before the tool starts.

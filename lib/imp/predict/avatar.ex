@@ -7,13 +7,16 @@ defmodule Imp.Predict.Avatar do
   for the next turn. A reserved `Finish` action or iteration exhaustion invokes
   a separate typed finalizer for the task signature.
 
-  Each tool callback runs in an `Imp.Tasks` task linked to the caller, bounded
-  by `:tool_timeout_ms` (default 30 seconds). The task carries the caller's
-  settings, `Imp.Run` context and `Imp.Deadline`, and ends when the caller
-  does, so a tool stops when its caller is killed, when its run is cancelled
-  and when the run's owner dies. A timeout kills the task, records a terminal
-  action observation and proceeds directly to finalization; the timed-out call
-  reads as `:unknown` in `Imp.Tool.outcome/1`, since the tool may have acted.
+  Each tool callback runs in its own unlinked task, bounded by
+  `:tool_timeout_ms` (default 30 seconds), that takes no place in the task
+  pool. The task carries the caller's settings, `Imp.Run` context and
+  `Imp.Deadline`, and ends when the caller does, so a tool stops when its
+  caller is killed, when its run is cancelled and when the run's owner dies.
+  A tool that crashes, or whose task exits, is an observation, not the
+  caller's crash. A timeout kills the task, records a terminal action
+  observation and proceeds directly to finalization. A timed-out call and one
+  whose task exited read as `:unknown` in `Imp.Tool.outcome/1`, since the
+  tool may have acted.
 
   Inside a run, each tool call is recorded as a `:tool_call` event and a
   `:tool_result` event whose `metadata.outcome` says how it ended. Avatar does
@@ -198,13 +201,22 @@ defmodule Imp.Predict.Avatar do
       else: {:continue, observation}
   end
 
-  # The tool runs in a task linked to the caller, so it ends when the caller
-  # does: when the caller is killed, and inside a run when the run is
-  # cancelled or its owner dies, since both end the run's task. The task
-  # carries the caller's settings, run context and deadline, and borrows the
-  # caller's admission place when it has one, because the caller only waits.
+  # The tool runs in an unlinked task that takes no place in the task pool,
+  # so a tool that crashes, or whose linked helper does, is an observation
+  # rather than the caller's crash, and nothing waits for a place that the
+  # caller may already hold. The task carries the caller's settings, run
+  # context and deadline, and a watcher linked to it ends it when the caller
+  # dies: when the caller is killed, and inside a run when the run is
+  # cancelled or its owner dies, since both end the run's task.
   defp bounded_tool_call(tool, arguments, timeout) do
-    task = Imp.Tasks.async_borrowed(fn -> safe_tool_call(tool, arguments) end)
+    caller = self()
+    context = Imp.Tasks.context()
+
+    task =
+      Task.Supervisor.async_nolink(Imp.Tasks.unlinked_supervisor(), fn ->
+        watch_caller(caller)
+        Imp.Tasks.with_context(context, fn -> safe_tool_call(tool, arguments) end)
+      end)
 
     case Task.yield(task, timeout) do
       {:ok, {output, error?, outcome}} ->
@@ -221,6 +233,22 @@ defmodule Imp.Predict.Avatar do
     error -> {{:error, {:tool_task_error, tool.name, error}}, true, nil, :unknown}
   catch
     kind, reason -> {{:error, {:tool_task_error, tool.name, {kind, reason}}}, true, nil, :unknown}
+  end
+
+  # Links a process to the calling tool task that exits when `caller` dies,
+  # taking the task with it, and exits quietly when the task ends first.
+  defp watch_caller(caller) do
+    task = self()
+
+    spawn_link(fn ->
+      caller_monitor = Process.monitor(caller)
+      task_monitor = Process.monitor(task)
+
+      receive do
+        {:DOWN, ^caller_monitor, :process, ^caller, reason} -> exit({:caller_down, reason})
+        {:DOWN, ^task_monitor, :process, ^task, _reason} -> :ok
+      end
+    end)
   end
 
   defp safe_tool_call(tool, arguments) do

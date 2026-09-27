@@ -307,6 +307,36 @@ defmodule AvatarTest do
     assert_receive {:DOWN, ^tool_monitor, :process, ^tool_pid, _reason}, 1_000
   end
 
+  test "a tool whose linked helper crashes is an observation, not the caller's crash" do
+    tool =
+      Imp.tool(:hang, "Starts a helper that crashes.", fn _arguments ->
+        spawn_link(fn -> exit(:boom) end)
+        Process.sleep(:infinity)
+      end)
+
+    avatar = Imp.avatar("question -> answer", [tool], lm: hanging_tool_lm(), max_iters: 1)
+
+    assert {:ok, prediction} = Imp.call(avatar, %{question: "q"})
+    assert [%ActionOutput{tool_output: output, error?: true}] = Imp.get(prediction, :actions)
+    assert {:error, {:tool_task_exit, :hang, :boom}} = output
+    assert Imp.Tool.outcome(output) == :unknown
+  end
+
+  test "a caller that traps exits gets no exit message from a tool call" do
+    tool = Imp.tool(:hang, "Answers.", fn _arguments -> "fine" end)
+    avatar = Imp.avatar("question -> answer", [tool], lm: hanging_tool_lm(), max_iters: 1)
+    parent = self()
+
+    spawn(fn ->
+      Process.flag(:trap_exit, true)
+      {:ok, _prediction} = Imp.call(avatar, %{question: "q"})
+      Process.sleep(50)
+      send(parent, {:mailbox, Process.info(self(), :messages)})
+    end)
+
+    assert_receive {:mailbox, {:messages, []}}, 2_000
+  end
+
   test "validates reserved fields and malformed actions" do
     assert_raise ArgumentError, ~r/reserved fields.*avatar_history/, fn ->
       Imp.avatar("avatar_history -> answer", [])

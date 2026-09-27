@@ -273,42 +273,26 @@ defmodule Imp.Tasks do
   end
 
   @doc false
-  def async_nolink_borrowed(fun) when is_function(fun, 0), do: start_borrowed(:nolink, fun)
-
-  def async_nolink_borrowed(fun) do
-    raise ArgumentError,
-          "Imp.Tasks.async_nolink_borrowed/1 expects a zero-arity function, got: #{inspect(fun)}"
-  end
-
-  @doc false
-  # The linked form of `async_nolink_borrowed/1`: work its caller waits on,
-  # such as a tool call bounded by a timeout, that must end when the caller
-  # does.
-  def async_borrowed(fun) when is_function(fun, 0), do: start_borrowed(:linked, fun)
-
-  def async_borrowed(fun) do
-    raise ArgumentError,
-          "Imp.Tasks.async_borrowed/1 expects a zero-arity function, got: #{inspect(fun)}"
-  end
-
-  defp start_borrowed(link, fun) do
+  def async_nolink_borrowed(fun) when is_function(fun, 0) do
     case current_admission() do
       {token, owner} when owner == self() ->
         ensure_runtime!()
 
         if @admission.owned_by?(token, owner) do
-          start_borrowed_task(link, token, owner, fun)
+          start_borrowed_task(token, owner, fun)
         else
-          start_unborrowed(link, fun)
+          async_nolink(fun)
         end
 
       _other ->
-        start_unborrowed(link, fun)
+        async_nolink(fun)
     end
   end
 
-  defp start_unborrowed(:linked, fun), do: async(fun)
-  defp start_unborrowed(:nolink, fun), do: async_nolink(fun)
+  def async_nolink_borrowed(fun) do
+    raise ArgumentError,
+          "Imp.Tasks.async_nolink_borrowed/1 expects a zero-arity function, got: #{inspect(fun)}"
+  end
 
   @doc false
   def cancel(task, timeout \\ 5_000)
@@ -421,17 +405,14 @@ defmodule Imp.Tasks do
   # additional fan-out: its consumer is waiting while the producer owns the
   # next step. Reuse that lease without transferring or releasing it. This is
   # intentionally narrower than making arbitrary nested async work reentrant.
-  defp start_borrowed_task(link, token, owner, fun) do
+  defp start_borrowed_task(token, owner, fun) do
     context = capture_context(Imp.Settings.snapshot())
 
     wrapped = fn ->
       with_admission(token, owner, fn -> with_runtime_context(context, fun) end)
     end
 
-    case link do
-      :linked -> Task.Supervisor.async(@supervisor, wrapped)
-      :nolink -> Task.Supervisor.async_nolink(@unlinked_supervisor, wrapped)
-    end
+    Task.Supervisor.async_nolink(@unlinked_supervisor, wrapped)
   end
 
   defp spawn_task(supervisor, link, wrapped, token) do
@@ -461,6 +442,15 @@ defmodule Imp.Tasks do
   defp run_borrowed(context, token, owner, fun) do
     with_admission(token, owner, fn -> with_runtime_context(context, fun) end)
   end
+
+  @doc false
+  # What a task carries from the process that starts it, for a caller that
+  # starts a process of its own and binds it there with `with_context/2`.
+  def context, do: capture_context(Imp.Settings.snapshot())
+
+  @doc false
+  def with_context(context, fun) when is_function(fun, 0),
+    do: with_runtime_context(context, fun)
 
   # What a task carries from the process that starts it.
   defp capture_context(snapshot) do

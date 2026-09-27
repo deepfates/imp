@@ -60,28 +60,57 @@ defmodule EffectLifecycleTest do
     assert_received {:at_once, 3}
   end
 
-  test "an Avatar tool inside a run shares the run's pool place" do
-    tool = Imp.tool(:lookup, "Answers.", fn _arguments -> "found" end)
+  # An Avatar tool takes no place in the task pool, so an Avatar inside work
+  # that holds the only place still runs its tools.
+  test "Avatar in parallel inside an admitted task returns with a pool of one" do
+    avatar = Imp.avatar("question -> answer", [lookup()], lm: tool_lm("lookup"), max_iters: 1)
 
-    lm =
-      Imp.LM.Static.new(
-        handler: fn messages, _opts ->
-          if Enum.map_join(messages, "\n", & &1.content) =~ "Do not request another tool.",
-            do: %{answer: "done"},
-            else: %{action: %{tool_name: "lookup", tool_input_query: %{}}}
-        end
+    task =
+      Imp.context([async_max_workers: 1], fn ->
+        Imp.Tasks.async_nolink(fn ->
+          Imp.Predict.Parallel.map(avatar, [%{question: "a"}, %{question: "b"}], num_threads: 2)
+        end)
+      end)
+
+    assert {:ok, [ok: first, ok: second]} = Task.yield(task, 3_000) || Task.shutdown(task)
+    assert [%{tool_output: "found"}] = Imp.get(first, :actions)
+    assert [%{tool_output: "found"}] = Imp.get(second, :actions)
+  end
+
+  test "an Avatar whose tool calls another Avatar returns inside a run with a pool of one" do
+    inner = Imp.avatar("question -> answer", [lookup()], lm: tool_lm("lookup"), max_iters: 1)
+
+    outer_tool =
+      Imp.tool(:inner, "Asks the inner agent.", fn _arguments ->
+        {:ok, prediction} = Imp.call(inner, %{question: "x"})
+        Imp.get(prediction, :answer)
+      end)
+
+    outer =
+      Imp.avatar("question -> answer", [outer_tool],
+        lm: tool_lm("inner"),
+        max_iters: 1,
+        tool_timeout_ms: 2_000
       )
 
-    avatar = Imp.avatar("question -> answer", [tool], lm: lm, max_iters: 1)
-
     assert {:ok, run} =
-             Imp.context([async_max_workers: 1], fn ->
-               Imp.start_run(avatar, %{question: "q"})
-             end)
+             Imp.context([async_max_workers: 1], fn -> Imp.start_run(outer, %{question: "q"}) end)
 
-    assert {:ok, prediction} = Task.await(run.task, 2_000)
-    assert [%{tool_output: "found"}] = Imp.get(prediction, :actions)
+    assert {:ok, {:ok, prediction}} = Task.yield(run.task, 3_000)
+    assert [%{tool_output: "done"}] = Imp.get(prediction, :actions)
     Imp.Run.stop(run)
+  end
+
+  defp lookup, do: Imp.tool(:lookup, "Answers.", fn _arguments -> "found" end)
+
+  defp tool_lm(name) do
+    Imp.LM.Static.new(
+      handler: fn messages, _opts ->
+        if Enum.map_join(messages, "\n", & &1.content) =~ "Do not request another tool.",
+          do: %{answer: "done"},
+          else: %{action: %{tool_name: name, tool_input_query: %{}}}
+      end
+    )
   end
 
   defp gate(parent, waiting, 0) do
