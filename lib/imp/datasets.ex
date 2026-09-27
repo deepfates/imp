@@ -205,11 +205,14 @@ defmodule Imp.Datasets do
     record
   rescue
     error in NimbleCSV.ParseError ->
-      raise Error,
-        message: "invalid CSV at #{path}:#{line_number}: #{Exception.message(error)}",
-        path: path,
-        line: line_number,
-        record: text
+      reraise Error,
+              [
+                message: "invalid CSV at #{path}:#{line_number}: #{Exception.message(error)}",
+                path: path,
+                line: line_number,
+                record: text
+              ],
+              __STACKTRACE__
   end
 
   defp decode_jsonl_line!(line, path, line_number) do
