@@ -55,6 +55,12 @@ User-visible changes to Imp are recorded here.
   failure, so a run whose metric returned feedback reported `errors`,
   `status: :with_errors` and candidates named "Program call failed: …" when
   nothing had failed.
+- A GEPA report no longer crashes when a metric throws or exits: the
+  failure is shown as `{:throw, reason}` or `{:exit, reason}`, with credential
+  values redacted. Before, building the report raised
+  `Protocol.UndefinedError`.
+- A GEPA candidate rejected because its proposal failed is named "Proposal
+  failed: …", not "Program call failed: …".
 
 ## 0.5.0 — 2026-09-26
 
