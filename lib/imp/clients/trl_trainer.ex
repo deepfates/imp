@@ -10,7 +10,12 @@ defmodule Imp.Clients.TRLTrainer do
   The package ships the worker, its locked Python environment
   (`priv/trl_worker/pyproject.toml` and `uv.lock`), and the default contract,
   which pins Qwen2.5-0.5B, the worker's dependency versions, and one durable MPS
-  LoRA update. A contract for longer runs is passed as `:contract_path`.
+  LoRA update. Build that environment outside the package, since `priv` is
+  copied into `_build` and releases: for example
+  `UV_PROJECT_ENVIRONMENT=/path/to/trl-env uv sync --project <priv>/trl_worker`,
+  then pass `/path/to/trl-env/bin/python` as `:python`. A contract you write for
+  longer runs is passed as `:contract_path`; it must pin the dependency versions
+  the environment installs, or the worker refuses to start.
   Contracts accept arbitrary Imp-rendered prompt groups and finite external
   rewards.
   Ordered groups are source-bound and batched through official TRL. Later steps
