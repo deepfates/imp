@@ -107,6 +107,12 @@ defmodule Imp.Optimizer.SignatureOptimizer do
 
   @doc false
   def compile(%__MODULE__{} = optimizer, program, trainset, devset) do
+    # Read each dataset once: a one-shot stream is checked, proposed from and
+    # evaluated as the same rows.
+    trainset = materialize(trainset)
+    devset = materialize(devset)
+    Imp.Example.require_inputs!(trainset, "Imp.Optimizer.SignatureOptimizer.compile", "trainset")
+    Imp.Example.require_inputs!(devset, "Imp.Optimizer.SignatureOptimizer.compile", "valset")
     predictor = selected_predictor!(program, optimizer.predictor)
     {candidates, proposal} = proposals(optimizer, program, trainset, predictor)
 
@@ -212,4 +218,6 @@ defmodule Imp.Optimizer.SignatureOptimizer do
         end
     end
   end
+
+  defp materialize(rows), do: if(Enumerable.impl_for(rows), do: Enum.to_list(rows), else: rows)
 end

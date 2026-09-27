@@ -372,7 +372,7 @@ defmodule Imp do
   def evaluate(program, devset, metric, opts \\ []) do
     devset
     |> Imp.Evaluate.new(metric, opts)
-    |> Imp.Evaluate.run(program)
+    |> Imp.Evaluate.run(program, "Imp.evaluate/4")
   end
 
   @doc "Builds a metric that compares one prediction field to the same example field."

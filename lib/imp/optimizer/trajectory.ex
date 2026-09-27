@@ -1095,7 +1095,9 @@ defmodule Imp.Optimizer.TrajectoryRunner do
   Evaluates examples into ordered, provider-neutral optimizer trajectories.
 
   Program and metric failures are captured in the returned trajectories so a
-  failed example does not discard the rest of a bounded-concurrency batch.
+  failed example does not discard the rest of a bounded-concurrency batch. An
+  example whose inputs were never declared with `Imp.with_inputs/2` raises
+  `ArgumentError` before any row runs.
   """
 
   alias Imp.Optimizer.{Trace, Trajectory}
@@ -1109,7 +1111,9 @@ defmodule Imp.Optimizer.TrajectoryRunner do
     max_concurrency = Keyword.get(opts, :max_concurrency, 1)
     timeout = Keyword.get(opts, :timeout, 5_000)
 
-    indexed_examples = examples |> Enum.to_list() |> Enum.with_index()
+    examples = Enum.to_list(examples)
+    Imp.Example.require_inputs!(examples, "Imp.Optimizer.TrajectoryRunner.run/4", "examples")
+    indexed_examples = Enum.with_index(examples)
 
     case Keyword.get(opts, :deadline) do
       nil ->

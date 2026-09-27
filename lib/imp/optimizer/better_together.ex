@@ -122,6 +122,8 @@ defmodule Imp.Optimizer.BetterTogether do
     :ok = validate_step_compile_options!(bt.optimizers, opts[:optimizer_compile_args])
     :ok = ensure_report_storage(student)
     {trainset, valset} = prepare_validation!(trainset, valset, opts[:valset_ratio])
+    Imp.Example.require_inputs!(trainset, "Imp.Optimizer.BetterTogether.compile", "trainset")
+    Imp.Example.require_inputs!(valset, "Imp.Optimizer.BetterTogether.compile", "valset")
     evaluator = evaluator(bt.metric, valset, opts)
 
     baseline = evaluate_candidate(student, [], nil, evaluator, 0)
