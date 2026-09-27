@@ -7,9 +7,12 @@ defmodule Imp.Clients.TRLTrainer do
   Constructing the backend does not install Python packages or download a
   model. The configured Python environment and model tree must already exist.
 
-  The bundled default contract pins Qwen2.5-0.5B, TRL 1.6.0, and one durable
-  MPS LoRA update; the bundled two-step contract exercises durable continuation.
-  Both accept arbitrary Imp-rendered prompt groups and finite external rewards.
+  The package ships the worker, its locked Python environment
+  (`priv/trl_worker/pyproject.toml` and `uv.lock`), and the default contract,
+  which pins Qwen2.5-0.5B, the worker's dependency versions, and one durable MPS
+  LoRA update. A contract for longer runs is passed as `:contract_path`.
+  Contracts accept arbitrary Imp-rendered prompt groups and finite external
+  rewards.
   Ordered groups are source-bound and batched through official TRL. Later steps
   restore the prior adapter, optimizer, scheduler, Trainer state, and explicit
   MPS RNG before continuing. Experiment-specific assertions such as a required

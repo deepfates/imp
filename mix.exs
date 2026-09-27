@@ -219,6 +219,13 @@ defmodule Imp.MixProject do
          "RELEASE_NOTES.md",
          "assets/imp-with-cards.jpg",
          "priv/public_api.json",
+         # What `Imp.Clients.TRLTrainer` reads by default: the worker, its
+         # locked Python environment and the default contract. The other
+         # contracts in priv/trl_worker belong to research runs.
+         "priv/trl_worker/pyproject.toml",
+         "priv/trl_worker/qwen-one-update-contract.json",
+         "priv/trl_worker/uv.lock",
+         "priv/trl_worker/worker.py",
          "priv/tutorial/support_tickets.json",
          "README.md",
          "mix.exs"

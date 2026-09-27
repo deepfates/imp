@@ -196,7 +196,7 @@
   {"lib/imp/clients/training.ex", :pattern_match, {1536, 8}},
   {"lib/imp/clients/trl_deployment.ex", :unknown_type, {29, 42}},
   {"lib/imp/clients/trl_deployment.ex", :unknown_type, {72, 30}},
-  {"lib/imp/clients/trl_trainer.ex", :pattern_match_cov, {339, 20}},
+  {"lib/imp/clients/trl_trainer.ex", :pattern_match_cov, {342, 20}},
   # URI.parse/1's success type makes the ordinary-port rejection branch look
   # unreachable; keep the public URL validator defensive at this trust boundary.
   {"lib/imp/optimizer/budget.ex", :pattern_match, 1},
