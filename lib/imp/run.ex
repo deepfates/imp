@@ -211,33 +211,26 @@ defmodule Imp.Run do
       gate = make_ref()
 
       body = fn ->
-        if deadline != :infinity do
-          Imp.Deadline.bind(deadline)
-          await_gate(gate, owner)
+        if deadline != :infinity, do: Imp.Deadline.bind(deadline)
+
+        gate_answer = if deadline == :infinity, do: :go, else: await_gate(gate, owner)
+
+        case gate_answer do
+          :refuse -> {:error, :deadline_exceeded}
+          :go -> run_body(control, program, inputs, execution)
         end
-
-        with_context(control, fn ->
-          emit(:run_started, component: program.__struct__, input: inputs)
-          result = Imp.Module.execute(program, inputs, execution)
-
-          case result do
-            {:ok, %Imp.Prediction{} = prediction} -> emit(:run_finished, output: prediction)
-            {:error, {:execution_cancelled, reason}} -> emit(:run_cancelled, error: reason)
-            {:error, reason} -> emit(:run_failed, error: reason)
-            other -> emit(:run_failed, error: {:invalid_result, other})
-          end
-
-          result
-        end)
       end
 
       case start_task(body, admission) do
         {:ok, task} when deadline != :infinity ->
           # Admission may have waited for a place in the pool. A run whose
           # deadline passed meanwhile would fail its first request, so it is
-          # not started at all.
+          # not started at all. The task is told to return rather than being
+          # killed, so its admission lease is released before `start/3`
+          # returns and an immediate retry finds the place free.
           if Imp.Deadline.expired?(deadline) do
-            Task.shutdown(task)
+            send(task.pid, {gate, :refuse})
+            Task.yield(task, :infinity)
             Control.force_stop(control)
             {:error, :deadline_exceeded}
           else
@@ -257,6 +250,22 @@ defmodule Imp.Run do
     end
   end
 
+  defp run_body(control, program, inputs, execution) do
+    with_context(control, fn ->
+      emit(:run_started, component: program.__struct__, input: inputs)
+      result = Imp.Module.execute(program, inputs, execution)
+
+      case result do
+        {:ok, %Imp.Prediction{} = prediction} -> emit(:run_finished, output: prediction)
+        {:error, {:execution_cancelled, reason}} -> emit(:run_cancelled, error: reason)
+        {:error, reason} -> emit(:run_failed, error: reason)
+        other -> emit(:run_failed, error: {:invalid_result, other})
+      end
+
+      result
+    end)
+  end
+
   @doc false
   def validate_admission({_pool, limit} = admission) when is_integer(limit) and limit > 0,
     do: {:ok, admission}
@@ -270,8 +279,9 @@ defmodule Imp.Run do
     owner_monitor = Process.monitor(owner)
 
     receive do
-      {^gate, :go} ->
+      {^gate, answer} when answer in [:go, :refuse] ->
         Process.demonitor(owner_monitor, [:flush])
+        answer
 
       {:DOWN, ^owner_monitor, :process, ^owner, _reason} ->
         exit(:shutdown)

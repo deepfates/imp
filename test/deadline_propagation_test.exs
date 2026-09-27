@@ -192,3 +192,64 @@ defmodule Imp.DeadlinePropagationTest do
     end
   end
 end
+
+defmodule Imp.DeadlineAdmissionTest do
+  # Holds the machine-wide pool, so it runs alone.
+  use ExUnit.Case, async: false
+
+  setup do
+    Imp.Settings.reset()
+    on_exit(&Imp.Settings.reset/0)
+  end
+
+  defp reporting_program do
+    test = self()
+
+    lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          send(test, :model_called)
+          %{answer: "ok"}
+        end
+      )
+
+    Imp.predict("q -> answer", lm: lm)
+  end
+
+  test "a deadline that passes while a run waits for a place refuses the run and frees the place" do
+    Imp.configure(async_max_workers: 1)
+    test = self()
+    program = reporting_program()
+    sink = fn event -> send(test, {:sink, event.kind}) end
+
+    holder = Imp.Tasks.async(fn -> receive(do: (:release -> :ok)) end)
+    spawn(fn -> Process.sleep(300) && send(holder.pid, :release) end)
+
+    assert {:error, :deadline_exceeded} =
+             Imp.start_run(program, %{q: "a"}, deadline: 100, event_sink: sink)
+
+    assert Imp.Tasks.admission_status() == %{active: 0, queued: 0}
+    assert :ok = Task.await(holder)
+    refute_received :model_called
+    refute_received {:sink, _kind}
+
+    assert {:ok, run} = Imp.start_run(program, %{q: "a"}, deadline: 5_000, event_sink: sink)
+    assert {:ok, _prediction} = Task.await(run.task, 5_000)
+    assert_receive :model_called
+  end
+
+  test "a refused run's place in a named pool is free when start/3 returns" do
+    program = reporting_program()
+    pool = make_ref()
+
+    for _ <- 1..50 do
+      assert {:error, :deadline_exceeded} =
+               Imp.start_run(program, %{q: "a"}, admission: {pool, 1}, deadline: 0)
+
+      assert Imp.Tasks.Admission.status({:pool, pool}) == %{active: 0, queued: 0}
+    end
+
+    assert {:ok, run} = Imp.start_run(program, %{q: "a"}, admission: {pool, 1}, deadline: 5_000)
+    assert {:ok, _prediction} = Task.await(run.task, 5_000)
+  end
+end
