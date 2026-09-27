@@ -220,21 +220,22 @@ defmodule Imp.Datasets do
     # Each record is checked as it is parsed and nothing parsed is kept: a
     # list of every parsed row makes each garbage collection slower as it
     # grows.
-    [{rest, start_line} | records]
-    |> Enum.reverse()
-    |> Enum.reduce(nil, fn {record, line}, header ->
-      record
-      |> parse_csv_record!(path, line)
-      |> Enum.reject(&(&1 == [""]))
-      |> Enum.reduce(header, fn
-        row, nil ->
-          row
+    _header =
+      [{rest, start_line} | records]
+      |> Enum.reverse()
+      |> Enum.reduce(nil, fn {record, line}, header ->
+        record
+        |> parse_csv_record!(path, line)
+        |> Enum.reject(&(&1 == [""]))
+        |> Enum.reduce(header, fn
+          row, nil ->
+            row
 
-        row, header ->
-          validate_csv_row!(row, header, path, line)
-          header
+          row, header ->
+            validate_csv_row!(row, header, path, line)
+            header
+        end)
       end)
-    end)
 
     raise Error,
       message: "invalid CSV at #{path}: the file could not be read as CSV",
