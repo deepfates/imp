@@ -51,11 +51,18 @@ defmodule Imp.Observability.Inspection do
   a map with other keys becomes `%{"__imp_type__" => "map", "entries" => [[key,
   value], ...]}` in a stable order. Tuples become lists, an improper list
   becomes `%{"__imp_type__" => "improper_list", "head" => ..., "tail" => ...}`,
-  atoms other than `nil`, `true` and `false` become strings, and anything else
-  that is not a number or a UTF-8 binary becomes its `inspect/1` text: a pid, a
-  reference, a function, or a binary that is not valid UTF-8 renders as it
-  prints. Nothing is redacted here; pass a value through
-  `Imp.Redaction.redact/1` first when it may carry secrets.
+  and atoms other than `nil`, `true` and `false` become strings.
+
+  A binary that is not valid UTF-8, as a value or as a map key, becomes
+  `%{"__imp_type__" => "binary", "bytes" => size, "sha256" => prefix}`, where
+  `prefix` is the first 12 hex characters of its SHA-256. Its content is never
+  rendered: such bytes are most often key material, ciphertext or random
+  values, and the size and fingerprint still tell two of them apart. Anything
+  else that is not a number or a UTF-8 binary, such as a pid, a reference or
+  a function, becomes its `inspect/1` text.
+
+  Nothing is redacted here; pass a value through `Imp.Redaction.redact/1`
+  first when it may carry secrets.
 
       iex> Imp.Observability.Inspection.json_safe(%{kind: :tool, args: {1, :a}})
       %{"args" => [1, "a"], "kind" => "tool"}
@@ -97,8 +104,18 @@ defmodule Imp.Observability.Inspection do
   def json_safe(value) when is_atom(value), do: Atom.to_string(value)
   def json_safe(value) when is_number(value), do: value
 
-  def json_safe(value) when is_binary(value),
-    do: if(String.valid?(value), do: value, else: Kernel.inspect(value))
+  def json_safe(value) when is_binary(value) do
+    if String.valid?(value) do
+      value
+    else
+      %{
+        "__imp_type__" => "binary",
+        "bytes" => byte_size(value),
+        "sha256" =>
+          :sha256 |> :crypto.hash(value) |> Base.encode16(case: :lower) |> binary_part(0, 12)
+      }
+    end
+  end
 
   def json_safe(value), do: Kernel.inspect(value)
 

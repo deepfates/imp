@@ -297,6 +297,42 @@ defmodule Imp.Redaction do
     }
   end
 
+  # The MCP OAuth structs hold secrets under names that say nothing about them:
+  # a store's derived HMAC key, a flow's PKCE transaction and registered client,
+  # and the `state` that an authorization URL also carries. Each keeps its type
+  # and the fields its `Inspect` implementation shows; the secret fields become
+  # the redaction marker.
+  def redact(%Imp.MCP.OAuth.Store{} = store, keys) do
+    %{store | directory: redact(store.directory, keys), key: "[REDACTED]"}
+  end
+
+  def redact(%Imp.MCP.OAuth.Flow{} = flow, keys) do
+    %{
+      flow
+      | resource_url: redact(flow.resource_url, keys),
+        redirect_uri: redact(flow.redirect_uri, keys),
+        authorization_url: "[REDACTED]",
+        transaction: "[REDACTED]",
+        client: "[REDACTED]",
+        issuer: redact(flow.issuer, keys),
+        token_endpoint: redact(flow.token_endpoint, keys),
+        scopes: redact(flow.scopes, keys)
+    }
+  end
+
+  def redact(%Imp.MCP.OAuth.Pending{} = pending, keys) do
+    %{
+      pending
+      | store: redact(pending.store, keys),
+        credential: redact(pending.credential, keys),
+        server_url: redact(pending.server_url, keys),
+        authorization_url: "[REDACTED]",
+        redirect_uri: redact(pending.redirect_uri, keys),
+        flow: redact(pending.flow, keys),
+        state: if(is_nil(pending.state), do: nil, else: "[REDACTED]")
+    }
+  end
+
   # An exception keeps its type, so a redacted failure still matches as the
   # failure it is; only its fields are redacted.
   def redact(value, keys) when is_exception(value) do

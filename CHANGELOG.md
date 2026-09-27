@@ -21,10 +21,24 @@ User-visible changes to Imp are recorded here.
   ReActV2 history keeps for a call to a tool that does not exist, raised
   `Protocol.UndefinedError`. Turns now render through the same conversion
   `Imp.Observability.render_inspection/2` uses: tuples become lists, structs
-  become maps, and pids, references, functions and binaries that are not valid
-  UTF-8 become their `inspect/1` text, which `render_inspection/2` now also
-  does for such binaries instead of raising `Jason.EncodeError`. Redaction is
-  unchanged.
+  become maps, and pids, references and functions become their `inspect/1`
+  text. Redaction runs first, as before.
+- A binary that is not valid UTF-8 renders as
+  `%{"__imp_type__" => "binary", "bytes" => size, "sha256" => prefix}`, the
+  first 12 hex characters of its SHA-256, and never as its content; a map key
+  that is not valid UTF-8 takes the same form inside the map's `entries`. This
+  applies to `Imp.inspect_history/2` and
+  `Imp.Observability.render_inspection/2`, which raised `Jason.EncodeError` on
+  such a binary, and to `Imp.Run.Event.to_map/1` and
+  `Imp.Trajectory.to_atif/2`, which returned the raw bytes, so encoding their
+  result raised. Output for values without such binaries is unchanged, and a
+  request's `tools_hash` is identical.
+- `Imp.Redaction.redact/2` redacts the secrets in `Imp.MCP.OAuth.Store` (the
+  derived key), `Imp.MCP.OAuth.Pending` (the authorization URL and `state`)
+  and `Imp.MCP.OAuth.Flow` (the authorization URL, PKCE transaction and
+  registered client), keeping each struct and its other fields. They were
+  walked as plain maps, whose field names are not credential names, so the
+  store's key reached any redacted output that held a store.
 - A call streamed with `Imp.stream(program, inputs, provider_stream: true)`
   is recorded in its run like any other model call: a `:model_request` event
   with the request's `:purpose`, and a `:model_response` event with the usage

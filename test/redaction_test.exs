@@ -399,4 +399,57 @@ defmodule Imp.RedactionTest do
     assert Imp.Redaction.redact(%{log: "cache hit #{fake_hex}"}).log ==
              "cache hit #{fake_hex}"
   end
+
+  test "MCP OAuth structs keep their type and public fields and lose their secrets" do
+    store = %Imp.MCP.OAuth.Store{directory: "/var/imp/oauth", key: <<151, 87, 0, 255>>}
+
+    flow = %Imp.MCP.OAuth.Flow{
+      resource_url: "https://mcp.example/mcp",
+      redirect_uri: "http://127.0.0.1:4000/callback",
+      authorization_url: "https://auth.example/authorize?state=state-value&code_challenge=c",
+      transaction: %{code_verifier: "verifier-value", state: "state-value"},
+      client: %{client_id: "client-id", client_secret: "client-secret-value"},
+      issuer: "https://auth.example",
+      token_endpoint: "https://auth.example/token",
+      token_auth_method: :client_secret_post,
+      scopes: ["read"]
+    }
+
+    pending = %Imp.MCP.OAuth.Pending{
+      store: store,
+      credential: "readwise",
+      server_url: "https://mcp.example/mcp",
+      authorization_url: flow.authorization_url,
+      redirect_uri: flow.redirect_uri,
+      flow: flow,
+      state: "state-value"
+    }
+
+    redacted = Imp.Redaction.redact(pending)
+
+    assert %Imp.MCP.OAuth.Pending{
+             credential: "readwise",
+             server_url: "https://mcp.example/mcp",
+             authorization_url: "[REDACTED]",
+             state: "[REDACTED]",
+             store: %Imp.MCP.OAuth.Store{directory: "/var/imp/oauth", key: "[REDACTED]"},
+             flow: %Imp.MCP.OAuth.Flow{
+               resource_url: "https://mcp.example/mcp",
+               authorization_url: "[REDACTED]",
+               transaction: "[REDACTED]",
+               client: "[REDACTED]",
+               token_auth_method: :client_secret_post,
+               scopes: ["read"]
+             }
+           } = redacted
+
+    printed = Kernel.inspect(redacted, structs: false)
+
+    for secret <- ["state-value", "verifier-value", "client-secret-value", "client-id"] do
+      refute printed =~ secret
+    end
+
+    refute printed =~ Kernel.inspect(store.key)
+    assert Imp.Redaction.redact(%{pending | state: nil}).state == nil
+  end
 end
