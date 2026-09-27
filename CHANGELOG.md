@@ -4,6 +4,27 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Fixed
+
+- An Avatar tool ends with its caller. Its task kept running after the
+  caller was killed, after `Imp.Run.cancel/3` and after the run's owner died;
+  it now ends when the caller does. It still runs unlinked, so a crash is an
+  observation, and takes no place in the task pool. It sees the caller's
+  `Imp.context/2` settings, run context and deadline, which it did not, and
+  parallel work it starts runs on the caller's place in the pool when the
+  caller has one. A tool that timed out, or whose task exited, reads as
+  `:unknown` in `Imp.Tool.outcome/1` rather than `:result`, since it may have
+  acted.
+  Inside a run, Avatar records each tool call as `:tool_call` and
+  `:tool_result` events with `metadata.outcome`, and arguments that fail the
+  tool's schema are refused before the tool starts.
+- An RLM call made outside a run no longer leaves its model or tool call
+  running, holding a place in the task pool, when the calling process is
+  killed. An RLM call no longer leaves the pool place of one of its own tasks
+  recorded in the calling process, which made parallel work that process
+  started afterwards (`Imp.Predict.Parallel.map/3`, `Imp.Evaluate.run/2`) run
+  one item at a time.
+
 ### Documentation
 
 - The install instructions ask for a C and a C++ compiler: jaxon builds native
