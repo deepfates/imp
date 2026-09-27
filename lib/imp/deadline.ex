@@ -11,8 +11,8 @@ defmodule Imp.Deadline do
   `Imp.Clients.ReqLLM` caps each request's `:receive_timeout` and
   `:total_timeout` (retries included) to the time left, and
   `Imp.Predict.ReActV2` makes no further model request once it has passed.
-  Nothing else reads it: a running tool, retriever or metric is not
-  interrupted. To stop work at a time you choose, run it in a process you can
+  Apart from Imp's own evaluation and optimizer machinery, nothing is limited
+  by it: a running tool or retriever is not interrupted. To stop work at a time you choose, run it in a process you can
   cancel, such as a run from `Imp.start_run/3`.
 
   The binding belongs to the calling process. Work Imp starts in other
@@ -20,7 +20,7 @@ defmodule Imp.Deadline do
   evaluation rows, optimizer fan-out and `Imp.Run`, runs under the deadline of
   the process that started it. `Imp.Run.start/3` also takes `deadline:`, and
   `Imp.Evaluate`'s `:deadline` option and GEPA's coordinator bind their own in
-  the workers they start. Each of these is resolved with `resolve/1`, so it can
+  the workers they start, and stop those workers when it passes. Each of these is resolved with `resolve/1`, so it can
   shorten the inherited deadline but never extend it. The deadline does not
   bound the wait for a place in Imp's task pool; `Imp.Run.start/3` returns
   `{:error, :deadline_exceeded}` instead of starting a run whose deadline

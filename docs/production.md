@@ -121,7 +121,7 @@ A model call has three layers of time limit:
    nothing outside, so a retry is safe, but it multiplies the worst case.
 3. **The whole call.** Inside `Imp.Deadline.with_deadline/2`, every model
    request made through ReqLLM is cut to the time left, retries included,
-   including requests in `Imp.parallel/3` workers and runs, and a ReAct agent
+   and so is every request made in `Imp.parallel/3` workers and runs; a ReAct agent
    makes no further model request once the time is up. It does not interrupt
    a tool that is running. To stop a whole call at a time you choose, tools
    included, start it as a run and cancel it

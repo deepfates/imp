@@ -144,8 +144,8 @@ worth a second look before we ship: atlas takes billing "only", and anything
 that matches no squad goes to harbor. We can review those because the
 optimizer's output is text.
 
-Three runs, each in a fresh VM, scored 0.95, 0.9 and 0.95, took 70 to 80
-seconds, and cost eight to fourteen cents each. The eight demonstrations
+Three runs, each in a fresh VM and routed through OpenRouter to the same
+models, scored 0.95, 0.9 and 0.95, took 69 to 78 seconds, and cost eight to fourteen cents each. The eight demonstrations
 scored 0.75 to 0.85 and cost nothing to compile. Here the instruction is the
 better lever: the model lacked a description of the squads, and GEPA wrote
 one from its failures. Demonstrations are cheaper and a good first step; the
