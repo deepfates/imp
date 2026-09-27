@@ -8,6 +8,7 @@ defmodule Imp.Optimizer.GEPA.V014CompatibilityTest do
   test "public GEPA forwards the released candidate parent selector" do
     optimizer =
       GEPAOptimizer.new(fn _example, _prediction -> 1.0 end,
+        execution_profile: :beam_native,
         candidate_selection_strategy: :current_best,
         generations: 0
       )
@@ -969,6 +970,7 @@ defmodule Imp.Optimizer.GEPA.V014CompatibilityTest do
   test "public optimizer accepts the v0.1.4 strategy and stopping parameters by name" do
     optimizer =
       GEPAOptimizer.new(fn _example, _prediction -> 1.0 end,
+        execution_profile: :beam_native,
         sampling_strategy: {:pxn, 2, 3},
         selection_strategy: :best_improvement,
         reflection_strategy: SemanticStrategy,
@@ -984,6 +986,7 @@ defmodule Imp.Optimizer.GEPA.V014CompatibilityTest do
 
     contextual =
       GEPAOptimizer.new(fn _example, _prediction -> 1.0 end,
+        execution_profile: :beam_native,
         reflection_strategy: {:contextual, ChainingStrategy, %{generation: 0, total_cost: 0.0}},
         max_reflection_cost: 2.5
       )
@@ -1000,6 +1003,7 @@ defmodule Imp.Optimizer.GEPA.V014CompatibilityTest do
 
     assert_raise ArgumentError, ~r/observable total_cost/, fn ->
       GEPAOptimizer.new(fn _example, _prediction -> 1.0 end,
+        execution_profile: :beam_native,
         reflection_strategy: strategy,
         max_reflection_cost: 1.0
       )

@@ -765,6 +765,31 @@ Every change here is breaking for code that matches on the old shape.
   The `load` of `Imp.Datasets.Colors`, which builds examples from records and raises,
   is `load!/1`.
 
+### GEPA
+
+- `Imp.Optimizer.GEPA` is DSPy's GEPA unless told otherwise: with no
+  `:execution_profile` it runs `:gepa_v0_1_4_merge` (merge on, perfect
+  minibatches skipped, no evaluation cache, the pinned RNG and budget), or
+  `:gepa_v0_1_4` with `use_merge: false`. The old default is
+  `execution_profile: :beam_native`, which a run using ComBee, parallel
+  proposals, `:feedback_fn` or another Imp-only option now has to name; without
+  it, those options raise.
+- GEPA optimizes agents. For `Imp.react/3` the reflection model reads the
+  whole run of each example as `Context` (every thought, tool call and tool
+  result, and the outputs when the turn answered or called `submit`) and the
+  loop's tools by name, description and arguments. It used to read only the
+  first step, with an empty history.
+- A predictor called several times in a run is reflected on at one call drawn
+  at random with the optimizer's seed, not always its first call.
+- A metric that returns only a score gives the reflection model "This
+  trajectory got a score of 0.0.", as DSPy does, instead of `improve` or
+  `successful`.
+- An iteration whose chosen component has no reflection records ends without
+  a reflection call.
+- A program with an `Imp.History` input, or any struct among its inputs, no
+  longer crashes the reflection prompt under `reflection_record_mode:
+  :beam_native`; the history is shown as its turns.
+
 ### Retrieval
 
 - `Imp.Retrieve.Memory` (`Imp.memory/2`) returns only documents that share a

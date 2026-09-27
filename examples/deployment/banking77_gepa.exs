@@ -34,6 +34,7 @@ defmodule Banking77GEPA do
           Imp.Experiment.check(
             Banking77Pipeline.new(),
             GEPA.new(&metric/2,
+              execution_profile: :beam_native,
               reflection_lm: optimizer_lm,
               generations: 1,
               module_selector: :all,

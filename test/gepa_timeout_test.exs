@@ -130,6 +130,7 @@ defmodule Imp.Optimizer.GEPATimeoutTest do
 
     {_compiled, report} =
       Imp.Optimizer.GEPA.new(Imp.Metrics.exact_match(:answer),
+        execution_profile: :beam_native,
         generations: 1,
         timeout: 20,
         reflection_lm: reflection_lm,

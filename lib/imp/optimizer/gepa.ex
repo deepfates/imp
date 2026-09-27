@@ -6,12 +6,75 @@ defmodule Imp.Optimizer.GEPA do
   The optimizer exposes every predictor through `Imp.ProgramParameters`,
   evaluates named candidate maps through a trace-rich adapter, applies strict
   minibatch improvement before validation, and maintains the source-shaped
-  per-instance Pareto archive in its internal optimization engine.
+  per-instance Pareto archive in its internal optimization engine. It rewrites
+  predictor instructions; it does not change tool descriptions.
+
+  A real proposal source is mandatory for optimization. Set `:reflection_lm`
+  or `:reflection_strategy`; GEPA never fabricates an instruction from the
+  current prompt or diagnostic records. Baseline-only `generations: 0` runs do
+  not require a proposal source.
+
+  ## The default is DSPy's GEPA
+
+  Without an `:execution_profile`, GEPA runs `:gepa_v0_1_4_merge`, the
+  semantics of `dspy.GEPA` with its defaults, or `:gepa_v0_1_4` when
+  `use_merge: false` is given, as in `dspy.GEPA(use_merge=False)`. These
+  profiles seal the pinned single-proposal search:
+  CPython's persisted MT19937 stream is shared by Pareto selection and
+  Fisher-Yates minibatch sampling, perfect minibatches are skipped at `1.0`,
+  evaluation caching is disabled, and one failed batched reflection is retried
+  once as the corresponding single task. Candidate proposal remains serial,
+  while `:num_threads` may bound the same concurrent row evaluation used by
+  the source artifact. Like pinned GEPA, `max_metric_calls` is checked between
+  iterations: an iteration that legally starts is allowed to finish. Separate
+  internal metric/reflection envelopes bound that legal overshoot; they are not
+  alternate stopping rules. A finite `:max_metric_calls` is the authoritative
+  semantic budget; when it is `:infinity`, `:generations` derives the budget
+  instead. The merge profile uses the source-authenticated common-ancestor
+  merge path of DSPy's ordinary GEPA treatment.
+
+  These profiles fix every option that DSPy's GEPA does not offer, and giving
+  one of those options another value raises. `execution_profile: :beam_native`
+  is Imp's own search, where they are available: ComBee, speculative
+  proposals, the other selection, frontier and acceptance policies, and the
+  global `:feedback_fn`. It also caches evaluations, merges only with
+  `use_merge: true`, never skips a perfect minibatch, draws from a BEAM RNG, and
+  takes `:generations` as its iteration count.
+
+  ## What the reflection model reads
+
+  Each reflection call asks for a new instruction for one predictor, from
+  records of that predictor's calls on the minibatch. Under the DSPy profiles
+  (`reflection_record_mode: :gepa_v0_1_4`) a record is DSPy's: `Inputs`,
+  `Generated Outputs` and `Feedback` for one call of the predictor per
+  example, with values in their JSON spelling. When the program calls the
+  predictor more than once, as an agent loop calls its step predictor once per
+  turn, that call is drawn at random, keyed on `:seed`. A row whose program
+  failed gives no record, and when a component chosen for reflection has no
+  records the iteration ends without a reflection call.
+
+  An `Imp.History` input is shown as `Context`, one line per turn. For an agent
+  (`Imp.react/3`, `Imp.Predict.ReActV2`) that is the whole finished run, taken
+  from the prediction's `:history` metadata whichever step was drawn: every
+  turn's thought, tool calls and tool results, and the outputs when the turn
+  answered or called `submit`. The tools the predictor offers its model are
+  shown as `tools`, with their names, descriptions and arguments. `Feedback` is
+  the metric's feedback, or `:component_feedback`'s, or
+  `"This trajectory got a score of 0.0."` (with the row's score) when there is
+  none.
+
+  `reflection_record_mode: :beam_native`, available under
+  `execution_profile: :beam_native` and its default there, gives each record
+  the example's inputs, the program's outputs, the feedback, the score and the
+  whole trace, and reflects even when there are no records.
+
+  ## Other options
 
   `:candidate_selection_strategy` controls the parent program sampled for the
-  next reflection. It defaults to pinned GEPA's `:pareto` policy and also
-  accepts `:current_best`, the other released built-ins, or a validated custom
-  `Imp.Optimizer.GEPA.CandidateSelector` module/struct.
+  next reflection. It defaults to pinned GEPA's `:pareto` policy; under
+  `:beam_native` it also accepts `:current_best`, the other released
+  built-ins, or a validated custom `Imp.Optimizer.GEPA.CandidateSelector`
+  module/struct.
 
   The `:callbacks` option accepts callback modules or `{module, context}`
   tuples implementing any subset of the documented GEPA callback contract.
@@ -22,56 +85,27 @@ defmodule Imp.Optimizer.GEPA do
   These callbacks shape reflective minibatches and are part of optimization;
   invalid names, invalid output, and callback failures stop the run.
 
-  `:reflection_record_mode` defaults to `:beam_native`, retaining scores and
-  traces alongside feedback. `:gepa_v0_1_4` emits the pinned DSPy adapter's
-  narrower `Inputs`/`Generated Outputs`/`Feedback` records and exact reflection
-  prompt bytes. The pinned mode rejects the separate global `:feedback_fn`
-  extension; use metric/component feedback so every reflection receives the
-  same information as upstream.
-
-  `:execution_profile` defaults to `:beam_native`. The opt-in
-  `:gepa_v0_1_4` and `:gepa_v0_1_4_merge` profiles seal the pinned
-  single-proposal search semantics:
-  CPython's persisted MT19937 stream is shared by Pareto selection and
-  Fisher-Yates minibatch sampling, perfect minibatches are skipped at `1.0`,
-  evaluation caching is disabled, and one failed batched reflection is retried
-  once as the corresponding single task. Candidate proposal remains serial,
-  while `:num_threads` may bound the same concurrent row evaluation used by
-  the source artifact. Like pinned GEPA, `max_metric_calls` is checked between
-  iterations: an iteration that legally starts is allowed to finish. Separate
-  internal metric/reflection envelopes bound that legal overshoot; they are not
-  alternate stopping rules. A finite
-  `:max_metric_calls` is the pinned profile's authoritative semantic budget and
-  supersedes the BEAM-native `:generations` knob. When the metric budget is
-  `:infinity`, `:generations` derives the budget instead.
-  The first profile is the released no-merge ablation. The second enables the
-  same source-authenticated common-ancestor merge path used by DSPy's ordinary
-  GEPA treatment.
-
-  `:proposal_concurrency` enables first-party GEPA speculative parallel
-  proposals. Contexts are sampled sequentially from one archive and RNG
-  snapshot, expensive proposal phases run concurrently, and all effects are
-  applied by proposal slot. This is separate from ComBee aggregation: it does
-  not combine worker proposals or use map-shuffle-reduce voting.
+  `:proposal_concurrency` (`:beam_native`) enables first-party GEPA
+  speculative parallel proposals. Contexts are sampled sequentially from one
+  archive and RNG snapshot, expensive proposal phases run concurrently, and all
+  effects are applied by proposal slot. This is separate from ComBee
+  aggregation: it does not combine worker proposals or use map-shuffle-reduce
+  voting.
 
   `:module_selector` picks which named components each reflective mutation
   updates: `:round_robin` (default, one component per mutation in declared
-  program order), `:all` (every component per mutation), an arity-five function, or a
-  selector module/struct implementing the `Imp.Optimizer.GEPA.ModuleSelector`
-  contract. Custom selectors receive the engine state, captured trajectories,
-  minibatch scores, candidate index, and candidate map, and must return a
-  non-empty list of the candidate's component names; anything else raises.
+  program order) and, under `:beam_native`, `:all` (every component per
+  mutation), an arity-five function, or a selector module/struct implementing
+  the `Imp.Optimizer.GEPA.ModuleSelector` contract. Custom selectors receive
+  the engine state, captured trajectories, minibatch scores, candidate index,
+  and candidate map, and must return a non-empty list of the candidate's
+  component names; anything else raises.
 
-  `:combee` accepts `true` or its documented keyword options. ComBee duplicates
-  and deterministically shuffles reflection records, reduces `floor(sqrt(n))`
-  balanced groups concurrently, and performs one ordered final reduction.
-  `:proposal_timeout` bounds reflection work and inherits `:timeout` when
-  omitted; a finite nested ComBee timeout is an additional upper bound.
-
-  A real proposal source is mandatory for optimization. Set `:reflection_lm`
-  or `:reflection_strategy`; GEPA never fabricates an instruction from the
-  current prompt or diagnostic records. Baseline-only `generations: 0` runs do
-  not require a proposal source.
+  `:combee` (`:beam_native`) accepts `true` or its documented keyword options.
+  ComBee duplicates and deterministically shuffles reflection records, reduces
+  `floor(sqrt(n))` balanced groups concurrently, and performs one ordered final
+  reduction. `:proposal_timeout` bounds reflection work and inherits `:timeout`
+  when omitted; a finite nested ComBee timeout is an additional upper bound.
   """
 
   alias Imp.Optimizer.GEPA.{
@@ -95,9 +129,9 @@ defmodule Imp.Optimizer.GEPA do
     :reflection_lm,
     :reflection_strategy,
     callbacks: [],
-    execution_profile: :beam_native,
+    execution_profile: :gepa_v0_1_4_merge,
     component_feedback: %{},
-    reflection_record_mode: :beam_native,
+    reflection_record_mode: :gepa_v0_1_4,
     feedback_fn: nil,
     candidate_selection_strategy: :pareto,
     module_selector: :round_robin,
@@ -111,7 +145,7 @@ defmodule Imp.Optimizer.GEPA do
     timeout: 30_000,
     minibatch_size: nil,
     seed: 0,
-    use_merge: false,
+    use_merge: true,
     max_merge_invocations: 5,
     merge_val_overlap_floor: 5,
     frontier_type: :instance,
@@ -119,13 +153,13 @@ defmodule Imp.Optimizer.GEPA do
     acceptance_policy: :strict_improvement,
     merge_acceptance_policy: :equal_or_better,
     raise_on_exception: true,
-    skip_perfect_score: false,
-    perfect_score: nil,
-    cache_evaluation: true,
+    skip_perfect_score: true,
+    perfect_score: 1.0,
+    cache_evaluation: false,
     cache_identity: nil,
     resume_cache: :replay,
-    rng_algorithm: :beam_native,
-    reflection_failure_policy: :single_attempt_fail_closed,
+    rng_algorithm: :python_v3,
+    reflection_failure_policy: :gepa_v0_1_4_batch_then_single_retry,
     stopper: nil,
     max_metric_calls: :infinity,
     max_full_evaluations: :infinity,
@@ -134,10 +168,7 @@ defmodule Imp.Optimizer.GEPA do
   ]
 
   @option_schema [
-    execution_profile: [
-      type: {:in, [:beam_native, :gepa_v0_1_4, :gepa_v0_1_4_merge]},
-      default: :beam_native
-    ],
+    execution_profile: [type: {:in, [:beam_native, :gepa_v0_1_4, :gepa_v0_1_4_merge]}],
     callbacks: [type: {:custom, Callback, :validate, []}, default: []],
     component_feedback: [type: {:custom, ComponentFeedback, :validate, []}, default: %{}],
     reflection_record_mode: [
@@ -211,6 +242,15 @@ defmodule Imp.Optimizer.GEPA do
     opts = Imp.Options.validate!(opts, @option_schema, "Imp.Optimizer.GEPA.new/2")
     opts = resolve_execution_profile!(requested_opts, opts)
     reflection_strategy = ReflectionStrategy.validate!(opts[:reflection_strategy])
+
+    # The DSPy profiles propose through the reflection LM alone; a strategy
+    # would be ignored there and the run would fail at its first reflection.
+    if reflection_strategy && opts[:execution_profile] != :beam_native do
+      raise ArgumentError,
+            ":reflection_strategy runs under execution_profile: :beam_native; " <>
+              "#{inspect(opts[:execution_profile])} proposes with :reflection_lm"
+    end
+
     max_reflection_cost = validate_cost_limit!(opts[:max_reflection_cost])
 
     if max_reflection_cost &&
@@ -221,7 +261,9 @@ defmodule Imp.Optimizer.GEPA do
 
     if opts[:reflection_record_mode] == :gepa_v0_1_4 and is_function(opts[:feedback_fn], 1) do
       raise ArgumentError,
-            ":feedback_fn adds a non-upstream global reflection record; use metric or component feedback with :reflection_record_mode :gepa_v0_1_4"
+            ":feedback_fn adds a non-upstream global reflection record; use metric or component " <>
+              "feedback with :reflection_record_mode :gepa_v0_1_4, or pass " <>
+              "execution_profile: :beam_native"
     end
 
     %__MODULE__{
@@ -314,7 +356,8 @@ defmodule Imp.Optimizer.GEPA do
       Map.new(predictors, fn %{name: name, predictor: predictor} ->
         {name,
          %{
-           "Inputs" => Enum.map(predictor.signature.inputs, &to_string(&1.name)),
+           "Inputs" =>
+             ["Context", "tools"] ++ Enum.map(predictor.signature.inputs, &to_string(&1.name)),
            "Generated Outputs" => Enum.map(predictor.signature.outputs, &to_string(&1.name))
          }}
       end)
@@ -324,7 +367,8 @@ defmodule Imp.Optimizer.GEPA do
         max_concurrency: optimizer.num_threads,
         timeout: optimizer.timeout,
         component_feedback: optimizer.component_feedback,
-        reflection_record_mode: optimizer.reflection_record_mode
+        reflection_record_mode: optimizer.reflection_record_mode,
+        seed: optimizer.seed
       )
 
     envelope = profile_budget_envelope(optimizer, trainset, devset)
@@ -681,8 +725,17 @@ defmodule Imp.Optimizer.GEPA do
   defp default_feedback(trainset),
     do: "Use observed examples carefully. Training examples available: #{length(trainset)}."
 
+  # Without an explicit profile, GEPA runs DSPy's: with merge, or without it
+  # when `use_merge: false` says so, as `dspy.GEPA(use_merge=False)` does.
   defp resolve_execution_profile!(requested, opts) do
-    case opts[:execution_profile] do
+    profile =
+      opts[:execution_profile] ||
+        if Keyword.get(requested, :use_merge, true), do: :gepa_v0_1_4_merge, else: :gepa_v0_1_4
+
+    opts = Keyword.put(opts, :execution_profile, profile)
+    explicit? = Keyword.has_key?(requested, :execution_profile)
+
+    case profile do
       :beam_native ->
         opts
         |> Keyword.put(:skip_perfect_score, false)
@@ -709,8 +762,9 @@ defmodule Imp.Optimizer.GEPA do
         Enum.each(requirements, fn {key, expected} ->
           if Keyword.has_key?(requested, key) and Keyword.fetch!(requested, key) != expected do
             raise ArgumentError,
-                  ":execution_profile #{inspect(profile)} requires " <>
-                    "#{inspect(key)}: #{inspect(expected)}"
+                  ":execution_profile #{inspect(profile)}#{if explicit?, do: "", else: " (the default)"} requires " <>
+                    "#{inspect(key)}: #{inspect(expected)}; " <>
+                    "Imp's extensions run under execution_profile: :beam_native"
           end
         end)
 

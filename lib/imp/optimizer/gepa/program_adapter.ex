@@ -3,7 +3,7 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
 
   @behaviour Imp.Optimizer.GEPA.Adapter
 
-  alias Imp.Optimizer.GEPA.{Candidate, ComponentFeedback, Result}
+  alias Imp.Optimizer.GEPA.{Candidate, ComponentFeedback, Random, Result}
   alias Imp.Optimizer.TrajectoryRunner
 
   @enforce_keys [:program, :metric]
@@ -12,7 +12,9 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
     :metric,
     :component_order,
     component_feedback: %{},
+    component_tools: %{},
     reflection_record_mode: :beam_native,
+    seed: 0,
     max_concurrency: 1,
     timeout: 30_000
   ]
@@ -22,7 +24,9 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
           metric: function(),
           component_order: [Candidate.component_name()],
           component_feedback: %{optional(atom()) => ComponentFeedback.callback()},
+          component_tools: %{optional(Candidate.component_name()) => [map()]},
           reflection_record_mode: :beam_native | :gepa_v0_1_4,
+          seed: non_neg_integer(),
           max_concurrency: pos_integer(),
           timeout: timeout()
         }
@@ -46,7 +50,9 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
       metric: metric,
       component_order: Enum.map(Imp.ProgramParameters.instruction_components(program), & &1.name),
       component_feedback: component_feedback,
+      component_tools: component_tools(program),
       reflection_record_mode: reflection_record_mode,
+      seed: Keyword.get(opts, :seed, 0),
       max_concurrency: Keyword.get(opts, :max_concurrency, 1),
       timeout: Keyword.get(opts, :timeout, 30_000)
     }
@@ -123,16 +129,13 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
               else: feedback_only_records(feedback, adapter.reflection_record_mode)
 
           {trajectory, feedback} ->
-            feedback = reflective_feedback(adapter, trajectory, component, feedback)
+            case reflected_step(adapter, candidate, trajectory, component) do
+              nil ->
+                []
 
-            case reflection_record(
-                   trajectory,
-                   feedback,
-                   component,
-                   adapter.reflection_record_mode
-                 ) do
-              nil -> []
-              record -> [record]
+              step ->
+                feedback = reflective_feedback(adapter, trajectory, component, step, feedback)
+                [reflection_record(adapter, trajectory, step, feedback, component)]
             end
         end)
 
@@ -207,11 +210,13 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
 
   defp component_visited?(_trajectory, _component), do: false
 
-  defp reflective_feedback(adapter, trajectory, component, fallback) do
+  defp reflective_feedback(adapter, trajectory, component, step, fallback) do
     case Map.fetch(adapter.component_feedback, component) do
-      {:ok, callback} ->
-        step = fetch_component_step!(trajectory.trace, component)
+      {:ok, _callback} when step == :unvisited ->
+        raise RuntimeError,
+              "GEPA component feedback trace is missing predictor #{inspect(component)}"
 
+      {:ok, callback} ->
         ComponentFeedback.feedback!(callback, %ComponentFeedback{
           component: component,
           predictor_inputs: step.inputs,
@@ -227,12 +232,6 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
       :error ->
         fallback
     end
-  end
-
-  defp fetch_component_step!(trace, component) do
-    Enum.find(trace, &match?(%{predictor: ^component}, &1)) ||
-      raise RuntimeError,
-            "GEPA component feedback trace is missing predictor #{inspect(component)}"
   end
 
   defp metric_feedback(%{score: score}) when score > 0, do: :successful
@@ -288,7 +287,47 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
     end
   end
 
-  defp reflection_record(trajectory, feedback, _component, :beam_native) do
+  # The trace step a record reflects on. The BEAM-native record keeps the
+  # first call of the predictor beside the whole trace. The pinned record
+  # follows DSPy's GEPA adapter, which reflects on one call per example, chosen
+  # at random among that predictor's calls when a program calls it more than
+  # once (an agent loop calls its step predictor once per turn). Imp's trace
+  # holds successful calls only, so DSPy's preference for a call that failed to
+  # parse has nothing to choose from; a row whose program failed is left out
+  # above. The draw is keyed on the seed, the parent candidate, the component
+  # and the example rather than taken from one stream, so it is the same after
+  # a resume and under concurrent proposals.
+  defp reflected_step(
+         %__MODULE__{reflection_record_mode: :beam_native},
+         _candidate,
+         trajectory,
+         component
+       ) do
+    trajectory.trace |> component_steps(component) |> List.first() || :unvisited
+  end
+
+  defp reflected_step(%__MODULE__{} = adapter, candidate, trajectory, component) do
+    case component_steps(trajectory.trace, component) do
+      [] ->
+        nil
+
+      [step] ->
+        step
+
+      steps ->
+        key = :erlang.phash2({adapter.seed, candidate, component, trajectory.example})
+        {index, _state} = Random.integer(length(steps), Random.new(key, :beam_native))
+        Enum.at(steps, index)
+    end
+  end
+
+  defp reflection_record(
+         %__MODULE__{reflection_record_mode: :beam_native},
+         trajectory,
+         _step,
+         feedback,
+         _component
+       ) do
     %{
       "Inputs" => example_inputs(trajectory.example),
       "Generated Outputs" => prediction_output(trajectory.prediction),
@@ -298,18 +337,17 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
     }
   end
 
-  defp reflection_record(trajectory, feedback, component, :gepa_v0_1_4) do
-    case component_step(trajectory.trace, component) do
-      nil ->
-        nil
-
-      step ->
-        %{
-          "Inputs" => stringify_fields(step.inputs),
-          "Generated Outputs" => stringify_fields(step.outputs),
-          "Feedback" => feedback_text(feedback || trajectory.feedback || trajectory.error)
-        }
-    end
+  defp reflection_record(%__MODULE__{} = adapter, trajectory, step, feedback, component) do
+    %{
+      "Inputs" =>
+        reflection_inputs(
+          step.inputs,
+          trajectory.prediction,
+          Map.get(adapter.component_tools, component, [])
+        ),
+      "Generated Outputs" => stringify_fields(step.outputs),
+      "Feedback" => feedback_text(feedback || trajectory.feedback, trajectory.score)
+    }
   end
 
   defp feedback_only_record(feedback, :beam_native), do: %{"Feedback" => inspect(feedback)}
@@ -319,24 +357,155 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
 
   defp feedback_only_records(_feedback, :gepa_v0_1_4), do: []
 
-  defp component_step(trace, component) when is_list(trace) do
-    Enum.find(trace, fn
-      %{predictor: ^component} -> true
-      _ -> false
-    end)
+  defp component_steps(trace, component) when is_list(trace),
+    do: Enum.filter(trace, &match?(%{predictor: ^component}, &1))
+
+  defp component_steps(_trace, _component), do: []
+
+  # A predictor's inputs as DSPy's GEPA adapter shows them. A history input is
+  # shown as `Context`, one line per turn, and is taken out of the other
+  # inputs. The tools the predictor offered the model are shown as `tools`,
+  # which is how DSPy's agent loops pass them to their step predictor.
+  defp reflection_inputs(inputs, prediction, tools) when is_map(inputs) do
+    {histories, others} = Enum.split_with(inputs, fn {_key, value} -> history?(value) end)
+
+    fields = Map.new(others, fn {key, value} -> {to_string(key), text(plain(value))} end)
+
+    fields =
+      case histories do
+        [] -> fields
+        [{_key, history} | _rest] -> Map.put(fields, "Context", context(history, prediction))
+      end
+
+    if tools == [] or Map.has_key?(fields, "tools"),
+      do: fields,
+      else: Map.put(fields, "tools", text(tools))
   end
 
-  defp component_step(_trace, _component), do: nil
+  defp reflection_inputs(inputs, _prediction, _tools), do: text(plain(inputs))
+
+  defp history?(%Imp.History{}), do: true
+  defp history?(_value), do: false
+
+  defp context(history, prediction) do
+    lines =
+      history
+      |> finished_history(prediction)
+      |> Imp.History.messages()
+      |> Enum.with_index()
+      |> Enum.map_join("", fn {message, index} ->
+        # Provider-native reasoning details are opaque continuation data
+        # (signatures, encrypted blocks) that tell the reflection model nothing.
+        turn = Map.drop(message, [:reasoning_details, "reasoning_details"])
+        "  #{index}: #{turn |> plain() |> text()}\n"
+      end)
+
+    "```json\n" <> lines <> "```"
+  end
+
+  # A step of an agent loop is given the history as it stood when the step
+  # ran, since `Imp.History` is a value. DSPy's loops append to one history
+  # object that every step holds, so the reflection model reads the whole run,
+  # the later tool results and the final answer included, whichever step it
+  # reflects on. The finished history is the prediction's `:history` metadata
+  # (`Imp.Predict.ReActV2`); when it continues the history this step was given,
+  # that continuation is what the reflection model reads.
+  defp finished_history(
+         %Imp.History{messages: seen} = history,
+         %Imp.Prediction{metadata: metadata}
+       ) do
+    case Map.get(metadata, :history) do
+      %Imp.History{messages: finished} ->
+        case continuation(finished, seen) do
+          nil -> history
+          messages -> %{history | messages: messages}
+        end
+
+      _none ->
+        history
+    end
+  end
+
+  defp finished_history(history, _prediction), do: history
+
+  defp continuation(finished, seen) when length(finished) < length(seen), do: nil
+
+  defp continuation(finished, seen) do
+    if List.starts_with?(finished, seen),
+      do: finished,
+      else: continuation(tl(finished), seen)
+  end
+
+  # The tools a predictor offers its model natively, as name, description and
+  # argument properties.
+  defp component_tools(program) do
+    program
+    |> Imp.ProgramParameters.predictors()
+    |> Map.new(fn %{name: name, predictor: predictor} -> {name, predictor_tools(predictor)} end)
+  end
+
+  defp predictor_tools(%{config: config}) when is_list(config) do
+    config
+    |> Keyword.get(:tools, [])
+    |> List.wrap()
+    |> Enum.flat_map(&tool_entry/1)
+  end
+
+  defp predictor_tools(_predictor), do: []
+
+  defp tool_entry(%{function: function}), do: tool_entry(function)
+  defp tool_entry(%{"function" => function}), do: tool_entry(function)
+
+  defp tool_entry(tool) when is_map(tool) do
+    name = Map.get(tool, :name, Map.get(tool, "name"))
+    parameters = Map.get(tool, :parameters, Map.get(tool, "parameters")) || %{}
+
+    if name do
+      [
+        Jason.OrderedObject.new([
+          {"name", to_string(name)},
+          {"description", Map.get(tool, :description, Map.get(tool, "description"))},
+          {"args", Map.get(parameters, "properties", Map.get(parameters, :properties, %{}))}
+        ])
+      ]
+    else
+      []
+    end
+  end
+
+  defp tool_entry(_tool), do: []
 
   defp stringify_fields(fields) when is_map(fields) do
-    Map.new(fields, fn {key, value} -> {to_string(key), text(value)} end)
+    Map.new(fields, fn {key, value} -> {to_string(key), text(plain(value))} end)
   end
 
-  defp stringify_fields(value), do: text(value)
+  defp stringify_fields(value), do: text(plain(value))
 
-  defp feedback_text(nil), do: ""
-  defp feedback_text(value) when is_binary(value), do: value
-  defp feedback_text(value), do: text(value)
+  # Structs as the data they hold, so a value renders as JSON rather than as
+  # an Elixir term: a history as its turns, tool calls as the list of them, any
+  # other struct as its fields.
+  defp plain(%Imp.History{messages: messages}), do: plain(messages)
+  defp plain(%Imp.Adapter.Types.ToolCalls{tool_calls: calls}), do: plain(calls)
+
+  defp plain(%Date{} = date), do: Date.to_iso8601(date)
+  defp plain(%Time{} = time), do: Time.to_iso8601(time)
+
+  defp plain(%module{} = value)
+       when module in [DateTime, NaiveDateTime, Jason.OrderedObject, Imp.Adapter.Types.Code],
+       do: value
+
+  defp plain(%_{} = struct), do: struct |> Map.from_struct() |> plain()
+  defp plain(map) when is_map(map), do: Map.new(map, fn {key, value} -> {key, plain(value)} end)
+  defp plain(list) when is_list(list), do: Enum.map(list, &plain/1)
+  defp plain(value), do: value
+
+  # DSPy's GEPA gives the reflection model this line when the metric returns
+  # a score and no feedback.
+  defp feedback_text(feedback, score) when feedback in [nil, :improve, :successful],
+    do: "This trajectory got a score of #{text(score)}."
+
+  defp feedback_text(value, _score) when is_binary(value), do: value
+  defp feedback_text(value, _score), do: text(plain(value))
 
   # A value as the reflection model reads it: text as itself, anything else
   # in its JSON spelling (`true`, `null`, `["a"]`), as adapters render values.
