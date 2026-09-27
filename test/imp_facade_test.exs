@@ -55,13 +55,65 @@ defmodule ImpFacadeTest do
     assert Imp.stream(program, %{question: "Capital of France?"}, chunker: &[&1])
            |> Enum.to_list() == ["Paris"]
 
-    assert Imp.collect(program, %{question: "Capital of France?"}) == "Paris"
+    assert {:ok, prediction} = Imp.collect(program, %{question: "Capital of France?"})
+    assert Imp.Prediction.to_map(prediction) == %{answer: "Paris"}
 
     failing = Imp.LM.Static.new(handler: fn _messages, _opts -> raise "provider down" end)
 
     failing_program = Imp.predict("question -> answer", lm: failing)
 
     assert {:error, _reason} = Imp.collect(failing_program, %{question: "Capital of France?"})
+  end
+
+  # An LM whose `stream/3` yields a chat-formatted completion in two pieces.
+  defmodule ChatStreamLM do
+    defstruct [:text, :owner]
+
+    def generate(%__MODULE__{text: text}, _messages, _opts), do: {:ok, text}
+
+    def stream(%__MODULE__{text: text, owner: owner}, _messages, _opts) do
+      send(owner, :streamed)
+      {first, rest} = String.split_at(text, div(String.length(text), 2))
+
+      [
+        %Imp.Streaming.Messages.StreamResponse{chunk: first},
+        %Imp.Streaming.Messages.StreamResponse{chunk: rest, done: true}
+      ]
+    end
+  end
+
+  # Collecting a stream returns what calling the program returns, with every
+  # output field kept apart, whether or not the provider streamed it.
+  test "collect returns the program's prediction, one output field or several" do
+    one = %ChatStreamLM{owner: self(), text: "[[ ## answer ## ]]\nParis\n\n[[ ## completed ## ]]"}
+
+    several = %ChatStreamLM{
+      owner: self(),
+      text:
+        "[[ ## reasoning ## ]]\nBecause.\n\n[[ ## answer ## ]]\nParis\n\n" <>
+          "[[ ## confidence ## ]]\n0.9\n\n[[ ## completed ## ]]"
+    }
+
+    cases = [
+      {Imp.predict("question -> answer", lm: one), %{answer: "Paris"}},
+      {Imp.predict("question -> reasoning, answer, confidence: float", lm: several),
+       %{reasoning: "Because.", answer: "Paris", confidence: 0.9}}
+    ]
+
+    for {program, fields} <- cases, provider_stream <- [false, true] do
+      inputs = %{question: "Capital of France?"}
+      assert {:ok, called} = Imp.call(program, inputs)
+
+      assert {:ok, %Imp.Prediction{} = collected} =
+               Imp.collect(program, inputs,
+                 provider_stream: provider_stream,
+                 include_final_prediction: false
+               )
+
+      assert Imp.Prediction.to_map(collected) == fields
+      assert Imp.Prediction.to_map(collected) == Imp.Prediction.to_map(called)
+      if provider_stream, do: assert_received(:streamed), else: refute_received(:streamed)
+    end
   end
 
   test "facade exposes examples and predictions through one reader" do
