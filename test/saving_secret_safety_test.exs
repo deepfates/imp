@@ -44,9 +44,9 @@ defmodule Imp.SavingSecretSafetyTest do
     loaded = Imp.load!(state)
     assert loaded.metadata.deployment_secret == "[REDACTED]"
     assert loaded.metadata.token_count == 7
-    assert loaded.metadata.basic_header == "[REDACTED]"
-    assert loaded.metadata.cookie_line == "[REDACTED]"
-    assert loaded.metadata.image.url == "[REDACTED]"
+    assert loaded.metadata.basic_header == "Basic [REDACTED]"
+    assert loaded.metadata.cookie_line == "session=[REDACTED]"
+    assert loaded.metadata.image.url == "https://example.test/private/[REDACTED]"
     assert loaded.metadata.image.data == "aW1hZ2U="
     assert loaded.metadata.prose == prose
     assert loaded.metadata.ordinary_url == ordinary_url
@@ -88,8 +88,8 @@ defmodule Imp.SavingSecretSafetyTest do
     refute artifact =~ "Bearer abcdefghijklmnop"
 
     loaded = Imp.read!(path, registry: registry)
-    assert loaded.tools.lookup.description == "[REDACTED]"
-    assert loaded.tools.lookup.schema.note == "[REDACTED]"
+    assert loaded.tools.lookup.description == "Use credential [REDACTED]"
+    assert loaded.tools.lookup.schema.note == "Bearer [REDACTED]"
     assert loaded.tools.lookup.schema.token == :string
     assert loaded.tools.lookup.schema.api_key == :string
     assert loaded.tools.lookup.schema.auth_token == %{type: :string}

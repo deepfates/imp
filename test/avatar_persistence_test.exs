@@ -57,9 +57,9 @@ defmodule AvatarPersistenceTest do
     assert restored.finisher.lm == %Imp.Clients.ReqLLM{model: "openai:gpt-avatar", opts: []}
     assert restored.tool_policy == policy
     assert restored.tools.lookup.run == runner
-    assert restored.tools.lookup.description == "[REDACTED]"
+    assert restored.tools.lookup.description == "lookup facts Bearer [REDACTED]"
     assert restored.tools.lookup.schema.api_key == %{type: :string}
-    assert restored.tools.lookup.schema.default_token == "[REDACTED]"
+    assert restored.tools.lookup.schema.default_token == "Bearer [REDACTED]"
     assert restored.metadata.api_key == "[REDACTED]"
     assert restored.metadata.release == "2026-07-13"
     assert Imp.Predict.Avatar.current_instruction(restored) == "Use lookup once, then finish."

@@ -5,8 +5,8 @@ defmodule Imp.Redaction do
   Imp keeps prompts, tool inputs, provider metadata, and optimizer reports
   inspectable, but credentials and credential-shaped strings must not leak into
   those artifacts. `redact/2` walks ordinary Elixir maps, lists, tuples, and structs,
-  replacing known secret fields and secret-looking string values with
-  `"[REDACTED]"`.
+  replacing known secret fields with `"[REDACTED]"`, and the credential-shaped
+  parts of every string likewise, keeping the text around them.
 
   Clients, retrievers and trackers that hold a credential print through a
   redacting `Inspect` implementation, which hides every header value and the
@@ -258,6 +258,16 @@ defmodule Imp.Redaction do
   exact keys plus token-delimited or camel-case provider prefixes such as
   `:openai_api_key` are redacted.
 
+  In a string, each credential-shaped part is replaced and the text around it
+  kept. This is the one set of value patterns in Imp: text cleaned anywhere
+  else before it is kept or shown (a command's captured output, an optimizer
+  pricing URL) is cleaned by calling `redact/1` on it. The shapes are PEM
+  private key blocks, OpenAI and Anthropic `sk-` keys, GitHub and Hugging Face
+  tokens, AWS access key ids, Google API keys, Slack tokens, JSON Web Tokens,
+  Bearer and Basic credentials, `session=` values, and long hex values assigned
+  to a credential name. A label that names the credential (`Bearer`, `Basic`,
+  `session=`, `token=`) is kept and the value after it replaced.
+
       iex> Imp.Redaction.redact(%{api_key: "sk-test-secret-1234567890", model: "demo"})
       %{api_key: "[REDACTED]", model: "demo"}
 
@@ -271,7 +281,13 @@ defmodule Imp.Redaction do
       %{tenant_id: "[REDACTED]"}
 
       iex> Imp.Redaction.redact({:error, "Bearer abcdefghijklmnop"})
-      {:error, "[REDACTED]"}
+      {:error, "Bearer [REDACTED]"}
+
+      iex> Imp.Redaction.redact("key sk-test-secret-1234567890 was used")
+      "key [REDACTED] was used"
+
+      iex> Imp.Redaction.redact("sha 0badcafe0badcafe0badcafe0badcafe0badcafe")
+      "sha 0badcafe0badcafe0badcafe0badcafe0badcafe"
 
   """
   def redact(value, keys \\ @default_redact_keys)
@@ -353,11 +369,15 @@ defmodule Imp.Redaction do
     |> List.to_tuple()
   end
 
-  def redact(value, _keys) when is_binary(value) do
-    if secret_value?(value), do: "[REDACTED]", else: value
-  end
+  def redact(value, _keys) when is_binary(value), do: redact_secrets(value)
 
   def redact(value, _keys), do: value
+
+  defp redact_secrets(text) do
+    Enum.reduce(secret_patterns(), text, fn {pattern, replacement}, redacted ->
+      Regex.replace(pattern, redacted, replacement)
+    end)
+  end
 
   @doc """
   Recursively removes credential-bearing entries while preserving semantic data.
@@ -661,70 +681,58 @@ defmodule Imp.Redaction do
     end)
   end
 
-  defp secret_value?(value) do
-    trimmed = String.trim(value)
-
-    String.match?(
-      value,
-      ~r/(?:\A|[^A-Za-z0-9_-])sk-[A-Za-z0-9_-]{8,}(?=\z|[^A-Za-z0-9_-])/
-    ) or bearer_credential?(trimmed) or basic_credential?(trimmed) or
-      session_assignment?(value) or aws_access_key_id?(value) or google_api_key?(value) or
-      hex_credential_assignment?(value)
+  # Each pattern matches one credential shape. A pattern that captures a label
+  # (`\1`) keeps it and replaces what follows. The PEM block runs first
+  # because it can hold anything, including the other shapes.
+  defp secret_patterns do
+    [
+      # A PEM private key block (PKCS#8, RSA, EC, OpenSSH, encrypted). Output
+      # cut off mid-key has no END line; everything after BEGIN goes.
+      {~r/-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----(?:.*?-----END [A-Z0-9 ]*PRIVATE KEY-----|.*\z)/s,
+       "[REDACTED]"},
+      # A token after `Bearer` ends the line or is closed by punctuation, so
+      # prose ("Bearer authentication is ...") is not taken for one.
+      {~r/(?<![^\s:;,"'=({\[])(Bearer[ \t]+)[A-Za-z0-9._~+\/-]{12,}={0,2}(?=[ \t]*(?:\z|[\r\n])|["'`}\]),;])/i,
+       "\\1[REDACTED]"},
+      {~r/(?<![^\s:;,])(Basic[ \t]+)([A-Za-z0-9+\/]+={0,2})(?=[ \t]*(?:\z|[\r\n]))/i,
+       &basic_credential/3},
+      # JSON Web Tokens: header.payload.signature, each base64url, the first
+      # two JSON objects (so `eyJ`).
+      {~r/(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]*(?![A-Za-z0-9_.-])/,
+       "[REDACTED]"},
+      # OpenAI and Anthropic keys: `sk-`, `sk-proj-`, `sk-ant-`.
+      {~r/(?<![A-Za-z0-9_-])sk-[A-Za-z0-9_-]{8,}(?![A-Za-z0-9_-])/, "[REDACTED]"},
+      # GitHub classic, OAuth, user-to-server, server and refresh tokens, and
+      # fine-grained personal access tokens.
+      {~r/(?<![A-Za-z0-9_])(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{22,})(?![A-Za-z0-9_])/,
+       "[REDACTED]"},
+      # Hugging Face user access tokens.
+      {~r/(?<![A-Za-z0-9_])hf_[A-Za-z0-9]{30,}(?![A-Za-z0-9_])/, "[REDACTED]"},
+      # Slack bot, user, app and configuration tokens (`xoxb-`, `xoxp-`, ...).
+      {~r/(?<![A-Za-z0-9_-])xox[a-z]-[A-Za-z0-9-]{10,}(?![A-Za-z0-9_-])/, "[REDACTED]"},
+      # AWS access key ids: AKIA (long-term) or ASIA (temporary), then at
+      # least 16 uppercase base-32 characters.
+      {~r/(?<![A-Z0-9])(?:AKIA|ASIA)[0-9A-Z]{16,}(?![A-Z0-9])/, "[REDACTED]"},
+      # Google API keys: AIza and 35 url-safe base64 characters.
+      {~r/(?<![A-Za-z0-9_-])AIza[0-9A-Za-z_-]{35}(?![A-Za-z0-9_-])/, "[REDACTED]"},
+      {~r/(?<![^?&;,\s])(session\s*=\s*)[A-Za-z0-9._~+\/-]{8,}={0,2}(?=\z|[?&;,\s])/i,
+       "\\1[REDACTED]"},
+      # Long hex strings alone are not secrets: Imp passes SHA-1 and SHA-256
+      # digests around as cache keys and git identities. One is redacted only
+      # in an explicit credential assignment (`token=<hex>`, `secret: <hex>`),
+      # where the key name says what it is.
+      {~r/((?:secret|token|password|api[_-]?key|credential)s?\s*[=:]\s*"?)[0-9a-fA-F]{32,}(?![0-9a-fA-F])/i,
+       "\\1[REDACTED]"}
+    ]
   end
 
-  # AWS access key ids have a fixed, distinctive shape: a 4-letter prefix
-  # (AKIA long-term, ASIA temporary) followed by exactly 16 uppercase
-  # base-32-ish characters. Distinctive enough to redact standalone.
-  defp aws_access_key_id?(value),
-    do: String.match?(value, ~r/(?:\A|[^A-Z0-9])(?:AKIA|ASIA)[0-9A-Z]{16}(?=\z|[^A-Z0-9])/)
-
-  # Google API keys are "AIza" followed by exactly 35 url-safe base64 chars.
-  defp google_api_key?(value),
-    do:
-      String.match?(
-        value,
-        ~r/(?:\A|[^A-Za-z0-9_-])AIza[0-9A-Za-z_-]{35}(?=\z|[^A-Za-z0-9_-])/
-      )
-
-  # Long hex strings alone are NOT treated as secrets — this codebase passes
-  # SHA-1/SHA-256 digests around as cache keys and git identities, and blanket
-  # hex redaction would destroy them. A long hex value is only redacted when it
-  # sits in an explicit credential assignment (`token=<hex>`, `secret: <hex>`),
-  # where the key name already says what it is.
-  defp hex_credential_assignment?(value),
-    do:
-      String.match?(
-        value,
-        ~r/(?:secret|token|password|api[_-]?key|credential)s?\s*[=:]\s*"?[0-9a-fA-F]{32,}"?(?=\z|[^0-9a-fA-F])/i
-      )
-
-  defp bearer_credential?(value),
-    do:
-      String.match?(
-        value,
-        ~r/(?:\A|[\s:;,"'=({\[])Bearer[ \t]+[A-Za-z0-9._~+\/-]{12,}={0,2}(?=\z|["'`}\]),;])/i
-      )
-
-  defp basic_credential?(value) do
-    case Regex.run(~r/(?:\A|[\s:;,])Basic[ \t]+([A-Za-z0-9+\/]+={0,2})\z/i, value,
-           capture: :all_but_first
-         ) do
-      [encoded] ->
-        case Base.decode64(encoded) do
-          {:ok, decoded} -> String.contains?(decoded, ":")
-          :error -> false
-        end
-
-      _other ->
-        false
+  # `Basic` is followed by base64 in prose too ("Basic authentication"); it is
+  # a credential only when the decoded text is `user:password`.
+  defp basic_credential(match, label, encoded) do
+    case Base.decode64(encoded) do
+      {:ok, decoded} -> if String.contains?(decoded, ":"), do: label <> "[REDACTED]", else: match
+      :error -> match
     end
-  end
-
-  defp session_assignment?(value) do
-    String.match?(
-      value,
-      ~r/(?:\A|[?&;,\s])session\s*=\s*[A-Za-z0-9._~+\/-]{8,}={0,2}(?=\z|[?&;,\s])/i
-    )
   end
 end
 

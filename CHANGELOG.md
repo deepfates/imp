@@ -2,6 +2,27 @@
 
 User-visible changes to Imp are recorded here.
 
+## Unreleased
+
+### Security
+
+- `Imp.Redaction` catches PEM private key blocks, GitHub tokens (`ghp_`,
+  `gho_`, `ghu_`, `ghs_`, `ghr_`, `github_pat_`), Hugging Face `hf_` tokens,
+  Slack `xox?-` tokens, JSON Web Tokens and AWS access key ids longer than 20
+  characters, which it passed through unchanged into run events, traces,
+  trajectories and saved programs. It replaces only the credential in a
+  string and keeps the text around it (`"key [REDACTED] was used"`, `"Bearer
+  [REDACTED]"`, `"session=[REDACTED]"`), where it replaced the whole string.
+  `Imp.ExternalCommand` and the optimizer's pricing URL check use the same
+  patterns instead of their own.
+
+### Fixed
+
+- `Imp.inspect_history/2` renders a history holding terms JSON has no encoding
+  for, such as the `{:error, {:unknown_tool, name}}` a ReActV2 turn records
+  when the model calls a tool that does not exist, a pid or a map with tuple
+  keys. It raised `Protocol.UndefinedError`.
+
 ## 0.5.0 — 2026-09-26
 
 ### Security

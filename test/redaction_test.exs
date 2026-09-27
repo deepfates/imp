@@ -34,6 +34,86 @@ defmodule Imp.RedactionTest do
     "x-api-key": "CANARY_X_API_KEY_9c372"
   ]
 
+  # Every shape Imp.Redaction catches, each with the text around it and a
+  # near miss that must survive. All values are fake: fillers such as `F4ke`
+  # and AWS's documented example key id, never real credentials.
+  @pem "-----BEGIN PRIVATE KEY-----\nMIIFAKEFAKEFAKEFAKEFAKE\nFAKEFAKEFAKE==\n-----END PRIVATE KEY-----"
+  @jwt "eyJhbGciOiJub25lIn0.eyJzdWIiOiJmYWtlLXVzZXIifQ.ZmFrZS1zaWduYXR1cmU"
+  @secret_shapes [
+    pem:
+      {"key:\n#{@pem}\ndone", "key:\n[REDACTED]\ndone",
+       "-----BEGIN PUBLIC KEY-----\nMFkwFAKE\n-----END PUBLIC KEY-----"},
+    pem_rsa:
+      {"-----BEGIN RSA PRIVATE KEY-----\nFAKE\n-----END RSA PRIVATE KEY----- then",
+       "[REDACTED] then", "BEGIN PRIVATE KEY is how the block opens"},
+    pem_cut_off:
+      {"log: -----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEFAKE", "log: [REDACTED]",
+       "-----BEGIN CERTIFICATE-----"},
+    openai: {"key sk-F4keF4keF4keF4keF4ke used", "key [REDACTED] used", "sk-short"},
+    openai_project: {"(sk-proj-F4ke_F4ke-F4keF4ke)", "([REDACTED])", "task-runner-F4keF4keF4ke"},
+    anthropic:
+      {"ANTHROPIC_API_KEY=sk-ant-api03-F4keF4keF4keF4ke", "ANTHROPIC_API_KEY=[REDACTED]",
+       "desk-ant-api03-F4keF4keF4keF4ke"},
+    github_classic:
+      {"token ghp_#{String.duplicate("F4ke", 9)} set", "token [REDACTED] set", "ghp_short"},
+    github_oauth: {"gho_#{String.duplicate("F4ke", 9)}", "[REDACTED]", "gho_F4ke"},
+    github_user: {"ghu_#{String.duplicate("F4ke", 9)}", "[REDACTED]", "ghu_F4ke"},
+    github_server: {"ghs_#{String.duplicate("F4ke", 9)}", "[REDACTED]", "ghs_F4ke"},
+    github_refresh: {"ghr_#{String.duplicate("F4ke", 9)}", "[REDACTED]", "ghr_F4ke"},
+    github_fine_grained:
+      {"pat github_pat_11F4KE#{String.duplicate("F4ke", 6)}_#{String.duplicate("F4ke", 10)}.",
+       "pat [REDACTED].", "github_pat_ is the prefix"},
+    hugging_face:
+      {"HF_TOKEN=hf_#{String.duplicate("F4ke", 9)} ok", "HF_TOKEN=[REDACTED] ok",
+       "hf_hub_download"},
+    aws_access_key:
+      {"creds AKIAIOSFODNN7EXAMPLE in prose", "creds [REDACTED] in prose",
+       "AKIA1234 is too short"},
+    aws_long_access_key:
+      {"id=AKIAIOSFODNN7EXAMPLE1;", "id=[REDACTED];", "NAKIAIOSFODNN7EXAMPLES"},
+    aws_temporary: {"ASIAIOSFODNN7EXAMPLE", "[REDACTED]", "ASIA is a continent"},
+    slack:
+      {"xoxb-#{String.duplicate("0", 10)}-#{String.duplicate("F4ke", 4)} posted",
+       "[REDACTED] posted", "xoxo-hugs"},
+    bearer:
+      {"Authorization: Bearer F4keF4keF4keF4ke\nnext", "Authorization: Bearer [REDACTED]\nnext",
+       "Bearer authentication is an authorization mechanism."},
+    jwt: {"id_token #{@jwt} end", "id_token [REDACTED] end", "eyJhbGciOiJub25lIn0 alone"},
+    google: {"key=AIza#{String.duplicate("Xy-_9", 7)}.", "key=[REDACTED].", "AIzaShort"},
+    basic:
+      {"Authorization: Basic #{Base.encode64("fake-user:fake-pass")}",
+       "Authorization: Basic [REDACTED]", "Basic authentication is enabled."},
+    session: {"a=1&session=F4keSessionF4ke&b=2", "a=1&session=[REDACTED]&b=2", "session=short"},
+    hex_assignment:
+      {"token=#{String.duplicate("0badcafe", 5)} rest", "token=[REDACTED] rest",
+       "cache hit #{String.duplicate("0badcafe", 5)}"}
+  ]
+
+  for {name, {text, redacted, near_miss}} <- @secret_shapes do
+    test "redacts the #{name} shape and keeps the text around it" do
+      assert Imp.Redaction.redact(unquote(text)) == unquote(redacted)
+      assert Imp.Redaction.redact(%{note: unquote(text)}) == %{note: unquote(redacted)}
+      assert Imp.Redaction.redact(unquote(near_miss)) == unquote(near_miss)
+    end
+  end
+
+  test "the optimizer's pricing URL check refuses every shape Imp.Redaction catches" do
+    for token <- ["ghp_#{String.duplicate("F4ke", 9)}", "hf_#{String.duplicate("F4ke", 9)}"] do
+      assert_raise ArgumentError, fn ->
+        Imp.Optimizer.Budget.validate_pricing_source_url!("https://pricing.example/#{token}")
+      end
+    end
+
+    pem_path = URI.encode("-----BEGIN PRIVATE KEY-----")
+
+    assert_raise ArgumentError, fn ->
+      Imp.Optimizer.Budget.validate_pricing_source_url!("https://pricing.example/#{pem_path}")
+    end
+
+    url = "https://pricing.example/models/gpt/rates"
+    assert Imp.Optimizer.Budget.validate_pricing_source_url!(url) == url
+  end
+
   defmodule OrdinaryStruct do
     defstruct [:value]
   end
@@ -59,7 +139,7 @@ defmodule Imp.RedactionTest do
     assert %Image{} = redacted.side_information.prompt |> hd() |> Map.fetch!("Image")
     redacted_image = redacted.side_information.prompt |> hd() |> Map.fetch!("Image")
 
-    assert redacted_image.url == "[REDACTED]"
+    assert redacted_image.url == "https://example.test/image?token=[REDACTED]"
     assert redacted_image.data == base64
     assert redacted_image.mime_type == image.mime_type
     assert redacted_image.metadata.authorization == "[REDACTED]"
@@ -93,14 +173,14 @@ defmodule Imp.RedactionTest do
     assert redacted.basic_prose == "Basic authentication is enabled for this endpoint."
     assert redacted.ordinary_url == ordinary_url
     assert redacted.ordinary_image.url == ordinary_url
-    assert redacted.message == "[REDACTED]"
-    assert redacted.description == "[REDACTED]"
-    assert redacted.code == "[REDACTED]"
-    assert redacted.quoted_output == "[REDACTED]"
-    assert redacted.basic == "[REDACTED]"
-    assert redacted.cookie == "[REDACTED]"
+    assert redacted.message == "Bearer [REDACTED]"
+    assert redacted.description == "lookup facts Bearer [REDACTED]"
+    assert redacted.code == ~s(token = "Bearer [REDACTED]")
+    assert redacted.quoted_output == ~s("Bearer [REDACTED]")
+    assert redacted.basic == "Basic [REDACTED]"
+    assert redacted.cookie == "session=[REDACTED]"
     assert redacted.headers == [{"authorization", "[REDACTED]"}]
-    assert redacted.image.url == "[REDACTED]"
+    assert redacted.image.url == "https://example.test/image/[REDACTED]"
   end
 
   test "ordinary structs and maps retain existing redaction behavior" do
@@ -114,7 +194,7 @@ defmodule Imp.RedactionTest do
            }
 
     assert Imp.Redaction.redact({:error, {:provider, "Bearer abcdefghijklmnop"}}) ==
-             {:error, {:provider, "[REDACTED]"}}
+             {:error, {:provider, "Bearer [REDACTED]"}}
   end
 
   test "redaction and credential dropping preserve improper provider lists" do
@@ -338,11 +418,11 @@ defmodule Imp.RedactionTest do
 
     assert measurements.max_tokens == 32
     assert measurements.request_id == "measurement-request"
-    assert measurements.basic_header == "[REDACTED]"
-    assert measurements.message == "[REDACTED]"
+    assert measurements.basic_header == "Basic [REDACTED]"
+    assert measurements.message == "Bearer [REDACTED]"
     assert metadata.model.id == "inline-model"
-    assert metadata.cookie_line == "[REDACTED]"
-    assert metadata.image.url == "[REDACTED]"
+    assert metadata.cookie_line == "session=[REDACTED]"
+    assert metadata.image.url == "https://example.test/private/[REDACTED]"
     assert metadata.image.data == "aW1hZ2U="
     assert metadata.prose == prose
     assert metadata.ordinary_url == ordinary_url
@@ -374,9 +454,11 @@ defmodule Imp.RedactionTest do
     fake_asia = "ASIAIOSFODNN7EXAMPLE"
     fake_aiza = "AIza" <> String.duplicate("Xy-_9", 7)
 
-    assert Imp.Redaction.redact(%{note: "creds #{fake_akia} in prose"}).note == "[REDACTED]"
+    assert Imp.Redaction.redact(%{note: "creds #{fake_akia} in prose"}).note ==
+             "creds [REDACTED] in prose"
+
     assert Imp.Redaction.redact(%{note: fake_asia}).note == "[REDACTED]"
-    assert Imp.Redaction.redact(%{note: "key=#{fake_aiza}."}).note == "[REDACTED]"
+    assert Imp.Redaction.redact(%{note: "key=#{fake_aiza}."}).note == "key=[REDACTED]."
 
     # Near-miss shapes survive: short AKIA prefix, AKIA embedded in a word.
     assert Imp.Redaction.redact(%{note: "AKIA1234 is too short"}).note ==
@@ -389,9 +471,9 @@ defmodule Imp.RedactionTest do
   test "redacts long hex values only inside credential assignments" do
     fake_hex = String.duplicate("0badcafe", 5)
 
-    assert Imp.Redaction.redact(%{log: "token=#{fake_hex}"}).log == "[REDACTED]"
-    assert Imp.Redaction.redact(%{log: "api_key: #{fake_hex}"}).log == "[REDACTED]"
-    assert Imp.Redaction.redact(%{log: ~s(secret="#{fake_hex}")}).log == "[REDACTED]"
+    assert Imp.Redaction.redact(%{log: "token=#{fake_hex}"}).log == "token=[REDACTED]"
+    assert Imp.Redaction.redact(%{log: "api_key: #{fake_hex}"}).log == "api_key: [REDACTED]"
+    assert Imp.Redaction.redact(%{log: ~s(secret="#{fake_hex}")}).log == ~s(secret="[REDACTED]")
 
     # Bare digests (git SHAs, cache keys) are data, not secrets — untouched.
     assert Imp.Redaction.redact(%{sha: fake_hex}).sha == fake_hex

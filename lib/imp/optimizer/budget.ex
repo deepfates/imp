@@ -17,7 +17,6 @@ defmodule Imp.Optimizer.Budget do
   use GenServer
 
   @credential_marker ~r/(?:api[_-]?key|authorization|proxy[_-]?authorization|bearer(?:[_-]?token)?|access[_-]?token|refresh[_-]?token|id[_-]?token|session(?:[_-]?token)?|secret(?:[_-]?(?:access[_-]?key|key))?|client[_-]?secret|private[_-]?(?:key|token)|password|credential(?:s)?)/i
-  @secret_shape ~r/(?:sk-(?:proj-)?[A-Za-z0-9_-]{12,}|AKIA[0-9A-Z]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY-----)/
 
   @type limit :: non_neg_integer() | number() | :infinity
 
@@ -68,8 +67,7 @@ defmodule Imp.Optimizer.Budget do
       {:ok, forms} ->
         Enum.all?(forms, fn decoded ->
           Imp.Redaction.redact(decoded) == decoded and
-            not Regex.match?(@credential_marker, decoded) and
-            not Regex.match?(@secret_shape, decoded)
+            not Regex.match?(@credential_marker, decoded)
         end)
 
       :error ->

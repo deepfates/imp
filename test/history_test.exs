@@ -73,7 +73,7 @@ defmodule Imp.HistoryTest do
     redacted = Imp.History.redact(history)
 
     assert Imp.History.messages(redacted) == [
-             %{question: "[REDACTED]", answer: "No", api_key: "[REDACTED]"}
+             %{question: "Use [REDACTED]?", answer: "No", api_key: "[REDACTED]"}
            ]
   end
 

@@ -98,7 +98,7 @@ defmodule Imp.Observability do
         |> Enum.take(-opts[:limit])
         |> Enum.with_index(1)
         |> Enum.map_join("\n\n", fn {turn, index} ->
-          "Turn #{index}\n" <> Jason.encode!(turn, pretty: true)
+          "Turn #{index}\n" <> (turn |> Inspection.json_safe() |> Jason.encode!(pretty: true))
         end)
 
       if opts[:io], do: IO.write(opts[:io], rendered)
