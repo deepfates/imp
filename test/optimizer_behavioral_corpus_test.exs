@@ -200,6 +200,29 @@ defmodule OptimizerBehavioralCorpusTest do
     assert report.metadata.generations == 0
   end
 
+  test "GEPA reports metric feedback as feedback, not as failed program calls" do
+    feedback_metric = fn example, prediction ->
+      score = Imp.Metrics.normalize_result(metric().(example, prediction)).score
+      %{score: score, feedback: "This trajectory got a score of #{score}."}
+    end
+
+    report =
+      Imp.Optimizer.GEPA.new(feedback_metric,
+        execution_profile: :beam_native,
+        generations: 1,
+        reflection_lm: reflection_lm("Answer in one word."),
+        feedback_fn: fn _trainset -> "Answer in one word." end
+      )
+      |> Imp.Optimizer.GEPA.compile(france_program(), trainset(), devset())
+      |> Imp.Optimizer.Report.fetch()
+
+    assert report.metadata.rejected_candidates > 0
+    assert report.errors == []
+    assert report.metadata.status == :ok
+    assert Enum.all?(report.candidates, &(&1.diagnostics == []))
+    refute Enum.any?(report.candidates, &(&1.mutation =~ "Program call failed"))
+  end
+
   test "GEPA records program failures diagnostically without using them as instruction advice" do
     broken_program =
       Imp.predict("question -> answer",
@@ -219,6 +242,8 @@ defmodule OptimizerBehavioralCorpusTest do
 
     assert report.optimizer == :gepa
     assert report.best_score == 0.0
+    assert report.metadata.status == :with_errors
+    assert [%{candidate_id: "baseline", diagnostics: ["offline_candidate"]}] = report.errors
 
     assert Enum.any?(report.candidates, fn candidate ->
              candidate.mutation =~ "Program call failed"
@@ -227,6 +252,26 @@ defmodule OptimizerBehavioralCorpusTest do
     refute Enum.any?(report.candidates, fn candidate ->
              candidate.instruction =~ "Program call failed"
            end)
+  end
+
+  test "GEPA reports a program that raises as an error" do
+    raising_program =
+      Imp.predict("question -> answer",
+        lm: Imp.Test.FunLM.new(fn _messages, _opts -> raise "candidate crashed" end)
+      )
+
+    report =
+      Imp.Optimizer.GEPA.new(metric(),
+        execution_profile: :beam_native,
+        generations: 1,
+        reflection_lm: reflection_lm("Answer in one word.")
+      )
+      |> Imp.Optimizer.GEPA.compile(raising_program, trainset(), devset())
+      |> Imp.Optimizer.Report.fetch()
+
+    assert report.metadata.status == :with_errors
+    assert [%{candidate_id: "baseline", diagnostics: [diagnostic]}] = report.errors
+    assert diagnostic =~ "candidate crashed"
   end
 
   test "GEPA keeps truncated multibyte diagnostics valid UTF-8" do

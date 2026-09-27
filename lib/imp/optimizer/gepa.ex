@@ -650,13 +650,13 @@ defmodule Imp.Optimizer.GEPA do
     end)
   end
 
+  # Diagnostics name real failures only: rows whose program call or metric
+  # failed, which the adapter records as diagnostic entries, and proposal
+  # errors. The metric's feedback on the other rows is not a failure.
   defp result_diagnostics(result) do
-    result.side_information
-    |> Map.values()
-    |> List.flatten()
-    |> Enum.map(&diagnostic_text/1)
-    |> Enum.reject(&(&1 in [nil, "successful", "improve"]))
-    |> Enum.uniq()
+    [result.side_information]
+    |> failed_rows()
+    |> diagnostic_texts()
   end
 
   defp rejection_diagnostics(event) do
@@ -670,10 +670,21 @@ defmodule Imp.Optimizer.GEPA do
       Map.get(event, :parent_side_information, %{}),
       Map.get(event, :candidate_side_information, %{})
     ]
-    |> Enum.flat_map(&(&1 |> Map.values() |> List.flatten()))
+    |> failed_rows()
     |> Kernel.++(reason)
+    |> diagnostic_texts()
+  end
+
+  defp failed_rows(side_informations) do
+    side_informations
+    |> Enum.flat_map(&(&1 |> Map.values() |> List.flatten()))
+    |> Enum.filter(&ProgramAdapter.diagnostic_failure?/1)
+  end
+
+  defp diagnostic_texts(failures) do
+    failures
     |> Enum.map(&diagnostic_text/1)
-    |> Enum.reject(&(&1 in [nil, "successful", "improve"]))
+    |> Enum.reject(&is_nil/1)
     |> Enum.uniq()
   end
 

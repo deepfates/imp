@@ -48,6 +48,14 @@ User-visible changes to Imp are recorded here.
   contract now pins transformers 5.10.1, the version the lockfile installs; it
   named 5.5.0, which the worker refused at startup.
 
+### GEPA
+
+- A GEPA report names real failures only: a row whose program call or metric
+  failed, and a proposal error. Before, it treated the metric's feedback as a
+  failure, so a run whose metric returned feedback reported `errors`,
+  `status: :with_errors` and candidates named "Program call failed: …" when
+  nothing had failed.
+
 ## 0.5.0 — 2026-09-26
 
 ### Security
