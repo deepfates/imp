@@ -1514,8 +1514,6 @@
       "category": "stable",
       "functions": [
         "format_tool_result/1",
-        "render_outputs/3",
-        "render_system/2",
         "tool_error_text/1"
       ],
       "kind": "module",
@@ -1525,12 +1523,6 @@
         "functions": {
           "format_tool_result/1": [
             "format_tool_result(value)"
-          ],
-          "render_outputs/3": [
-            "render_outputs(signature, outputs, missing_field_message)"
-          ],
-          "render_system/2": [
-            "render_system(signature, opts \\\\ [])"
           ],
           "tool_error_text/1": [
             "tool_error_text(reason)"
@@ -1546,9 +1538,7 @@
       "category": "stable",
       "functions": [
         "lm_opts/2",
-        "lm_opts/3",
-        "render_outputs/3",
-        "render_system/2"
+        "lm_opts/3"
       ],
       "kind": "module",
       "macros": [],
@@ -1560,12 +1550,6 @@
           ],
           "lm_opts/3": [
             "lm_opts(signature, opts, capability)"
-          ],
-          "render_outputs/3": [
-            "render_outputs(signature, outputs, missing_field_message)"
-          ],
-          "render_system/2": [
-            "render_system(signature, opts \\\\ [])"
           ]
         }
       },
@@ -2048,23 +2032,11 @@
     {
       "callbacks": [],
       "category": "stable",
-      "functions": [
-        "render_outputs/3",
-        "render_system/2"
-      ],
+      "functions": [],
       "kind": "module",
       "macros": [],
       "module": "Imp.Adapter.XML",
-      "signatures": {
-        "functions": {
-          "render_outputs/3": [
-            "render_outputs(signature, outputs, missing_field_message)"
-          ],
-          "render_system/2": [
-            "render_system(signature, opts \\\\ [])"
-          ]
-        }
-      },
+      "signatures": {},
       "source": "lib/imp/adapter/xml.ex",
       "struct_fields": [],
       "types": []

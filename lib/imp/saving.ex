@@ -629,7 +629,8 @@ defmodule Imp.Saving do
       signature: signature,
       react: require_predict!(load_state!(state["react"]), "ReActV2"),
       tools: Imp.Predict.ReActV2.put_submit(tools, signature),
-      # The saved list is in declared order, which is the roster's order.
+      # The roster is sent in the saved list's order: declared order when this
+      # version saved it, name order in a 0.5.0 file, which sorted it.
       tool_order:
         Enum.map(state["tools"], &Imp.Optimizer.Report.decode_term_compatible(&1["name"])),
       max_iters: require_non_negative_integer!(state["max_iters"], "ReActV2 max_iters"),

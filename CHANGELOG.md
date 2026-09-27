@@ -30,19 +30,23 @@ User-visible changes to Imp are recorded here.
   contain, so GRPO training from Hex needed a source checkout. The default
   contract now pins transformers 5.10.1, the version the lockfile installs; it
   named 5.5.0, which the worker refused at startup.
-- An `Imp.react` step asks for one thing. With the Chat adapter and an LM
-  that calls tools natively, the step's system message is the inputs and the
-  objective with the loop's guidance, and no longer also describes
-  `next_thought` and `tool_calls` as fields to write. A model that followed
-  that description wrote a JSON object, and for a signature with one text
-  output the object became the answer. An LM whose client says it cannot call
-  tools (a ReqLLM model the registry lists without tool calling,
-  `Imp.Clients.TRLLM`) keeps the field structure, so it can still write its
-  calls. `Imp.LM.Budgeted` and BootstrapFewShot's rollout LM answer for the LM
-  they wrap, for this and for reasoning and response-format support.
-- With the JSON or XML adapter, an `Imp.react` agent whose answer is text is
-  told to write it in `next_thought` and leave `tool_calls` empty, which that
-  format can say, instead of to write plain text without calling a tool.
+- An `Imp.react` step asks for one thing, whichever adapter formats it. With
+  an LM that calls tools natively, the tools are sent natively and the step's
+  prompt no longer also describes `tool_calls` as a field to write, in the
+  Chat, JSON and XML adapters, their demos and the JSON fallback: the step
+  output that native calls fill is left out before any adapter formats, as
+  DSPy does. A model that followed that description wrote a JSON object, and
+  for a signature with one text output the object became the answer. An LM
+  whose client says it cannot call tools (a ReqLLM model the registry lists
+  without tool calling, `Imp.Clients.TRLLM`) is sent no tools and asked to
+  write its calls in `tool_calls`. The guidance says where a text answer
+  goes: plain text when the tools are native (in `next_thought` for JSON and
+  XML, which cannot be plain text), and in `next_thought` with `tool_calls`
+  left empty when the model writes its calls. A stored turn that carries only
+  the task's answer is replayed as that answer, not as step fields marked
+  "Not supplied". `Imp.LM.Budgeted` and BootstrapFewShot's rollout LM answer
+  for the LM they wrap, for this and for reasoning and response-format
+  support.
 - `Imp.react` sends its tool roster in the order the tools were declared, then
   `submit`, and a saved agent keeps that order. It was the order of the tool
   names' atoms, which can differ between processes and changed the prompt a
@@ -56,11 +60,11 @@ User-visible changes to Imp are recorded here.
   `:system_renderer`, `:output_renderer` and `:guidance` whenever they are
   used, and end a request whose inputs are all in the history with the output
   requirements as a user message of their own instead of appending them to the
-  last tool result. A renderer is told the adapter formatting the request as
-  `opts[:adapter]`, and one that builds on the default calls that adapter's
-  `render_system/2` or `render_outputs/3`, which Chat, JSON and XML each
-  have, so a fallback never asks for two formats. An `:output_renderer` may
-  take the options as a fourth argument.
+  last tool result. A renderer receives the formatting adapter's own
+  rendering in its options, as `:default_system` and, for an
+  `:output_renderer` that takes the options as a fourth argument,
+  `:default_outputs`, so one that builds on the default builds on the format
+  of the request and a fallback never asks for two formats.
 - The `[:imp, :adapter, :parse, :json_fallback]` event names the adapter whose
   reply failed as `:adapter` (it always said `Imp.Adapter.Chat`, also for
   XML) and the adapter that retried as `:fallback_adapter`.

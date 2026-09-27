@@ -120,15 +120,18 @@ defmodule Imp.Predict.ReActV2 do
   `args` or `parameters` for `arguments` (`Imp.Adapter.Types.ToolCall`); a map
   that names no tool at all is kept as a malformed-call observation.
 
-  So a step asks for one thing. When the LM calls tools natively (every LM
-  unless its client says otherwise; `Imp.Clients.ReqLLM` asks the model
-  registry), the Chat adapter's system message is the inputs and the objective,
-  the loop's guidance included, with no `next_thought`/`tool_calls` field
-  structure: the model answers with tool calls or with plain text. When the LM
-  cannot (the registry says the model has no tool calling, or the LM is
-  `Imp.Clients.TRLLM`), the step keeps that structure, so the model can write
-  its calls under `[[ ## tool_calls ## ]]`. The roster is sent natively
-  either way.
+  So a step asks for one thing, whichever adapter formats it. When the LM calls
+  tools natively (every LM unless its client says otherwise;
+  `Imp.Clients.ReqLLM` asks the model registry), the tools are sent natively
+  and `Imp.Predict` formats the step without its `tool_calls` output, in every
+  adapter and in the JSON fallback: the model answers with tool calls or with
+  text. When the LM cannot (the registry says the model has no tool calling, or
+  the LM is `Imp.Clients.TRLLM`), no tools are sent and the step describes
+  `tool_calls` for the model to write its calls in. The guidance says where a
+  text answer goes: in `next_thought` with `tool_calls` empty when that field
+  is described, otherwise as plain text (or in `next_thought`, in a format that
+  cannot be plain text). A stored turn that carries a one-text-output task's
+  answer and no step outputs is replayed as a step that answered in text.
 
   On a recognized context-window refusal, up to eight smaller requests omit
   oldest prior episodes from the prompt, preserving their full durable history.
@@ -276,7 +279,7 @@ defmodule Imp.Predict.ReActV2 do
         # completion as `next_thought`, and `tool_calls` takes its declared
         # default of none, which ends the turn: as the answer when the
         # signature has one text output, and at the forced submit otherwise.
-        metadata: %{text_field: :next_thought}
+        metadata: step_metadata()
       }
 
     config = Keyword.merge(opts[:config], provider_tool_config(tools, tool_order, signature))
@@ -382,8 +385,8 @@ defmodule Imp.Predict.ReActV2 do
   def restore_loop(%__MODULE__{react: react} = agent) do
     metadata =
       react.signature.metadata
-      |> Map.delete("text_field")
-      |> Map.put(:text_field, :next_thought)
+      |> Map.drop(["text_field", "tool_calls_field"])
+      |> Map.merge(step_metadata())
 
     react = %{
       react
@@ -909,21 +912,31 @@ defmodule Imp.Predict.ReActV2 do
 
   defp error_text(value), do: inspect(value)
 
-  # Every step sends its roster natively. Whether the model answers that
-  # natively is the LM's to say, once per call of the loop, since the LM can
-  # come from `Imp.Settings`: when it does, the step asks for tool calls or
-  # plain text and the prompt describes no written `tool_calls` field; when it
-  # does not, the prompt keeps the field structure so the model can write its
-  # calls. Asking once keeps a registry lookup (and its warning for a model the
-  # registry does not know) to one per call rather than one per step.
+  # Whether the model answers the roster natively is the LM's to say, asked
+  # once per call of the loop (the LM can come from `Imp.Settings`) and handed
+  # to every step as `:native_tool_calls`: `Imp.Predict` then sends the tools
+  # and leaves `tool_calls` out of the prompt, or, for an LM that cannot call
+  # tools, keeps the field for the model to write and sends none. Asking once
+  # keeps a registry lookup (and its warning for a model the registry does not
+  # know) to one per call rather than one per step.
   defp with_native_tools(%__MODULE__{react: program} = react) do
     native? = program |> Imp.Predict.resolve_lm() |> Imp.LM.tool_calling_capability()
-    adapter_opts = Keyword.put(program.adapter_opts, :native_tools, native?)
-    %{react | react: %{program | adapter_opts: adapter_opts}}
+
+    %{
+      react
+      | react: %{program | config: Keyword.put(program.config, :native_tool_calls, native?)}
+    }
   end
 
-  defp predict(program, _react, history, pending) do
+  # What the step signature says about its outputs: a reply with no marker is
+  # `next_thought` (`Imp.Adapter.Chat`), and native tool calls fill
+  # `tool_calls`, so `Imp.Predict` leaves that field out of the prompt when the
+  # step sends its tools natively.
+  defp step_metadata, do: %{text_field: :next_thought, tool_calls_field: :tool_calls}
+
+  defp predict(program, react, history, pending) do
     context_call(history, fn projected ->
+      projected = %{projected | messages: Enum.map(projected.messages, &step_turn(&1, react))}
       Imp.Predict.call(program, Map.put(pending, :history, projected))
     end)
   end
@@ -1261,6 +1274,27 @@ defmodule Imp.Predict.ReActV2 do
 
     %{full: history, boundaries: boundaries, omitted: 0, omitted_groups: 0, retries: 0}
   end
+
+  # A stored turn that carries the answer of a one-text-output task but no
+  # step outputs (a host wrote it, or it predates the loop's own events) is,
+  # in the step's terms, a step that answered in text: `next_thought` is the
+  # answer and it called nothing. Read that way, every adapter replays it as
+  # the answer the model gave, not as step fields it never filled. Only the
+  # prompt's view changes; the history the caller holds does not.
+  defp step_turn(turn, %__MODULE__{signature: signature}) when is_map(turn) do
+    with {:text, [%Imp.Signature.Field{name: name}]} <- text_output(signature),
+         false <- Imp.FieldMap.has_key?(turn, :next_thought),
+         false <- Imp.FieldMap.has_key?(turn, :tool_calls),
+         answer when is_binary(answer) <- Imp.FieldMap.get(turn, name) do
+      if Enum.any?(Map.keys(turn), &is_binary/1),
+        do: turn |> Map.put("next_thought", answer) |> Map.put("tool_calls", []),
+        else: turn |> Map.put(:next_thought, answer) |> Map.put(:tool_calls, [])
+    else
+      _step_turn -> turn
+    end
+  end
+
+  defp step_turn(turn, _react), do: turn
 
   defp append_history(context, event),
     do: %{context | full: Imp.History.append(context.full, event)}

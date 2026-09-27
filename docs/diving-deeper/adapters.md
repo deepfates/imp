@@ -193,15 +193,15 @@ to return only the value.
 `adapter_opts` replaces parts of the prompt without changing how the reply is
 read: `:system_renderer` writes the system message, `:output_renderer` the
 assistant side of demos and stored turns, `:input_section_renderer` each
-input. A renderer is told which adapter is formatting the request as
-`opts[:adapter]`. That is not always the program's adapter, since a Chat reply
-that cannot be parsed is asked again through the JSON adapter with the same
-renderers, so a renderer that adds to the default builds on that adapter's
-rendering rather than naming one:
+input. The adapter formatting the request is not always the program's, since
+a Chat reply that cannot be parsed is asked again through the JSON adapter
+with the same renderers. So a renderer's options carry that adapter's own
+rendering as `opts[:default_system]`, and a renderer that adds to the default
+calls it rather than naming an adapter:
 
 ```elixir
 terse = fn signature, opts ->
-  "Answer in one word.\n\n" <> opts[:adapter].render_system(signature, opts)
+  "Answer in one word.\n\n" <> opts[:default_system].(signature, opts)
 end
 
 router = Imp.predict(signature, lm: lm, adapter_opts: [system_renderer: terse])
@@ -211,9 +211,8 @@ String.starts_with?(hd(prediction.metadata.trace.messages).content, "Answer in o
 #=> true
 ```
 
-The Chat, JSON and XML adapters each have `render_system/2` and
-`render_outputs/3`, and an `:output_renderer` that takes a fourth argument
-receives the same options.
+An `:output_renderer` that takes a fourth argument receives the same options,
+with the adapter's own assistant-turn rendering as `opts[:default_outputs]`.
 
 ### When the answer does not fit
 

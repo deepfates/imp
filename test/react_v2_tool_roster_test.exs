@@ -51,6 +51,14 @@ defmodule ReActV2ToolRosterTest do
     assert {:ok, _} = Imp.context([lm: lm], fn -> Imp.call(restored, %{intent: "hi"}) end)
     assert_received {:request, _messages, opts}
     assert roster(opts) == ["zeta_probe", "alpha_probe"]
+
+    # A 0.5.0 file lists its tools by name, and loads in that order.
+    state = program |> Imp.dump(registry: registry) |> Jason.encode!() |> Jason.decode!()
+    state = Map.update!(state, "tools", &Enum.sort_by(&1, fn tool -> tool["name"] end))
+    restored = Imp.load!(state, registry: registry)
+    assert {:ok, _} = Imp.context([lm: lm], fn -> Imp.call(restored, %{intent: "hi"}) end)
+    assert_received {:request, _messages, opts}
+    assert roster(opts) == ["alpha_probe", "zeta_probe"]
   end
 
   defmodule CountingLM do
@@ -77,6 +85,10 @@ defmodule ReActV2ToolRosterTest do
       send(owner, :capability_asked)
       native
     end
+
+    # Values other than an undeclared LM's defaults, so forwarding shows.
+    def reasoning_capability(%__MODULE__{}), do: true
+    def response_format_capability(%__MODULE__{}), do: Imp.LM.Capability.json_schema()
   end
 
   test "the LM is asked whether it calls tools once per call, not once per step" do
@@ -106,15 +118,14 @@ defmodule ReActV2ToolRosterTest do
 
     for wrapper <- [budgeted, rollout] do
       refute Imp.LM.tool_calling_capability(wrapper)
-      assert Imp.LM.reasoning_capability(wrapper) == Imp.LM.reasoning_capability(text_only)
-
-      assert Imp.LM.response_format_capability(wrapper) ==
-               Imp.LM.response_format_capability(text_only)
+      assert Imp.LM.reasoning_capability(wrapper)
+      assert Imp.LM.response_format_capability(wrapper) == Imp.LM.Capability.json_schema()
     end
 
     program = Imp.react("intent -> answer", tools(), lm: budgeted)
     assert {:ok, _} = Imp.call(program, %{intent: "hi"})
-    assert_received {:request, [system | _], _opts}
+    assert_received {:request, [system | _], opts}
     assert system.content =~ "[[ ## tool_calls ## ]]"
+    assert opts[:tools] in [nil, []]
   end
 end

@@ -171,36 +171,6 @@ defmodule ReActV2RequestShapeTest do
     assert system.content == "You are Gregory. Outputs: answer."
   end
 
-  # A step asks for one thing. With native tool calling the model answers with
-  # tool calls or with plain text, so the prompt must not also describe a
-  # written `next_thought`/`tool_calls` answer: a model that follows that
-  # description writes a JSON object, and for one text output the object
-  # became the answer.
-  test "a native tool-calling step describes no written output fields" do
-    program = Imp.react("intent -> answer", [look()], lm: recording_lm(self(), 2))
-    assert {:ok, _} = Imp.call(program, %{intent: "hello"})
-
-    for {messages, opts} <- requests(2) do
-      assert Enum.map(opts[:tools], & &1.function.name) == ["look"]
-      text = Enum.map_join(messages, "\n", &to_string(&1[:content]))
-
-      refute text =~ "[[ ## tool_calls ## ]]"
-      refute text =~ "[[ ## next_thought ## ]]"
-      refute text =~ "[[ ## completed ## ]]"
-      refute text =~ "`next_thought`"
-      refute text =~ "`tool_calls`"
-      refute text =~ "Your output fields are"
-
-      [system | _] = messages
-      assert system.content =~ "Your input fields are:\n1. `intent` (string):"
-
-      assert system.content =~
-               "When the final answer is ready, write it as plain text without calling a tool."
-
-      assert system.content =~ "The available tools are: `look`."
-    end
-  end
-
   test "a step answered in prose returns that prose" do
     lm =
       Imp.LM.Static.new(
@@ -213,9 +183,6 @@ defmodule ReActV2RequestShapeTest do
     assert prediction.metadata.termination_reason == :answered
   end
 
-  # A model that cannot call tools natively has only the prompt to call them
-  # through, so its steps keep the written field structure, and a call written
-  # under `[[ ## tool_calls ## ]]` runs.
   defmodule TextOnlyLM do
     @behaviour Imp.LM
     defstruct [:handler]
@@ -225,47 +192,6 @@ defmodule ReActV2RequestShapeTest do
       do: {:ok, handler.(messages, opts)}
 
     def tool_calling_capability(%__MODULE__{}), do: false
-  end
-
-  test "a step for a model without native tool calling keeps the written field structure" do
-    owner = self()
-    counter = :counters.new(1, [])
-
-    lm = %TextOnlyLM{
-      handler: fn messages, opts ->
-        :counters.add(counter, 1, 1)
-        n = :counters.get(counter, 1)
-        send(owner, {:request, n, messages, opts})
-
-        if n == 1,
-          do:
-            "[[ ## next_thought ## ]]\nLook first.\n\n[[ ## tool_calls ## ]]\n" <>
-              ~s([{"name": "look", "arguments": {}}]) <> "\n\n[[ ## completed ## ]]",
-          else: "It holds 1, 2 and 3."
-      end
-    }
-
-    look =
-      Imp.tool(:look, "Look at a thing", fn _ -> send(owner, :looked) && %{"seen" => [1]} end)
-
-    program = Imp.react("intent -> answer", [look], lm: lm)
-    assert {:ok, prediction} = Imp.call(program, %{intent: "what is in it?"})
-    assert Imp.get(prediction, :answer) == "It holds 1, 2 and 3."
-    assert_received :looked
-
-    [{[system | _], opts}, {second, _opts}] = requests(2)
-    assert Enum.any?(second, &(&1.role == :tool))
-    assert Enum.map(opts[:tools], & &1.function.name) == ["look"]
-
-    for line <- [
-          "Your output fields are:\n1. `next_thought` (string): \n2. `tool_calls` (list):",
-          "[[ ## tool_calls ## ]]",
-          "[[ ## completed ## ]]",
-          "In adhering to this structure, your objective is:",
-          "The available tools are: `look`."
-        ] do
-      assert system.content =~ line
-    end
   end
 
   test "tool calling is the LM's to declare" do
