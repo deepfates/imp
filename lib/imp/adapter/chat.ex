@@ -20,7 +20,7 @@ defmodule Imp.Adapter.Chat do
   the signature says what an unanswered field means. The exception is narrow on
   purpose: the completion must carry no `[[ ## field ## ]]` line anywhere and
   must not be blank, and a signature without that metadata parses exactly as
-  before. The text beside native tool calls (`Imp.LM.Result.tool_calls/2`) is
+  before. The text a model writes beside native tool calls is
   read the same way. `Imp.Predict.ReActV2` sets it on its internal step
   signature; see that module.
 
