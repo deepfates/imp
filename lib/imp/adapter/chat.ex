@@ -1108,29 +1108,34 @@ defmodule Imp.Adapter.Chat do
       turn = Imp.Example.new(turn) |> Imp.Example.to_map()
 
       messages =
-        if native_tool_history_turn?(turn) do
-          render_native_tool_history_turn(signature, turn, renderers)
-        else
-          [
-            %{
-              role: :user,
-              content:
-                render_inputs(signature, turn,
-                  skip: history_input_fields(signature),
-                  section_renderer: renderers.input_section
-                )
-            },
-            %{
-              role: :assistant,
-              content:
-                renderers.output.(
-                  signature,
-                  turn,
-                  "Not supplied for this conversation history message. "
-                )
-            }
-          ]
-          |> Enum.reject(&blank_message?/1)
+        cond do
+          native_tool_history_turn?(turn) and describes_tool_calls?(signature) ->
+            render_written_tool_history_turn(signature, turn, renderers)
+
+          native_tool_history_turn?(turn) ->
+            render_native_tool_history_turn(signature, turn, renderers)
+
+          true ->
+            [
+              %{
+                role: :user,
+                content:
+                  render_inputs(signature, turn,
+                    skip: history_input_fields(signature),
+                    section_renderer: renderers.input_section
+                  )
+              },
+              %{
+                role: :assistant,
+                content:
+                  renderers.output.(
+                    signature,
+                    turn,
+                    "Not supplied for this conversation history message. "
+                  )
+              }
+            ]
+            |> Enum.reject(&blank_message?/1)
         end
 
       messages ++ history_note_messages(signature, turn, renderers.history_note)
@@ -1148,6 +1153,76 @@ defmodule Imp.Adapter.Chat do
   end
 
   defp native_tool_history_turn?(turn), do: not is_nil(fetch_field(turn, :tool_calls))
+
+  # A request that describes the signature's tool-calls output
+  # (`metadata[:tool_calls_field]`) is one where the model writes its calls,
+  # and no tools are declared to the provider. Its earlier steps are replayed
+  # the same way, as text, the way DSPy replays history without native
+  # function calling: the step's fields as the assistant's turn, then the
+  # results as a user turn. Native tool blocks without declared tools are
+  # what a provider may refuse.
+  defp describes_tool_calls?(signature) do
+    name =
+      Map.get(signature.metadata, :tool_calls_field) ||
+        Map.get(signature.metadata, "tool_calls_field")
+
+    not is_nil(name) and not is_nil(output_field(signature, name))
+  end
+
+  defp render_written_tool_history_turn(signature, turn, renderers) do
+    calls =
+      turn
+      |> fetch_field(:tool_calls)
+      |> normalize_history_tool_calls()
+      |> Enum.map(fn %{function: function} ->
+        %{"name" => function.name, "arguments" => function.arguments}
+      end)
+
+    results = List.wrap(fetch_field(turn, :tool_call_results))
+
+    user = %{
+      role: :user,
+      content:
+        render_inputs(signature, turn,
+          skip: history_input_fields(signature),
+          section_renderer: renderers.input_section
+        )
+    }
+
+    assistant = %{
+      role: :assistant,
+      content:
+        renderers.output.(
+          signature,
+          turn |> Imp.FieldMap.delete(:tool_call_results) |> Imp.FieldMap.put(:tool_calls, calls),
+          "Not supplied for this conversation history message. "
+        )
+    }
+
+    result_messages =
+      case results do
+        [] ->
+          []
+
+        results ->
+          value =
+            Enum.map(results, fn result ->
+              id = fetch_field(result, :id)
+              name = result |> fetch_field(:name) |> blank_to_empty()
+
+              %{
+                "name" => name,
+                "result" =>
+                  renderers.tool_result.(fetch_field(result, :result), %{id: id, name: name})
+              }
+            end)
+
+          field = Imp.Signature.Field.new(%{name: :tool_call_results}, :input)
+          [%{role: :user, content: renderers.input_section.(field, format_value(value))}]
+      end
+
+    Enum.reject([user, assistant | result_messages], &blank_message?/1)
+  end
 
   # A loop whose guidance names no finish tool answers in plain text, and has
   # no `submit` for a recorded call to name.

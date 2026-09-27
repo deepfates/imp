@@ -1,0 +1,179 @@
+{
+  "finish_on": {},
+  "last_request_note": null,
+  "max_iters": 7,
+  "react": {
+    "adapter": "Elixir.Imp.Adapter.Chat",
+    "config": [
+      [
+        "tools",
+        [
+          {
+            "function": {
+              "description": "Z",
+              "name": "zeta_probe",
+              "parameters": {
+                "properties": {},
+                "type": "object"
+              }
+            },
+            "type": "function"
+          },
+          {
+            "function": {
+              "description": "A",
+              "name": "alpha_probe",
+              "parameters": {
+                "properties": {},
+                "type": "object"
+              }
+            },
+            "type": "function"
+          }
+        ]
+      ],
+      [
+        "tool_choice",
+        "auto"
+      ]
+    ],
+    "demos": [
+      {
+        "__imp_type__": "example",
+        "demos": [],
+        "fields": {
+          "__imp_type__": "map",
+          "entries": [
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "intent"
+              },
+              "d"
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "tool_calls"
+              },
+              []
+            ],
+            [
+              {
+                "__imp_type__": "atom",
+                "value": "next_thought"
+              },
+              "n"
+            ]
+          ]
+        },
+        "input_keys": {
+          "__imp_type__": "atom",
+          "value": "nil"
+        }
+      }
+    ],
+    "dynamic_adapter": true,
+    "dynamic_lm": true,
+    "lm": null,
+    "metadata": {},
+    "signature": {
+      "inputs": [
+        {
+          "desc": null,
+          "kind": "input",
+          "metadata": {
+            "optional": true
+          },
+          "name": "intent",
+          "prefix": "Intent:",
+          "type": "string"
+        },
+        {
+          "desc": null,
+          "kind": "input",
+          "metadata": {},
+          "name": "history",
+          "prefix": "History:",
+          "type": "history"
+        }
+      ],
+      "instructions": "Given the fields `intent`, produce the fields `answer`.",
+      "metadata": {
+        "text_field": "next_thought"
+      },
+      "outputs": [
+        {
+          "desc": null,
+          "kind": "output",
+          "metadata": {
+            "optional": true
+          },
+          "name": "next_thought",
+          "prefix": "Next Thought:",
+          "type": "string"
+        },
+        {
+          "desc": null,
+          "kind": "output",
+          "metadata": {
+            "default": []
+          },
+          "name": "tool_calls",
+          "prefix": "Tool Calls:",
+          "type": "array"
+        }
+      ]
+    },
+    "type": "predict"
+  },
+  "signature": {
+    "inputs": [
+      {
+        "desc": null,
+        "kind": "input",
+        "metadata": {},
+        "name": "intent",
+        "prefix": "Intent:",
+        "type": "string"
+      }
+    ],
+    "instructions": "Given the fields `intent`, produce the fields `answer`.",
+    "metadata": {},
+    "outputs": [
+      {
+        "desc": null,
+        "kind": "output",
+        "metadata": {},
+        "name": "answer",
+        "prefix": "Answer:",
+        "type": "string"
+      }
+    ]
+  },
+  "tool_policy": {
+    "__imp_type__": "atom",
+    "value": "allow"
+  },
+  "tools": [
+    {
+      "description": "A",
+      "name": {
+        "__imp_type__": "atom",
+        "value": "alpha_probe"
+      },
+      "runner": "roster_runner",
+      "schema": {}
+    },
+    {
+      "description": "Z",
+      "name": {
+        "__imp_type__": "atom",
+        "value": "zeta_probe"
+      },
+      "runner": "roster_runner",
+      "schema": {}
+    }
+  ],
+  "type": "react_v2"
+}

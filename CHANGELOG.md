@@ -39,13 +39,18 @@ User-visible changes to Imp are recorded here.
   for a signature with one text output the object became the answer. An LM
   whose client says it cannot call tools (a ReqLLM model the registry lists
   without tool calling, `Imp.Clients.TRLLM`) is sent no tools and asked to
-  write its calls in `tool_calls`. The guidance says where a text answer
+  write its calls in `tool_calls`, with every tool's description and argument
+  schema listed in a `tools` input as DSPy lists them, and its earlier steps
+  replayed as text rather than as tool blocks a provider without declared
+  tools may refuse. A task signature can no longer have a field named
+  `tools`. The guidance says where a text answer
   goes, the same in every format: in `next_thought`, with `tool_calls` left
   empty when the model writes its calls. It no longer asks for plain text
   beside a structure that asks for fields; a plain-text reply to a Chat step
   is still read as the answer. A stored turn that carries only
   the task's answer is replayed as that answer, not as step fields marked
-  "Not supplied". `Imp.LM.Budgeted` and BootstrapFewShot's rollout LM answer
+  "Not supplied"; it is replayed by the adapter itself, so a host
+  `:output_renderer` is not consulted for it. `Imp.LM.Budgeted` and BootstrapFewShot's rollout LM answer
   for the LM they wrap, for this and for reasoning and response-format
   support.
 - `Imp.react` sends its tool roster in the order the tools were declared, then

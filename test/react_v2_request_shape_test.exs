@@ -38,8 +38,8 @@ defmodule ReActV2RequestShapeTest do
 
     [{r1, _}, {r2, _}, {r3, _}] = requests(3)
 
-    # Remove `response_instruction: false` or reinstate the `tools` input field
-    # in ReActV2.new/3: the first user message changes between steps 1 and 2.
+    # Remove `response_instruction: false`, or render the `tools` input for a
+    # native step: the first user message changes between steps 1 and 2.
     assert Enum.map(r1, &render/1) == Enum.take(Enum.map(r2, &render/1), length(r1))
     assert Enum.map(r2, &render/1) == Enum.take(Enum.map(r3, &render/1), length(r2))
     assert length(r2) == length(r1) + 2

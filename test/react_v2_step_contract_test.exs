@@ -51,6 +51,7 @@ defmodule ReActV2StepContractTest do
   defp assert_native({messages, opts}, guidance) do
     assert Enum.map(opts[:tools], & &1.function.name) == ["look"]
     refute text(messages) =~ "tool_calls"
+    refute text(messages) =~ "whose description is"
     assert hd(messages).content =~ guidance
     refute hd(messages).content =~ "plain text"
   end
@@ -252,5 +253,114 @@ defmodule ReActV2StepContractTest do
       [{messages, _opts}] = requests()
       assert Enum.find(messages, &(&1.role == :assistant)).content == expected
     end
+  end
+
+  # An LM that cannot call tools reads them from the prompt, as DSPy renders a
+  # list of tools: every tool's description and arguments, `submit`'s too.
+  test "a step for an LM that cannot call tools lists every tool" do
+    search =
+      Imp.tool(:search, "Search the catalog by SKU and region", fn _ -> "ok" end,
+        schema: %{
+          "type" => "object",
+          "properties" => %{
+            "sku" => %{"type" => "string", "description" => "exact SKU"},
+            "region" => %{"type" => "string", "enum" => ["eu", "us"]}
+          },
+          "required" => ["sku", "region"]
+        }
+      )
+
+    agent =
+      Imp.react("intent -> answer, confidence: float", [search],
+        lm: lm(false, ["just prose, no call"]),
+        max_iters: 1
+      )
+
+    assert {:ok, _prediction} = Imp.call(agent, %{intent: "find SKU 12"})
+
+    for {messages, opts} <- requests() do
+      assert opts[:tools] in [nil, []]
+      listing = List.last(messages).content
+
+      for piece <- [
+            "search, whose description is <desc>Search the catalog by SKU and region</desc>.",
+            "exact SKU",
+            "sku",
+            "region",
+            "submit, whose description is <desc>Submit the final outputs for the task.</desc>.",
+            "answer",
+            "confidence"
+          ] do
+        assert listing =~ piece
+      end
+    end
+  end
+
+  # On the wire, a request that declares no tools carries no tool blocks: its
+  # earlier steps are text, as DSPy replays them without native calling.
+  test "a ReqLLM step for a model without tool calling sends no tool blocks" do
+    owner = self()
+    counter = :counters.new(1, [])
+
+    replies = [
+      "[[ ## next_thought ## ]]\nLook.\n\n[[ ## tool_calls ## ]]\n" <>
+        ~s([{"name": "look", "arguments": {}}]) <> "\n\n[[ ## completed ## ]]",
+      "It holds 1."
+    ]
+
+    adapter = fn request ->
+      :counters.add(counter, 1, 1)
+      body = request.body |> IO.iodata_to_binary() |> Jason.decode!()
+      send(owner, {:body, body})
+
+      response = %{
+        "id" => "msg_#{:counters.get(counter, 1)}",
+        "type" => "message",
+        "role" => "assistant",
+        "model" => "claude-x",
+        "content" => [
+          %{"type" => "text", "text" => Enum.at(replies, :counters.get(counter, 1) - 1)}
+        ],
+        "stop_reason" => "end_turn",
+        "usage" => %{"input_tokens" => 1, "output_tokens" => 1}
+      }
+
+      {request,
+       Req.Response.new(
+         status: 200,
+         headers: [{"content-type", "application/json"}],
+         body: Jason.encode!(response)
+       )}
+    end
+
+    model = %{provider: :anthropic, id: "claude-x", capabilities: %{tools: %{enabled: false}}}
+
+    lm =
+      Imp.req_llm(model,
+        api_key: "local-test-key",
+        cache: false,
+        max_retries: 0,
+        req_http_options: [adapter: adapter, retry: false, max_retries: 0]
+      )
+
+    assert {:ok, prediction} =
+             Imp.call(Imp.react("intent -> answer", [look()], lm: lm), %{intent: "hi"})
+
+    assert Imp.get(prediction, :answer) == "It holds 1."
+
+    assert_received {:body, first}
+    assert_received {:body, second}
+
+    for body <- [first, second] do
+      refute Map.has_key?(body, "tools")
+
+      for message <- body["messages"], block <- List.wrap(message["content"]), is_map(block) do
+        refute block["type"] in ["tool_use", "tool_result"]
+      end
+    end
+
+    assert Enum.any?(second["messages"], fn message ->
+             message |> Jason.encode!() |> String.contains?("tool_call_results")
+           end)
   end
 end

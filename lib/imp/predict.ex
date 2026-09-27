@@ -170,37 +170,39 @@ defmodule Imp.Predict do
   end
 
   # A signature can name the output that native tool calls fill
-  # (`metadata[:tool_calls_field]`, set by `Imp.Predict.ReActV2`). When the
-  # request sends `:tools` and the LM answers them natively, the adapter formats
-  # the signature without that output, so no format describes a written list
-  # of calls while the provider holds the tools; the reply is still parsed
-  # against the whole signature, where native calls fill the field and a reply
-  # without them takes its default. When the LM cannot call tools, the field
-  # stays for the model to write and no tools are sent. This is DSPy's
-  # `Adapter._call_preprocess`. `:native_tool_calls` in the config gives the
-  # answer instead of asking the LM, so a loop asks once per call.
+  # (`metadata[:tool_calls_field]`) and the input that lists the tools as text
+  # (`metadata[:tools_field]`), as `Imp.Predict.ReActV2`'s step does. When the
+  # LM answers the request's `:tools` natively, the adapter
+  # formats the signature without both, so no format describes the tools or a
+  # written list of calls while the provider holds the tools; the reply is
+  # still parsed against the whole signature, where native calls fill the
+  # field and a reply without them takes its default. When the LM cannot call
+  # tools, both stay, for the model to read the tools and write its calls, and
+  # no tools are sent. This is DSPy's `Adapter._call_preprocess`.
   defp prepare_native_tool_calls(signature, lm, config) do
-    field = tool_calls_field(signature)
-    tools = Keyword.get(config, :tools, [])
+    calls = named_field(signature.outputs, signature, :tool_calls_field)
 
     cond do
-      is_nil(field) or tools in [nil, []] ->
+      is_nil(calls) ->
         {signature, config}
 
-      Keyword.get_lazy(config, :native_tool_calls, fn -> Imp.LM.tool_calling_capability(lm) end) ->
-        {%{signature | outputs: Enum.reject(signature.outputs, &(&1.name == field.name))}, config}
+      Imp.LM.tool_calling_capability(lm) ->
+        listing = named_field(signature.inputs, signature, :tools_field)
+
+        {%{
+           signature
+           | outputs: List.delete(signature.outputs, calls),
+             inputs: List.delete(signature.inputs, listing)
+         }, config}
 
       true ->
         {signature, Keyword.drop(config, [:tools, :tool_choice, :parallel_tool_calls])}
     end
   end
 
-  defp tool_calls_field(signature) do
-    name =
-      Map.get(signature.metadata, :tool_calls_field) ||
-        Map.get(signature.metadata, "tool_calls_field")
-
-    name && Enum.find(signature.outputs, &(to_string(&1.name) == to_string(name)))
+  defp named_field(fields, signature, key) do
+    name = Map.get(signature.metadata, key) || Map.get(signature.metadata, Atom.to_string(key))
+    name && Enum.find(fields, &(to_string(&1.name) == to_string(name)))
   end
 
   defp prepare_native_reasoning(signature, lm, config) do
@@ -941,8 +943,7 @@ defmodule Imp.Predict do
 
   defp parse_error_message({:error, reason}), do: parse_failure(reason).message
 
-  defp provider_lm_opts(opts),
-    do: Keyword.drop(opts, [:json_fallback, :json_retries, :native_tool_calls])
+  defp provider_lm_opts(opts), do: Keyword.drop(opts, [:json_fallback, :json_retries])
 
   defp parse_error({:error, reason}, messages, raw, signature) do
     failure = parse_failure(reason)
@@ -993,10 +994,8 @@ defmodule Imp.Predict do
 
   defp present_output_fields(_reason, _expected), do: []
 
-  @doc false
-  # The LM a call of this program would use: its own, or the configured one.
-  def resolve_lm(%__MODULE__{dynamic_lm?: true}), do: Imp.Settings.get().lm
-  def resolve_lm(%__MODULE__{lm: lm}), do: lm
+  defp resolve_lm(%__MODULE__{dynamic_lm?: true}), do: Imp.Settings.get().lm
+  defp resolve_lm(%__MODULE__{lm: lm}), do: lm
 
   defp resolve_adapter(%__MODULE__{dynamic_adapter?: true}), do: Imp.Settings.get().adapter
   defp resolve_adapter(%__MODULE__{adapter: nil}), do: Imp.Settings.get().adapter

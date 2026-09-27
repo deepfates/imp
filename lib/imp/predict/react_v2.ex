@@ -120,18 +120,24 @@ defmodule Imp.Predict.ReActV2 do
   `args` or `parameters` for `arguments` (`Imp.Adapter.Types.ToolCall`); a map
   that names no tool at all is kept as a malformed-call observation.
 
-  So a step asks for one thing, whichever adapter formats it. When the LM calls
-  tools natively (every LM unless its client says otherwise;
-  `Imp.Clients.ReqLLM` asks the model registry), the tools are sent natively
-  and `Imp.Predict` formats the step without its `tool_calls` output, in every
+  So a step asks for one thing, whichever adapter formats it. The step has a
+  `tools` input, the roster as text in DSPy's shape ("name, whose description
+  is <desc>...</desc>. It takes arguments {...}."), and a `tool_calls` output.
+  When the LM calls tools natively (every LM unless its client says
+  otherwise; `Imp.Clients.ReqLLM` asks the model registry), the tools are sent
+  natively and `Imp.Predict` formats the step without both fields, in every
   adapter and in the JSON fallback: the model answers with tool calls or with
-  text. When the LM cannot (the registry says the model has no tool calling, or
-  the LM is `Imp.Clients.TRLLM`), no tools are sent and the step describes
-  `tool_calls` for the model to write its calls in. The guidance says where a
-  text answer goes, the same in every format: in `next_thought`, with
+  text. When the LM cannot (the registry says the model has no tool calling,
+  or the LM is `Imp.Clients.TRLLM`), no tools are sent: the step lists them in
+  `tools`, the model writes its calls in `tool_calls`, and earlier steps are
+  replayed as text (the step's fields, then the results), never as native
+  tool messages. This is DSPy's structure. The guidance says where a text
+  answer goes, the same in every format: in `next_thought`, with
   `tool_calls` left empty when that field is described. A reply in plain text
-  is still read as `next_thought` by `Imp.Adapter.Chat`. A stored turn that carries a one-text-output task's
-  answer and no step outputs is replayed as a step that answered in text.
+  is still read as `next_thought` by `Imp.Adapter.Chat`. A stored turn that
+  carries a one-text-output task's answer and no step outputs is replayed as
+  a step that answered in text. The name `tools` is reserved: a task
+  signature cannot have a field of that name.
 
   On a recognized context-window refusal, up to eight smaller requests omit
   oldest prior episodes from the prompt, preserving their full durable history.
@@ -259,13 +265,19 @@ defmodule Imp.Predict.ReActV2 do
       raise ArgumentError, "submit is reserved by Imp.Predict.ReActV2"
     end
 
+    if Enum.any?(signature.inputs ++ signature.outputs, &Imp.FieldMap.same_name?(&1.name, :tools)) do
+      raise ArgumentError,
+            "Imp.Predict.ReActV2.new/3: `tools` is reserved for the step's tool list; " <>
+              "rename that field"
+    end
+
     tools = put_submit(tools, signature)
 
     react_signature =
       %Imp.Signature{
         inputs:
           Enum.map(signature.inputs, &Imp.Signature.Field.optional/1) ++
-            [Imp.Signature.Field.new(%{name: :history, type: :history}, :input)],
+            [Imp.Signature.Field.new(%{name: :history, type: :history}, :input), tools_field()],
         outputs: [
           Imp.Signature.Field.new(%{name: :next_thought, metadata: %{optional: true}}, :output),
           Imp.Signature.Field.new(
@@ -284,11 +296,12 @@ defmodule Imp.Predict.ReActV2 do
 
     config = Keyword.merge(opts[:config], provider_tool_config(tools, tool_order, signature))
 
-    # The roster goes to the provider once, natively, in `config`. The loop's
-    # guidance goes to the adapter as data. Nothing about tools is written into
-    # the signature or rendered into a user message, so a step's request is the
-    # previous step's request plus the newest exchange, which is what a
-    # provider's prompt cache is keyed on.
+    # The roster goes to the provider once, natively, in `config`, and the
+    # loop's guidance goes to the adapter as data. For an LM that calls tools
+    # natively, `Imp.Predict` leaves the `tools` input and `tool_calls` output
+    # out of the prompt, so a step's request is the previous step's request
+    # plus the newest exchange, which is what a provider's prompt cache is
+    # keyed on. For an LM that cannot, the roster is the `tools` input, as text.
     adapter_opts =
       Keyword.merge(Keyword.get(opts, :adapter_opts, []), loop_adapter_opts(signature, tools))
 
@@ -385,8 +398,15 @@ defmodule Imp.Predict.ReActV2 do
   def restore_loop(%__MODULE__{react: react} = agent) do
     metadata =
       react.signature.metadata
-      |> Map.drop(["text_field", "tool_calls_field"])
+      |> Map.drop(["text_field", "tool_calls_field", "tools_field"])
       |> Map.merge(step_metadata())
+
+    # A program saved before the step had a `tools` input gets one, so it
+    # describes its tools to an LM that cannot call them natively.
+    inputs =
+      if Enum.any?(react.signature.inputs, &Imp.FieldMap.same_name?(&1.name, :tools)),
+        do: react.signature.inputs,
+        else: react.signature.inputs ++ [tools_field()]
 
     react = %{
       react
@@ -397,7 +417,7 @@ defmodule Imp.Predict.ReActV2 do
           ),
         adapter_opts:
           Keyword.merge(react.adapter_opts, loop_adapter_opts(agent.signature, agent.tools)),
-        signature: %{react.signature | metadata: metadata}
+        signature: %{react.signature | metadata: metadata, inputs: inputs}
     }
 
     %{agent | react: react}
@@ -455,7 +475,6 @@ defmodule Imp.Predict.ReActV2 do
       # so extra keys would vanish silently here; warn at this boundary the same
       # way Imp.Predict does (:history is a documented call-time key).
       :ok = Imp.Predict.warn_extra_inputs(react.signature, inputs, [:history])
-      react = with_native_tools(react)
 
       pending =
         react.signature
@@ -912,32 +931,45 @@ defmodule Imp.Predict.ReActV2 do
 
   defp error_text(value), do: inspect(value)
 
-  # Whether the model answers the roster natively is the LM's to say, asked
-  # once per call of the loop (the LM can come from `Imp.Settings`) and handed
-  # to every step as `:native_tool_calls`: `Imp.Predict` then sends the tools
-  # and leaves `tool_calls` out of the prompt, or, for an LM that cannot call
-  # tools, keeps the field for the model to write and sends none. Asking once
-  # keeps a registry lookup (and its warning for a model the registry does not
-  # know) to one per call rather than one per step.
-  defp with_native_tools(%__MODULE__{react: program} = react) do
-    native? = program |> Imp.Predict.resolve_lm() |> Imp.LM.tool_calling_capability()
+  # What the step signature says about its fields: a reply with no marker is
+  # `next_thought` (`Imp.Adapter.Chat`), native tool calls fill `tool_calls`,
+  # and `tools` lists the tools as text. `Imp.Predict` leaves both tool fields
+  # out of the prompt when the step sends its tools natively, as DSPy's
+  # `Adapter._call_preprocess` does.
+  defp step_metadata,
+    do: %{text_field: :next_thought, tool_calls_field: :tool_calls, tools_field: :tools}
 
-    %{
-      react
-      | react: %{program | config: Keyword.put(program.config, :native_tool_calls, native?)}
-    }
+  defp tools_field,
+    do: Imp.Signature.Field.new(%{name: :tools, type: :array, metadata: %{default: []}}, :input)
+
+  # The roster as the `tools` input: one line per tool in DSPy's `Tool.__str__`
+  # shape, "name, whose description is <desc>...</desc>. It takes arguments
+  # {...}.", with the arguments as the JSON properties of the schema the
+  # provider would get, `submit`'s included.
+  defp tool_lines(react) do
+    react.tools
+    |> ordered_tools(react.tool_order)
+    |> Enum.map(fn tool ->
+      %{function: function} = tool_description(tool, react.signature)
+
+      arguments =
+        Map.get(function.parameters, "properties", Map.get(function.parameters, :properties, %{}))
+
+      description =
+        case function.description do
+          desc when desc in [nil, ""] -> "."
+          desc -> ", whose description is <desc>#{String.replace(desc, "\n", "  ")}</desc>."
+        end
+
+      "#{function.name}#{description} It takes arguments #{Jason.encode!(arguments)}."
+    end)
   end
-
-  # What the step signature says about its outputs: a reply with no marker is
-  # `next_thought` (`Imp.Adapter.Chat`), and native tool calls fill
-  # `tool_calls`, so `Imp.Predict` leaves that field out of the prompt when the
-  # step sends its tools natively.
-  defp step_metadata, do: %{text_field: :next_thought, tool_calls_field: :tool_calls}
 
   defp predict(program, react, history, pending) do
     context_call(history, fn projected ->
       projected = %{projected | messages: Enum.map(projected.messages, &step_turn(&1, react))}
-      Imp.Predict.call(program, Map.put(pending, :history, projected))
+      inputs = pending |> Map.put(:history, projected) |> Map.put(:tools, tool_lines(react))
+      Imp.Predict.call(program, inputs)
     end)
   end
 

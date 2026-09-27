@@ -182,10 +182,26 @@ defmodule Imp.Clients.ReqLLM do
   # False only when the ReqLLM/LLMDB registry resolves the model and says it
   # cannot call tools. A model the registry does not know, or knows without
   # saying, is sent the roster natively like any other.
+  #
+  # A ReAct loop asks on every step, and a lookup of a model the registry does
+  # not know logs a warning, so the answer is kept per model for the life of
+  # the node: the registry does not change under a running program.
   def tool_calling_capability(%__MODULE__{model: model_spec}) do
-    case resolve_model(model_spec) do
-      {:ok, %{capabilities: %{tools: %{enabled: false}}}} -> false
-      _known_or_unknown -> true
+    key = {__MODULE__, :tool_calling_capability, model_spec}
+
+    case :persistent_term.get(key, :unknown) do
+      :unknown ->
+        answer =
+          case resolve_model(model_spec) do
+            {:ok, %{capabilities: %{tools: %{enabled: false}}}} -> false
+            _known_or_unknown -> true
+          end
+
+        :persistent_term.put(key, answer)
+        answer
+
+      answer ->
+        answer
     end
   end
 

@@ -91,16 +91,18 @@ defmodule ReActV2ToolRosterTest do
     def response_format_capability(%__MODULE__{}), do: Imp.LM.Capability.json_schema()
   end
 
-  test "the LM is asked whether it calls tools once per call, not once per step" do
-    lm = %CountingLM{owner: self(), native: true, counter: :counters.new(1, [])}
-    program = Imp.react("intent -> answer", tools(), lm: lm)
+  # Every step asks whether the LM calls tools. A ReqLLM model the registry
+  # does not know warns on each lookup, so the client keeps its answer.
+  test "a ReqLLM model's tool calling is looked up once" do
+    lm =
+      Imp.req_llm("openai:imp-uncatalogued-#{System.unique_integer([:positive])}", api_key: "k")
 
-    assert {:ok, prediction} = Imp.call(program, %{intent: "hi"})
-    assert Imp.get(prediction, :answer) == "done"
+    warnings =
+      ExUnit.CaptureIO.capture_io(:stderr, fn ->
+        for _step <- 1..3, do: assert(Imp.LM.tool_calling_capability(lm))
+      end)
 
-    for _step <- 1..3, do: assert_received({:request, _messages, _opts})
-    assert_received :capability_asked
-    refute_received :capability_asked
+    assert length(String.split(warnings, "Using unverified model")) == 2
   end
 
   test "a wrapped LM answers for the LM it wraps" do
