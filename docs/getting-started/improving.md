@@ -97,57 +97,60 @@ optimizer =
 searched = Imp.optimize!(router, optimizer, trainset, devset)
 
 Imp.evaluate(searched, testset, metric, num_threads: 8).score
-#=> 0.7
+#=> 0.95
 ```
 
 GEPA takes the development set as a fourth argument, so the test set stays
-unseen. `max_metric_calls` is the budget: this run took about a minute and
-cost about five cents. The instruction it wrote is part of the program:
+unseen. `max_metric_calls` is the budget: this run took about 70 seconds and
+cost about eight cents. The instruction it wrote is part of the program:
 
 ```elixir
 IO.puts(searched.signature.instructions)
 ```
 
 ```text
-You are given a support ticket as plain text in a single input field:
+You are given a support ticket as input in this format:
 
-- ticket: the customer’s issue/request
+- `ticket`: the text of the support request
 
-Your task is to route the ticket to exactly one owning squad and output only the squad name in the `team` field.
+Your task is to classify the ticket to the correct owning squad and output only the squad name.
 
-Possible squads seen so far:
-- quill
-- harbor
-- beacon
+Valid squads and routing rules:
 
-Routing guidance inferred from prior examples:
-- Route data export / CSV export / exporting customer data requests to `quill`.
-- Route account access, workspace access, user offboarding, or former employee access/security issues to `beacon`.
-- Route dashboard performance, slow page loads, uptime/reliability, or product performance issues to `harbor`.
+- `beacon`: account access and security issues, including login/authentication problems, MFA/two-factor issues, password resets, account lockouts, and other security-related requests
+- `quill`: product feature requests, how-to/product usage questions, data export requests, and issues involving Slack integrations or alerting/alerts integrations
+- `harbor`: general product/platform issues not covered by another squad, including dashboard/site performance problems, API errors/outages, email delivery/communications issues, and order or commerce-related communications such as missing receipt emails
+- `atlas`: billing and invoicing issues only, including duplicate charges, being charged twice, invoice disputes, and invoice/payment issues
 
-Important requirements:
-- Choose the single best owning squad based on the primary issue described in the ticket.
-- Do not explain your reasoning.
-- Do not output anything except the team name/value.
-- Be careful not to confuse:
-  - CSV/data export requests (`quill`)
-  - access/security/account permission issues (`beacon`)
-  - dashboard slowness/performance incidents (`harbor`)
+Important classification guidance:
+
+- Infer the underlying issue/topic from the whole ticket, not just keywords
+- Prefer the most specific matching squad
+- Do not default to `atlas`; use it only for clear billing/invoicing matters
+- Tickets about dashboard slowness or intermittent 502/API failures belong to `harbor`
+- Tickets asking how to export data to CSV belong to `quill`
+- If a ticket does not match `beacon`, `quill`, or `atlas` specifically, route it to `harbor`
+
+Output requirements:
+
+- Return only the squad name
+- Do not include explanations
+- Do not include labels, markdown, punctuation, or any extra text beyond the exact team value
 ```
 
-It scored 0.7, below the demonstrations, and reading it shows a problem: it
-lists three squads and never mentions atlas. An instruction that forgets a
-squad is the kind of change we'd catch in review, and we can review it
-because the optimizer's output is text.
+GEPA read the tickets it got wrong and wrote down what each squad owns, the
+thing our labels mean and the model was never told. It also made choices
+worth a second look before we ship: atlas takes billing "only", and anything
+that matches no squad goes to harbor. We can review those because the
+optimizer's output is text.
 
-With a budget this small, GEPA's result varies. Three runs scored 0.85, 0.7,
-and 0.7, and cost five to eight cents each; the eight demonstrations scored
-0.75 to 0.85 and cost nothing to compile. For this task, examples are the
-better buy: what the model lacks is what our labels mean, and examples say
-that directly. Instruction search is for tasks where the model needs to be
-told *how* to work, and it wants a larger budget than a guide should spend.
-[Choosing an optimizer](../diving-deeper/choosing-an-optimizer.md) compares
-the rest.
+Three runs, each in a fresh VM, scored 0.95, 0.9 and 0.95, took 70 to 80
+seconds, and cost eight to fourteen cents each. The eight demonstrations
+scored 0.75 to 0.85 and cost nothing to compile. Here the instruction is the
+better lever: the model lacked a description of the squads, and GEPA wrote
+one from its failures. Demonstrations are cheaper and a good first step; the
+two combine, and [Choosing an optimizer](../diving-deeper/choosing-an-optimizer.md)
+compares the rest.
 
 [Livebook 03](../../livebooks/03_evaluate_and_optimize.livemd) runs these
 optimizers in a notebook, offline or with a key.
