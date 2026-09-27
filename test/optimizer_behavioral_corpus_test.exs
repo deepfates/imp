@@ -201,26 +201,52 @@ defmodule OptimizerBehavioralCorpusTest do
   end
 
   test "GEPA reports metric feedback as feedback, not as failed program calls" do
-    feedback_metric = fn example, prediction ->
-      score = Imp.Metrics.normalize_result(metric().(example, prediction)).score
-      %{score: score, feedback: "This trajectory got a score of #{score}."}
+    # Feedback of any shape - text, a map, a tagged tuple - is the metric's
+    # judgement of a row that ran, not a failure.
+    for feedback_for <- [
+          fn score -> "This trajectory got a score of #{score}." end,
+          fn score -> %{verdict: "wrong", score: score} end,
+          fn _score -> {:error, "judge says wrong"} end
+        ] do
+      feedback_metric = fn example, prediction ->
+        score = Imp.Metrics.normalize_result(metric().(example, prediction)).score
+        %{score: score, feedback: feedback_for.(score)}
+      end
+
+      report =
+        Imp.Optimizer.GEPA.new(feedback_metric,
+          execution_profile: :beam_native,
+          generations: 1,
+          reflection_lm: reflection_lm("Answer in one word."),
+          feedback_fn: fn _trainset -> "Answer in one word." end
+        )
+        |> Imp.Optimizer.GEPA.compile(france_program(), trainset(), devset())
+        |> Imp.Optimizer.Report.fetch()
+
+      assert report.metadata.rejected_candidates > 0
+      assert report.errors == []
+      assert report.metadata.status == :ok
+      assert Enum.all?(report.candidates, &(&1.diagnostics == []))
+      refute Enum.any?(report.candidates, &(&1.mutation =~ "Program call failed"))
     end
+  end
 
-    report =
-      Imp.Optimizer.GEPA.new(feedback_metric,
-        execution_profile: :beam_native,
-        generations: 1,
-        reflection_lm: reflection_lm("Answer in one word."),
-        feedback_fn: fn _trainset -> "Answer in one word." end
-      )
-      |> Imp.Optimizer.GEPA.compile(france_program(), trainset(), devset())
-      |> Imp.Optimizer.Report.fetch()
+  test "GEPA reports a metric result it cannot read as an error" do
+    for {value, expected} <- [
+          {{:ok, 1.0}, "invalid metric result: {:ok, 1.0}"},
+          {nil, "invalid metric result: nil"}
+        ] do
+      report =
+        Imp.Optimizer.GEPA.new(fn _example, _prediction -> value end,
+          execution_profile: :beam_native,
+          generations: 0
+        )
+        |> Imp.Optimizer.GEPA.compile(france_program(), trainset(), devset())
+        |> Imp.Optimizer.Report.fetch()
 
-    assert report.metadata.rejected_candidates > 0
-    assert report.errors == []
-    assert report.metadata.status == :ok
-    assert Enum.all?(report.candidates, &(&1.diagnostics == []))
-    refute Enum.any?(report.candidates, &(&1.mutation =~ "Program call failed"))
+      assert report.metadata.status == :with_errors
+      assert [%{candidate_id: "baseline", diagnostics: [^expected]}] = report.errors
+    end
   end
 
   test "GEPA records program failures diagnostically without using them as instruction advice" do
@@ -274,12 +300,14 @@ defmodule OptimizerBehavioralCorpusTest do
     assert diagnostic =~ "candidate crashed"
   end
 
-  test "GEPA reports a metric that throws or exits as an error" do
+  test "GEPA reports a metric that raises, throws or exits as an error, redacted" do
     for {metric, expected} <- [
           {fn _example, _prediction -> throw(:judge_down) end, "{:throw, :judge_down}"},
           {fn _example, _prediction -> exit(:judge_gone) end, "{:exit, :judge_gone}"},
+          {fn _example, _prediction -> throw("judge down") end, ~s({:throw, "judge down"})},
           {fn _example, _prediction -> throw(%{api_key: "sk-judge-secret"}) end,
-           ~s({:throw, %{api_key: "[REDACTED]"}})}
+           ~s({:throw, %{api_key: "[REDACTED]"}})},
+          {fn _example, _prediction -> raise "judge rejected sk-judge-secret0" end, "[REDACTED]"}
         ] do
       report =
         Imp.Optimizer.GEPA.new(metric, execution_profile: :beam_native, generations: 0)

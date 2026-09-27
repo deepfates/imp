@@ -51,14 +51,15 @@ User-visible changes to Imp are recorded here.
 ### GEPA
 
 - A GEPA report names real failures only: a row whose program call or metric
-  failed, and a proposal error. Before, it treated the metric's feedback as a
-  failure, so a run whose metric returned feedback reported `errors`,
+  failed, a row whose metric returned a value `Imp.Metrics` cannot read, and
+  a proposal error. Before, it treated the metric's feedback as a failure, so
+  a run whose metric returned feedback reported `errors`,
   `status: :with_errors` and candidates named "Program call failed: …" when
   nothing had failed.
 - A GEPA report no longer crashes when a metric throws or exits: the
-  failure is shown as `{:throw, reason}` or `{:exit, reason}`, with credential
-  values redacted. Before, building the report raised
-  `Protocol.UndefinedError`.
+  failure is shown as `{:throw, reason}` or `{:exit, reason}`. Before,
+  building the report raised `Protocol.UndefinedError`. Every diagnostic in
+  the report has its credential values redacted.
 - A GEPA candidate rejected because its proposal failed is named "Proposal
   failed: …", not "Program call failed: …".
 

@@ -648,8 +648,9 @@ defmodule Imp.Optimizer.GEPA do
   end
 
   # Diagnostics name real failures only: rows whose program call or metric
-  # failed, which the adapter records as diagnostic entries, and proposal
-  # errors. The metric's feedback on the other rows is not a failure.
+  # failed, which the adapter records as diagnostic entries, rows whose metric
+  # returned a value `Imp.Metrics` could not read, and proposal errors. The
+  # metric's feedback on the other rows is not a failure.
   defp result_diagnostics(result) do
     [result.side_information]
     |> failed_rows()
@@ -689,7 +690,9 @@ defmodule Imp.Optimizer.GEPA do
   defp failed_rows(side_informations) do
     side_informations
     |> Enum.flat_map(&(&1 |> Map.values() |> List.flatten()))
-    |> Enum.filter(&ProgramAdapter.diagnostic_failure?/1)
+    |> Enum.filter(
+      &(ProgramAdapter.diagnostic_failure?(&1) or Imp.Metrics.invalid_result_feedback?(&1))
+    )
   end
 
   defp diagnostic_texts(failures) do
@@ -704,16 +707,24 @@ defmodule Imp.Optimizer.GEPA do
   defp diagnostic_text(%{"diagnostic_only" => true, "error" => error}),
     do: diagnostic_text(error)
 
+  # A metric that raised carries its message; one that threw or exited
+  # carries `{kind, reason}`, shown whole so the kind is kept.
   defp diagnostic_text({:metric_error, message}) when is_binary(message),
-    do: truncate_text(message, 240)
+    do: message_text(message)
 
-  defp diagnostic_text({:metric_error, reason}), do: diagnostic_text(reason)
-  defp diagnostic_text({_kind, message}) when is_binary(message), do: truncate_text(message, 240)
+  defp diagnostic_text({:metric_error, reason}), do: term_text(reason)
+
+  defp diagnostic_text({:invalid_metric_result, value}),
+    do: truncate_text("invalid metric result: " <> term_text(value), 240)
+
+  defp diagnostic_text({_kind, message}) when is_binary(message), do: message_text(message)
   defp diagnostic_text(value) when is_atom(value), do: Atom.to_string(value)
   defp diagnostic_text(nil), do: nil
+  defp diagnostic_text(value), do: term_text(value)
 
-  defp diagnostic_text(value),
-    do: value |> Imp.Redaction.redact() |> inspect() |> truncate_text(240)
+  defp message_text(message), do: message |> Imp.Redaction.redact() |> truncate_text(240)
+
+  defp term_text(value), do: value |> Imp.Redaction.redact() |> inspect() |> truncate_text(240)
 
   defp primary_instruction(candidate) do
     Map.get(candidate, :main) || Map.get(candidate, "main") || candidate |> Map.values() |> hd()
