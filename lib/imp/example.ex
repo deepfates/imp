@@ -5,11 +5,14 @@ defmodule Imp.Example do
   Examples are plain data with one important Imp convention: call
   `with_inputs/2` to mark which fields a program may see. The remaining fields
   are labels for evaluation, bootstrapping, demonstrations, and optimizers.
+  Until inputs are declared, `inputs/1` and `labels/1` raise, since no field
+  can be told apart from a label.
 
   A key keeps the type it was given: `%{"question" => ...}` is stored under the
   string and `%{question: ...}` under the atom, and no string is turned into an
   atom. Every function that takes a key compares keys by their text, so
-  `get(example, :question)` reads a field stored under `"question"`.
+  `get(example, :question)` reads a field stored under `"question"`, and
+  `new/1` refuses a field given under both spellings.
 
   Internal fields whose names start with `imp_` are omitted from `keys/1`,
   `items/1`, and `values/1`, but `to_map/1` remains lossless for persistence and
