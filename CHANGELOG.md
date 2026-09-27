@@ -38,6 +38,11 @@ User-visible changes to Imp are recorded here.
   RFC 4180 CSV with NimbleCSV, a new dependency (`nimble_csv ~> 1.3`), and a
   malformed file raises `Imp.Datasets.Error` naming the line its record
   starts on.
+- `Imp.Evaluate.Result.save_as_csv/2` writes through NimbleCSV too, so what
+  it writes `Imp.Datasets.csv/3` reads back unchanged. The output is the same
+  as before (CRLF line endings, a field quoted when it holds a comma, a quote
+  or a line feed) except that a field holding a carriage return with no line
+  feed is no longer quoted.
 
 ### Documentation
 

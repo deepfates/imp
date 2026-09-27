@@ -86,6 +86,38 @@ defmodule DatasetsContractTest do
     cleanup_tmp("malformed.csv")
   end
 
+  test "rows written by Evaluate.Result.save_as_csv read back equal through Datasets.csv" do
+    path = tmp_path("round-trip.csv")
+
+    questions = ["a, b", ~s(say "hi"), "two\nlines", "naïve café 漢字 ✓", "plain"]
+
+    rows =
+      Enum.map(questions, fn question ->
+        %{
+          example: Imp.example(question: question, answer: question <> "!"),
+          prediction: Imp.prediction(reasoning: "r: " <> question),
+          score: 1.0
+        }
+      end)
+
+    result = %Imp.Evaluate.Result{score: 1.0, rows: rows}
+    assert :ok = Imp.Evaluate.Result.save_as_csv(result, path)
+
+    read_back = path |> Datasets.csv([:question]) |> Enum.map(& &1.fields)
+
+    assert read_back ==
+             Enum.map(questions, fn question ->
+               %{
+                 "question" => question,
+                 "answer" => question <> "!",
+                 "reasoning" => "r: " <> question,
+                 "score" => "1.0"
+               }
+             end)
+  after
+    cleanup_tmp("round-trip.csv")
+  end
+
   test "CSV loader rejects empty files with dataset context" do
     path = tmp_path("empty.csv")
     File.write!(path, "")
