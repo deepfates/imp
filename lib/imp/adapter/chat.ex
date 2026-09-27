@@ -25,7 +25,7 @@ defmodule Imp.Adapter.Chat do
   signature; see that module.
 
   Options to `format/3`: `:demos`, `:response_instruction`, `:guidance`,
-  `:omit_empty_request`, and the renderer seams `:output_renderer`,
+  `:omit_empty_request`, `:native_tools`, and the renderer seams `:output_renderer`,
   `:input_section_renderer`, `:system_renderer`, `:tool_result_renderer` and
   `:history_note_renderer`,
   which let another adapter reuse this message assembly with its own dialect
@@ -81,7 +81,12 @@ defmodule Imp.Adapter.Chat do
     # Drop the trailing user message when it is blank. A native tool loop has
     # nothing left to ask once every input is in the history, and an empty
     # message still counts as a turn to the provider.
-    omit_empty_request: [type: :boolean, default: false]
+    omit_empty_request: [type: :boolean, default: false],
+    # The request carries its tools natively and the model answers with tool
+    # calls or plain text, so the default system message describes the inputs
+    # and the objective and no output field structure: a prompt that also
+    # spelled out the step's outputs would ask for a second format.
+    native_tools: [type: :boolean, default: false]
   ]
 
   @impl true
@@ -553,15 +558,35 @@ defmodule Imp.Adapter.Chat do
   end
 
   # The default system message: the field listing, the marker template and the
-  # objective. Public so a custom `:system_renderer` can fall back to it;
+  # objective, or, with `:native_tools`, the input listing and the objective.
+  # Public so a custom `:system_renderer` can fall back to it;
   # an internal seam, not packaged API.
   @doc false
   def render_system(signature, opts \\ []) do
-    objective =
-      signature.instructions
-      |> with_guidance(Keyword.get(opts, :guidance))
-      |> Imp.Adapter.Instructions.objective_text()
+    objective = objective(signature, opts)
 
+    if Keyword.get(opts, :native_tools, false) do
+      """
+      Your input fields are:
+      #{render_field_list(signature.inputs)}
+      Your objective is: #{objective}
+      """
+      |> String.trim()
+    else
+      render_structured_system(signature, objective)
+    end
+  end
+
+  # The objective: the program's instructions followed by any loop guidance.
+  # Shared with the JSON adapter, so a request in either format says the same.
+  @doc false
+  def objective(signature, opts) do
+    signature.instructions
+    |> with_guidance(Keyword.get(opts, :guidance))
+    |> Imp.Adapter.Instructions.objective_text()
+  end
+
+  defp render_structured_system(signature, objective) do
     """
     Your input fields are:
     #{render_field_list(signature.inputs)}

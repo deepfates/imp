@@ -6,6 +6,28 @@ User-visible changes to Imp are recorded here.
 
 ### Fixed
 
+- An `Imp.react` step asks for one thing. With the Chat adapter and an LM
+  that calls tools natively, the step's system message is the inputs and the
+  objective with the loop's guidance, and no longer also describes
+  `next_thought` and `tool_calls` as fields to write. A model that followed
+  that description wrote a JSON object, and for a signature with one text
+  output the object became the answer. An LM whose client says it cannot call
+  tools (a ReqLLM model the registry lists without tool calling,
+  `Imp.Clients.TRLLM`) keeps the field structure, so it can still write its
+  calls.
+- The JSON fallback after an unparseable Chat or XML reply sends the same
+  request in JSON: the program's `adapter_opts` renderers (`:system_renderer`,
+  `:output_renderer`), an agent loop's guidance and the demos go with it.
+  Before, it sent the stock JSON prompt, so a host that shapes its prompt with
+  renderers got a different prompt on every fallback, and an `Imp.react` step
+  lost its tool guidance. `Imp.Adapter.JSON` now honors `:system_renderer`,
+  `:output_renderer` and `:guidance` whenever it is used, and ends a request
+  whose inputs are all in the history with the output requirements as a user
+  message of their own instead of appending them to the last tool result.
+- The `[:imp, :adapter, :parse, :json_fallback]` event names the adapter whose
+  reply failed as `:adapter` (it always said `Imp.Adapter.Chat`, also for
+  XML) and the adapter that retried as `:fallback_adapter`.
+
 - Repairing a Python-style completion keeps its text: `{'answer': 'caf\u00e9'}`
   reads as `café`, not `cafu00e9`, and emoji written as `\ud83d\ude00` or
   `\U0001f600` read as the emoji. An escape the repair cannot read makes the

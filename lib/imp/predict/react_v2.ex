@@ -120,6 +120,16 @@ defmodule Imp.Predict.ReActV2 do
   `args` or `parameters` for `arguments` (`Imp.Adapter.Types.ToolCall`); a map
   that names no tool at all is kept as a malformed-call observation.
 
+  So a step asks for one thing. When the LM calls tools natively (every LM
+  unless its client says otherwise; `Imp.Clients.ReqLLM` asks the model
+  registry), the Chat adapter's system message is the inputs and the objective,
+  the loop's guidance included, with no `next_thought`/`tool_calls` field
+  structure: the model answers with tool calls or with plain text. When the LM
+  cannot (the registry says the model has no tool calling, or the LM is
+  `Imp.Clients.TRLLM`), the step keeps that structure, so the model can write
+  its calls under `[[ ## tool_calls ## ]]`. The roster is sent natively
+  either way.
+
   On a recognized context-window refusal, up to eight smaller requests omit
   oldest prior episodes from the prompt, preserving their full durable history.
   Completed signature outputs delimit episodes; a trailing unfinished prior
@@ -884,7 +894,15 @@ defmodule Imp.Predict.ReActV2 do
 
   defp error_text(value), do: inspect(value)
 
+  # Every step sends its roster natively. Whether the model answers that
+  # natively is the LM's to say, per call, since the LM can come from
+  # `Imp.Settings`: when it does, the step asks for tool calls or plain text
+  # and the prompt describes no written `tool_calls` field; when it does not,
+  # the prompt keeps the field structure so the model can write its calls.
   defp predict(program, _react, history, pending) do
+    native? = program |> Imp.Predict.resolve_lm() |> Imp.LM.tool_calling_capability()
+    program = %{program | adapter_opts: Keyword.put(program.adapter_opts, :native_tools, native?)}
+
     context_call(history, fn projected ->
       Imp.Predict.call(program, Map.put(pending, :history, projected))
     end)

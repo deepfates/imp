@@ -179,6 +179,17 @@ defmodule Imp.Clients.ReqLLM do
   end
 
   @doc false
+  # False only when the ReqLLM/LLMDB registry resolves the model and says it
+  # cannot call tools. A model the registry does not know, or knows without
+  # saying, is sent the roster natively like any other.
+  def tool_calling_capability(%__MODULE__{model: model_spec}) do
+    case resolve_model(model_spec) do
+      {:ok, %{capabilities: %{tools: %{enabled: false}}}} -> false
+      _known_or_unknown -> true
+    end
+  end
+
+  @doc false
   def configured_option(%__MODULE__{opts: opts}, key), do: Keyword.fetch(opts, key)
 
   @impl true

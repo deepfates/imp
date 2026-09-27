@@ -90,6 +90,20 @@ defmodule Imp.LM do
   def reasoning_capability(_lm), do: false
 
   @doc false
+  # Whether the LM answers a request's `:tools` with native tool calls, the
+  # analog of DSPy's `lm.supports_function_calling`. `Imp.Predict.ReActV2`
+  # sends every step's roster natively and reads this to decide whether the
+  # step's prompt also describes a written `tool_calls` field. A client that
+  # knows it cannot call tools declares `tool_calling_capability/1` returning
+  # false; one that declares nothing is taken to answer the request it is sent.
+  def tool_calling_capability(%module{} = lm) do
+    not (Code.ensure_loaded?(module) and function_exported?(module, :tool_calling_capability, 1) and
+           module.tool_calling_capability(lm) == false)
+  end
+
+  def tool_calling_capability(_lm), do: true
+
+  @doc false
   # A configured client option ranks below a per-call or program override,
   # matching DSPy's `lm_kwargs` > `lm.kwargs` precedence.
   def configured_option(%module{} = lm, key) do

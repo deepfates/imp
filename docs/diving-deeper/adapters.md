@@ -47,7 +47,9 @@ followed by one more request, not an error straight away:
 
 - The Chat and XML adapters retry through the JSON adapter, which asks for a
   JSON object instead. This is on by default, as in DSPy; turn it off with
-  `config: [json_fallback: false]`.
+  `config: [json_fallback: false]`. The retry is the same request in JSON:
+  it keeps the program's demos, its `adapter_opts` renderers and an agent
+  loop's guidance.
 - The JSON and single-field adapters retry only when asked:
   `config: [json_retries: n]` makes up to `n` more requests. Each repeats the
   original request with the latest failure's message added as a user turn, so
@@ -225,7 +227,9 @@ provider itself failed is an `Imp.LMError`, and an adapter that makes its own
 request (TwoStep) returns that request's failure as it is.
 
 Each fallback, retry and final parse failure also emits telemetry:
-`[:imp, :adapter, :parse, :json_fallback | :retry | :error]`.
+`[:imp, :adapter, :parse, :json_fallback | :retry | :error]`. A fallback's
+metadata names the adapter whose reply failed as `:adapter` and the one that
+retried it as `:fallback_adapter`.
 
 ### Choosing an adapter for a call
 
