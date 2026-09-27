@@ -22,12 +22,17 @@ defmodule Imp.Clients.ReqLLMBatch do
   date), the request is not sent again before then; otherwise the wait grows
   exponentially with the attempt, with jitter. A request that is waiting holds
   no dispatch slot: other requests are sent meanwhile, and the batch sleeps
-  only when every remaining request is waiting. Backoff is capped at
+  only when every remaining request is waiting. A process that traps exits
+  and is stopped by its parent during that sleep exits at once with the
+  parent's reason; a dispatch wave that is running is still waited for, for
+  up to `:timeout`. Backoff is capped at
   `:max_retry_wait`. When the provider asks for longer than `:max_retry_wait`,
   or the wait would end after the `Imp.Deadline` bound to the calling
   process, the request is not retried in this run: it stays
   `:transient_failure` with the attempts it has used, the summary is not
-  `complete?`, and `resume/3` retries it.
+  `complete?`, and `resume/3` retries it. The time a request may be sent
+  again is kept in the checkpoint as a UTC time, and `resume/3` waits for it
+  under the same rules.
 
   The checkpoint is an auditable JSON document. Every dispatch intent and
   outcome is appended to its event history before execution continues. Writes
@@ -113,8 +118,11 @@ defmodule Imp.Clients.ReqLLMBatch do
 
   Persisted requests, attempts, and retry policy are authoritative. Resume
   accepts only runtime options: `:num_threads`, `:timeout`,
-  `:validate_output`, `:max_retry_wait` and `:clock`. A request whose retry
-  was stopped by a long `retry-after` or a deadline is retried.
+  `:validate_output`, `:max_retry_wait` and `:clock`. A request waiting for
+  a retry, or whose retry was stopped, is not sent before the `not_before`
+  time its checkpoint holds: the batch waits for it when that is within
+  `:max_retry_wait` and the deadline, and stops its retry again, unsent,
+  when it is not.
   """
   @spec resume(Path.t(), dispatcher(), keyword()) :: {:ok, summary()} | {:error, term()}
   def resume(checkpoint, dispatcher, opts \\ [])
@@ -125,11 +133,9 @@ defmodule Imp.Clients.ReqLLMBatch do
          {:ok, state} <- read_checkpoint(checkpoint),
          {:ok, state} <- migrate_checkpoint(state, checkpoint),
          {:ok, state} <- reconcile_ambiguous(state, checkpoint) do
-      state
-      |> update_in(["requests"], fn requests ->
-        Enum.map(requests, &Map.delete(&1, "retry_stopped"))
-      end)
-      |> execute(dispatcher, runtime)
+      with {:ok, state, waits} <- resume_waits(state, runtime) do
+        execute(state, dispatcher, runtime, waits)
+      end
     end
   end
 
@@ -230,58 +236,89 @@ defmodule Imp.Clients.ReqLLMBatch do
   end
 
   # For each request that failed transiently and has attempts left, decide
-  # when it may be sent again, or stop retrying it in this run.
+  # when it may be sent again, or stop retrying it in this run. The time is
+  # also kept in the checkpoint as `not_before`, a UTC time, so a resumed
+  # batch waits for it too.
   defp schedule_retries(state, results, runtime, waits) do
     now = runtime.clock.now.()
+    utc_now = runtime.clock.utc_now.()
     remaining = Imp.Deadline.remaining(Imp.Deadline.current())
     max_attempts = state["max_attempts"]
 
-    Enum.reduce_while(results, {:ok, state, waits}, fn
-      {id, attempt, {:transient, _reason}, raw}, {:ok, current, waits}
-      when attempt < max_attempts ->
-        case retry_wait(raw, attempt, runtime, remaining) do
-          {:wait, wait} ->
-            {:cont, {:ok, current, Map.put(waits, id, now + wait)}}
+    {state, waits} =
+      Enum.reduce(results, {state, waits}, fn
+        {id, attempt, {:transient, _reason}, raw}, {current, waits}
+        when attempt < max_attempts ->
+          {source, wait} = retry_wait(raw, attempt, runtime)
+          not_before = utc_now |> DateTime.add(wait, :millisecond) |> DateTime.to_iso8601()
+          current = update_request(current, id, &Map.put(&1, "not_before", not_before))
+          plan_retry(current, waits, id, attempt, now, decide(source, wait, runtime, remaining))
 
-          {:stop, why, wait} ->
-            stopped = %{"reason" => why, "wait_ms" => wait}
+        _result, acc ->
+          acc
+      end)
 
-            next =
-              current
-              |> update_request(id, &Map.put(&1, "retry_stopped", stopped))
-              |> append_event(id, "retry_stopped", "transient_failure", attempt, stopped)
+    with :ok <- write_checkpoint(runtime.checkpoint, state), do: {:ok, state, waits}
+  end
 
-            case write_checkpoint(runtime.checkpoint, next) do
-              :ok -> {:cont, {:ok, next, Map.delete(waits, id)}}
-              {:error, _reason} = error -> {:halt, error}
-            end
+  # On resume, a request with retries left waits until its `not_before`, or
+  # is stopped again, unsent, when that is past the caps or the deadline.
+  defp resume_waits(state, runtime) do
+    now = runtime.clock.now.()
+    utc_now = runtime.clock.utc_now.()
+    remaining = Imp.Deadline.remaining(Imp.Deadline.current())
+
+    {state, waits} =
+      Enum.reduce(state["requests"], {state, %{}}, fn request, {current, waits} ->
+        id = request["id"]
+        current = update_request(current, id, &Map.delete(&1, "retry_stopped"))
+
+        with "transient_failure" <- request["status"],
+             true <- request["attempts"] < state["max_attempts"],
+             not_before when is_binary(not_before) <- request["not_before"],
+             {:ok, at, _offset} <- DateTime.from_iso8601(not_before) do
+          wait = max(DateTime.diff(at, utc_now, :millisecond), 0)
+          decision = decide(:retry_after, wait, runtime, remaining)
+          plan_retry(current, waits, id, request["attempts"], now, decision)
+        else
+          _no_wait -> {current, waits}
         end
+      end)
 
-      _result, acc ->
-        {:cont, acc}
-    end)
+    with :ok <- write_checkpoint(runtime.checkpoint, state), do: {:ok, state, waits}
+  end
+
+  defp plan_retry(state, waits, id, _attempt, now, {:wait, wait}),
+    do: {state, Map.put(waits, id, now + wait)}
+
+  defp plan_retry(state, waits, id, attempt, _now, {:stop, why, wait}) do
+    stopped = %{"reason" => why, "wait_ms" => wait}
+
+    state =
+      state
+      |> update_request(id, &Map.put(&1, "retry_stopped", stopped))
+      |> append_event(id, "retry_stopped", "transient_failure", attempt, stopped)
+
+    {state, Map.delete(waits, id)}
   end
 
   @backoff_base 500
 
-  defp retry_wait(raw, attempt, runtime, remaining) do
-    wait =
-      case retry_after(raw, runtime.clock) do
-        nil -> {:backoff, min(backoff(attempt), runtime.max_retry_wait)}
-        wait -> {:retry_after, wait}
-      end
-
-    case wait do
-      {:retry_after, wait} when wait > runtime.max_retry_wait ->
-        {:stop, "retry_after_exceeds_max_retry_wait", wait}
-
-      {_source, wait} when remaining != :infinity and wait >= remaining ->
-        {:stop, "deadline", wait}
-
-      {_source, wait} ->
-        {:wait, wait}
+  defp retry_wait(raw, attempt, runtime) do
+    case retry_after(raw, runtime.clock) do
+      nil -> {:backoff, min(backoff(attempt), runtime.max_retry_wait)}
+      wait -> {:retry_after, wait}
     end
   end
+
+  defp decide(:retry_after, wait, runtime, _remaining) when wait > runtime.max_retry_wait,
+    do: {:stop, "retry_after_exceeds_max_retry_wait", wait}
+
+  defp decide(_source, wait, _runtime, remaining)
+       when remaining != :infinity and wait >= remaining,
+       do: {:stop, "deadline", wait}
+
+  defp decide(_source, wait, _runtime, _remaining), do: {:wait, wait}
 
   # Exponential with equal jitter: attempt n waits between half of and the
   # whole of base * 2^(n - 1), so a later attempt never waits less.
@@ -321,21 +358,79 @@ defmodule Imp.Clients.ReqLLMBatch do
 
   @months ~w(Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec)
 
-  # An IMF-fixdate, the form RFC 9110 requires of a sender:
-  # `Sun, 06 Nov 1994 08:49:37 GMT`.
+  # RFC 9110 has a sender use IMF-fixdate and a recipient accept two obsolete
+  # forms as well:
+  #
+  #   Sun, 06 Nov 1994 08:49:37 GMT    IMF-fixdate
+  #   Sunday, 06-Nov-94 08:49:37 GMT   RFC 850
+  #   Sun Nov  6 08:49:37 1994         asctime
   defp http_date_wait(value, clock) do
-    with [_day, day, month, year, time, "GMT"] <- String.split(value, ~r/,?\s+/),
+    now = clock.utc_now.()
+
+    fields =
+      case String.split(value, ~r/[\s,]+/, trim: true) do
+        [_day, day, month, year, time, "GMT"] ->
+          {day, month, year, time}
+
+        [_day, date, time, "GMT"] ->
+          case String.split(date, "-") do
+            [day, month, year] -> {day, month, year, time}
+            _other -> nil
+          end
+
+        [_day, month, day, time, year] ->
+          {day, month, year, time}
+
+        _other ->
+          nil
+      end
+
+    with {day, month, year, time} <- fields,
          month when is_integer(month) <- Enum.find_index(@months, &(&1 == month)),
-         {:ok, date} <-
-           Date.new(String.to_integer(year), month + 1, String.to_integer(day)),
+         {day, ""} <- Integer.parse(day),
+         {year, ""} <- Integer.parse(year),
+         {:ok, date} <- Date.new(full_year(year, now), month + 1, day),
          {:ok, time} <- Time.from_iso8601(time),
          {:ok, at} <- DateTime.new(date, time, "Etc/UTC") do
-      max(DateTime.diff(at, clock.utc_now.(), :millisecond), 0)
+      max(DateTime.diff(at, now, :millisecond), 0)
     else
       _unreadable -> nil
     end
-  rescue
-    ArgumentError -> nil
+  end
+
+  # An RFC 850 date has a two-digit year. RFC 9110: one that appears to be
+  # more than 50 years in the future is the most recent past year with the
+  # same last two digits.
+  defp full_year(year, _now) when year >= 100, do: year
+
+  defp full_year(year, now) do
+    century = div(now.year, 100) * 100
+    if century + year > now.year + 50, do: century - 100 + year, else: century + year
+  end
+
+  # The retry wait a trapping process can still be stopped in: an exit
+  # signal from its parent ends it with the same reason. Other messages stay
+  # in the mailbox.
+  defp interruptible_sleep(milliseconds) do
+    case parent() do
+      nil ->
+        Process.sleep(milliseconds)
+
+      parent ->
+        receive do
+          {:EXIT, ^parent, reason} -> exit(reason)
+        after
+          milliseconds -> :ok
+        end
+    end
+  end
+
+  defp parent do
+    case Process.get(:"$ancestors") do
+      [parent | _rest] when is_pid(parent) -> parent
+      [name | _rest] when is_atom(name) -> Process.whereis(name)
+      _none -> nil
+    end
   end
 
   defp dispatch_wave(requests, dispatcher, runtime) do
@@ -457,6 +552,7 @@ defmodule Imp.Clients.ReqLLMBatch do
           |> Map.put("attempts", attempt)
           |> Map.put("status", "dispatching")
           |> Map.delete("reason")
+          |> Map.delete("not_before")
         end)
         |> append_event(request["id"], "dispatch_intent", "dispatching", attempt, %{})
 
@@ -705,7 +801,7 @@ defmodule Imp.Clients.ReqLLMBatch do
     %{
       now: fn -> System.monotonic_time(:millisecond) end,
       utc_now: &DateTime.utc_now/0,
-      sleep: &Process.sleep/1
+      sleep: &interruptible_sleep/1
     }
   end
 

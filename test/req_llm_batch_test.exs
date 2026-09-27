@@ -4,6 +4,13 @@ defmodule ReqLLMBatchTest do
   alias Imp.Clients.ReqLLM, as: ReqLLMClient
   alias Imp.Clients.ReqLLMBatch
 
+  defmodule Idle do
+    @behaviour Imp.Module
+    defstruct [:signature]
+
+    def call(_program, _inputs), do: Process.sleep(:infinity)
+  end
+
   test "retries transient failures and records explicit terminal and malformed outcomes" do
     checkpoint = checkpoint_path("outcomes")
     {:ok, attempts} = Agent.start_link(fn -> %{} end)
@@ -182,6 +189,77 @@ defmodule ReqLLMBatchTest do
     for {name, expected_calls, expected_status} <- cases do
       assert {name, invocations[name], find_request(summary, name).status} ==
                {name, expected_calls, expected_status}
+    end
+  end
+
+  test "an error keeps only retry-after of the response's headers" do
+    secret_headers = [
+      {"set-cookie", "session=cookie-secret-value"},
+      {"openai-organization", "org-secret-value"},
+      {"x-request-id", "req-secret-value"}
+    ]
+
+    checkpoint = checkpoint_path("header-leak")
+    {:ok, script} = Agent.start_link(fn -> [401, 429] end)
+
+    adapter = fn request ->
+      status = Agent.get_and_update(script, fn [next | rest] -> {next, rest} end)
+
+      headers =
+        if status == 429, do: [{"retry-after", "0"} | secret_headers], else: secret_headers
+
+      {request, Req.Response.new(status: status, headers: headers)}
+    end
+
+    client =
+      Imp.req_llm(%{provider: :openai, id: "leak-model"},
+        api_key: "local-test-key",
+        cache: false,
+        max_retries: 0,
+        req_http_options: [adapter: adapter]
+      )
+
+    messages = [%{role: :user, content: "hi"}]
+
+    assert {:error, %Imp.LMError{status: 401} = unauthorized} =
+             ReqLLMClient.generate(client, messages, [])
+
+    assert {:error, %Imp.LMError{status: 429} = limited} =
+             ReqLLMClient.generate(client, messages, [])
+
+    assert unauthorized.reason.headers == nil
+    assert limited.reason.headers == %{"retry-after" => ["0"]}
+
+    {:ok, run} = Imp.Run.start(%__MODULE__.Idle{}, %{})
+
+    Imp.Run.with_context(run.control, fn ->
+      Imp.Run.emit(:model_response, error: unauthorized)
+      Imp.Run.emit(:model_response, error: limited)
+    end)
+
+    events = Imp.Run.events(run)
+    :ok = Imp.Run.cancel(run)
+
+    Agent.update(script, fn _ -> [429] end)
+
+    {:ok, _summary} =
+      ReqLLMBatch.run(
+        [%{id: "only", payload: %{"messages" => [%{"role" => "user", "content" => "hi"}]}}],
+        ReqLLMBatch.req_llm_dispatcher(client),
+        checkpoint: checkpoint,
+        max_attempts: 1
+      )
+
+    seen = [
+      inspect(unauthorized, limit: :infinity, printable_limit: :infinity),
+      inspect(limited, limit: :infinity, printable_limit: :infinity),
+      inspect(events, limit: :infinity, printable_limit: :infinity),
+      events |> Enum.map(&Imp.Run.Event.to_map/1) |> Jason.encode!(),
+      File.read!(checkpoint)
+    ]
+
+    for text <- seen, secret <- ~w(cookie-secret-value org-secret-value req-secret-value) do
+      refute text =~ secret
     end
   end
 
@@ -412,6 +490,127 @@ defmodule ReqLLMBatchTest do
       assert sent.() == [{"limited", 0}]
       assert %{status: :transient_failure, attempts: 1} = find_request(summary, "limited")
       refute summary.complete?
+    end
+
+    test "resume waits for the retry time the checkpoint holds" do
+      clock = fake_clock()
+
+      {dispatcher, sent} =
+        scripted_dispatcher(clock, %{
+          "limited" => [rate_limited(%{"retry-after" => ["2"]}), {:ok, "done"}]
+        })
+
+      checkpoint = checkpoint_path("resume-not-before")
+
+      assert {:ok, summary} =
+               Imp.Deadline.with_deadline(1_000, fn ->
+                 ReqLLMBatch.run([%{id: "limited", payload: []}], dispatcher,
+                   checkpoint: checkpoint,
+                   clock: clock
+                 )
+               end)
+
+      assert %{status: :transient_failure, attempts: 1} = find_request(summary, "limited")
+      saved = checkpoint |> File.read!() |> Jason.decode!()
+      assert [%{"not_before" => "2026-09-27T12:00:02.000Z"}] = saved["requests"]
+
+      # Resumed at once: nothing is sent before 12:00:02.
+      assert {:ok, resumed} = ReqLLMBatch.resume(checkpoint, dispatcher, clock: clock)
+      assert %{status: :succeeded, attempts: 2} = find_request(resumed, "limited")
+      assert sent.() == [{"limited", 0}, {"limited", 2_000}]
+      assert sleeps(clock) == [2_000]
+    end
+
+    test "resume stops a retry again, unsent, when its time is past the deadline" do
+      clock = fake_clock()
+
+      {dispatcher, sent} =
+        scripted_dispatcher(clock, %{"limited" => [rate_limited(%{"retry-after" => ["30"]})]})
+
+      checkpoint = checkpoint_path("resume-deadline")
+
+      Imp.Deadline.with_deadline(1_000, fn ->
+        ReqLLMBatch.run([%{id: "limited", payload: []}], dispatcher,
+          checkpoint: checkpoint,
+          clock: clock
+        )
+      end)
+
+      assert {:ok, resumed} =
+               Imp.Deadline.with_deadline(10_000, fn ->
+                 ReqLLMBatch.resume(checkpoint, dispatcher, clock: clock)
+               end)
+
+      assert sent.() == [{"limited", 0}]
+      assert sleeps(clock) == []
+      assert %{status: :transient_failure, attempts: 1} = find_request(resumed, "limited")
+      refute resumed.complete?
+    end
+
+    test "reads retry-after in the RFC 850 and asctime date forms" do
+      clock = fake_clock()
+
+      {dispatcher, sent} =
+        scripted_dispatcher(clock, %{
+          "rfc850" => [
+            rate_limited(%{"retry-after" => ["Sunday, 27-Sep-26 12:00:03 GMT"]}),
+            {:ok, "done"}
+          ],
+          "asctime" => [
+            rate_limited(%{"retry-after" => ["Sun Sep 27 12:00:05 2026"]}),
+            {:ok, "done"}
+          ]
+        })
+
+      assert {:ok, summary} =
+               ReqLLMBatch.run(
+                 [%{id: "rfc850", payload: []}, %{id: "asctime", payload: []}],
+                 dispatcher,
+                 checkpoint: checkpoint_path("date-forms"),
+                 num_threads: 2,
+                 clock: clock
+               )
+
+      assert summary.counts == %{succeeded: 2}
+      assert sent.() == [{"rfc850", 0}, {"asctime", 0}, {"rfc850", 3_000}, {"asctime", 5_000}]
+    end
+
+    test "a trapping process stopped by its parent during the wait exits at once" do
+      test_pid = self()
+
+      parent =
+        spawn(fn ->
+          {:ok, worker} =
+            Task.start_link(fn ->
+              Process.flag(:trap_exit, true)
+
+              dispatcher = fn _request, _context ->
+                send(test_pid, :dispatched)
+                rate_limited(%{"retry-after" => ["30"]})
+              end
+
+              ReqLLMBatch.run([%{id: "limited", payload: []}], dispatcher,
+                checkpoint: checkpoint_path("trapping")
+              )
+            end)
+
+          send(test_pid, {:worker, worker})
+
+          receive do
+            :stop -> Process.exit(worker, :shutdown)
+          end
+
+          Process.sleep(:infinity)
+        end)
+
+      assert_receive {:worker, worker}
+      ref = Process.monitor(worker)
+      assert_receive :dispatched
+      Process.sleep(50)
+      send(parent, :stop)
+
+      assert_receive {:DOWN, ^ref, :process, ^worker, :shutdown}, 500
+      Process.exit(parent, :kill)
     end
 
     test "a 429 through the Req transport waits for its retry-after" do

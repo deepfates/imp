@@ -155,6 +155,28 @@ defmodule DatasetsContractTest do
     cleanup_tmp("bare-cr-error.csv")
   end
 
+  test "CSV loader keeps a quoted empty value and skips blank lines" do
+    path = tmp_path("quoted-empty.csv")
+    File.write!(path, ~s(q\nx\n""\n\ny\n))
+
+    values = path |> Datasets.csv([]) |> Enum.map(& &1.fields["q"])
+    assert values == ["x", "", "y"]
+  after
+    cleanup_tmp("quoted-empty.csv")
+  end
+
+  test "CSV loader bounds the fields of a ragged row it reports" do
+    path = tmp_path("long-ragged.csv")
+    File.write!(path, "q,a\n" <> String.duplicate("z", 10_000) <> ",1,extra\n")
+
+    error = assert_raise Datasets.Error, fn -> Datasets.csv(path, [:q]) end
+    assert error.line == 2
+    assert [long, "1", "extra"] = error.record
+    assert byte_size(long) <= 210
+  after
+    cleanup_tmp("long-ragged.csv")
+  end
+
   test "CSV loader bounds the record an error carries" do
     path = tmp_path("long-unclosed.csv")
     File.write!(path, "q,a\n\"" <> String.duplicate("x", 10_000) <> ",1\n")

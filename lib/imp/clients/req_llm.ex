@@ -1358,9 +1358,15 @@ defmodule Imp.Clients.ReqLLM do
   # returns has lost the response's `retry-after` (ReqLLM's own retry step
   # reads it from the response before that). A caller that retries needs it:
   # `Imp.Clients.ReqLLMBatch` waits for it. The request step below runs after
-  # every provider step is attached; it keeps an error response's headers and
-  # puts them back on the `ReqLLM.Error.API.Request` the call returns. It is
-  # unnecessary once ReqLLM keeps the headers on the errors it decodes.
+  # every provider step is attached; it keeps an error response's
+  # `retry-after` and puts it back on the `ReqLLM.Error.API.Request` the call
+  # returns. It is unnecessary once ReqLLM keeps the header on the errors it
+  # decodes.
+  #
+  # Only `retry-after` is kept, and any other header ReqLLM left on the error
+  # is dropped: the error is inspected into logs, checkpoints and run events,
+  # and a response's headers carry cookies, account identifiers and request
+  # ids.
   defp keep_error_headers(opts) do
     http_opts = Keyword.get(opts, :req_http_options, [])
 
@@ -1382,30 +1388,43 @@ defmodule Imp.Clients.ReqLLM do
   @doc false
   def install_error_headers(%Req.Request{} = request) do
     request
-    |> Req.Request.prepend_response_steps(
-      imp_keep_error_headers: &__MODULE__.keep_error_response_headers/1
-    )
-    |> Req.Request.append_error_steps(
-      imp_restore_error_headers: &__MODULE__.restore_error_headers/1
-    )
+    |> Req.Request.prepend_response_steps(imp_keep_retry_after: &__MODULE__.keep_retry_after/1)
+    |> Req.Request.append_error_steps(imp_error_headers: &__MODULE__.only_retry_after/1)
   end
 
   @doc false
-  def keep_error_response_headers({request, %Req.Response{status: status} = response})
-      when status >= 400,
-      do: {Req.Request.put_private(request, :imp_error_headers, response.headers), response}
-
-  def keep_error_response_headers(pair), do: pair
-
-  @doc false
-  def restore_error_headers({request, %ReqLLM.Error.API.Request{headers: nil} = error}) do
-    case Req.Request.get_private(request, :imp_error_headers) do
-      nil -> {request, error}
-      headers -> {request, %{error | headers: headers}}
+  def keep_retry_after({request, %Req.Response{status: status} = response})
+      when status >= 400 do
+    case Req.Response.get_header(response, "retry-after") do
+      [] -> {request, response}
+      values -> {Req.Request.put_private(request, :imp_retry_after, values), response}
     end
   end
 
-  def restore_error_headers(pair), do: pair
+  def keep_retry_after(pair), do: pair
+
+  @doc false
+  def only_retry_after({request, %ReqLLM.Error.API.Request{} = error}) do
+    values =
+      Req.Request.get_private(request, :imp_retry_after) || retry_after_values(error.headers)
+
+    headers = if values == [], do: nil, else: %{"retry-after" => values}
+    {request, %{error | headers: headers}}
+  end
+
+  def only_retry_after(pair), do: pair
+
+  defp retry_after_values(headers) when is_map(headers) or is_list(headers) do
+    Enum.flat_map(headers, fn
+      {name, value} ->
+        if String.downcase(to_string(name)) == "retry-after", do: List.wrap(value), else: []
+
+      _other ->
+        []
+    end)
+  end
+
+  defp retry_after_values(_headers), do: []
 
   # An explicit caller no-retry policy is applied again in a final request step
   # at the adapter boundary, after every ReqLLM and Req step has run, so no
