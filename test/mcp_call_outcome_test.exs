@@ -410,6 +410,7 @@ defmodule Imp.MCPCallOutcomeTest do
         {{:transport_error, {:http_error, 403, ""}}, :refused},
         {{:transport_error, {:http_error, 429, ""}}, :refused},
         {{:transport_error, {:http_error, 502, ""}}, :unknown},
+        {{:transport_error, {:http_error, 529, ""}}, :refused},
         {{:transport_error, {:http_receive_failed, %Mint.TransportError{reason: :closed}}},
          :unknown},
         {{:transport_error, {:http_request_failed, %Mint.TransportError{reason: :closed}}},

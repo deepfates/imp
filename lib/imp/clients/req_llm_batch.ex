@@ -22,6 +22,12 @@ defmodule Imp.Clients.ReqLLMBatch do
   use a synced temporary file followed by an atomic rename. On resume, a
   request that was dispatched but has no committed outcome becomes
   `:ambiguous` for the same reason.
+
+  A checkpoint written by Imp 0.5.0 (schema version 1) retried timeouts and
+  dispatcher crashes as transient failures, and its stored reason does not
+  always say which a failure was. On resume, its `:transient_failure`
+  requests become `:ambiguous` and are not sent again; the checkpoint is
+  rewritten at schema version 2.
   """
 
   alias Imp.Clients.ReqLLM
@@ -43,7 +49,8 @@ defmodule Imp.Clients.ReqLLMBatch do
           requests: [map()]
         }
 
-  @schema_version 1
+  @schema_version 2
+  @schema_versions [1, @schema_version]
   @type_name "imp_req_llm_batch"
   @final_statuses ~w(succeeded terminal_failure malformed_output ambiguous)
   @status_atoms %{
@@ -94,6 +101,7 @@ defmodule Imp.Clients.ReqLLMBatch do
       when is_binary(checkpoint) and is_function(dispatcher, 2) do
     with {:ok, runtime} <- validate_resume_options(checkpoint, opts),
          {:ok, state} <- read_checkpoint(checkpoint),
+         {:ok, state} <- migrate_checkpoint(state, checkpoint),
          {:ok, state} <- reconcile_ambiguous(state, checkpoint) do
       execute(state, dispatcher, runtime)
     end
@@ -108,17 +116,28 @@ defmodule Imp.Clients.ReqLLMBatch do
   adapter is provider-neutral because provider and model selection remain in
   the client (`"openai:..."`, `"anthropic:..."`, or `"gemini:..."`).
 
-  A failed call's `Imp.LMError` decides its outcome. A request that never
-  reached the provider (the connection was refused, or no pooled connection
-  was free) and one the provider answered with a status that says try later
-  are `:transient`. Any other status is `:terminal`. A timeout or closed
-  connection with no response may have run, so it is `:ambiguous`.
+  The batch owns retries: every call is made with `max_retries: 0`, so ReqLLM
+  sends each attempt once and the error describes the only send.
+
+  A failed call's `Imp.LMError` decides its outcome:
+
+    * `:transient` - the request never reached the provider (the connection
+      was refused, or no pooled connection was free), or the provider
+      answered that it did not process it and to try later (408, 425, 429,
+      529).
+    * `:terminal` - the provider rejected it with any other 4xx status, or
+      the call failed with no status and no transport reason.
+    * `:ambiguous` - it may have run: a 5xx status other than 529 (500
+      included), any other status, or a timeout or closed connection with no
+      response.
   """
   @spec req_llm_dispatcher(ReqLLM.t(), keyword()) :: dispatcher()
   def req_llm_dispatcher(%ReqLLM{} = client, call_opts \\ []) when is_list(call_opts) do
     unless Keyword.keyword?(call_opts) do
       raise ArgumentError, "ReqLLMBatch.req_llm_dispatcher/2 expects keyword call options"
     end
+
+    call_opts = Keyword.put(call_opts, :max_retries, 0)
 
     fn request, _context ->
       messages = Map.get(request, :payload)
@@ -137,8 +156,13 @@ defmodule Imp.Clients.ReqLLMBatch do
     end
   end
 
-  defp classify_lm_error(%Imp.LMError{status: status} = error) when is_integer(status),
-    do: if(Imp.Errors.retryable?(error), do: :transient, else: :terminal)
+  defp classify_lm_error(%Imp.LMError{status: status}) when is_integer(status) do
+    case Imp.Errors.status_outcome(status) do
+      :try_later -> :transient
+      :refused -> :terminal
+      :unknown -> :ambiguous
+    end
+  end
 
   defp classify_lm_error(%Imp.LMError{} = error) do
     cond do
@@ -295,6 +319,32 @@ defmodule Imp.Clients.ReqLLMBatch do
         (request["status"] == "transient_failure" and request["attempts"] < max_attempts)
     end)
   end
+
+  # Schema version 1 (Imp 0.5.0) recorded a timeout, a dispatcher crash and a
+  # ReqLLM retry that may have sent the request as `transient_failure`.
+  defp migrate_checkpoint(%{"schema_version" => 1} = state, checkpoint) do
+    reason = "schema_1_transient_failure_may_have_run"
+
+    migrated =
+      state["requests"]
+      |> Enum.filter(&(&1["status"] == "transient_failure"))
+      |> Enum.reduce(state, fn request, current ->
+        current
+        |> update_request(request["id"], fn item ->
+          item
+          |> Map.put("status", "ambiguous")
+          |> Map.put("reason", %{"migrated_from" => item["reason"], "reason" => reason})
+        end)
+        |> append_event(request["id"], "schema_migration", "ambiguous", request["attempts"], %{
+          "reason" => reason
+        })
+      end)
+      |> Map.put("schema_version", @schema_version)
+
+    with :ok <- write_checkpoint(checkpoint, migrated), do: {:ok, migrated}
+  end
+
+  defp migrate_checkpoint(state, _checkpoint), do: {:ok, state}
 
   defp reconcile_ambiguous(state, checkpoint) do
     dispatching = Enum.filter(state["requests"], &(&1["status"] == "dispatching"))
@@ -499,12 +549,13 @@ defmodule Imp.Clients.ReqLLMBatch do
 
   defp validate_checkpoint(%{
          "type" => @type_name,
-         "schema_version" => @schema_version,
+         "schema_version" => schema_version,
          "max_attempts" => max_attempts,
          "requests" => requests,
          "events" => events
        })
-       when is_integer(max_attempts) and max_attempts > 0 and is_list(requests) and
+       when schema_version in @schema_versions and is_integer(max_attempts) and max_attempts > 0 and
+              is_list(requests) and
               is_list(events) do
     valid_requests? =
       Enum.all?(requests, fn request ->

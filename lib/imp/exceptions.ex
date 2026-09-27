@@ -27,15 +27,17 @@ defmodule Imp.LMError do
       response came back.
     * `:retryable` — `true` when sending the same request again may succeed.
       That is so when the provider says to try later (a 408, 425, 429 or 5xx
-      status), and when the request provably never reached the provider (the
-      connection was refused, no pooled connection was free, or it closed or
-      timed out before the request was sent). For any other status it is
-      ReqLLM's own `retryable` when ReqLLM set one, and `false` otherwise; a
-      409 is never retryable. It is also `true` for a timeout while waiting
-      for the answer and for a stream that failed after it started: those
-      requests may have run and been billed, and a retried stream repeats the
-      chunks the caller already has. A response or stream of a shape ReqLLM
-      never returns is `false`.
+      status), and when the transport failed with no response: the
+      connection was refused or no pooled connection was free, which say the
+      request never reached the provider, or the connection closed or timed
+      out, which may have happened after the request was sent. For any other
+      status it is ReqLLM's own `retryable` when ReqLLM set one, and `false`
+      otherwise; a 409 is never retryable. It is also `true` for a stream
+      that failed after it started. A timeout, a closed connection, a 5xx
+      other than 529 and a failed stream may follow a request that ran and
+      was billed, and a retried stream repeats the chunks the caller already
+      has; `retryable` says a retry may succeed, not that it is safe. A
+      response or stream of a shape ReqLLM never returns is `false`.
     * `:context_window_exceeded` — `true` when the provider refused the
       request because its input is longer than the model accepts. Sending it
       again unchanged will fail again; a shorter input may not.
@@ -172,6 +174,21 @@ defmodule Imp.Errors do
   @spec context_window_exceeded?(term()) :: boolean()
   def context_window_exceeded?(error),
     do: match?(%Imp.LMError{context_window_exceeded: true}, lm_error(error))
+
+  @doc false
+  # What an HTTP error status says about the request it answers, for a caller
+  # deciding whether sending it again could run it twice:
+  #
+  #   * `:try_later` - the server did not process the request and says it may
+  #     succeed later: 408, 425, 429, and 529 (a provider's overload refusal).
+  #   * `:refused` - the server rejected the request without processing it:
+  #     any other 4xx.
+  #   * `:unknown` - anything else. A 5xx can come from a gateway or a server
+  #     that failed after the request ran.
+  @spec status_outcome(integer()) :: :try_later | :refused | :unknown
+  def status_outcome(status) when status in [408, 425, 429, 529], do: :try_later
+  def status_outcome(status) when status in 400..499, do: :refused
+  def status_outcome(_status), do: :unknown
 
   @doc false
   # Whether `reason` is a language-model request's failure rather than

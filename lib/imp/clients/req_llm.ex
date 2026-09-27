@@ -442,6 +442,14 @@ defmodule Imp.Clients.ReqLLM do
 
   defp transport_reason(%module{reason: reason}) when module in @transport_errors, do: reason
 
+  # Finch reports a pool with no free connection as its own error, which Req
+  # passes on as an HTTP error, not a transport error. A pool checkout that
+  # times out raises a plain RuntimeError that only its message identifies, so
+  # it is not read here: it is not retryable, and so is never sent again.
+  defp transport_reason(%module{reason: :pool_not_available})
+       when module in [Req.HTTPError, Finch.Error],
+       do: :pool_not_available
+
   defp transport_reason(%ReqLLM.Error.API.Request{cause: cause}) when not is_nil(cause),
     do: transport_reason(cause)
 

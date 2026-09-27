@@ -106,6 +106,29 @@ defmodule ReqLLMBatchTest do
     assert %{status: :ambiguous, attempts: 1} = find_request(summary, "slow")
   end
 
+  test "a dispatcher that throws or exits is ambiguous and not re-dispatched" do
+    checkpoint = checkpoint_path("dispatcher-throw-exit")
+    {:ok, calls} = Agent.start_link(fn -> %{} end)
+
+    dispatcher = fn request, _context ->
+      Agent.update(calls, &Map.update(&1, request.id, 1, fn count -> count + 1 end))
+
+      case request.id do
+        "throws" -> throw(:sent_then_lost)
+        "exits" -> exit(:sent_then_lost)
+      end
+    end
+
+    requests = [%{id: "throws", payload: []}, %{id: "exits", payload: []}]
+
+    assert {:ok, summary} =
+             ReqLLMBatch.run(requests, dispatcher, checkpoint: checkpoint, max_attempts: 3)
+
+    assert Agent.get(calls, & &1) == %{"throws" => 1, "exits" => 1}
+    assert %{status: :ambiguous, attempts: 1} = find_request(summary, "throws")
+    assert %{status: :ambiguous, attempts: 1} = find_request(summary, "exits")
+  end
+
   test "req_llm_dispatcher retries only failures that say the request did not run" do
     checkpoint = checkpoint_path("lm-errors")
     {:ok, calls} = Agent.start_link(fn -> %{} end)
@@ -116,10 +139,34 @@ defmodule ReqLLMBatchTest do
         calls: calls
       )
 
+    # {name, calls expected, final status}
+    cases = [
+      # No answer after the request may have left: sent once.
+      {"timeout", 1, :ambiguous},
+      {"closed", 1, :ambiguous},
+      # A status that may follow a request that ran: sent once.
+      {"server_error", 1, :ambiguous},
+      {"bad_gateway", 1, :ambiguous},
+      {"gateway_timeout", 1, :ambiguous},
+      {"unavailable", 1, :ambiguous},
+      # Never sent, or not processed and try later: retried.
+      {"refused", 2, :succeeded},
+      {"pool", 2, :succeeded},
+      {"finch_pool", 2, :succeeded},
+      {"rate_limited", 2, :succeeded},
+      {"request_timeout", 2, :succeeded},
+      {"overloaded", 2, :succeeded},
+      # Rejected without running, and a retry will not help.
+      {"unauthorized", 1, :terminal_failure},
+      {"bad_request", 1, :terminal_failure}
+    ]
+
     requests =
       Enum.map(
-        ~w(timeout closed refused pool rate_limited unauthorized),
-        &%{id: &1, payload: %{"messages" => [%{"role" => "user", "content" => &1}]}}
+        cases,
+        fn {name, _calls, _status} ->
+          %{id: name, payload: %{"messages" => [%{"role" => "user", "content" => name}]}}
+        end
       )
 
     assert {:ok, summary} =
@@ -130,23 +177,102 @@ defmodule ReqLLMBatchTest do
 
     invocations = Agent.get(calls, & &1)
 
-    # Sent with no answer: it may have run, so it is sent once.
-    assert invocations["timeout"] == 1
-    assert %{status: :ambiguous, attempts: 1} = find_request(summary, "timeout")
-    assert invocations["closed"] == 1
-    assert %{status: :ambiguous, attempts: 1} = find_request(summary, "closed")
+    for {name, expected_calls, expected_status} <- cases do
+      assert {name, invocations[name], find_request(summary, name).status} ==
+               {name, expected_calls, expected_status}
+    end
+  end
 
-    # Never sent, or refused by the provider with try-later: retried.
-    assert invocations["refused"] == 2
-    assert %{status: :succeeded, attempts: 2} = find_request(summary, "refused")
-    assert invocations["pool"] == 2
-    assert %{status: :succeeded, attempts: 2} = find_request(summary, "pool")
-    assert invocations["rate_limited"] == 2
-    assert %{status: :succeeded, attempts: 2} = find_request(summary, "rate_limited")
+  describe "req_llm_dispatcher through the Req transport" do
+    # Counts every request that reaches the Req adapter, which is where
+    # ReqLLM's own retry step would send again.
+    test "a timeout is sent once, not retried by ReqLLM or the batch" do
+      {summary, sends} = run_through_transport([:timeout, :timeout, :timeout, :timeout])
 
-    # Refused for good: not retried.
-    assert invocations["unauthorized"] == 1
-    assert %{status: :terminal_failure, attempts: 1} = find_request(summary, "unauthorized")
+      assert sends == 1
+      assert %{status: :ambiguous, attempts: 1} = find_request(summary, "only")
+    end
+
+    test "a timeout followed by a refused connection is sent once" do
+      {summary, sends} =
+        run_through_transport([:timeout, :econnrefused, :econnrefused, :econnrefused])
+
+      assert sends == 1
+      assert %{status: :ambiguous, attempts: 1} = find_request(summary, "only")
+    end
+
+    test "a refused connection is retried by the batch, one send per attempt" do
+      {summary, sends} = run_through_transport(List.duplicate(:econnrefused, 12))
+
+      assert sends == 3
+      assert %{status: :transient_failure, attempts: 3} = find_request(summary, "only")
+    end
+
+    test "an exhausted pool, as Req reports it, is retried by the batch" do
+      pool = %Req.HTTPError{protocol: :http1, reason: :pool_not_available}
+      {summary, sends} = run_through_transport(List.duplicate(pool, 12))
+
+      assert sends == 3
+      assert %{status: :transient_failure, attempts: 3} = find_request(summary, "only")
+    end
+  end
+
+  test "resume treats a 0.5.0 checkpoint's transient failures as ambiguous" do
+    checkpoint = checkpoint_path("schema-1")
+
+    assert {:ok, _summary} =
+             ReqLLMBatch.run(
+               [%{id: "timed-out", payload: []}, %{id: "not-started", payload: []}],
+               fn _request, _context -> {:ok, "done"} end,
+               checkpoint: checkpoint,
+               max_attempts: 3
+             )
+
+    # Rewrite it as 0.5.0 would have left it: a timeout recorded as a
+    # transient failure with attempts left, and a request not yet sent.
+    state = checkpoint |> File.read!() |> Jason.decode!()
+
+    requests =
+      Enum.map(state["requests"], fn
+        %{"id" => "timed-out"} = request ->
+          request
+          |> Map.merge(%{
+            "status" => "transient_failure",
+            "attempts" => 1,
+            "reason" => ~s({:dispatcher_exit, "{:timeout, ...}"})
+          })
+          |> Map.delete("output")
+
+        request ->
+          request |> Map.merge(%{"status" => "pending", "attempts" => 0}) |> Map.delete("output")
+      end)
+
+    File.write!(
+      checkpoint,
+      Jason.encode!(%{state | "schema_version" => 1, "requests" => requests})
+    )
+
+    parent = self()
+
+    resume_dispatcher = fn request, _context ->
+      send(parent, {:resumed_dispatch, request.id})
+      {:ok, "done"}
+    end
+
+    assert {:ok, summary} = ReqLLMBatch.resume(checkpoint, resume_dispatcher)
+    assert_receive {:resumed_dispatch, "not-started"}
+    refute_receive {:resumed_dispatch, "timed-out"}
+
+    assert %{status: :ambiguous, attempts: 1} = find_request(summary, "timed-out")
+    assert %{status: :succeeded, attempts: 1} = find_request(summary, "not-started")
+
+    saved = checkpoint |> File.read!() |> Jason.decode!()
+    assert saved["schema_version"] == 2
+
+    assert Enum.any?(saved["events"], fn event ->
+             event["request_id"] == "timed-out" and event["kind"] == "schema_migration" and
+               event["status"] == "ambiguous"
+           end)
   end
 
   test "resume fails closed for an uncommitted post-dispatch request" do
@@ -358,13 +484,20 @@ defmodule ReqLLMBatchTest do
     defp failure("timeout"), do: %Req.TransportError{reason: :timeout}
     defp failure("closed"), do: %Mint.TransportError{reason: :closed}
     defp failure("refused"), do: %Req.TransportError{reason: :econnrefused}
-    defp failure("pool"), do: %Req.TransportError{reason: :pool_not_available}
+    defp failure("pool"), do: %Req.HTTPError{protocol: :http1, reason: :pool_not_available}
+    defp failure("finch_pool"), do: %Finch.Error{reason: :pool_not_available}
+    defp failure("rate_limited"), do: status_error(429)
+    defp failure("request_timeout"), do: status_error(408)
+    defp failure("overloaded"), do: status_error(529)
+    defp failure("server_error"), do: status_error(500)
+    defp failure("bad_gateway"), do: status_error(502)
+    defp failure("unavailable"), do: status_error(503)
+    defp failure("gateway_timeout"), do: status_error(504)
+    defp failure("unauthorized"), do: status_error(401)
+    defp failure("bad_request"), do: status_error(400)
 
-    defp failure("rate_limited"),
-      do: %ReqLLM.Error.API.Request{reason: "slow down", status: 429}
-
-    defp failure("unauthorized"),
-      do: %ReqLLM.Error.API.Request{reason: "bad key", status: 401}
+    defp status_error(status),
+      do: %ReqLLM.Error.API.Request{reason: "status #{status}", status: status}
 
     defp answer(model, messages) do
       {:ok,
@@ -412,6 +545,42 @@ defmodule ReqLLMBatchTest do
   end
 
   defp find_request(summary, id), do: Enum.find(summary.requests, &(&1.id == id))
+
+  # Runs one request through a real ReqLLM client whose Req adapter fails each
+  # send with the next reason in `failures`, and returns the summary and the
+  # number of sends that reached the adapter.
+  defp run_through_transport(failures) do
+    {:ok, script} = Agent.start_link(fn -> %{failures: failures, sends: 0} end)
+
+    adapter = fn request ->
+      failure =
+        Agent.get_and_update(script, fn %{failures: [next | rest], sends: sends} ->
+          {next, %{failures: rest, sends: sends + 1}}
+        end)
+
+      exception =
+        if is_atom(failure), do: %Req.TransportError{reason: failure}, else: failure
+
+      {request, exception}
+    end
+
+    client =
+      Imp.req_llm(%{provider: :openai, id: "counting-model"},
+        api_key: "local-test-key",
+        cache: false,
+        req_http_options: [adapter: adapter]
+      )
+
+    {:ok, summary} =
+      ReqLLMBatch.run(
+        [%{id: "only", payload: %{"messages" => [%{"role" => "user", "content" => "hi"}]}}],
+        ReqLLMBatch.req_llm_dispatcher(client),
+        checkpoint: checkpoint_path("transport"),
+        max_attempts: 3
+      )
+
+    {summary, Agent.get(script, & &1.sends)}
+  end
 
   defp checkpoint_path(name) do
     nonce = Base.url_encode64(:crypto.strong_rand_bytes(8), padding: false)
