@@ -24,8 +24,11 @@ defmodule Imp.Streaming.Execution do
 
   def generate(%Imp.Predict{} = predict, lm, messages, opts) do
     case stream_target(predict) do
-      {:ok, name, context} -> stream_generate(context, name, lm, messages, opts)
-      :ordinary -> Imp.LM.generate(lm, messages, opts)
+      {:ok, name, context} ->
+        stream_generate(context, name, text_field(predict), lm, messages, opts)
+
+      :ordinary ->
+        Imp.LM.generate(lm, messages, opts)
     end
   end
 
@@ -41,7 +44,7 @@ defmodule Imp.Streaming.Execution do
     end
   end
 
-  defp stream_generate(context, name, lm, messages, opts) do
+  defp stream_generate(context, name, text_field, lm, messages, opts) do
     module = lm_module(lm)
 
     if is_atom(module) and Code.ensure_loaded?(module) and function_exported?(module, :stream, 3) do
@@ -52,7 +55,9 @@ defmodule Imp.Streaming.Execution do
         {messages, opts} = Imp.Core.request_parts(request)
 
         with {:ok, raw} <-
-               lm |> module.stream(messages, opts) |> consume_stream(context, name, lm) do
+               lm
+               |> module.stream(messages, opts)
+               |> consume_stream(context, name, lm, text_field) do
           Imp.Core.response(raw)
         end
       end)
@@ -65,7 +70,7 @@ defmodule Imp.Streaming.Execution do
   defp lm_module(%module{}), do: module
   defp lm_module(module), do: module
 
-  defp consume_stream(stream, context, name, lm) do
+  defp consume_stream(stream, context, name, lm, text_field) do
     stream = attach_listeners(stream, context, name)
 
     result =
@@ -86,7 +91,7 @@ defmodule Imp.Streaming.Execution do
     case result do
       {:ok, chunks, metadata} ->
         chunks
-        |> materialize_chunks()
+        |> materialize_chunks(text_field)
         |> envelope(normalize_metadata(lm, metadata))
         |> then(&{:ok, &1})
 
@@ -172,15 +177,43 @@ defmodule Imp.Streaming.Execution do
   defp collect_metadata(%StreamResponse{metadata: incoming}, metadata),
     do: Map.merge(metadata, incoming || %{})
 
-  defp materialize_chunks(chunks) do
-    chunks = Enum.reverse(chunks)
+  # The streamed output is what the same completion returns unstreamed: text
+  # alone is the joined text; tool calls, one per chunk as a provider streams
+  # them, are all kept in order as the output's `:tool_calls`, with any text
+  # that came with them under the signature's `:text_field` (see
+  # `Imp.Adapter.Chat`), which is where a text completion lands.
+  defp materialize_chunks(chunks, text_field) do
+    {texts, maps} = chunks |> Enum.reverse() |> Enum.split_with(&is_binary/1)
+    text = Enum.join(texts)
+    calls = Enum.flat_map(maps, &List.wrap(Map.get(&1, :tool_calls, Map.get(&1, "tool_calls"))))
 
     cond do
-      Enum.any?(chunks, &is_binary/1) -> Enum.filter(chunks, &is_binary/1) |> Enum.join()
-      chunks == [] -> ""
-      true -> Enum.reduce(chunks, %{}, &Map.merge(&2, &1))
+      calls != [] ->
+        maps
+        |> Enum.reduce(%{}, &Map.merge(&2, &1))
+        |> Map.drop([:tool_calls, "tool_calls"])
+        |> Map.put(:tool_calls, calls)
+        |> put_text(text_field, text)
+
+      texts != [] or maps == [] ->
+        text
+
+      true ->
+        Enum.reduce(maps, %{}, &Map.merge(&2, &1))
     end
   end
+
+  defp put_text(output, nil, _text), do: output
+
+  defp put_text(output, text_field, text) do
+    if String.trim(text) == "", do: output, else: Map.put(output, text_field, text)
+  end
+
+  defp text_field(%Imp.Predict{signature: %Imp.Signature{metadata: metadata}})
+       when is_map(metadata),
+       do: Map.get(metadata, :text_field, Map.get(metadata, "text_field"))
+
+  defp text_field(_predict), do: nil
 
   defp envelope(output, metadata) when map_size(metadata) == 0, do: output
 

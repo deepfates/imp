@@ -161,4 +161,46 @@ defmodule Imp.StreamedRunRecordTest do
     assert Enum.map(streamed_events, & &1.kind) == Enum.map(plain_events, & &1.kind)
     assert [%{error: _error}] = Enum.filter(streamed_events, &(&1.kind == :model_response))
   end
+
+  defp look(name),
+    do: Imp.tool(name, "look up #{name}", fn _arguments -> "#{name} says Paris" end)
+
+  defp calls(names),
+    do: Enum.map(names, &%{id: "call_#{&1}", name: to_string(&1), arguments: %{}})
+
+  defp tool_calls(events),
+    do: events |> Enum.filter(&(&1.kind == :tool_call)) |> Enum.map(& &1.metadata)
+
+  # A streamed turn that says something and calls tools runs every call, in
+  # order, and keeps what it said, as the same turn unstreamed does.
+  for names <- [[:atlas], [:atlas, :gazetteer]] do
+    test "a streamed turn with text and #{length(names)} tool call(s) matches the unstreamed turn" do
+      names = unquote(names)
+
+      runs =
+        for provider_stream <- [false, true] do
+          lm = ScriptedLM.new([{"Let me look.", calls(names)}, {"Paris", []}])
+
+          program =
+            Imp.react("question -> answer", Enum.map(names, &look/1), lm: lm, max_iters: 3)
+
+          run(program, provider_stream)
+        end
+
+      [{{:ok, plain}, plain_events}, {{:ok, streamed}, streamed_events}] = runs
+
+      assert Imp.get(streamed, :answer) == "Paris"
+      assert streamed.fields == plain.fields
+      assert Enum.map(streamed_events, & &1.kind) == Enum.map(plain_events, & &1.kind)
+      assert length(tool_calls(streamed_events)) == length(names)
+      assert tool_calls(streamed_events) == tool_calls(plain_events)
+
+      trajectory = fn prediction ->
+        prediction.metadata |> Map.get(:trajectory, prediction.metadata) |> inspect()
+      end
+
+      assert trajectory.(streamed) =~ "Let me look."
+      assert trajectory.(streamed) == trajectory.(plain)
+    end
+  end
 end
