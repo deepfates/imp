@@ -73,9 +73,19 @@ User-visible changes to Imp are recorded here.
   asks for longer than `:max_retry_wait`, or the wait would pass the
   `Imp.Deadline` in force, the request is not retried in that run: it stays
   `:transient_failure`, the summary is not `complete?`, and `resume/3`
-  retries it. `Imp.Clients.ReqLLM` keeps an error response's headers on the
-  `ReqLLM.Error.API.Request` it returns (ReqLLM's decoding dropped them), so
-  `retry-after` reaches the caller.
+  retries it. The checkpoint keeps the time each such request may be sent
+  again (`not_before`, UTC), and `resume/3` waits for it under the same
+  rules or stops the retry again without sending. `retry-after` may be an
+  IMF-fixdate, an RFC 850 date or an asctime date. A process that traps
+  exits and is stopped by its parent during the wait exits at once with the
+  parent's reason; a dispatch wave in progress is still waited for, up to
+  `:timeout`.
+- The `ReqLLM.Error.API.Request` inside an `Imp.LMError` from
+  `Imp.Clients.ReqLLM` carries at most one response header, `retry-after`,
+  so the caller can wait before retrying (ReqLLM's own decoding dropped it).
+  Any other header ReqLLM left on the error is removed, so cookies, account
+  identifiers and request ids no longer reach logs, checkpoints or run
+  events through `inspect/1` of the error.
   A checkpoint written by 0.5.0 is rewritten at schema version 2 on resume,
   and its `:transient_failure` requests become `:ambiguous`, since 0.5.0
   recorded timeouts and dispatcher crashes that way.
@@ -89,7 +99,8 @@ User-visible changes to Imp are recorded here.
   RFC 4180 CSV with NimbleCSV, a new dependency (`nimble_csv ~> 1.3`). A
   line break may be CRLF, LF or a bare CR (as Excel for Mac writes), and a
   leading byte order mark is dropped; it was read into the first column's
-  name. A malformed file raises `Imp.Datasets.Error` naming the line its
+  name. A blank line is skipped; a record holding only `""` is a row with
+  an empty value. A malformed file raises `Imp.Datasets.Error` naming the line its
   record starts on, with the start of that record (at most 200 characters)
   as `record`. Some files 0.5.0 loaded are now refused:
   - a quote inside an unquoted field, such as an inch mark (`12" pipe,1`):

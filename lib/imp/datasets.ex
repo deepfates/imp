@@ -196,9 +196,10 @@ defmodule Imp.Datasets do
   defp quoted_empty_record?(text), do: Regex.match?(~r/(?:\A|[\r\n])""(?:[\r\n]|\z)/, text)
 
   # The walk runs in a process of its own: a garbage collection in the
-  # caller would copy whatever else the caller holds, and loading a file
-  # from a process holding another dataset took half a minute. Its error is
-  # raised again in the caller.
+  # caller also goes over whatever else the caller holds. From a process
+  # holding a 400,000-row dataset, the walk over a 200,000-row file took
+  # 190 s in that process and 1 s in its own. Its error is raised again in
+  # the caller.
   defp walk_csv(text, path) do
     task =
       Task.async(fn ->
