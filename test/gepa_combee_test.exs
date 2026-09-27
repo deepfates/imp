@@ -493,6 +493,7 @@ defmodule Imp.Optimizer.GEPA.ComBeeTest do
              max_reflection_calls: 5
            } =
              Imp.Optimizer.GEPA.new(metric,
+               execution_profile: :beam_native,
                combee: true,
                max_reflection_calls: 5
              )

@@ -1019,6 +1019,7 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
         metric,
         Keyword.merge(
           [
+            execution_profile: :beam_native,
             seed: seed,
             generations: generations,
             num_threads: max_concurrency,

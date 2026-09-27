@@ -166,6 +166,7 @@ defmodule Imp.BenchmarkTruth.PapillonProgramTest do
 
     {_selected, report} =
       Imp.Optimizer.GEPA.new(fn _example, _prediction -> 0.0 end,
+        execution_profile: :beam_native,
         generations: 2,
         minibatch_size: 1,
         module_selector: :round_robin,

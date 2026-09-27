@@ -566,7 +566,14 @@ defmodule UpstreamExam.TelepromptTest do
   defp compile_multi_component(opts) do
     Imp.Optimizer.GEPA.new(
       component_selection_metric(),
-      Keyword.merge([reflection_lm: selector_reflection_lm(), generations: 2], opts)
+      Keyword.merge(
+        [
+          execution_profile: :beam_native,
+          reflection_lm: selector_reflection_lm(),
+          generations: 2
+        ],
+        opts
+      )
     )
     |> Imp.Optimizer.GEPA.compile(
       MultiComponentProgram.new(),
@@ -613,6 +620,7 @@ defmodule UpstreamExam.TelepromptTest do
       {_compiled, report} =
         Imp.Optimizer.GEPA.new(
           component_selection_metric(),
+          execution_profile: :beam_native,
           reflection_lm: selector_reflection_lm(),
           generations: 2,
           module_selector: selector,
@@ -729,6 +737,7 @@ defmodule UpstreamExam.TelepromptTest do
     result =
       Imp.Optimizer.GEPA.new(
         component_selection_metric(),
+        execution_profile: :beam_native,
         reflection_strategy: custom_proposer,
         module_selector: all_component_selector,
         generations: 2
@@ -777,6 +786,7 @@ defmodule UpstreamExam.TelepromptTest do
 
     result =
       Imp.Optimizer.GEPA.new(metric,
+        execution_profile: :beam_native,
         reflection_strategy: proposer_with_external_lm,
         generations: 2
       )

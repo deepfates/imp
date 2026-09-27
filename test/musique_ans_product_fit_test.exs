@@ -202,6 +202,7 @@ defmodule Imp.BenchmarkTruth.MusiqueAnsProductFitTest do
 
     optimizer =
       Imp.Optimizer.GEPA.new(metric,
+        execution_profile: :beam_native,
         generations: 2,
         module_selector: :round_robin,
         reflection_strategy: proposer

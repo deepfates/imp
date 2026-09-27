@@ -231,6 +231,7 @@ defmodule Mix.Tasks.Imp.Benchmark.OptimizerLift do
   defp compile_gepa(metric, program, {trainset, devset}),
     do:
       Imp.Optimizer.GEPA.new(metric,
+        execution_profile: :beam_native,
         generations: 1,
         # GEPA likewise refuses to synthesize reflection proposals without an
         # explicit reflection LM. Provider-free lane: deterministic static

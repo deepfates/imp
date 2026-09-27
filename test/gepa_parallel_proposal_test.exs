@@ -268,10 +268,13 @@ defmodule Imp.Optimizer.GEPA.ParallelProposalTest do
     metric = fn _example, _prediction -> 1.0 end
 
     assert %Imp.Optimizer.GEPA{proposal_concurrency: :auto} =
-             Imp.Optimizer.GEPA.new(metric, proposal_concurrency: :auto)
+             Imp.Optimizer.GEPA.new(metric,
+               execution_profile: :beam_native,
+               proposal_concurrency: :auto
+             )
 
     assert_raise ArgumentError, ~r/invalid value for :proposal_concurrency option/, fn ->
-      Imp.Optimizer.GEPA.new(metric, proposal_concurrency: 0)
+      Imp.Optimizer.GEPA.new(metric, execution_profile: :beam_native, proposal_concurrency: 0)
     end
 
     legacy =
