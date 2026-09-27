@@ -29,8 +29,7 @@ defmodule Imp.Trajectory do
   arrived, but an overlapping reuse raises `ArgumentError`.
 
   The document is a projection, not a replay and not a durable effect ledger.
-  Streaming paths that bypass `Imp.LM.request/2` do not produce complete model
-  episodes. Redaction runs again on export, including caller metadata; prompts
+  Redaction runs again on export, including caller metadata; prompts
   and results are still private application data.
   """
 

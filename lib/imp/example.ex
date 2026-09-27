@@ -5,11 +5,14 @@ defmodule Imp.Example do
   Examples are plain data with one important Imp convention: call
   `with_inputs/2` to mark which fields a program may see. The remaining fields
   are labels for evaluation, bootstrapping, demonstrations, and optimizers.
+  Until inputs are declared, `inputs/1` and `labels/1` raise, since no field
+  can be told apart from a label.
 
   A key keeps the type it was given: `%{"question" => ...}` is stored under the
   string and `%{question: ...}` under the atom, and no string is turned into an
   atom. Every function that takes a key compares keys by their text, so
-  `get(example, :question)` reads a field stored under `"question"`.
+  `get(example, :question)` reads a field stored under `"question"`, and
+  `new/1` refuses a field given under both spellings.
 
   Internal fields whose names start with `imp_` are omitted from `keys/1`,
   `items/1`, and `values/1`, but `to_map/1` remains lossless for persistence and
@@ -41,7 +44,7 @@ defmodule Imp.Example do
 
   def new(fields) do
     raise ArgumentError,
-          "Imp.Example.new/1 expects a map, field pair list, or Imp.Example; got: #{inspect(fields)}"
+          "Imp.Example.new/1 expects a map, field pair list, or Imp.Example; got: #{Imp.FieldMap.describe(fields)}"
   end
 
   @doc "Reads a field, returning `default` when it is missing."
@@ -85,17 +88,70 @@ defmodule Imp.Example do
   def with_inputs(%__MODULE__{} = example, keys),
     do: %{example | input_keys: keys |> List.wrap() |> Enum.map(&key!/1)}
 
-  @doc "Returns an example containing only the marked input fields."
-  def inputs(%__MODULE__{input_keys: nil} = example), do: example
+  @doc """
+  Returns an example containing only the marked input fields.
 
+  Raises `ArgumentError` when `with_inputs/2` was never called: without a
+  declared split every field, labels included, would reach the program.
+  """
   def inputs(%__MODULE__{} = example),
-    do: %{example | fields: Imp.FieldMap.take(example.fields, example.input_keys)}
+    do: %{example | fields: Imp.FieldMap.take(example.fields, input_keys!(example, "inputs"))}
 
-  @doc "Returns an example containing label fields, excluding marked inputs."
-  def labels(%__MODULE__{input_keys: nil}), do: new(%{})
+  @doc """
+  Returns an example containing label fields, excluding marked inputs.
 
+  Raises `ArgumentError` when `with_inputs/2` was never called, as `inputs/1`
+  does.
+  """
   def labels(%__MODULE__{} = example),
-    do: %{example | fields: Imp.FieldMap.drop(example.fields, example.input_keys)}
+    do: %{example | fields: Imp.FieldMap.drop(example.fields, input_keys!(example, "labels"))}
+
+  @doc false
+  # Raises when a row of `rows` cannot say which of its fields are inputs,
+  # naming `caller` (the public function the user called), the `dataset` and
+  # the row's index. Evaluation and optimizers call it before any model call,
+  # outside the per-row recovery that would otherwise record the error as a
+  # failed, scored row. A plain map or field pair list cannot declare inputs.
+  # Messages list key names only: values can be private data. Any other row,
+  # or a `rows` that is not enumerable, is left to the caller's own checks.
+  def require_inputs!(rows, caller, dataset) do
+    if Enumerable.impl_for(rows) do
+      rows
+      |> Enum.with_index()
+      |> Enum.each(fn {row, index} -> require_row_inputs!(row, caller, dataset, index) end)
+    end
+
+    :ok
+  end
+
+  defp require_row_inputs!(%__MODULE__{input_keys: nil} = example, caller, dataset, index) do
+    raise ArgumentError,
+          "#{caller}: #{dataset} row #{index} does not declare its inputs; call " <>
+            "Imp.with_inputs/2 on it. Its keys: #{inspect(keys(example))}"
+  end
+
+  defp require_row_inputs!(%__MODULE__{}, _caller, _dataset, _index), do: :ok
+
+  defp require_row_inputs!(row, caller, dataset, index)
+       when (is_map(row) and not is_struct(row)) or is_list(row) do
+    raise ArgumentError,
+          "#{caller}: #{dataset} row #{index} is a plain map or field pair list, which " <>
+            "cannot declare its inputs; build it with Imp.example/1 and call " <>
+            "Imp.with_inputs/2 on it. Its keys: #{inspect(row_keys(row))}"
+  end
+
+  defp require_row_inputs!(_row, _caller, _dataset, _index), do: :ok
+
+  defp row_keys(row), do: Imp.FieldMap.key_names(row)
+
+  defp input_keys!(%__MODULE__{input_keys: nil} = example, function) do
+    raise ArgumentError,
+          "Imp.Example.#{function}/1 needs the example's inputs declared; call " <>
+            "Imp.with_inputs/2 (Imp.Example.with_inputs/2) first. Example keys: " <>
+            inspect(keys(example))
+  end
+
+  defp input_keys!(%__MODULE__{input_keys: keys}, _function), do: keys
 
   @doc "Attaches demonstrations to an example."
   def with_demos(%__MODULE__{} = example, demos),
@@ -112,7 +168,7 @@ defmodule Imp.Example do
 
       true ->
         raise ArgumentError,
-              "#{context} expects a demo, field pair list, or list of demos; got: #{inspect(demos)}"
+              "#{context} expects a demo, field pair list, or list of demos; got: #{Imp.FieldMap.describe(demos)}"
     end
   end
 
@@ -121,7 +177,7 @@ defmodule Imp.Example do
 
   defp normalize_demo!(demo, context) do
     raise ArgumentError,
-          "#{context} expects demos as Imp.Example structs, maps, or field pair lists; got: #{inspect(demo)}"
+          "#{context} expects demos as Imp.Example structs, maps, or field pair lists; got: #{Imp.FieldMap.describe(demo)}"
   end
 
   defp key!(key), do: Imp.FieldMap.key!(key, "Imp.Example")

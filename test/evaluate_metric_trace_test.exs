@@ -17,7 +17,10 @@ defmodule EvaluateMetricTraceTest do
     end
   end
 
-  defp devset, do: [Imp.example(question: "Capital of France?", answer: "Paris")]
+  defp devset,
+    do: [
+      Imp.example(question: "Capital of France?", answer: "Paris") |> Imp.with_inputs(:question)
+    ]
 
   test "evaluation passes nil as the trace" do
     result = Imp.evaluate(program(), devset(), recording_metric(self()))

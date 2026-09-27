@@ -168,6 +168,19 @@ defmodule Imp.Optimizer.BootstrapFewShotWithRandomSearch do
     opts = validate_compile_options!(opts)
     trainset = Enum.to_list(trainset)
     valset = materialize_valset(valset, trainset)
+
+    Imp.Example.require_inputs!(
+      trainset,
+      "Imp.Optimizer.BootstrapFewShotWithRandomSearch.compile",
+      "trainset"
+    )
+
+    Imp.Example.require_inputs!(
+      valset,
+      "Imp.Optimizer.BootstrapFewShotWithRandomSearch.compile",
+      "valset"
+    )
+
     teacher = Keyword.get(opts, :teacher)
     restrict = Keyword.get(opts, :restrict)
     labeled_sample = Keyword.get(opts, :labeled_sample, true)

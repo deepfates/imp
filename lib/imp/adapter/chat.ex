@@ -19,9 +19,9 @@ defmodule Imp.Adapter.Chat do
   through `Imp.Adapter.JSON`. Remaining outputs take their declared defaults, so
   the signature says what an unanswered field means. The exception is narrow on
   purpose: the completion must carry no `[[ ## field ## ]]` line anywhere and
-  must not be blank, a completion that carried native tool calls is a map rather
-  than text and never reaches it, and a signature without that metadata parses
-  exactly as before. `Imp.Predict.ReActV2` sets it on its internal step
+  must not be blank, and a signature without that metadata parses exactly as
+  before. The text a model writes beside native tool calls is
+  read the same way. `Imp.Predict.ReActV2` sets it on its internal step
   signature; see that module.
 
   Options to `format/3`: `:demos`, `:response_instruction`, `:guidance`,
@@ -135,6 +135,26 @@ defmodule Imp.Adapter.Chat do
   end
 
   defp do_parse(_signature, %Imp.Prediction{} = prediction), do: {:ok, prediction}
+
+  # A completion that said something and called tools
+  # (`Imp.LM.Result.tool_calls/2`): its text is read as a text completion is,
+  # marker sections or the signature's `:text_field`, and its calls fill
+  # `tool_calls`, as DSPy's `Adapter._call_postprocess` does. A signature that
+  # declares a `text` output reads such a map as fields.
+  defp do_parse(signature, %{text: text, tool_calls: calls} = map)
+       when map_size(map) == 2 and is_binary(text) do
+    if output_field(signature, :text),
+      do: build_prediction(signature, map),
+      else:
+        build_prediction(
+          signature,
+          signature
+          |> parse_fields(text)
+          |> Map.drop(["tool_calls"])
+          |> Map.put(:tool_calls, calls)
+        )
+  end
+
   defp do_parse(signature, map) when is_map(map), do: build_prediction(signature, map)
 
   # The completion is split into `[[ ## field ## ]]`-headed sections and the
@@ -1340,8 +1360,6 @@ defmodule Imp.Adapter.Chat do
   # marker-free completion. Only a completion with no `[[ ## field ## ]]` line
   # anywhere qualifies: a partially marked completion is still a parse failure,
   # so a model that half-followed the format is not silently reinterpreted.
-  # Native tool calls never reach here — a completion that carried them is a
-  # map, not text.
   defp text_field_for(signature, text) do
     with name when not is_nil(name) <-
            Map.get(signature.metadata, :text_field, Map.get(signature.metadata, "text_field")),

@@ -68,11 +68,11 @@
   # defensive fallback paired with the 904 clause
   {"lib/imp/clients/training.ex", :pattern_match_cov, {1537, 8}},
   # defensive error clause on an always-ok internal call
-  {"lib/imp/optimizer/better_together.ex", :pattern_match, {1285, 8}},
+  {"lib/imp/optimizer/better_together.ex", :pattern_match, {1287, 8}},
   # defensive error clause on an always-ok internal call
-  {"lib/imp/optimizer/better_together.ex", :pattern_match, {1288, 8}},
+  {"lib/imp/optimizer/better_together.ex", :pattern_match, {1290, 8}},
   # defensive fallback paired with the clauses above
-  {"lib/imp/optimizer/better_together.ex", :pattern_match_cov, {1300, 8}},
+  {"lib/imp/optimizer/better_together.ex", :pattern_match_cov, {1302, 8}},
   # raise-only helper: every raise_parallel_worker_error/1 clause raises
   # (engine.ex:2469-2530); the catch-all covers these shapes at runtime
   {"lib/imp/optimizer/gepa/engine.ex", :call, {3962, 35}},
@@ -89,7 +89,7 @@
   # :rand seed format ([first | second]) at the seed_s call
   {"lib/imp/optimizer/sampling.ex", :improper_list_constr, {24, 11}},
   # defensive clause for non-covered bucket shapes
-  {"lib/imp/optimizer/simba.ex", :pattern_match_cov, {698, 8}},
+  {"lib/imp/optimizer/simba.ex", :pattern_match_cov, {700, 8}},
   # defensive clause for non-covered trace entries
   {"lib/imp/optimizer/trajectory.ex", :pattern_match_cov, {270, 8}},
   # defensive error clause on an always-ok retriever call
@@ -211,7 +211,7 @@
   # Defensive fallbacks and MapSet opacity retained at the 0.3 cut. These are
   # individually pinned so a changed success type makes the gate ask again.
   {"bench/imp/benchmark_truth/multimodal_runner.ex", :pattern_match_cov, {340, 16}},
-  {"lib/imp/adapter/chat.ex", :pattern_match_cov, {711, 8}},
+  {"lib/imp/adapter/chat.ex", :pattern_match_cov, {731, 8}},
   {"lib/imp/adapter/xml.ex", :pattern_match_cov, {623, 8}},
   {"lib/imp/optimizer/artifact.ex", :call_without_opaque, {745, 52}},
   {"lib/imp/optimizer/artifact.ex", :call_without_opaque, {909, 53}},

@@ -18,6 +18,13 @@ defmodule Imp.Optimizer.InstructionSearch do
     demos = Keyword.get(opts, :demos, [])
     predictor_name = resolve_predictor_name!(program, Keyword.get(opts, :predictor))
     candidate_instructions = unique_candidates(candidates)
+    # Read each dataset once: every candidate is evaluated on the same rows,
+    # which a one-shot stream could give only once.
+    trainset = materialize(trainset)
+    devset = materialize(devset)
+    # Candidate evaluation records any failure as a failed candidate, so an
+    # example without declared inputs is refused here instead.
+    Imp.Example.require_inputs!(devset, "Imp.Optimizer.InstructionSearch.compile", "devset")
 
     {candidate_results, baseline_result} =
       case new_evaluator(devset, metric) do
@@ -94,33 +101,6 @@ defmodule Imp.Optimizer.InstructionSearch do
     error -> {:error, error}
   catch
     kind, reason -> {:error, {kind, reason}}
-  end
-
-  def put_instruction(%Imp.Predict{signature: signature} = program, instruction) do
-    Imp.Predict.with_signature(program, %{signature | instructions: instruction})
-  end
-
-  def put_instruction(%Imp.Predict.ChainOfThought{predict: predict} = program, instruction) do
-    %{program | predict: put_instruction(predict, instruction)}
-  end
-
-  def put_instruction(
-        %Imp.Predict.ProgramOfThought{signature: signature, predict: predict} = program,
-        instruction
-      ) do
-    %{
-      program
-      | signature: %{signature | instructions: instruction},
-        predict: put_instruction(predict, instruction)
-    }
-  end
-
-  def put_instruction(%Imp.Predict.CodeAct{program_of_thought: pot} = program, instruction) do
-    %{program | program_of_thought: put_instruction(pot, instruction)}
-  end
-
-  def put_instruction(%Imp.Predict.RAG{program: inner} = program, instruction) do
-    %{program | program: put_instruction(inner, instruction)}
   end
 
   def put_instruction(%module{} = program, instruction) do
@@ -244,6 +224,8 @@ defmodule Imp.Optimizer.InstructionSearch do
   end
 
   defp unique_candidates(candidates), do: Enum.uniq(candidates)
+
+  defp materialize(rows), do: if(Enumerable.impl_for(rows), do: Enum.to_list(rows), else: rows)
 
   defp put_single_predictor_instruction!(program, instruction) do
     case Imp.ProgramParameters.predictors(program) do

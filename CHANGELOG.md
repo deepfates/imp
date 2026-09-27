@@ -4,8 +4,34 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Changed
+
+- Breaking: `Imp.collect/3` now returns `{:ok, prediction}` or
+  `{:error, reason}`, as `Imp.call/2` does, instead of a string. The string
+  joined the values of every output field with no separator, so
+  `question -> reasoning, answer` collected as `"Because.Paris"`. Code that
+  matched a string reads the field from the prediction instead:
+  `{:ok, prediction} = Imp.collect(program, inputs)`, then
+  `Imp.get(prediction, :answer)`.
+
 ### Fixed
 
+- A call streamed with `Imp.stream(program, inputs, provider_stream: true)`
+  is recorded in its run like any other model call: a `:model_request` event
+  with the request's `:purpose`, and a `:model_response` event with the usage
+  and cost the provider reported. It recorded neither, so a streamed turn left
+  no model record, no cost and no ATIF model step.
+- A model turn that says something and calls tools keeps what it said. Through
+  `Imp.req_llm/2` the text was dropped whenever the reply had tool calls, so a
+  ReActV2 step's `next_thought` was empty; streamed with `provider_stream:
+  true`, the text was kept but the tool calls were lost, all of them when text
+  arrived and all but the last otherwise. Both now return the text and every
+  tool call, and the adapter reads the text as it reads a text reply, into
+  `next_thought` for ReActV2, as DSPy does. So when a ReActV2 run reaches
+  `max_iters` and its last reply has text beside tool calls it did not run,
+  that text is now the answer, where the answer was `nil`; the calls are still
+  listed as unexecuted. The text also appears in history turns and in the ATIF
+  model step.
 - An Avatar tool ends with its caller. Its task kept running after the
   caller was killed, after `Imp.Run.cancel/3` and after the run's owner died;
   it now ends when the caller does. It still runs unlinked, so a crash is an
@@ -77,6 +103,36 @@ User-visible changes to Imp are recorded here.
 - `Imp.Evaluate.Result.save_as_csv/2` writes with the same CSV module that
   `Imp.Datasets.csv/3` reads with, so what it writes reads back unchanged.
   The bytes it writes are the same as before.
+- An instruction an optimizer sets on `Imp.Predict.ProgramOfThought` or
+  `Imp.Predict.CodeAct` reaches the extraction step, which kept the old
+  instructions when GEPA, MIPROv2, COPRO, SIMBA or InferRules set it.
+  `Imp.Optimizer.InstructionSearch` sets instructions the same way.
+- A ProgramOfThought or CodeAct whose instruction an optimizer set saves and
+  loads. `Imp.Saving.load!/1` raised "saved ProgramOfThought planner
+  instructions must match task instructions" for it.
+
+### Examples and datasets
+
+Every change here is breaking for code that relied on the old behaviour.
+
+- `Imp.Example.inputs/1` and `labels/1` raise `ArgumentError` when the example
+  never declared its inputs, as DSPy raises `ValueError`. They returned every
+  field as inputs, labels included, so a program was given the answer and
+  scored on it. `Imp.evaluate/4`, `Imp.Evaluate.run/2`,
+  `Imp.Experiment.Data.new/1` and every optimizer that runs a program on
+  examples check each dataset before any model call, and the error names the
+  function, the dataset and the row. Migration: call `Imp.with_inputs/2` on
+  every example you evaluate or optimize on.
+- `Imp.Evaluate` and `Imp.Experiment.Data` refuse a row that is a plain map or
+  a field pair list, which cannot declare its inputs; Evaluate turned it into
+  an example whose labels reached the program. Migration: build the row with
+  `Imp.example/1 |> Imp.with_inputs(...)`.
+- `Imp.Example.new/1` and `Imp.Prediction.new/2` raise when a field is given
+  twice, as an atom and a string or as a repeated key; one value was silently
+  dropped. Migration: give each field once, under one spelling.
+- `Imp.Signature.new/2` (and `Imp.signature/2`) applies new instructions to an
+  existing signature; it returned the signature unchanged. Migration: to keep
+  a signature's instructions, pass it without instructions.
 
 ### Documentation
 

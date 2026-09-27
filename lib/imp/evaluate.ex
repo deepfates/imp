@@ -186,7 +186,13 @@ defmodule Imp.Evaluate do
   `%Imp.Metrics.Result{}`. An arity-3 metric receives `nil` as its trace here,
   as in DSPy (see `Imp.Metrics`).
   Program and metric failures are recorded as failed rows so optimizers can keep
-  searching and report diagnostics.
+  searching and report diagnostics. A row whose inputs were never declared with
+  `Imp.with_inputs/2` is not a failed row: `run/2` raises `ArgumentError` before
+  calling the program, because every field, labels included, would otherwise
+  reach it. A plain map or field pair list cannot declare inputs, so a devset of
+  them raises the same way. DSPy's `Evaluate` records such a row's error and
+  goes on until `max_errors`; Imp refuses before any row runs, since no row of
+  such a devset can be scored honestly.
 
   The per-row `:timeout` defaults to `:infinity`, matching DSPy's `Evaluate`
   (which imposes no per-example deadline). When a finite `:timeout` kills a row
@@ -270,15 +276,25 @@ defmodule Imp.Evaluate do
     {:error, "expected :infinity or a non-negative integer, got: #{inspect(value)}"}
   end
 
-  def run(%__MODULE__{} = evaluator, program) do
+  def run(%__MODULE__{} = evaluator, program), do: run(evaluator, program, "Imp.Evaluate.run/2")
+
+  @doc false
+  # `caller` names the public function the user called, for the error an
+  # example without declared inputs raises.
+  def run(%__MODULE__{} = evaluator, program, caller) do
     Imp.Telemetry.span(
       [:imp, :evaluate],
       %{num_threads: evaluator.num_threads},
-      fn -> run_traced(evaluator, program) end
+      fn -> run_traced(evaluator, program, caller) end
     )
   end
 
-  defp run_traced(evaluator, program) do
+  defp run_traced(evaluator, program, caller) do
+    # The devset is enumerated once: a lazy stream does its work once, and a
+    # one-shot stream is not found empty on a second pass.
+    evaluator = %{evaluator | devset: Enum.to_list(evaluator.devset)}
+    Imp.Example.require_inputs!(evaluator.devset, caller, "devset")
+
     case run_rows(evaluator, program) do
       {:completed, rows, errors} ->
         rows = Enum.reverse(rows)
@@ -464,19 +480,14 @@ defmodule Imp.Evaluate do
       devset
     else
       raise ArgumentError,
-            "Imp.Evaluate.new/3 expects devset to be an enumerable (Enumerable) of examples, maps, or field pair lists; got: #{inspect(devset)}"
+            "Imp.Evaluate.new/3 expects devset to be an enumerable (Enumerable) of Imp.Example rows with declared inputs; got: #{Imp.FieldMap.describe(devset)}"
     end
   end
 
   defp normalize_example(%Imp.Example{} = example), do: {:ok, example}
 
-  defp normalize_example(example) when is_map(example) or is_list(example) do
-    {:ok, Imp.Example.new(example)}
-  rescue
-    error -> {:error, {:invalid_evaluation_example, error_message(error)}}
-  end
-
-  defp normalize_example(example), do: {:error, {:invalid_evaluation_example, inspect(example)}}
+  defp normalize_example(example),
+    do: {:error, {:invalid_evaluation_example, Imp.FieldMap.describe(example)}}
 
   defp failed_row_data(index, example, failure_score, reason) do
     %{
