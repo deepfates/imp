@@ -41,33 +41,29 @@ defmodule Imp.Streaming.Execution do
     end
   end
 
-  defp stream_generate(context, name, %module{} = lm, messages, opts) do
-    cond do
-      Code.ensure_loaded?(module) and function_exported?(module, :stream, 3) ->
-        module.stream(lm, messages, unrecorded(opts))
-        |> consume_stream(context, name, lm)
+  defp stream_generate(context, name, lm, messages, opts) do
+    module = lm_module(lm)
 
-      true ->
-        Imp.LM.generate(lm, messages, opts)
-    end
-  end
+    if is_atom(module) and Code.ensure_loaded?(module) and function_exported?(module, :stream, 3) do
+      request = Imp.LM.new_request(lm, messages, opts, "Imp.stream/3")
 
-  defp stream_generate(context, name, module, messages, opts) when is_atom(module) do
-    if Code.ensure_loaded?(module) and function_exported?(module, :stream, 3) do
-      module.stream(module, messages, unrecorded(opts))
-      |> consume_stream(context, name, module)
+      lm
+      |> Imp.LM.record(request, fn request ->
+        {messages, opts} = Imp.Core.request_parts(request)
+
+        with {:ok, raw} <-
+               lm |> module.stream(messages, opts) |> consume_stream(context, name, lm) do
+          Imp.Core.response(raw)
+        end
+      end)
+      |> Imp.LM.legacy_result()
     else
-      Imp.LM.generate(module, messages, opts)
+      Imp.LM.generate(lm, messages, opts)
     end
   end
 
-  defp stream_generate(_context, _name, lm, messages, opts),
-    do: Imp.LM.generate(lm, messages, opts)
-
-  # A streamed call goes to the provider without `Imp.LM.generate/3`, which is
-  # where `:purpose` is taken off and recorded, and it emits no request event to
-  # record it on; it is dropped so it is never sent.
-  defp unrecorded(opts), do: Keyword.delete(opts, :purpose)
+  defp lm_module(%module{}), do: module
+  defp lm_module(module), do: module
 
   defp consume_stream(stream, context, name, lm) do
     stream = attach_listeners(stream, context, name)
@@ -93,7 +89,6 @@ defmodule Imp.Streaming.Execution do
         |> materialize_chunks()
         |> envelope(normalize_metadata(lm, metadata))
         |> then(&{:ok, &1})
-        |> record_usage()
 
       {:error, _reason} = error ->
         error
@@ -212,11 +207,6 @@ defmodule Imp.Streaming.Execution do
   end
 
   defp normalize_metadata(_lm, metadata), do: metadata
-
-  defp record_usage({:ok, value} = result) do
-    Imp.Usage.maybe_record(value)
-    result
-  end
 
   defp normalize_name(name), do: to_string(name)
 end

@@ -4,6 +4,11 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+- A call streamed with `Imp.stream(program, inputs, provider_stream: true)`
+  is recorded in its run like any other model call: a `:model_request` event
+  with the request's `:purpose`, and a `:model_response` event with the usage
+  and cost the provider reported. It recorded neither, so a streamed turn left
+  no model record, no cost and no ATIF model step.
 - `Imp.collect/3` returns what `Imp.call/2` returns, `{:ok, %Imp.Prediction{}}`
   or `{:error, reason}`, instead of a string. It joined the values of every
   output field with no separator, so `question -> reasoning, answer` collected
