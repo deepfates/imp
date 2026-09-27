@@ -98,7 +98,7 @@ defmodule PredictJSONFallbackRequestTest do
 
     for line <- [
           "You are an Agent. Use the supplied tools to produce `answer` from `intent`.",
-          "When the final answer is ready, write it in `next_thought` without calling a tool.",
+          "When the final answer is ready, write it in `next_thought`.",
           "The available tools are: `look`."
         ] do
       assert fallback_system.content =~ line

@@ -201,7 +201,7 @@ defmodule Imp.Adapter.XML do
   # ChatAdapter.format_task_description (inherited by XMLAdapter).
   defp task_description(signature, opts) do
     "In adhering to this structure, your objective is: " <>
-      Imp.Adapter.Chat.objective(signature, opts, false)
+      Imp.Adapter.Chat.objective(signature, opts)
   end
 
   # ------------------------------------------------------------------

@@ -20,9 +20,8 @@ defmodule ReActV2StepContractTest do
     def tool_calling_capability(%__MODULE__{}), do: false
   end
 
-  @plain "When the final answer is ready, write it as plain text without calling a tool."
-  @in_field "When the final answer is ready, write it in `next_thought` without calling a tool."
-  @leave_empty "When the final answer is ready, write it in `next_thought` and leave `tool_calls` empty."
+  @in_field "When the final answer is ready, write it in `next_thought`."
+  @leave_empty "When the final answer is ready, write it in `next_thought`, and leave `tool_calls` empty."
 
   defp look, do: Imp.tool(:look, "Look at a thing", fn _ -> %{"seen" => [1]} end)
 
@@ -53,6 +52,7 @@ defmodule ReActV2StepContractTest do
     assert Enum.map(opts[:tools], & &1.function.name) == ["look"]
     refute text(messages) =~ "tool_calls"
     assert hd(messages).content =~ guidance
+    refute hd(messages).content =~ "plain text"
   end
 
   defp assert_text_only({messages, opts}, marker) do
@@ -92,9 +92,9 @@ defmodule ReActV2StepContractTest do
   end
 
   describe "an LM that calls tools natively" do
-    test "Chat: plain text is the answer" do
+    test "Chat: the answer goes in next_thought, and plain text is still read as it" do
       [request] = run(agent(Imp.Adapter.Chat, lm(true, ["done."])))
-      assert_native(request, @plain)
+      assert_native(request, @in_field)
     end
 
     test "JSON: the answer goes in next_thought" do
@@ -112,7 +112,7 @@ defmodule ReActV2StepContractTest do
     test "the JSON fallback of a Chat step" do
       replies = ["[[ ## tool_calls ## ]]\nnot a list", ~s({"next_thought": "done."})]
       [first, fallback] = run(agent(Imp.Adapter.Chat, lm(true, replies)))
-      assert_native(first, @plain)
+      assert_native(first, @in_field)
       assert_native(fallback, @in_field)
     end
 

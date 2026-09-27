@@ -606,7 +606,7 @@ defmodule Imp.Adapter.Chat do
     All interactions will be structured in the following way, with the appropriate values filled in.
 
     #{render_interaction_template(signature)}
-    In adhering to this structure, your objective is: #{objective(signature, opts, true)}
+    In adhering to this structure, your objective is: #{objective(signature, opts)}
     """
     |> String.trim()
   end
@@ -614,11 +614,10 @@ defmodule Imp.Adapter.Chat do
   @doc false
   # The objective: the program's instructions followed by any loop guidance.
   # Shared with the JSON and XML adapters' system messages, so a request in
-  # any format says the same. `plain_text?` is whether the format reads a
-  # reply with no structure as the text answer (this adapter does).
-  def objective(signature, opts, plain_text?) do
+  # any format says the same.
+  def objective(signature, opts) do
     signature.instructions
-    |> with_guidance(Keyword.get(opts, :guidance), signature, plain_text?)
+    |> with_guidance(Keyword.get(opts, :guidance), signature)
     |> Imp.Adapter.Instructions.objective_text()
   end
 
@@ -630,21 +629,21 @@ defmodule Imp.Adapter.Chat do
   # finish tool and the answer is the text the model writes when it stops
   # calling tools, so that line says so instead (`Imp.Predict.ReActV2`).
   #
-  # With no finish tool the answer is text, and where the text goes is read off
-  # the signature the request describes. If it describes a tool-calls output
-  # (`metadata[:tool_calls_field]`), the model writes its calls there, so the
-  # answer goes in the text output with the calls left empty. Otherwise the
-  # tools are native, and the model writes plain text, or, in a format that
-  # cannot be plain text (JSON, XML), puts it in the text output.
-  defp with_guidance(instructions, nil, _signature, _plain_text?), do: instructions
+  # With no finish tool the answer is text, and it goes in the signature's
+  # text output (`metadata[:text_field]`), which every format describes; when
+  # the request also describes a tool-calls output
+  # (`metadata[:tool_calls_field]`), that is left empty. The same sentence in
+  # every format, so it never contradicts the structure the request shows. A
+  # reply that is plain text is still read as the text output by this adapter.
+  defp with_guidance(instructions, nil, _signature), do: instructions
 
-  defp with_guidance(instructions, %{} = guidance, signature, plain_text?) do
+  defp with_guidance(instructions, %{} = guidance, signature) do
     names = fn key -> guidance |> Map.get(key, []) |> Enum.map_join(", ", &"`#{&1}`") end
 
     finish =
       case Map.get(guidance, :submit_tool, :submit) do
         nil ->
-          text_answer(signature, plain_text?)
+          text_answer(signature)
 
         tool ->
           "When the final answer is ready, call `#{tool}` with #{names.(:output_names)}."
@@ -666,17 +665,17 @@ defmodule Imp.Adapter.Chat do
     |> String.trim()
   end
 
-  defp text_answer(signature, plain_text?) do
+  defp text_answer(signature) do
     text = output_field(signature, meta_field(signature, :text_field))
     calls = output_field(signature, meta_field(signature, :tool_calls_field))
 
     cond do
       text && calls ->
-        "When the final answer is ready, write it in `#{text.name}` and leave " <>
+        "When the final answer is ready, write it in `#{text.name}`, and leave " <>
           "`#{calls.name}` empty."
 
-      text && not plain_text? ->
-        "When the final answer is ready, write it in `#{text.name}` without calling a tool."
+      text ->
+        "When the final answer is ready, write it in `#{text.name}`."
 
       true ->
         "When the final answer is ready, write it as plain text without calling a tool."

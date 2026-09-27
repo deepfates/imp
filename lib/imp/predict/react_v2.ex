@@ -8,8 +8,8 @@ defmodule Imp.Predict.ReActV2 do
   ## Which signatures get `submit`
 
   A task signature with exactly one output of type `:string` and no
-  constraints has an answer that the model can write as plain text, so its
-  loop offers no `submit` tool. Every other signature (several outputs, one
+  constraints has an answer that the model can write as text, so its loop
+  offers no `submit` tool. Every other signature (several outputs, one
   output that is not text, or one text output with constraints such as an
   `enum`, whose allowed values reach the model in `submit`'s schema) gets
   the reserved `submit` tool, whose parameters are the signature's outputs,
@@ -128,9 +128,9 @@ defmodule Imp.Predict.ReActV2 do
   text. When the LM cannot (the registry says the model has no tool calling, or
   the LM is `Imp.Clients.TRLLM`), no tools are sent and the step describes
   `tool_calls` for the model to write its calls in. The guidance says where a
-  text answer goes: in `next_thought` with `tool_calls` empty when that field
-  is described, otherwise as plain text (or in `next_thought`, in a format that
-  cannot be plain text). A stored turn that carries a one-text-output task's
+  text answer goes, the same in every format: in `next_thought`, with
+  `tool_calls` left empty when that field is described. A reply in plain text
+  is still read as `next_thought` by `Imp.Adapter.Chat`. A stored turn that carries a one-text-output task's
   answer and no step outputs is replayed as a step that answered in text.
 
   On a recognized context-window refusal, up to eight smaller requests omit
@@ -1406,7 +1406,7 @@ defmodule Imp.Predict.ReActV2 do
 
   # What the adapter needs to say about the loop, as data. `submit_tool` is the
   # tool that ends the turn, so a renderer never has to know its name, and nil
-  # when the signature has no `submit` and the answer is plain text. `outputs`
+  # when the signature has no `submit` and the answer is text. `outputs`
   # are the task's output fields, so each step says what every output means;
   # otherwise their descriptions reach the model only inside `submit`'s schema.
   defp guidance(signature, tools) do
