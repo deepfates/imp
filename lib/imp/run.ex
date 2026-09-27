@@ -112,6 +112,14 @@ defmodule Imp.Run do
       type: :string,
       doc: "The run's id. When absent, a random one is made."
     ],
+    deadline: [
+      type: {:custom, __MODULE__, :validate_deadline, []},
+      doc:
+        "Bounds the run with `Imp.Deadline`: milliseconds counted from the call to " <>
+          "`start/3`, `:infinity`, or `{:deadline, absolute}` in monotonic " <>
+          "milliseconds. It is capped by the caller's own deadline. When absent, " <>
+          "the run inherits the caller's deadline, if any."
+    ],
     max_event_bytes: [
       type: @bound,
       default: 65_536,
@@ -154,6 +162,16 @@ defmodule Imp.Run do
   itself, which runs one item at a time on the run's own place, as it does for
   any run.
 
+  A run inherits the caller's `Imp.Deadline`, and `deadline: 30_000` bounds it
+  further. Requests made through `Imp.Clients.ReqLLM` inside the run are capped
+  to the time left, `Imp.Predict.ReActV2` makes no further request once it has
+  passed, and tasks the run starts carry the same bound; a custom `Imp.LM`
+  decides for itself whether to read it. The deadline does not bound the wait
+  for a place in the pool: `start/3` waits as it does without one, and returns
+  `{:error, :deadline_exceeded}`, having started no work, when the deadline
+  passed while it waited. Nor does it interrupt a tool that is already
+  running; use `cancel/2` for that.
+
   An option this function does not know raises `ArgumentError`, so a
   misspelled `:authorize` cannot start a run whose tool calls nobody is asked
   about.
@@ -169,6 +187,7 @@ defmodule Imp.Run do
     authorize = opts[:authorize]
     authorization_timeout = opts[:authorization_timeout]
     admission = opts[:admission]
+    deadline = Imp.Deadline.resolve(Keyword.get(opts, :deadline, :infinity))
 
     id = Keyword.get_lazy(opts, :id, &new_id/0)
     owner = self()
@@ -189,23 +208,37 @@ defmodule Imp.Run do
              limits:
                Map.new(Keyword.take(opts, [:max_events, :max_event_bytes, :max_snapshot_bytes]))
            ) do
+      gate = make_ref()
+
       body = fn ->
-        with_context(control, fn ->
-          emit(:run_started, component: program.__struct__, input: inputs)
-          result = Imp.Module.execute(program, inputs, execution)
+        if deadline != :infinity, do: Imp.Deadline.bind(deadline)
 
-          case result do
-            {:ok, %Imp.Prediction{} = prediction} -> emit(:run_finished, output: prediction)
-            {:error, {:execution_cancelled, reason}} -> emit(:run_cancelled, error: reason)
-            {:error, reason} -> emit(:run_failed, error: reason)
-            other -> emit(:run_failed, error: {:invalid_result, other})
-          end
+        gate_answer = if deadline == :infinity, do: :go, else: await_gate(gate, owner)
 
-          result
-        end)
+        case gate_answer do
+          :refuse -> {:error, :deadline_exceeded}
+          :go -> run_body(control, program, inputs, execution)
+        end
       end
 
       case start_task(body, admission) do
+        {:ok, task} when deadline != :infinity ->
+          # Admission may have waited for a place in the pool. A run whose
+          # deadline passed meanwhile would fail its first request, so it is
+          # not started at all. The task is told to return rather than being
+          # killed, so its admission lease is released before `start/3`
+          # returns and an immediate retry finds the place free.
+          if Imp.Deadline.expired?(deadline) do
+            send(task.pid, {gate, :refuse})
+            Task.yield(task, :infinity)
+            Control.force_stop(control)
+            {:error, :deadline_exceeded}
+          else
+            :ok = Control.attach_task(control, task.pid)
+            send(task.pid, {gate, :go})
+            {:ok, %__MODULE__{task: task, control: control, id: id}}
+          end
+
         {:ok, task} ->
           :ok = Control.attach_task(control, task.pid)
           {:ok, %__MODULE__{task: task, control: control, id: id}}
@@ -217,12 +250,58 @@ defmodule Imp.Run do
     end
   end
 
+  defp run_body(control, program, inputs, execution) do
+    with_context(control, fn ->
+      emit(:run_started, component: program.__struct__, input: inputs)
+      result = Imp.Module.execute(program, inputs, execution)
+
+      case result do
+        {:ok, %Imp.Prediction{} = prediction} -> emit(:run_finished, output: prediction)
+        {:error, {:execution_cancelled, reason}} -> emit(:run_cancelled, error: reason)
+        {:error, reason} -> emit(:run_failed, error: reason)
+        other -> emit(:run_failed, error: {:invalid_result, other})
+      end
+
+      result
+    end)
+  end
+
   @doc false
   def validate_admission({_pool, limit} = admission) when is_integer(limit) and limit > 0,
     do: {:ok, admission}
 
   def validate_admission(other),
     do: {:error, "expected {pool, limit} with a positive integer limit, got: #{inspect(other)}"}
+
+  # A run with a deadline waits for `start/3` to check it once the run is
+  # admitted, so that a run whose deadline has passed does no work.
+  defp await_gate(gate, owner) do
+    owner_monitor = Process.monitor(owner)
+
+    receive do
+      {^gate, answer} when answer in [:go, :refuse] ->
+        Process.demonitor(owner_monitor, [:flush])
+        answer
+
+      {:DOWN, ^owner_monitor, :process, ^owner, _reason} ->
+        exit(:shutdown)
+    end
+  end
+
+  @doc false
+  def validate_deadline(:infinity), do: {:ok, :infinity}
+
+  def validate_deadline(milliseconds) when is_integer(milliseconds) and milliseconds >= 0,
+    do: {:ok, milliseconds}
+
+  def validate_deadline({:deadline, absolute} = deadline) when is_integer(absolute),
+    do: {:ok, deadline}
+
+  def validate_deadline(other),
+    do:
+      {:error,
+       "expected a non-negative timeout in milliseconds, :infinity or {:deadline, absolute}, " <>
+         "got: #{inspect(other)}"}
 
   defp start_task(body, nil), do: {:ok, Imp.Tasks.async_nolink(body)}
   defp start_task(body, {pool, limit}), do: Imp.Tasks.async_nolink_in_pool(body, pool, limit)

@@ -303,8 +303,11 @@ defmodule Imp do
   forward events to their host mailbox and return promptly.
 
   Pass `admission: {pool, limit}` to count the run in a pool the host names,
-  with its own limit; a full pool returns `{:error, :busy}` at once. See
-  `Imp.Run.start/3`.
+  with its own limit; a full pool returns `{:error, :busy}` at once. Pass
+  `deadline: ms` to bound the run with `Imp.Deadline`; without it the run
+  inherits the caller's deadline. When the deadline passes while the run waits
+  for a place in the pool, it returns `{:error, :deadline_exceeded}` and starts
+  nothing. See `Imp.Run.start/3`.
   """
   defdelegate start_run(program, inputs, opts \\ []), to: Imp.Run, as: :start
 

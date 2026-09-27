@@ -178,15 +178,16 @@ defmodule Imp.Tasks do
   Tasks that carry the caller's Imp context.
 
   `async/1` and `async_nolink/1` start a supervised task that runs with the
-  settings, `Imp.Run` context and telemetry context of the process that
-  started it, so a model call or tool event inside the task belongs to the
-  caller's run, and reads the caller's `Imp.configure/1` and `Imp.context/2`
-  settings. A plain `Task` does not carry them.
+  settings, `Imp.Run` context, telemetry context and `Imp.Deadline` of the
+  process that started it, so a model call or tool event inside the task
+  belongs to the caller's run, reads the caller's `Imp.configure/1` and
+  `Imp.context/2` settings, and has its model requests capped to the caller's
+  deadline. A plain `Task` does not carry them.
 
   Every such task takes a place in one machine-wide pool bounded by the
-  `:async_max_workers` setting, and waits for a place when the pool is full. A
-  host that bounds its own runs passes `admission: {pool, limit}` to
-  `Imp.Run.start/3` instead.
+  `:async_max_workers` setting, and waits for a place when the pool is full.
+  The caller's deadline does not bound that wait. A host that bounds its own
+  runs passes `admission: {pool, limit}` to `Imp.Run.start/3` instead.
   """
   @supervisor Imp.TaskSupervisor
   @unlinked_supervisor Imp.UnlinkedTaskSupervisor
@@ -312,9 +313,10 @@ defmodule Imp.Tasks do
 
   @doc false
   # Lazily runs a function through Imp's bounded, supervised task boundary.
-  # Settings are captured when `async_stream/3` is called. Stream-local fan-out
-  # is capped by the effective `:async_max_workers`; concurrent Imp work waits
-  # for capacity instead of turning contention into a prediction failure. A
+  # Settings and the caller's `Imp.Deadline` are captured when
+  # `async_stream/3` is called, not when the stream is enumerated. Stream-local
+  # fan-out is capped by the effective `:async_max_workers`; concurrent Imp work
+  # waits for capacity instead of turning contention into a prediction failure. A
   # stream synchronously enumerated inside an admitted Imp task reuses that
   # task's slot serially, so nested optimizer fan-out remains bounded without
   # self-deadlocking when the limit is one.
@@ -323,11 +325,8 @@ defmodule Imp.Tasks do
   def async_stream(enumerable, fun, opts) when is_function(fun, 1) do
     enumerable = validate_enumerable!(enumerable)
     opts = Imp.Options.validate!(opts, @async_stream_option_schema, "Imp.Tasks.async_stream/3")
-    snapshot = Imp.Settings.snapshot()
-    telemetry_context = Imp.Telemetry.context()
-    run_context = Imp.Run.context()
-    streaming_context = Imp.Streaming.Execution.context()
-    max_workers = Map.fetch!(snapshot, :async_max_workers)
+    context = capture_context(Imp.Settings.snapshot())
+    max_workers = Map.fetch!(context.snapshot, :async_max_workers)
     borrowed = current_admission()
     enumerator = self()
     stream_max_workers = if borrowed, do: 1, else: max_workers
@@ -340,39 +339,13 @@ defmodule Imp.Tasks do
         {token, lease_owner} ->
           if direct_task_caller?(@supervisor, enumerator) and
                @admission.owned_by?(token, lease_owner) do
-            run_borrowed(
-              snapshot,
-              telemetry_context,
-              run_context,
-              streaming_context,
-              token,
-              lease_owner,
-              fn ->
-                fun.(item)
-              end
-            )
+            run_borrowed(context, token, lease_owner, fn -> fun.(item) end)
           else
-            run_admitted(
-              snapshot,
-              telemetry_context,
-              run_context,
-              streaming_context,
-              max_workers,
-              fn ->
-                fun.(item)
-              end
-            )
+            run_admitted(context, max_workers, fn -> fun.(item) end)
           end
 
         nil ->
-          run_admitted(
-            snapshot,
-            telemetry_context,
-            run_context,
-            streaming_context,
-            max_workers,
-            fn -> fun.(item) end
-          )
+          run_admitted(context, max_workers, fn -> fun.(item) end)
       end
     end
 
@@ -393,9 +366,7 @@ defmodule Imp.Tasks do
   end
 
   defp start_admitted_task(supervisor, link, fun, snapshot, token) do
-    telemetry_context = Imp.Telemetry.context()
-    run_context = Imp.Run.context()
-    streaming_context = Imp.Streaming.Execution.context()
+    context = capture_context(snapshot)
     owner = self()
 
     wrapped = fn ->
@@ -406,15 +377,7 @@ defmodule Imp.Tasks do
           Process.demonitor(owner_monitor, [:flush])
 
           try do
-            with_admission(token, self(), fn ->
-              with_runtime_context(
-                snapshot,
-                telemetry_context,
-                run_context,
-                streaming_context,
-                fun
-              )
-            end)
+            with_admission(token, self(), fn -> with_runtime_context(context, fun) end)
           after
             @admission.release(token)
           end
@@ -443,15 +406,10 @@ defmodule Imp.Tasks do
   # next step. Reuse that lease without transferring or releasing it. This is
   # intentionally narrower than making arbitrary nested async work reentrant.
   defp start_borrowed_task(token, owner, fun) do
-    snapshot = Imp.Settings.snapshot()
-    telemetry_context = Imp.Telemetry.context()
-    run_context = Imp.Run.context()
-    streaming_context = Imp.Streaming.Execution.context()
+    context = capture_context(Imp.Settings.snapshot())
 
     wrapped = fn ->
-      with_admission(token, owner, fn ->
-        with_runtime_context(snapshot, telemetry_context, run_context, streaming_context, fun)
-      end)
+      with_admission(token, owner, fn -> with_runtime_context(context, fun) end)
     end
 
     Task.Supervisor.async_nolink(@unlinked_supervisor, wrapped)
@@ -470,42 +428,45 @@ defmodule Imp.Tasks do
     end
   end
 
-  defp run_admitted(snapshot, telemetry_context, run_context, streaming_context, max_workers, fun) do
+  defp run_admitted(context, max_workers, fun) do
     token = @admission.reserve!(@machine_pool, max_workers)
     :ok = @admission.transfer(token, self())
 
     try do
-      with_admission(token, self(), fn ->
-        with_runtime_context(snapshot, telemetry_context, run_context, streaming_context, fun)
-      end)
+      with_admission(token, self(), fn -> with_runtime_context(context, fun) end)
     after
       @admission.release(token)
     end
   end
 
-  defp run_borrowed(
-         snapshot,
-         telemetry_context,
-         run_context,
-         streaming_context,
-         token,
-         owner,
-         fun
-       ) do
-    with_admission(token, owner, fn ->
-      with_runtime_context(snapshot, telemetry_context, run_context, streaming_context, fun)
-    end)
+  defp run_borrowed(context, token, owner, fun) do
+    with_admission(token, owner, fn -> with_runtime_context(context, fun) end)
   end
 
-  defp with_runtime_context(snapshot, telemetry_context, run_context, streaming_context, fun) do
-    Imp.Telemetry.with_context(telemetry_context, fn ->
-      Imp.Settings.with_snapshot(snapshot, fn ->
+  # What a task carries from the process that starts it.
+  defp capture_context(snapshot) do
+    %{
+      snapshot: snapshot,
+      telemetry: Imp.Telemetry.context(),
+      run: Imp.Run.context(),
+      streaming: Imp.Streaming.Execution.context(),
+      deadline: Imp.Deadline.current()
+    }
+  end
+
+  # Runs in the freshly started worker. A deadline is bound only when the
+  # caller had one, so a worker of an unbounded caller gains no binding.
+  defp with_runtime_context(context, fun) do
+    if context.deadline != :infinity, do: Imp.Deadline.bind(context.deadline)
+
+    Imp.Telemetry.with_context(context.telemetry, fn ->
+      Imp.Settings.with_snapshot(context.snapshot, fn ->
         run = fn ->
-          if is_pid(run_context), do: Imp.Run.with_context(run_context, fun), else: fun.()
+          if is_pid(context.run), do: Imp.Run.with_context(context.run, fun), else: fun.()
         end
 
-        if is_map(streaming_context),
-          do: Imp.Streaming.Execution.with_context(streaming_context, run),
+        if is_map(context.streaming),
+          do: Imp.Streaming.Execution.with_context(context.streaming, run),
           else: run.()
       end)
     end)

@@ -120,8 +120,8 @@ A model call has three layers of time limit:
    times, immediately (`max_retries:` on the client). A model call changes
    nothing outside, so a retry is safe, but it multiplies the worst case.
 3. **The whole call.** `Imp.Deadline.with_deadline/2` bounds everything
-   inside it, retries and multi-step programs included. Every request made
-   inside is cut to the time left:
+   inside it, retries, multi-step programs, `Imp.parallel/3` and runs
+   included. Every request made inside is cut to the time left:
 
 ~~~elixir
 router = Tickets.Router.build(System.fetch_env!("OPENAI_API_KEY"))
@@ -132,7 +132,10 @@ end)
 #=> {:error, %ReqLLM.Error.API.Timeout{kind: :total, ...}}
 ~~~
 
-To stop a call from outside, start it as a run and cancel it. Tool calls are
+`Imp.start_run/3` takes the same bound as `deadline:`. A deadline caps model
+requests and is carried into Imp's workers, but it does not bound the wait for
+a place in Imp's task pool. To stop a call from
+outside, start it as a run and cancel it. Tool calls are
 different from model calls: a tool that times out may already have acted, and
 Imp never retries one (see
 [Runs and supervision](diving-deeper/runs-and-supervision.md)).
