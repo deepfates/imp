@@ -944,8 +944,20 @@ defmodule Imp.ProgramParameters do
   defp update_builtin_predictor(%ChainOfThought{predict: predictor} = program, update),
     do: %{program | predict: update.(predictor)}
 
-  defp update_builtin_predictor(%ProgramOfThought{predict: predictor} = program, update),
-    do: %{program | predict: update.(predictor)}
+  # ProgramOfThought's extraction step reads the outer signature's
+  # instructions, so an instruction set on the inner predictor is carried to
+  # it; otherwise extraction would run with the old text.
+  defp update_builtin_predictor(%ProgramOfThought{predict: predictor} = program, update) do
+    updated = update.(predictor)
+    instructions = updated.signature.instructions
+
+    signature =
+      if instructions == predictor.signature.instructions,
+        do: program.signature,
+        else: %{program.signature | instructions: instructions}
+
+    %{program | predict: updated, signature: signature}
+  end
 
   defp update_builtin_predictor(%CodeAct{program_of_thought: inner} = program, update),
     do: %{program | program_of_thought: update_builtin_predictor(inner, update)}
