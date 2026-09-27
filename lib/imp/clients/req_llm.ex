@@ -390,7 +390,7 @@ defmodule Imp.Clients.ReqLLM do
     %Imp.LMError{
       message: lm_error_message(reason),
       status: status(reason),
-      reason: reason,
+      reason: only_retry_after_header(reason),
       retryable: retryable,
       context_window_exceeded: context_length_exceeded?(reason)
     }
@@ -1363,10 +1363,10 @@ defmodule Imp.Clients.ReqLLM do
   # returns. It is unnecessary once ReqLLM keeps the header on the errors it
   # decodes.
   #
-  # Only `retry-after` is kept, and any other header ReqLLM left on the error
-  # is dropped: the error is inspected into logs, checkpoints and run events,
-  # and a response's headers carry cookies, account identifiers and request
-  # ids.
+  # Only `retry-after` is kept: the error is inspected into logs,
+  # checkpoints and run events, and a response's headers carry cookies,
+  # account identifiers and request ids. `lm_error/2` drops any other header
+  # ReqLLM itself left on an error.
   defp keep_error_headers(opts) do
     http_opts = Keyword.get(opts, :req_http_options, [])
 
@@ -1389,7 +1389,7 @@ defmodule Imp.Clients.ReqLLM do
   def install_error_headers(%Req.Request{} = request) do
     request
     |> Req.Request.prepend_response_steps(imp_keep_retry_after: &__MODULE__.keep_retry_after/1)
-    |> Req.Request.append_error_steps(imp_error_headers: &__MODULE__.only_retry_after/1)
+    |> Req.Request.append_error_steps(imp_retry_after: &__MODULE__.restore_retry_after/1)
   end
 
   @doc false
@@ -1404,15 +1404,29 @@ defmodule Imp.Clients.ReqLLM do
   def keep_retry_after(pair), do: pair
 
   @doc false
-  def only_retry_after({request, %ReqLLM.Error.API.Request{} = error}) do
-    values =
-      Req.Request.get_private(request, :imp_retry_after) || retry_after_values(error.headers)
-
-    headers = if values == [], do: nil, else: %{"retry-after" => values}
-    {request, %{error | headers: headers}}
+  def restore_retry_after({request, %ReqLLM.Error.API.Request{} = error}) do
+    case Req.Request.get_private(request, :imp_retry_after) do
+      nil -> {request, error}
+      values -> {request, %{error | headers: %{"retry-after" => values}}}
+    end
   end
 
-  def only_retry_after(pair), do: pair
+  def restore_retry_after(pair), do: pair
+
+  # Every error this client returns passes here, streaming ones included, so
+  # no response header but `retry-after` reaches a caller whichever path
+  # built the error.
+  defp only_retry_after_header(%ReqLLM.Error.API.Request{} = error) do
+    values = retry_after_values(error.headers)
+
+    %{
+      error
+      | headers: if(values == [], do: nil, else: %{"retry-after" => values}),
+        cause: only_retry_after_header(error.cause)
+    }
+  end
+
+  defp only_retry_after_header(reason), do: reason
 
   defp retry_after_values(headers) when is_map(headers) or is_list(headers) do
     Enum.flat_map(headers, fn

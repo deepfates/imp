@@ -192,6 +192,18 @@ defmodule ReqLLMBatchTest do
     end
   end
 
+  test "an error ReqLLM built with every header keeps only retry-after" do
+    client =
+      ReqLLMClient.new("anthropic:test", req_module: __MODULE__.HeaderedErrorStub)
+
+    assert {:error, %Imp.LMError{reason: reason} = error} =
+             ReqLLMClient.generate(client, [%{role: :user, content: "hi"}], [])
+
+    assert reason.headers == %{"retry-after" => ["1"]}
+    assert reason.cause.headers == %{"retry-after" => ["1"]}
+    refute inspect(error, limit: :infinity) =~ "cookie-secret-value"
+  end
+
   test "an error keeps only retry-after of the response's headers" do
     secret_headers = [
       {"set-cookie", "session=cookie-secret-value"},
@@ -813,6 +825,20 @@ defmodule ReqLLMBatchTest do
              %ReqLLM.Message{role: :assistant, content: [%{text: "Previously: Paris."}]},
              %ReqLLM.Message{role: :user, content: [%{text: "Capital of Peru?"}]}
            ] = transport_messages
+  end
+
+  defmodule HeaderedErrorStub do
+    def generate_text(_model, _messages, _opts) do
+      headers = %{"set-cookie" => ["session=cookie-secret-value"], "retry-after" => ["1"]}
+
+      {:error,
+       %ReqLLM.Error.API.Request{
+         reason: "slow down",
+         status: 429,
+         headers: headers,
+         cause: %ReqLLM.Error.API.Request{reason: "inner", headers: headers}
+       }}
+    end
   end
 
   defmodule FailingStub do
