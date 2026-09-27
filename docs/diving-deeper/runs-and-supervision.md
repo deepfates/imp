@@ -123,8 +123,9 @@ storage.
 
 ### Timeouts and cancellation
 
-A run has no timeout of its own; you decide how long to wait and what to do
-then:
+Unless it runs under an `Imp.Deadline`, from its caller or from `deadline:`
+(below), a run has no timeout of its own; you decide how long to wait and what
+to do then:
 
 ```elixir
 slow =
@@ -146,6 +147,21 @@ Task.yield(run.task, 100)
 `Imp.cancel_run/3` does the same and returns `:ok`. The second argument is
 the reason recorded on `:run_cancelled`; the third bounds how long each
 cancellation may take before Imp gives up on it and kills the task.
+
+`deadline:` gives a run a time budget in milliseconds. A request made through
+`Imp.Clients.ReqLLM` inside the run is cut to the time left, ReActV2 makes no
+further request once it has passed, and the tasks the run starts carry the
+same bound; a custom `Imp.LM` decides for itself whether to read it. A run
+started inside `Imp.Deadline.with_deadline/2` inherits that deadline, and
+`deadline:` can only shorten it. The deadline does not bound the wait for a
+place in the pool: when it passes while `start_run` waits, `start_run` returns
+`{:error, :deadline_exceeded}` and starts nothing. Nor does it interrupt a tool
+that is already running, which is what cancelling is for.
+
+```elixir
+{:ok, run} = Imp.start_run(router, %{ticket: "Deploys hang at 90%."}, deadline: 30_000)
+{:ok, _prediction} = Task.await(run.task, :infinity)
+```
 
 ### Admission pools
 

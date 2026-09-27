@@ -9,15 +9,24 @@ defmodule Imp.Deadline do
 
   The bound is cooperative: only code that reads it is limited by it.
   `Imp.Clients.ReqLLM` caps each request's `:receive_timeout` and
-  `:total_timeout` (retries included) to the time left, and `Imp.Predict.ReActV2` makes no further model request once it has
-  passed. `Imp.Evaluate`'s `:deadline` option and GEPA's coordinator bind a
-  deadline in the workers they start. Nothing else reads it: a running tool,
-  retriever or metric is not interrupted. To stop work at a time you choose,
-  run it in a process you can cancel, such as a run from `Imp.start_run/3`.
+  `:total_timeout` (retries included) to the time left, and
+  `Imp.Predict.ReActV2` makes no further model request once it has passed.
+  Nothing else reads it: a running tool, retriever or metric is not
+  interrupted. To stop work at a time you choose, run it in a process you can
+  cancel, such as a run from `Imp.start_run/3`.
 
-  The binding belongs to the calling process and is not inherited by a
-  process it spawns, so a host that runs a program in another process, such
-  as `Imp.Run`'s task, binds it again inside that process.
+  The binding belongs to the calling process. Work Imp starts in other
+  processes carries it: every `Imp.Tasks` task, and so `Imp.parallel/3`,
+  evaluation rows, optimizer fan-out and `Imp.Run`, runs under the deadline of
+  the process that started it. `Imp.Run.start/3` also takes `deadline:`, and
+  `Imp.Evaluate`'s `:deadline` option and GEPA's coordinator bind their own in
+  the workers they start. Each of these is resolved with `resolve/1`, so it can
+  shorten the inherited deadline but never extend it. The deadline does not
+  bound the wait for a place in Imp's task pool; `Imp.Run.start/3` returns
+  `{:error, :deadline_exceeded}` instead of starting a run whose deadline
+  passed while it waited. A process started with plain `spawn/1` or `Task`
+  carries nothing; call `with_deadline/2` inside it with
+  `{:deadline, current()}` captured in the parent.
   """
 
   @key {__MODULE__, :deadline}

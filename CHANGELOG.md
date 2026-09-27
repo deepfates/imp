@@ -192,6 +192,17 @@ User-visible changes to Imp are recorded here.
   at most `limit` runs hold places in that pool at once, and a full pool
   returns `{:error, :busy}` without waiting. Runs started without it wait for
   the machine-wide pool as before.
+- An `Imp.Deadline` reaches the work Imp starts in other processes. Every
+  `Imp.Tasks` task, and so `Imp.parallel/3`, `Imp.best_of_n/3` attempts and
+  `Imp.Run`, runs under the deadline of the process that started it, so
+  requests made through `Imp.Clients.ReqLLM` inside are cut to the time left.
+  In 0.4.0 only a model call made in the process that bound the deadline was
+  cut; the same call through `Imp.parallel/3` or a run kept its full receive
+  timeout. `Imp.Run.start/3` takes `deadline:` (milliseconds, `:infinity` or
+  `{:deadline, absolute}`), capped by the caller's own, and returns
+  `{:error, :deadline_exceeded}` without starting the run when the deadline
+  passed while it waited for a place in the pool. A deadline does not bound
+  that wait.
 - An `Imp.Run` event sink that raises, throws or exits is no longer ignored.
   The run's owner is sent
   `{:imp_run_event_sink_failed, run_id, %{sequence: _, kind: _, reason: _}}`,
