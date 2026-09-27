@@ -765,6 +765,41 @@ Every change here is breaking for code that matches on the old shape.
   The `load` of `Imp.Datasets.Colors`, which builds examples from records and raises,
   is `load!/1`.
 
+### GEPA
+
+- `Imp.Optimizer.GEPA` is DSPy's GEPA unless told otherwise: with no
+  `:execution_profile` it runs `:gepa_v0_1_4_merge` (merge on, perfect
+  minibatches skipped, no evaluation cache, the pinned RNG and budget), or
+  `:gepa_v0_1_4` with `use_merge: false`. The old default is
+  `execution_profile: :beam_native`, which a run using ComBee, parallel
+  proposals, `:feedback_fn`, `:reflection_strategy`, a module selector other
+  than `:round_robin`, a parent selector other than `:pareto`, or another
+  option the DSPy profile fixes now has to name; without it, those options
+  raise.
+- Under the DSPy profiles, `:max_full_evaluations` is converted to a metric
+  budget as DSPy converts `max_full_evals` (times the training plus validation
+  set sizes) instead of being counted beside it, and giving it together with
+  `:max_metric_calls` raises. `:max_reflection_calls` raises in `new/2` under
+  the default profile, whose reflection limit is derived from the budget.
+- GEPA optimizes agents. For `Imp.react/3` the reflection model reads the
+  whole run of each example as `Context` (every thought, tool call and tool
+  result, and the outputs, except when `finish_on` or the extractor ended the
+  turn) and the
+  loop's tools by name, description and arguments. It used to read only the
+  first step, with an empty history.
+- A predictor called several times in a run is reflected on at one call drawn
+  at random with the optimizer's seed, not always its first call.
+- Under the DSPy profiles, a metric that returns only a score gives the
+  reflection model "This trajectory got a score of X." with the row's score,
+  as DSPy does, instead of `improve` or `successful`.
+- An iteration whose chosen component has no reflection records ends without
+  a reflection call.
+- A program with an `Imp.History` input, or any struct among its inputs, no
+  longer crashes the reflection prompt under `reflection_record_mode:
+  :beam_native`; the history is shown as its turns.
+- A predictor with two `Imp.History` inputs raises when GEPA builds its
+  reflection records, as DSPy's GEPA asserts there is one.
+
 ### Retrieval
 
 - `Imp.Retrieve.Memory` (`Imp.memory/2`) returns only documents that share a

@@ -3568,6 +3568,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
              parent_result,
              components
            ),
+         :ok <- maybe_skip_empty_dataset(reflective_dataset, components, state, opts),
          :ok <-
            notify(opts, :on_reflective_dataset_built, %{
              iteration: iteration,
@@ -4229,6 +4230,17 @@ defmodule Imp.Optimizer.GEPA.Engine do
     else
       :ok
     end
+  end
+
+  # Pinned GEPA reflects only on components that have records: DSPy's adapter
+  # leaves a component with none out of the dataset, and raises when none has
+  # any, and either way the iteration ends before any reflection call.
+  defp maybe_skip_empty_dataset(dataset, components, state, opts) do
+    pinned? = Keyword.get(opts, :execution_profile) in [:gepa_v0_1_4, :gepa_v0_1_4_merge]
+
+    if pinned? and Enum.any?(components, &(Map.get(dataset, &1, []) == [])),
+      do: {:skip, state},
+      else: :ok
   end
 
   defp maybe_skip_incomplete(result, parent, iteration, state, opts) do

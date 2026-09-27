@@ -76,6 +76,17 @@ tree calls, and no cowlib release fixes it yet.
   last connection to it closes, and origins the host configured are left
   alone. A host that runs other ExMCP clients it does not trust with those
   origins should know this.
+- `Imp.Optimizer.GEPA` defaults to DSPy's GEPA, `execution_profile:
+  :gepa_v0_1_4_merge`: merge on, no evaluation cache, perfect minibatches
+  skipped, the pinned RNG, and `:generations` turned into a metric budget when
+  `:max_metric_calls` is not given. Options the DSPy profiles fix (ComBee,
+  `:feedback_fn`, `:module_selector`, `:candidate_selection_strategy`,
+  `:proposal_concurrency`, `:reflection_strategy`, the frontier, sampling,
+  selection, evaluation and acceptance policies, `:max_reflection_calls`, and
+  `reflection_record_mode: :beam_native`) raise unless `execution_profile:
+  :beam_native` is given, which is the 0.4.0 behaviour. Resuming a checkpoint
+  written by a 0.4.0-default run raises under the new default; resume it with
+  `execution_profile: :beam_native`.
 - `Imp.MCP.OAuth.begin/3` no longer takes `:flow`; a pre-registered client is
   `client_registration: {:pre_registered, client_id, client_secret}` with
   `client_issuer:` naming the authorization server it belongs to. A server

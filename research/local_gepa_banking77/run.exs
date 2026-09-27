@@ -132,6 +132,7 @@ defmodule LocalGEPABanking77.Runner do
 
       {selected, report, artifact} =
         GEPA.new(metric(),
+          execution_profile: :beam_native,
           reflection_lm: reflection_lm,
           generations: 1,
           module_selector: :all,

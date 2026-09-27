@@ -328,6 +328,18 @@ out. The current turn's own tool results are never dropped. If the current
 turn and the instructions alone do not fit, the turn ends `:incomplete` with
 `termination_cause: :context_window_exceeded`.
 
+### Optimizing the loop
+
+`Imp.Optimizer.GEPA` optimizes an agent as DSPy's GEPA optimizes a ReActV2:
+it rewrites the step predictor's instruction and leaves the tool descriptions
+as they are. For each example it reflects on one step of the run, drawn with
+the optimizer's seed, and shows the reflection model the run's finished
+history (`metadata.history`): every step's thought, tool calls and results,
+and the outputs, which the history holds unless `finish_on` or the extractor
+ended the turn. It also shows the
+tools the loop offered, by name, description and arguments, and the metric's
+feedback.
+
 ### Coming from DSPy's ReAct and ReActV2
 
 DSPy is replacing its trajectory-based `ReAct` with the structured-history

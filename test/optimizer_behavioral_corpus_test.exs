@@ -158,6 +158,7 @@ defmodule OptimizerBehavioralCorpusTest do
 
     optimizer =
       Imp.Optimizer.GEPA.new(metric(),
+        execution_profile: :beam_native,
         generations: 2,
         reflection_lm: reflection_lm(),
         max_metric_calls: 20,
@@ -184,6 +185,7 @@ defmodule OptimizerBehavioralCorpusTest do
 
     compiled =
       Imp.Optimizer.GEPA.new(metric(),
+        execution_profile: :beam_native,
         generations: 0,
         feedback_fn: fn _trainset -> "Always answer Paris when asked about France." end
       )
@@ -206,6 +208,7 @@ defmodule OptimizerBehavioralCorpusTest do
 
     compiled =
       Imp.Optimizer.GEPA.new(metric(),
+        execution_profile: :beam_native,
         generations: 1,
         reflection_lm: reflection_lm("Recover from malformed candidate outputs."),
         feedback_fn: fn _trainset -> "Recover from malformed candidate outputs." end
@@ -251,6 +254,7 @@ defmodule OptimizerBehavioralCorpusTest do
   test "GEPA reports feedback callback failures and falls back to default feedback" do
     compiled =
       Imp.Optimizer.GEPA.new(metric(),
+        execution_profile: :beam_native,
         generations: 1,
         reflection_lm: reflection_lm(),
         feedback_fn: fn _trainset -> raise "feedback service offline" end
@@ -279,6 +283,7 @@ defmodule OptimizerBehavioralCorpusTest do
 
     compiled =
       Imp.Optimizer.GEPA.new(exploding_metric,
+        execution_profile: :beam_native,
         generations: 1,
         reflection_lm: reflection_lm("Try to improve."),
         feedback_fn: fn _trainset -> "Try to improve." end

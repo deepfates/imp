@@ -37,6 +37,7 @@ defmodule Imp.GEPAParameterArtifactLifecycleTest do
 
     {selected, report, artifact} =
       GEPA.new(metric,
+        execution_profile: :beam_native,
         generations: 1,
         module_selector: :all,
         reflection_strategy: proposer
