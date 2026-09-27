@@ -110,6 +110,7 @@ Example using externally collected measurements:
 
 ```elixir
 Imp.Optimizer.GEPA.new(metric,
+  execution_profile: :beam_native,
   generations: 4,
   timeout: 300_000,
   proposal_timeout: 120_000,
@@ -132,6 +133,7 @@ Runtime profiling example:
 
 ```elixir
 Imp.Optimizer.GEPA.new(metric,
+  execution_profile: :beam_native,
   generations: 5,
   max_metric_calls: 100,
   max_reflection_calls: 40,

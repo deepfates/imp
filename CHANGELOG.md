@@ -772,8 +772,10 @@ Every change here is breaking for code that matches on the old shape.
   minibatches skipped, no evaluation cache, the pinned RNG and budget), or
   `:gepa_v0_1_4` with `use_merge: false`. The old default is
   `execution_profile: :beam_native`, which a run using ComBee, parallel
-  proposals, `:feedback_fn` or another Imp-only option now has to name; without
-  it, those options raise.
+  proposals, `:feedback_fn`, `:reflection_strategy`, a module selector other
+  than `:round_robin`, a parent selector other than `:pareto`, or another
+  option the DSPy profile fixes now has to name; without it, those options
+  raise.
 - GEPA optimizes agents. For `Imp.react/3` the reflection model reads the
   whole run of each example as `Context` (every thought, tool call and tool
   result, and the outputs when the turn answered or called `submit`) and the

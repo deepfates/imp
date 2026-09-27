@@ -36,8 +36,8 @@ defmodule Imp.Optimizer.GEPA do
   These profiles fix every option that DSPy's GEPA does not offer, and giving
   one of those options another value raises. `execution_profile: :beam_native`
   is Imp's own search, where they are available: ComBee, speculative
-  proposals, the other selection, frontier and acceptance policies, and the
-  global `:feedback_fn`. It also caches evaluations, merges only with
+  proposals, the other selection, frontier and acceptance policies, the global
+  `:feedback_fn`, and `:reflection_strategy`. It also caches evaluations, merges only with
   `use_merge: true`, never skips a perfect minibatch, draws from a BEAM RNG, and
   takes `:generations` as its iteration count.
 
