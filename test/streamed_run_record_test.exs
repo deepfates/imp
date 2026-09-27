@@ -113,7 +113,7 @@ defmodule Imp.StreamedRunRecordTest do
       case next(lm) do
         {:raise, error} -> raise error
         {text, []} -> {:ok, text}
-        {text, calls} -> {:ok, %{next_thought: text, tool_calls: calls}}
+        {text, calls} -> {:ok, Imp.LM.Result.tool_calls(calls, text)}
       end
     end
 
@@ -168,18 +168,68 @@ defmodule Imp.StreamedRunRecordTest do
   defp calls(names),
     do: Enum.map(names, &%{id: "call_#{&1}", name: to_string(&1), arguments: %{}})
 
-  defp tool_calls(events),
-    do: events |> Enum.filter(&(&1.kind == :tool_call)) |> Enum.map(& &1.metadata)
+  defp steps(prediction), do: prediction.metadata.history.messages
 
-  # A streamed turn that says something and calls tools runs every call, in
-  # order, and keeps what it said, as the same turn unstreamed does.
-  for names <- [[:atlas], [:atlas, :gazetteer]] do
-    test "a streamed turn with text and #{length(names)} tool call(s) matches the unstreamed turn" do
+  defp tool_calls(events),
+    do:
+      events
+      |> Enum.filter(&(&1.kind == :tool_call))
+      |> Enum.map(&Map.take(&1, [:tool_call_id, :tool_name, :input]))
+
+  # ReqLLM's own client, over a stub transport: a completion that says
+  # something and calls tools, whole or streamed the way ReqLLM streams it.
+  defmodule ToolTurnStub do
+    def generate_text(model, messages, opts) do
+      {text, calls} = next(opts)
+
+      {:ok,
+       %ReqLLM.Response{
+         id: "resp_turn",
+         model: to_string(model),
+         context: ReqLLM.Context.new(messages),
+         message:
+           ReqLLM.Context.assistant(text,
+             tool_calls:
+               Enum.map(calls, &ReqLLM.ToolCall.new(&1.id, &1.name, Jason.encode!(&1.arguments)))
+           )
+       }}
+    end
+
+    def stream_text(model, messages, opts) do
+      {text, calls} = next(opts)
+
+      {:ok,
+       %ReqLLM.StreamResponse{
+         stream:
+           [ReqLLM.StreamChunk.text(text)] ++
+             Enum.map(calls, &ReqLLM.StreamChunk.tool_call(&1.name, &1.arguments, %{id: &1.id})) ++
+             [ReqLLM.StreamChunk.meta(%{finish_reason: "stop"})],
+         metadata_handle: self(),
+         cancel: fn -> :ok end,
+         model: model,
+         context: ReqLLM.Context.new(messages)
+       }}
+    end
+
+    defp next(opts),
+      do: Agent.get_and_update(Keyword.fetch!(opts, :turns), fn [turn | rest] -> {turn, rest} end)
+  end
+
+  defp req_llm(turns) do
+    {:ok, agent} = Agent.start_link(fn -> turns end)
+    Imp.req_llm("openai:gpt-test", req_module: ToolTurnStub, turns: agent, cache: false)
+  end
+
+  # A turn that says something and calls tools runs every call, in order, and
+  # keeps what it said as the step's `next_thought`, streamed or not.
+  for client <- [:scripted, :req_llm], names <- [[:atlas], [:atlas, :gazetteer]] do
+    test "#{client}: a turn with text and #{length(names)} tool call(s) is the same streamed or not" do
       names = unquote(names)
+      turns = [{"Let me look.", calls(names)}, {"Paris", []}]
 
       runs =
         for provider_stream <- [false, true] do
-          lm = ScriptedLM.new([{"Let me look.", calls(names)}, {"Paris", []}])
+          lm = if unquote(client) == :scripted, do: ScriptedLM.new(turns), else: req_llm(turns)
 
           program =
             Imp.react("question -> answer", Enum.map(names, &look/1), lm: lm, max_iters: 3)
@@ -189,18 +239,18 @@ defmodule Imp.StreamedRunRecordTest do
 
       [{{:ok, plain}, plain_events}, {{:ok, streamed}, streamed_events}] = runs
 
-      assert Imp.get(streamed, :answer) == "Paris"
-      assert streamed.fields == plain.fields
-      assert Enum.map(streamed_events, & &1.kind) == Enum.map(plain_events, & &1.kind)
-      assert length(tool_calls(streamed_events)) == length(names)
-      assert tool_calls(streamed_events) == tool_calls(plain_events)
+      assert Imp.get(plain, :answer) == "Paris"
 
-      trajectory = fn prediction ->
-        prediction.metadata |> Map.get(:trajectory, prediction.metadata) |> inspect()
+      for prediction <- [plain, streamed] do
+        assert [%{next_thought: "Let me look."} | _] = steps(prediction)
       end
 
-      assert trajectory.(streamed) =~ "Let me look."
-      assert trajectory.(streamed) == trajectory.(plain)
+      assert streamed.fields == plain.fields
+      assert Enum.map(streamed_events, & &1.kind) == Enum.map(plain_events, & &1.kind)
+      assert Enum.map(tool_calls(plain_events), & &1.tool_name) == Enum.map(names, &to_string/1)
+      assert tool_calls(streamed_events) == tool_calls(plain_events)
+
+      assert steps(streamed) == steps(plain)
     end
   end
 end

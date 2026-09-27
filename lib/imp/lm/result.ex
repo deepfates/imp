@@ -58,6 +58,18 @@ defmodule Imp.LM.Result do
     with {:ok, _output, metadata} <- split(value), do: {:ok, metadata}
   end
 
+  @doc false
+  # The output of a completion that called tools: `%{tool_calls: calls}`, and
+  # `:text` beside them when the model also said something, the shape DSPy's
+  # `BaseLM._process_completion` returns. `Imp.Adapter.Chat` reads the text as
+  # it reads a text completion.
+  @spec tool_calls([term()], term()) :: map()
+  def tool_calls(calls, text) when is_list(calls) do
+    if is_binary(text) and String.trim(text) != "",
+      do: %{text: text, tool_calls: calls},
+      else: %{tool_calls: calls}
+  end
+
   defp validate_output(output, metadata) do
     if is_map(output) and Enum.any?(@reserved_keys, &Map.has_key?(output, &1)) do
       {:error, {:nested_lm_result_envelope, output}}

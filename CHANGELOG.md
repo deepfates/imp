@@ -21,6 +21,13 @@ User-visible changes to Imp are recorded here.
   with the request's `:purpose`, and a `:model_response` event with the usage
   and cost the provider reported. It recorded neither, so a streamed turn left
   no model record, no cost and no ATIF model step.
+- A model turn that says something and calls tools keeps what it said. Through
+  `Imp.req_llm/2` the text was dropped whenever the reply had tool calls, so a
+  ReActV2 step's `next_thought` was empty; streamed with `provider_stream:
+  true`, the text was kept but the tool calls were lost, all of them when text
+  arrived and all but the last otherwise. Both now return the text and every
+  tool call, and the adapter reads the text as it reads a text reply, into
+  `next_thought` for ReActV2, as DSPy does.
 - An Avatar tool ends with its caller. Its task kept running after the
   caller was killed, after `Imp.Run.cancel/3` and after the run's owner died;
   it now ends when the caller does. It still runs unlinked, so a crash is an
