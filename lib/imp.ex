@@ -328,7 +328,8 @@ defmodule Imp do
   defdelegate stream(program, inputs, opts \\ []), to: Imp.Streaming
 
   @doc """
-  Streams one program call and joins the chunks into a string.
+  Streams one program call and returns its prediction, as `call/2` does:
+  `{:ok, %Imp.Prediction{}}` with every output field, or `{:error, reason}`.
 
   If any chunk fails, collection stops and returns `{:error, reason}` rather
   than partial output.

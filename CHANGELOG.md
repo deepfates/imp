@@ -2,6 +2,15 @@
 
 User-visible changes to Imp are recorded here.
 
+## Unreleased
+
+- `Imp.collect/3` returns what `Imp.call/2` returns, `{:ok, %Imp.Prediction{}}`
+  or `{:error, reason}`, instead of a string. It joined the values of every
+  output field with no separator, so `question -> reasoning, answer` collected
+  as `"Because.Paris"`. Code that matched a string now reads the field from
+  the prediction: `{:ok, prediction} = Imp.collect(program, inputs)` then
+  `Imp.get(prediction, :answer)`.
+
 ## 0.5.0 — 2026-09-26
 
 ### Security
