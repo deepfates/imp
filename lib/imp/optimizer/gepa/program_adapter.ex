@@ -247,9 +247,13 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
     }
   end
 
-  defp diagnostic_failure?(%{diagnostic_only: true}), do: true
-  defp diagnostic_failure?(%{"diagnostic_only" => true}), do: true
-  defp diagnostic_failure?(_feedback), do: false
+  @doc false
+  # Whether a side-information entry records a row whose program call or
+  # metric failed. Every other entry is the metric's feedback on the row.
+  @spec diagnostic_failure?(term()) :: boolean()
+  def diagnostic_failure?(%{diagnostic_only: true}), do: true
+  def diagnostic_failure?(%{"diagnostic_only" => true}), do: true
+  def diagnostic_failure?(_feedback), do: false
 
   defp project_objective_scores(trajectories) do
     projected = Enum.map(trajectories, &trajectory_objective_scores/1)
