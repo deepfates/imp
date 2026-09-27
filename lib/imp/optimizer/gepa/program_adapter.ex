@@ -391,9 +391,10 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
                   inspect(Enum.map(several, &elem(&1, 0)))
       end
 
-    if tools == [] or Map.has_key?(fields, "tools"),
-      do: fields,
-      else: Map.put(fields, "tools", text(tools))
+    # A ReActV2 step also has a `tools` input, the same roster as text for an
+    # LM that cannot call tools natively; the native roster shown here takes
+    # its place, so the reflection model reads each tool once.
+    if tools == [], do: fields, else: Map.put(fields, "tools", text(tools))
   end
 
   defp reflection_inputs(inputs, _prediction, _tools), do: text(plain(inputs))
