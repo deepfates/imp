@@ -20,8 +20,12 @@ The run's task lives under Imp's task supervisor and is not linked to you,
 so a crash inside the program comes back as a result instead of taking your
 process down. It is monitored in the other direction: when the process that
 started the run dies, Imp cancels the run's work in flight and ends the
-task. Model calls and tool calls do not outlive the process that asked for
-them, and nothing keeps spending after it has gone.
+task. Model requests and tool calls running in the run's task end with it,
+so Imp's own work stops spending once the process that asked for it has
+gone. What a tool starts outside that task is the tool's to clean up: an OS
+process, an external job, or work it spawned without linking. A tool
+registers how to stop such work with `Imp.Run.register_cancellable/1`, and
+cancelling the run calls it.
 
 ### 2. All of Imp's work shares one bounded pool
 
@@ -101,7 +105,7 @@ lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{team: "atlas"} end)
 router = Imp.predict("ticket -> team: enum[atlas,harbor,beacon,quill]", lm: lm)
 
 {:ok, run} = Imp.start_run(router, %{ticket: "We were charged twice this month."})
-{:ok, prediction} = Task.await(run.task)
+{:ok, prediction} = Task.await(run.task, :infinity)
 events = Imp.Run.events(run)
 :ok = Imp.Run.stop(run)
 
@@ -109,7 +113,9 @@ events = Imp.Run.events(run)
 #=> {"atlas", [:run_started, :model_request, :model_response, :run_finished]}
 ```
 
-`run.task` is an ordinary `Task`. `Imp.Run.events/1` returns what the run
+`run.task` is an ordinary `Task`. `Task.await/1` gives up after five
+seconds, less than many model calls take, so wait with `:infinity` or a limit
+of your own and cancel the run if it runs out. `Imp.Run.events/1` returns what the run
 has kept; `Imp.Run.stop/1` releases the run's control process when you are
 done with it. `Imp.Run.Event.kinds/0` lists every kind, and
 `Imp.Run.Event.to_map/1` turns an event into redacted JSON-safe data for
@@ -157,7 +163,7 @@ slow_router = Imp.predict("ticket -> team", lm: slow)
 Imp.start_run(slow_router, %{ticket: "two"}, admission: {{:tenant, 42}, 1})
 #=> {:error, :busy}
 
-{:ok, _prediction} = Task.await(first.task)
+{:ok, _prediction} = Task.await(first.task, :infinity)
 :ok = Imp.Run.stop(first)
 ```
 
@@ -228,7 +234,7 @@ agent =
     end
   )
 
-{:ok, prediction} = Task.await(run.task)
+{:ok, prediction} = Task.await(run.task, :infinity)
 
 tool_results =
   for event <- Imp.Run.events(run),
@@ -264,7 +270,7 @@ agent =
   )
 
 {:ok, run} = Imp.start_run(agent, %{ticket: "I was charged twice for T-1042."})
-{:ok, _prediction} = Task.await(run.task)
+{:ok, _prediction} = Task.await(run.task, :infinity)
 
 [refund_result | _] =
   for event <- Imp.Run.events(run), event.kind == :tool_result, do: event
@@ -288,7 +294,7 @@ parent = self()
     event_sink: fn event -> send(parent, {:imp_event, event.sequence, event.kind}) end
   )
 
-{:ok, _prediction} = Task.await(run.task)
+{:ok, _prediction} = Task.await(run.task, :infinity)
 :ok = Imp.Run.stop(run)
 
 for _ <- 1..4, do: receive(do: ({:imp_event, sequence, kind} -> {sequence, kind}))
@@ -313,7 +319,7 @@ v1.8 trajectory, a JSON format for agent runs that other tools can read:
 
 ```elixir
 {:ok, run} = Imp.start_run(router, %{ticket: "We were charged twice this month."})
-{:ok, _prediction} = Task.await(run.task)
+{:ok, _prediction} = Task.await(run.task, :infinity)
 
 trajectory =
   Imp.Trajectory.to_atif(Imp.Run.events(run),

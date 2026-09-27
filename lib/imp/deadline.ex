@@ -3,18 +3,21 @@ defmodule Imp.Deadline do
   Process-scoped absolute deadlines for cooperative time budgets.
 
   A deadline is either `:infinity` or an absolute monotonic time in
-  milliseconds. Long-running work (evaluation waves, optimizer rollouts,
-  provider calls) resolves its timeout against the current process deadline
-  with `resolve/1`, so a nested call can never outlive its parent's budget.
+  milliseconds. `with_deadline/2` binds one to the calling process for the
+  duration of a function; a nested `with_deadline/2` can shorten the bound but
+  never extend it.
 
-  A host bounds a piece of work by running it inside `with_deadline/2`. What
-  reads the bound: `Imp.Clients.ReqLLM` caps each request's
-  `:receive_timeout` to the time left, `Imp.Predict.ReActV2` makes no further
-  request once it has passed. `Imp.Evaluate`'s `:deadline` option and GEPA's
-  coordinator bind a deadline in the workers they start. The binding belongs to the calling process
-  and is not inherited by a process it spawns, so a host that runs a program in
-  another process, such as `Imp.Run`'s task, binds it again inside that
-  process.
+  The bound is cooperative: only code that reads it is limited by it.
+  `Imp.Clients.ReqLLM` caps each request's `:receive_timeout` and
+  `:total_timeout` (retries included) to the time left, and `Imp.Predict.ReActV2` makes no further model request once it has
+  passed. `Imp.Evaluate`'s `:deadline` option and GEPA's coordinator bind a
+  deadline in the workers they start. Nothing else reads it: a running tool,
+  retriever or metric is not interrupted. To stop work at a time you choose,
+  run it in a process you can cancel, such as a run from `Imp.start_run/3`.
+
+  The binding belongs to the calling process and is not inherited by a
+  process it spawns, so a host that runs a program in another process, such
+  as `Imp.Run`'s task, binds it again inside that process.
   """
 
   @key {__MODULE__, :deadline}

@@ -119,9 +119,11 @@ A model call has three layers of time limit:
 2. **Retries.** ReqLLM retries a dropped or timed-out connection up to three
    times, immediately (`max_retries:` on the client). A model call changes
    nothing outside, so a retry is safe, but it multiplies the worst case.
-3. **The whole call.** `Imp.Deadline.with_deadline/2` bounds everything
-   inside it, retries and multi-step programs included. Every request made
-   inside is cut to the time left:
+3. **The whole call.** Inside `Imp.Deadline.with_deadline/2`, every model
+   request is cut to the time left, retries included, and a ReAct agent makes
+   no further model request once the time is up. It does not interrupt a tool
+   that is running; to stop a whole call at a time you choose, tools
+   included, start it as a run and cancel it:
 
 ~~~elixir
 router = Tickets.Router.build(System.fetch_env!("OPENAI_API_KEY"))
@@ -132,7 +134,7 @@ end)
 #=> {:error, %ReqLLM.Error.API.Timeout{kind: :total, ...}}
 ~~~
 
-To stop a call from outside, start it as a run and cancel it. Tool calls are
+Tool calls are
 different from model calls: a tool that times out may already have acted, and
 Imp never retries one (see
 [Runs and supervision](diving-deeper/runs-and-supervision.md)).

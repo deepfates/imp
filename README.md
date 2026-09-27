@@ -14,11 +14,11 @@ optimizer improve it against examples of what good looks like. You get
 signatures, modules, optimizers, agent loops and retrieval, running with the
 reliability and concurrency of OTP.
 
-That pairing is the point. DSPy makes each call to a model a declared,
-typed, improvable function. The BEAM makes each agent what it already is: a
-process with its own state, a mailbox, and a supervisor. Put together, you
-can build anything from one typed call to a crowd of long-running agents,
-and make every part of it better by measuring it.
+DSPy makes each call to a model a declared, typed function that you can
+measure and improve. On the BEAM, an agent is a process: it keeps its own
+state, receives messages, and runs under a supervisor alongside thousands
+of others. With both, you can build anything from one typed call
+to many long-running agents, and improve each part by measuring it.
 
 ## Declare a task
 
@@ -46,12 +46,16 @@ same task reason first, use `Imp.chain_of_thought/2`; to give it tools, use
 ## Measure it and improve it
 
 Give Imp labeled examples and a metric, and it scores the program and
-optimizes it. Here `trainset` and `devset` are lists of issues you have
-already labeled (`Imp.example/1`, then `Imp.with_inputs/2` to mark the
-`issue` as the input), and `strong_lm` is a more
-capable model that GEPA uses to reflect on failures:
+optimizes it. You need two lists of issues you have already labeled:
+`trainset`, which the optimizer learns from, and `devset`, which it is scored
+on. `strong_lm` is a more capable model that GEPA uses to read failures and
+write new instructions.
 
 ```elixir
+# trainset and devset are lists of labeled issues like this one:
+Imp.example(%{issue: "Please add a dark mode to the dashboard", kind: "feature"})
+|> Imp.with_inputs([:issue])
+
 metric = Imp.exact_match(:kind)
 
 Imp.evaluate(triage, devset, metric).score
@@ -64,15 +68,18 @@ Imp.evaluate(improved, devset, metric).score
 
 GEPA runs the program, reads where it failed, and rewrites its instructions.
 Other optimizers choose worked examples (LabeledFewShot, BootstrapFewShot),
-search combinations of both (MIPROv2, SIMBA), or train the model's weights
-(fine-tuning, GRPO). The result is a new program whose instructions and
-examples you can read, save as JSON, and commit like code.
+search over combinations of instructions and examples (MIPROv2), learn rules
+and examples from the program's own better and worse attempts (SIMBA), or
+train the model's weights (fine-tuning, GRPO). The result is a new program
+whose instructions and examples you can read, save as JSON, and review as a
+diff.
 
 ## Build agents
 
 A tool is an Elixir function. `Imp.react/3` builds an agent that calls tools
-until it can answer. This one can read web pages, using Req, which comes with
-Imp:
+until it can answer. This one reads web pages with Req. Imp depends on Req;
+if your own code calls it, as this tool does, add `{:req, "~> 0.6"}` to your
+dependencies:
 
 ```elixir
 fetch =
@@ -83,12 +90,12 @@ fetch =
 researcher = Imp.react("question -> answer", [fetch], lm: lm)
 
 question =
-  "What version does https://raw.githubusercontent.com/elixir-lang/elixir/main/VERSION say? " <>
+  "What version does https://raw.githubusercontent.com/elixir-lang/elixir/v1.18.0/VERSION say? " <>
     "Reply with just the version."
 
 {:ok, prediction} = Imp.call(researcher, %{question: question})
 Imp.get(prediction, :answer)
-#=> "1.21.0-dev"
+#=> "1.18.0"
 ```
 
 ## Run agents as processes
@@ -109,29 +116,29 @@ which tool calls it may make:
     end
   )
 
-{:ok, prediction} = Task.await(run.task)
+{:ok, prediction} = Task.await(run.task, :infinity)
 
 for event <- Imp.Run.events(run), do: event.kind
 #=> [:run_started, :tools_sent, :model_request, :model_response, :tool_call,
 #    :tool_result, :model_request, :model_response, :run_finished]
 ~~~
 
-Around that, Imp gives agents what they need to run for a long time:
+Imp also includes:
 
 - **MCP:** import the tools of any MCP server you approve, and they work like
   your own.
-- **ACP:** serve any Imp program as an agent to Zed, JetBrains and other ACP
-  clients.
-- **OTP:** every call is supervised and bounded, and a run ends when the
-  process that started it does. A tool call that may already have taken
-  effect is reported as unknown, never silently retried.
+- **ACP:** serve any Imp program as an agent to Zed and other ACP clients.
+- **OTP:** a run is a process you can watch, stop and limit, and a run ends
+  when the process that started it does. Model requests are cut to a
+  deadline you set. A tool call that may already have taken effect is
+  reported as unknown, never silently retried.
 - **More shapes:** RLM for inputs far larger than a context window, CodeAct
   and program of thought for tasks that need code, and your own modules
   composed from these.
 
-The optimizers work on agents too. GEPA and Optimize Anything read whole
-runs and rewrite what steers an agent: its instructions, its tool
-descriptions, or any text or JSON it depends on.
+The optimizers work on agents too. GEPA reflects on whole agent runs and
+rewrites the instructions that steer them. Optimize Anything rewrites any
+text or JSON you can score, such as an agent's tool descriptions.
 
 ## Install
 
@@ -139,14 +146,14 @@ descriptions, or any text or JSON it depends on.
 {:imp, "~> 0.5"}
 ```
 
-Imp needs Elixir 1.19 and a C++ compiler for one dependency (erlexec). It
-reaches models through [ReqLLM](https://hex.pm/packages/req_llm), so any
-provider ReqLLM supports works.
+Imp needs Elixir 1.19 or later and a C++ compiler for one dependency
+(erlexec). It reaches models through
+[ReqLLM](https://hex.pm/packages/req_llm), so any provider ReqLLM supports
+works.
 
-Imp is young. 0.5 is its first Hex release, and its optimizers still need
-large-scale benchmarking; the core API is stable, and the parts marked
-experimental may change before 1.0. Bug reports and pull requests are very
-welcome.
+Imp 0.5 is experimental and is its first release on Hex. Its API may still
+change, and its optimizers need large-scale benchmarking. Bug reports and
+pull requests are welcome.
 
 ## Learn
 
