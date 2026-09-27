@@ -26,23 +26,44 @@ User-visible changes to Imp are recorded here.
   one item at a time.
 - `Imp.Clients.ReqLLMBatch` no longer sends a request again when it may
   already have run. A dispatch that timed out, crashed, threw or exited was
-  retried as transient, so one request could run and be billed several times;
-  it is now `:ambiguous` and final, as an uncommitted dispatch already was on
-  resume. `req_llm_dispatcher/2` retries only a request that never reached
-  the provider (connection refused, no pooled connection) or that the
-  provider answered with a try-later status; a timeout or closed connection
-  with no response is `:ambiguous`, and any other status is terminal. A
-  dispatcher may return `{:ambiguous, reason}` itself.
+  retried as transient, so one request could run and be billed several
+  times; it is now `:ambiguous` and final, as an uncommitted dispatch already
+  was on resume. A dispatcher may return `{:ambiguous, reason}` itself.
+  `req_llm_dispatcher/2`:
+  - makes every call with `max_retries: 0`. ReqLLM's own retry step resent a
+    timed-out or refused request up to three more times inside one batch
+    attempt, so a single attempt could send a request four times.
+  - retries only a request that never reached the provider (connection
+    refused, or no pooled connection free, as Req reports it) or that the
+    provider answered with 408, 425, 429 or 529.
+  - treats any other 4xx as terminal.
+  - treats a 5xx other than 529 (500 included), and a timeout or closed
+    connection with no response, as `:ambiguous`. A 5xx was retried.
+  A checkpoint written by 0.5.0 is rewritten at schema version 2 on resume,
+  and its `:transient_failure` requests become `:ambiguous`, since 0.5.0
+  recorded timeouts and dispatcher crashes that way.
+- An MCP call the server answers with HTTP 529 is `:refused`, like a 429,
+  where it was `:unknown`. MCP and language-model calls read a status the
+  same way.
 - `Imp.Datasets.csv/3` reads quoted fields. It raised `FunctionClauseError`
   on any quoted field and could not read a quoted line break. It now parses
-  RFC 4180 CSV with NimbleCSV, a new dependency (`nimble_csv ~> 1.3`), and a
-  malformed file raises `Imp.Datasets.Error` naming the line its record
-  starts on.
-- `Imp.Evaluate.Result.save_as_csv/2` writes through NimbleCSV too, so what
-  it writes `Imp.Datasets.csv/3` reads back unchanged. The output is the same
-  as before (CRLF line endings, a field quoted when it holds a comma, a quote
-  or a line feed) except that a field holding a carriage return with no line
-  feed is no longer quoted.
+  RFC 4180 CSV with NimbleCSV, a new dependency (`nimble_csv ~> 1.3`). A
+  line break may be CRLF, LF or a bare CR (as Excel for Mac writes), and a
+  leading byte order mark is dropped; it was read into the first column's
+  name. A malformed file raises `Imp.Datasets.Error` naming the line its
+  record starts on, with the start of that record (at most 200 characters)
+  as `record`. Some files 0.5.0 loaded are now refused:
+  - a quote inside an unquoted field, such as an inch mark (`12" pipe,1`):
+    `invalid CSV at <path>:<line>: a quote opened on this line is never
+    closed`, or, when the line holds two (`12" by 3" board,1`),
+    `invalid CSV at <path>:<line>: unexpected escape character " in "..."`.
+  - a space between a comma and a quoted field (`x, "y"`):
+    `invalid CSV at <path>:<line>: unexpected escape character " in "..."`.
+  Quote the whole field and double the quotes inside it (`"12"" pipe",1`),
+  or remove the space.
+- `Imp.Evaluate.Result.save_as_csv/2` writes with the same CSV module that
+  `Imp.Datasets.csv/3` reads with, so what it writes reads back unchanged.
+  The bytes it writes are the same as before.
 
 ### Documentation
 
