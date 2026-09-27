@@ -131,8 +131,8 @@ defmodule Imp.Optimizer.GEPA.InstructionProposal do
   defp maybe_trim_upstream_template(prompt, :gepa_v0_1_4), do: String.trim_trailing(prompt, "\n")
   defp maybe_trim_upstream_template(prompt, _mode), do: prompt
 
-  # A struct renders as the data it holds: a history as its turns, a date as
-  # its ISO 8601 text, anything else as its fields.
+  # A struct is not a map of headings: a history renders as its turns, a date
+  # as its ISO 8601 text, anything else as its complete inspected term.
   defp render_value(%Imp.History{messages: messages}, level, _order),
     do: render_value(messages, level, [])
 
@@ -140,8 +140,8 @@ defmodule Imp.Optimizer.GEPA.InstructionProposal do
        when module in [Date, Time, DateTime, NaiveDateTime],
        do: to_string(value) <> "\n\n"
 
-  defp render_value(%_{} = value, level, order),
-    do: render_value(value |> Map.from_struct() |> Map.delete(:__exception__), level, order)
+  defp render_value(%_{} = value, _level, _order),
+    do: String.trim(inspect(value, limit: :infinity, printable_limit: :infinity)) <> "\n\n"
 
   defp render_value(value, level, order) when is_map(value) do
     if map_size(value) == 0 do

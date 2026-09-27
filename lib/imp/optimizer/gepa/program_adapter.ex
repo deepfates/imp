@@ -3,6 +3,7 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
 
   @behaviour Imp.Optimizer.GEPA.Adapter
 
+  alias Imp.Adapter.Types.{ToolCall, ToolCallResults, ToolCalls, ToolResult}
   alias Imp.Optimizer.GEPA.{Candidate, ComponentFeedback, Random, Result}
   alias Imp.Optimizer.TrajectoryRunner
 
@@ -373,8 +374,17 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
 
     fields =
       case histories do
-        [] -> fields
-        [{_key, history} | _rest] -> Map.put(fields, "Context", context(history, prediction))
+        [] ->
+          fields
+
+        [{_key, history}] ->
+          Map.put(fields, "Context", context(history, prediction))
+
+        several ->
+          raise ArgumentError,
+                "GEPA reflection shows one history input as Context, as DSPy's GEPA " <>
+                  "does; the predictor was given #{length(several)}: " <>
+                  inspect(Enum.map(several, &elem(&1, 0)))
       end
 
     if tools == [] or Map.has_key?(fields, "tools"),
@@ -481,20 +491,21 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
 
   defp stringify_fields(value), do: text(plain(value))
 
-  # Structs as the data they hold, so a value renders as JSON rather than as
-  # an Elixir term: a history as its turns, tool calls as the list of them, any
-  # other struct as its fields.
+  # Imp's own values as the data they hold, so they render as JSON rather than
+  # as Elixir terms: a history as its turns, tool calls and results as their
+  # fields, and times as ISO 8601. Any other struct is left to
+  # `Imp.Adapter.Chat.format_value/1`.
   defp plain(%Imp.History{messages: messages}), do: plain(messages)
-  defp plain(%Imp.Adapter.Types.ToolCalls{tool_calls: calls}), do: plain(calls)
+  defp plain(%ToolCalls{tool_calls: calls}), do: plain(calls)
+  defp plain(%ToolCallResults{tool_call_results: results}), do: plain(results)
 
-  defp plain(%Date{} = date), do: Date.to_iso8601(date)
-  defp plain(%Time{} = time), do: Time.to_iso8601(time)
+  defp plain(%module{} = value) when module in [ToolCall, ToolResult],
+    do: value |> Map.from_struct() |> plain()
 
-  defp plain(%module{} = value)
-       when module in [DateTime, NaiveDateTime, Jason.OrderedObject, Imp.Adapter.Types.Code],
-       do: value
+  defp plain(%module{} = value) when module in [Date, Time, NaiveDateTime, DateTime],
+    do: module.to_iso8601(value)
 
-  defp plain(%_{} = struct), do: struct |> Map.from_struct() |> plain()
+  defp plain(%_{} = struct), do: struct
   defp plain(map) when is_map(map), do: Map.new(map, fn {key, value} -> {key, plain(value)} end)
   defp plain(list) when is_list(list), do: Enum.map(list, &plain/1)
   defp plain(value), do: value

@@ -335,7 +335,8 @@ it rewrites the step predictor's instruction and leaves the tool descriptions
 as they are. For each example it reflects on one step of the run, drawn with
 the optimizer's seed, and shows the reflection model the run's finished
 history (`metadata.history`): every step's thought, tool calls and results,
-and the outputs when the model answered or called `submit`. It also shows the
+and the outputs, which the history holds unless `finish_on` or the extractor
+ended the turn. It also shows the
 tools the loop offered, by name, description and arguments, and the metric's
 feedback.
 

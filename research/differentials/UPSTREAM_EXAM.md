@@ -1053,22 +1053,22 @@ content chunk, matching DSPy. A false marker prefix is still flushed unchanged.
 |---|---|---|
 | test_gepa_adapter_disables_logging_on_minibatch_eval | n/a | callback_metadata/logging plumbing on the DspyAdapter internals. |
 | test_basic_workflow | pass (adapted) | Upstream replays byte-exact prompt fixtures (gepa_dummy_lm.json). Imp now ports standalone GEPA v0.1.4's readable reflective-example prompt and plain/markdown-fenced instruction extraction, while retaining typed-map and JSON-text adapter responses. The consumer test requires the extracted replacement itself to improve validation, be selected, and be installed; byte-exact 2,000-character fixture equality remains outside this adapted row. |
-| test_workflow_with_custom_instruction_proposer_and_component_selector | pass (adapted) | Custom `:reflection_strategy` (instruction_proposer) + custom arity-5 `:module_selector` (component_selector) compile end to end; the proposer receives every selected component. Adapted: upstream replays dspy.Image fixtures and asserts the fixture instructions; Imp has no image example type, so the port asserts the boundary. |
+| test_workflow_with_custom_instruction_proposer_and_component_selector | pass (adapted: `execution_profile: :beam_native` only) | Custom `:reflection_strategy` (instruction_proposer) + custom arity-5 `:module_selector` (component_selector) compile end to end; the proposer receives every selected component. Adapted: upstream replays dspy.Image fixtures and asserts the fixture instructions; Imp has no image example type, so the port asserts the boundary. |
 | test_metric_requires_feedback_signature | n/a | TypeError from Python arity introspection of the metric; Imp metrics are arity-2/3 functions returning score/feedback data — the 5-arg feedback signature does not exist. |
 | test_gepa_compile_with_track_usage_no_tuple_error | n/a | litellm track_usage regression ("'tuple' object has no attribute 'set_lm_usage'"); no usage-tracking tuples in Imp. |
-| test_component_selector_functionality | pass | Custom arity-5 `:module_selector` function is invoked with the full candidate (both components) and may return single or multiple components. |
+| test_component_selector_functionality | pass (adapted: `execution_profile: :beam_native` only) | Custom arity-5 `:module_selector` function is invoked with the full candidate (both components) and may return single or multiple components. |
 | test_component_selector_default_behavior | pass | No selector option → `:round_robin` default on the struct; compile completes. |
 | test_component_selector_string_round_robin | pass | Upstream string "round_robin" is the `:round_robin` atom in Imp. |
-| test_component_selector_string_all | pass (adapted) | `:all` updates every component in the first accepted candidate; `:round_robin` exactly one. Adapted: candidate parameters read from the Report's candidates (Imp's `detailed_results.candidates` equivalent), acceptance via `:equal_or_better` since the port's metric is constant. |
-| test_component_selector_custom_random | pass | Random-half custom function selector compiles. |
-| test_alternating_half_component_selector | pass | Upstream `state.i` is `state.iteration` on Imp's `Engine.State`; even iterations select the first half, odd the second, verified over multiple selections. |
+| test_component_selector_string_all | pass (adapted: `execution_profile: :beam_native` only) | `:all` updates every component in the first accepted candidate; `:round_robin` exactly one. Adapted: candidate parameters read from the Report's candidates (Imp's `detailed_results.candidates` equivalent), acceptance via `:equal_or_better` since the port's metric is constant. |
+| test_component_selector_custom_random | pass (adapted: `execution_profile: :beam_native` only) | Random-half custom function selector compiles. |
+| test_alternating_half_component_selector | pass (adapted: `execution_profile: :beam_native` only) | Upstream `state.i` is `state.iteration` on Imp's `Engine.State`; even iterations select the first half, odd the second, verified over multiple selections. |
 
 ## tests/teleprompt/test_gepa_instruction_proposer.py (4)
 
 | Upstream test | Status | Note |
 |---|---|---|
 | test_reflection_lm_gets_structured_images | n/a | Tests DSPy's MultiModalInstructionProposer emitting structured image_url messages for dspy.Image inputs; Imp has no image example type, so there is no multimodal reflection path to assert. The pluggable proposer surface itself is covered by the ported rows below. |
-| test_custom_proposer_without_reflection_lm | pass | `:reflection_strategy` (the instruction_proposer equivalent) manages its own external reflection source; GEPA compiles with `reflection_lm` unset and the external source is called. |
+| test_custom_proposer_without_reflection_lm | pass (adapted: `execution_profile: :beam_native` only) | `:reflection_strategy` (the instruction_proposer equivalent) manages its own external reflection source; GEPA compiles with `reflection_lm` unset and the external source is called. |
 | test_image_serialization_into_strings | n/a | Asserts DSPy's CUSTOM-TYPE-START-IDENTIFIER text-serialization of dspy.Image objects — DSPy's own serialization format for a type Imp does not have. |
 | test_default_proposer (parametrized reasoning=True/False) | pass (adapted) | Without a custom proposer the default reflection path calls the configured reflection LM and no reflection/proposal error is recorded (upstream: "Exception during reflection/proposal" absent from logs). Adapted: no dspy.Image inputs, and the reasoning parametrization is DummyLM-specific. |
 

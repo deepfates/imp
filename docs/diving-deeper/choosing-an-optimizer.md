@@ -83,8 +83,8 @@ own model.
 Every optimizer reads a score per example. GEPA also reads the `feedback`
 a metric can return and hands it to the reflection model, so it knows *why*
 an answer was wrong, not only that it was. With a metric that only scores,
-the reflection model reads only "This trajectory got a score of 0.0.", as in
-DSPy: GEPA still works, but it loses what it is best at, and MIPROv2 or COPRO
+the reflection model reads only "This trajectory got a score of 0.0." (with
+the example's score in place of 0.0), as in DSPy: GEPA still works, but it loses what it is best at, and MIPROv2 or COPRO
 may do as well for the same spend.
 
 ### 6. Weights are trained with `Imp.train/4`, not `Imp.optimize/3`
@@ -205,7 +205,9 @@ that explains its scores.
 
 By default GEPA is DSPy's `dspy.GEPA`, merge included; `use_merge: false`
 turns merge off, and `execution_profile: :beam_native` selects Imp's own
-extensions (ComBee, parallel proposals, other selection policies). It works on
+search, which is where ComBee, parallel proposals, and the DSPy options the
+pinned profile does not support yet (`module_selector: :all`,
+`candidate_selection_strategy: :current_best`, a custom proposer) run. It works on
 agents: for `Imp.react/3` it rewrites the step instruction, and the reflection
 model reads the whole run of each example (every thought, tool call and tool
 result, and the answer) together with the tools' names and descriptions. Tool

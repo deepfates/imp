@@ -28,18 +28,31 @@ defmodule Imp.Optimizer.GEPA do
   the source artifact. Like pinned GEPA, `max_metric_calls` is checked between
   iterations: an iteration that legally starts is allowed to finish. Separate
   internal metric/reflection envelopes bound that legal overshoot; they are not
-  alternate stopping rules. A finite `:max_metric_calls` is the authoritative
-  semantic budget; when it is `:infinity`, `:generations` derives the budget
-  instead. The merge profile uses the source-authenticated common-ancestor
-  merge path of DSPy's ordinary GEPA treatment.
+  alternate stopping rules. The budget is `:max_metric_calls`, or
+  `:max_full_evaluations` converted as DSPy converts `max_full_evals`, to
+  that many evaluations of the training and validation sets together; giving
+  both raises. With neither, `:generations` derives the budget. The reflection
+  call limit is derived from the budget too: `:max_reflection_calls` raises
+  under the default, and under an explicit pinned profile it may only restate
+  the derived limit. The merge profile uses the source-authenticated
+  common-ancestor merge path of DSPy's ordinary GEPA treatment.
 
-  These profiles fix every option that DSPy's GEPA does not offer, and giving
-  one of those options another value raises. `execution_profile: :beam_native`
-  is Imp's own search, where they are available: ComBee, speculative
-  proposals, the other selection, frontier and acceptance policies, the global
-  `:feedback_fn`, and `:reflection_strategy`. It also caches evaluations, merges only with
-  `use_merge: true`, never skips a perfect minibatch, draws from a BEAM RNG, and
-  takes `:generations` as its iteration count.
+  Under these profiles the reflection record mode, parent and component
+  selection, minibatch sampling, proposal selection, frontier, evaluation and
+  acceptance policies, ComBee and proposal concurrency are fixed at DSPy's
+  values, and giving one of them another value raises, as do `:feedback_fn`
+  and `:reflection_strategy`. Some of these (`module_selector: :all` or a
+  custom selector, `candidate_selection_strategy: :current_best`, a custom
+  proposer) are DSPy options that the pinned profiles do not support yet. The
+  options DSPy passes through to GEPA (`:merge_val_overlap_floor`,
+  `:max_merge_invocations`, `:merge_acceptance_policy`, `:stopper`,
+  `:max_reflection_cost`, `:callbacks`, `:component_feedback`) are accepted.
+
+  `execution_profile: :beam_native` is Imp's own search, where every option
+  is available. It also caches evaluations, merges only with
+  `use_merge: true`, never skips a perfect minibatch, draws from a BEAM RNG,
+  takes `:generations` as its iteration count, and counts
+  `:max_full_evaluations` beside `:max_metric_calls`.
 
   ## What the reflection model reads
 
@@ -56,8 +69,8 @@ defmodule Imp.Optimizer.GEPA do
   An `Imp.History` input is shown as `Context`, one line per turn. For an agent
   (`Imp.react/3`, `Imp.Predict.ReActV2`) that is the whole finished run, taken
   from the prediction's `:history` metadata whichever step was drawn: every
-  turn's thought, tool calls and tool results, and the outputs when the turn
-  answered or called `submit`. The tools the predictor offers its model are
+  turn's thought, tool calls and tool results, and the outputs, which the
+  history holds unless `finish_on` or the extractor ended the turn. The tools the predictor offers its model are
   shown as `tools`, with their names, descriptions and arguments. `Feedback` is
   the metric's feedback, or `:component_feedback`'s, or
   `"This trajectory got a score of 0.0."` (with the row's score) when there is
@@ -408,7 +421,7 @@ defmodule Imp.Optimizer.GEPA do
         callbacks: optimizer.callbacks,
         stopper: profile_stopper(optimizer, envelope),
         max_metric_calls: envelope.operational_metric_call_cap,
-        max_full_evaluations: optimizer.max_full_evaluations,
+        max_full_evaluations: envelope.max_full_evaluations,
         max_reflection_calls: envelope.operational_reflection_call_cap,
         max_reflection_cost: optimizer.max_reflection_cost,
         reflection_strategy: optimizer.reflection_strategy,
@@ -762,11 +775,32 @@ defmodule Imp.Optimizer.GEPA do
         Enum.each(requirements, fn {key, expected} ->
           if Keyword.has_key?(requested, key) and Keyword.fetch!(requested, key) != expected do
             raise ArgumentError,
-                  ":execution_profile #{inspect(profile)}#{if explicit?, do: "", else: " (the default)"} requires " <>
+                  "#{profile_name(profile, explicit?)} requires " <>
                     "#{inspect(key)}: #{inspect(expected)}; " <>
-                    "Imp's extensions run under execution_profile: :beam_native"
+                    "options the DSPy profiles do not support run under " <>
+                    "execution_profile: :beam_native"
           end
         end)
+
+        # DSPy's GEPA has no reflection-call limit: the pinned profiles derive
+        # it from the metric budget, and an explicit profile may only restate
+        # the derived value, which depends on the datasets (checked at compile).
+        if not explicit? and finite?(Keyword.get(requested, :max_reflection_calls)) do
+          raise ArgumentError,
+                "#{profile_name(profile, explicit?)} derives :max_reflection_calls from " <>
+                  "the metric budget, as DSPy's GEPA has no reflection-call limit; " <>
+                  "set one under execution_profile: :beam_native"
+        end
+
+        # DSPy's GEPA takes one budget: `max_full_evals` is converted to metric
+        # calls, never counted beside them.
+        if finite?(Keyword.get(requested, :max_metric_calls)) and
+             finite?(Keyword.get(requested, :max_full_evaluations)) do
+          raise ArgumentError,
+                "#{profile_name(profile, explicit?)} takes one budget: " <>
+                  ":max_metric_calls or :max_full_evaluations, as DSPy's GEPA takes " <>
+                  "max_metric_calls or max_full_evals"
+        end
 
         opts
         |> Keyword.merge(requirements)
@@ -781,8 +815,14 @@ defmodule Imp.Optimizer.GEPA do
     end
   end
 
+  defp profile_name(profile, true), do: ":execution_profile #{inspect(profile)}"
+  defp profile_name(profile, false), do: ":execution_profile #{inspect(profile)} (the default)"
+
+  defp finite?(value), do: is_integer(value)
+
   defp profile_budget_envelope(%__MODULE__{execution_profile: :beam_native} = optimizer, _, _) do
     %{
+      max_full_evaluations: optimizer.max_full_evaluations,
       semantic_max_metric_calls: optimizer.max_metric_calls,
       operational_metric_call_cap: optimizer.max_metric_calls,
       operational_reflection_call_cap: optimizer.max_reflection_calls,
@@ -798,13 +838,18 @@ defmodule Imp.Optimizer.GEPA do
        when profile in [:gepa_v0_1_4, :gepa_v0_1_4_merge] do
     minibatch_size = optimizer.minibatch_size || min(3, length(trainset))
 
+    # DSPy converts `max_full_evals` to metric calls over both datasets:
+    # `max_full_evals * (len(trainset) + len(valset))`.
     semantic_max_metric_calls =
-      case optimizer.max_metric_calls do
-        :infinity ->
-          length(devset) + optimizer.generations * (2 * minibatch_size + length(devset))
-
-        finite when is_integer(finite) ->
+      case {optimizer.max_metric_calls, optimizer.max_full_evaluations} do
+        {finite, _full} when is_integer(finite) ->
           finite
+
+        {:infinity, full} when is_integer(full) ->
+          full * (length(trainset) + length(devset))
+
+        {:infinity, :infinity} ->
+          length(devset) + optimizer.generations * (2 * minibatch_size + length(devset))
       end
 
     envelope =
@@ -814,10 +859,12 @@ defmodule Imp.Optimizer.GEPA do
       raise ArgumentError,
             ":execution_profile #{inspect(profile)} requires :max_reflection_calls " <>
               "#{envelope.max_reflection_calls} for every legally started iteration; got: " <>
-              inspect(optimizer.max_reflection_calls)
+              "#{inspect(optimizer.max_reflection_calls)}; set a different limit under " <>
+              "execution_profile: :beam_native"
     end
 
     %{
+      max_full_evaluations: :infinity,
       semantic_max_metric_calls: semantic_max_metric_calls,
       operational_metric_call_cap: envelope.max_metric_calls,
       operational_reflection_call_cap: envelope.max_reflection_calls,

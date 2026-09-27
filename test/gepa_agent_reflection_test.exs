@@ -202,4 +202,141 @@ defmodule Imp.Optimizer.GEPA.AgentReflectionTest do
     assert Enum.any?(prompts, &(&1 =~ "PLANNER-INSTRUCTION"))
     refute Enum.any?(prompts, &(&1 =~ "WRITER-INSTRUCTION"))
   end
+
+  test "values that are not Imp's own structs render as their complete terms", ctx do
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "wrong"} end)
+    program = Imp.predict("question, tags, pattern -> answer", lm: lm)
+
+    data =
+      Enum.map(ctx.data, fn example ->
+        example
+        |> Imp.Example.to_map()
+        |> Map.merge(%{tags: MapSet.new(["red", "blue"]), pattern: ~r/v\d+/})
+        |> Imp.example()
+        |> Imp.with_inputs([:question, :tags, :pattern])
+      end)
+
+    optimizer =
+      Imp.Optimizer.GEPA.new(Imp.exact_match(:answer),
+        reflection_lm: ctx.reflection_lm,
+        max_metric_calls: 8
+      )
+
+    Imp.Optimizer.GEPA.compile(optimizer, program, data, data)
+
+    assert [prompt | _rest] = prompts(ctx.prompts)
+    assert prompt =~ ~s|### tags\nMapSet.new(["blue", "red"])\n|
+    assert prompt =~ "### pattern\n~r/v\\d+/\n"
+    refute prompt =~ "#Reference"
+  end
+
+  test "a predictor given two histories is refused, as DSPy's GEPA asserts one", ctx do
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "wrong"} end)
+    program = Imp.predict("question, history, notes -> answer", lm: lm)
+    history = Imp.History.new([%{question: "earlier?", answer: "yes"}])
+
+    data =
+      Enum.map(ctx.data, fn example ->
+        example
+        |> Imp.Example.to_map()
+        |> Map.merge(%{history: history, notes: history})
+        |> Imp.example()
+        |> Imp.with_inputs([:question, :history, :notes])
+      end)
+
+    optimizer =
+      Imp.Optimizer.GEPA.new(Imp.exact_match(:answer),
+        reflection_lm: ctx.reflection_lm,
+        max_metric_calls: 8
+      )
+
+    assert_raise ArgumentError, ~r/one history input as Context.*\[:history, :notes\]/s, fn ->
+      Imp.Optimizer.GEPA.compile(optimizer, program, data, data)
+    end
+
+    assert prompts(ctx.prompts) == []
+  end
+
+  describe "choosing the profile" do
+    defp metric, do: Imp.exact_match(:answer)
+
+    test "no profile is DSPy's GEPA with merge, and use_merge: false drops merge" do
+      assert %{execution_profile: :gepa_v0_1_4_merge, use_merge: true} =
+               Imp.Optimizer.GEPA.new(metric())
+
+      assert %{execution_profile: :gepa_v0_1_4, use_merge: false} =
+               Imp.Optimizer.GEPA.new(metric(), use_merge: false)
+
+      assert %{execution_profile: :beam_native, use_merge: false} =
+               Imp.Optimizer.GEPA.new(metric(), execution_profile: :beam_native)
+    end
+
+    test "an option the DSPy profiles fix names the default and :beam_native" do
+      assert_raise ArgumentError,
+                   ~r/^:execution_profile :gepa_v0_1_4_merge \(the default\) requires :combee: false; .*execution_profile: :beam_native$/,
+                   fn -> Imp.Optimizer.GEPA.new(metric(), combee: true) end
+
+      assert_raise ArgumentError,
+                   ~r/^:execution_profile :gepa_v0_1_4 requires :module_selector: :round_robin; .*execution_profile: :beam_native$/,
+                   fn ->
+                     Imp.Optimizer.GEPA.new(metric(),
+                       execution_profile: :gepa_v0_1_4,
+                       module_selector: :all
+                     )
+                   end
+
+      assert %{combee: %{}} =
+               Imp.Optimizer.GEPA.new(metric(), execution_profile: :beam_native, combee: true)
+    end
+
+    test "a reflection strategy needs :beam_native" do
+      strategy = fn _candidate, _dataset, _components -> %{new_texts: %{}} end
+
+      assert_raise ArgumentError,
+                   ~r/:reflection_strategy runs under execution_profile: :beam_native/,
+                   fn -> Imp.Optimizer.GEPA.new(metric(), reflection_strategy: strategy) end
+
+      assert %{reflection_strategy: kept} =
+               Imp.Optimizer.GEPA.new(metric(),
+                 execution_profile: :beam_native,
+                 reflection_strategy: strategy
+               )
+
+      refute is_nil(kept)
+    end
+
+    test "the default derives the reflection limit and takes one budget" do
+      assert_raise ArgumentError,
+                   ~r/^:execution_profile :gepa_v0_1_4_merge \(the default\) derives :max_reflection_calls.*execution_profile: :beam_native$/,
+                   fn -> Imp.Optimizer.GEPA.new(metric(), max_reflection_calls: 4) end
+
+      assert_raise ArgumentError, ~r/takes one budget/, fn ->
+        Imp.Optimizer.GEPA.new(metric(), max_metric_calls: 10, max_full_evaluations: 1)
+      end
+
+      assert %{max_reflection_calls: 4} =
+               Imp.Optimizer.GEPA.new(metric(),
+                 execution_profile: :beam_native,
+                 max_reflection_calls: 4
+               )
+    end
+
+    test "max_full_evaluations is a metric budget over both datasets, as DSPy's max_full_evals",
+         ctx do
+      lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "wrong"} end)
+      program = Imp.predict("question -> answer", lm: lm)
+
+      optimizer =
+        Imp.Optimizer.GEPA.new(metric(),
+          reflection_lm: ctx.reflection_lm,
+          max_full_evaluations: 2
+        )
+
+      {_compiled, report} =
+        Imp.Optimizer.GEPA.compile_with_report(optimizer, program, ctx.data, ctx.data)
+
+      assert report.metadata.max_metric_calls == 2 * (4 + 4)
+      assert report.metadata.max_full_evaluations == :infinity
+    end
+  end
 end
