@@ -489,12 +489,14 @@ defmodule Imp.Evaluate do
       devset
     else
       raise ArgumentError,
-            "Imp.Evaluate.new/3 expects devset to be an enumerable (Enumerable) of Imp.Example rows with declared inputs; got: #{inspect(devset)}"
+            "Imp.Evaluate.new/3 expects devset to be an enumerable (Enumerable) of Imp.Example rows with declared inputs; got: #{Imp.FieldMap.describe(devset)}"
     end
   end
 
   defp normalize_example(%Imp.Example{} = example), do: {:ok, example}
-  defp normalize_example(example), do: {:error, {:invalid_evaluation_example, inspect(example)}}
+
+  defp normalize_example(example),
+    do: {:error, {:invalid_evaluation_example, Imp.FieldMap.describe(example)}}
 
   defp failed_row_data(index, example, failure_score, reason) do
     %{

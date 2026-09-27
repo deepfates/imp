@@ -249,8 +249,6 @@ defmodule Imp.Optimizer.MIPROv2 do
 
     trainset = Keyword.fetch!(opts, :trainset)
     valset = Keyword.get(opts, :valset)
-    Imp.Example.require_inputs!(trainset, "Imp.Optimizer.MIPROv2.compile", "trainset")
-    Imp.Example.require_inputs!(valset, "Imp.Optimizer.MIPROv2.compile", "valset")
     compile_overrides = Keyword.drop(opts, [:trainset, :valset] ++ @compile_runtime_keys)
     run_opts = opts |> Keyword.take(@compile_runtime_keys) |> validate_compile_options!()
     predictors = Imp.ProgramParameters.predictors(program)

@@ -44,7 +44,7 @@ defmodule Imp.Example do
 
   def new(fields) do
     raise ArgumentError,
-          "Imp.Example.new/1 expects a map, field pair list, or Imp.Example; got: #{inspect(fields)}"
+          "Imp.Example.new/1 expects a map, field pair list, or Imp.Example; got: #{Imp.FieldMap.describe(fields)}"
   end
 
   @doc "Reads a field, returning `default` when it is missing."
@@ -142,8 +142,7 @@ defmodule Imp.Example do
 
   defp require_row_inputs!(_row, _caller, _dataset, _index), do: :ok
 
-  defp row_keys(row) when is_map(row), do: row |> Map.keys() |> Enum.sort_by(&to_string/1)
-  defp row_keys(row), do: for({key, _value} <- row, do: key)
+  defp row_keys(row), do: Imp.FieldMap.key_names(row)
 
   defp input_keys!(%__MODULE__{input_keys: nil} = example, function) do
     raise ArgumentError,
@@ -169,7 +168,7 @@ defmodule Imp.Example do
 
       true ->
         raise ArgumentError,
-              "#{context} expects a demo, field pair list, or list of demos; got: #{inspect(demos)}"
+              "#{context} expects a demo, field pair list, or list of demos; got: #{Imp.FieldMap.describe(demos)}"
     end
   end
 
@@ -178,7 +177,7 @@ defmodule Imp.Example do
 
   defp normalize_demo!(demo, context) do
     raise ArgumentError,
-          "#{context} expects demos as Imp.Example structs, maps, or field pair lists; got: #{inspect(demo)}"
+          "#{context} expects demos as Imp.Example structs, maps, or field pair lists; got: #{Imp.FieldMap.describe(demo)}"
   end
 
   defp key!(key), do: Imp.FieldMap.key!(key, "Imp.Example")

@@ -118,21 +118,7 @@ defmodule Imp.ExampleInputsDeclaredTest do
         for index <- 1..3,
             do: Imp.example(question: "q#{index}", answer: "secret") |> Imp.with_inputs(:question)
 
-      {:ok, agent} = Agent.start_link(fn -> rows end)
-
-      one_shot =
-        Stream.resource(
-          fn -> agent end,
-          fn agent ->
-            case Agent.get_and_update(agent, fn rows -> {rows, []} end) do
-              [] -> {:halt, agent}
-              rows -> {rows, agent}
-            end
-          end,
-          fn _agent -> :ok end
-        )
-
-      result = Imp.evaluate(program(self()), one_shot, Imp.exact_match(:answer))
+      result = Imp.evaluate(program(self()), one_shot(rows), Imp.exact_match(:answer))
       assert length(result.rows) == 3
       assert result.score == 1.0
     end
@@ -157,6 +143,133 @@ defmodule Imp.ExampleInputsDeclaredTest do
 
     assert_raise ArgumentError, ~r/test row 0 does not declare its inputs/, fn ->
       Imp.Experiment.Data.new(train: [declared], selection: [other], test: [undeclared])
+    end
+  end
+
+  # A stream that yields its rows on the first read and nothing afterwards,
+  # like a stream over a socket or a consumed file handle.
+  defp one_shot(rows) do
+    {:ok, agent} = Agent.start_link(fn -> rows end)
+
+    Stream.resource(
+      fn -> agent end,
+      fn agent ->
+        case Agent.get_and_update(agent, fn rows -> {rows, []} end) do
+          [] -> {:halt, agent}
+          rows -> {rows, agent}
+        end
+      end,
+      fn _agent -> :ok end
+    )
+  end
+
+  test "messages about rows that are not examples name types and keys, never values" do
+    sentinel = "SENTINEL-private-value"
+
+    error =
+      assert_raise ArgumentError, fn ->
+        Imp.Evaluate.new({sentinel}, Imp.exact_match(:answer))
+      end
+
+    assert Exception.message(error) =~ "got: a tuple of 1 elements"
+    refute Exception.message(error) =~ sentinel
+
+    result =
+      [{sentinel}]
+      |> Imp.Evaluate.new(Imp.exact_match(:answer), max_errors: :infinity)
+      |> Imp.Evaluate.run(program(self()))
+
+    assert [%{reason: {:invalid_evaluation_example, "a tuple of 1 elements"}}] = result.errors
+
+    for bad <- [sentinel, {sentinel}] do
+      error = assert_raise ArgumentError, fn -> Imp.Example.new(bad) end
+      refute Exception.message(error) =~ sentinel
+    end
+
+    error = assert_raise ArgumentError, fn -> Imp.Example.new([{:question, "q"}, sentinel]) end
+    refute Exception.message(error) =~ sentinel
+
+    error =
+      assert_raise ArgumentError, fn -> Imp.Example.with_demos(Imp.example(q: 1), sentinel) end
+
+    refute Exception.message(error) =~ sentinel
+  end
+
+  test "Imp.Optimizer.TrajectoryRunner.run refuses rows without declared inputs before any call" do
+    assert_raise ArgumentError,
+                 ~r/Imp\.Optimizer\.TrajectoryRunner\.run\/4: examples row 0 does not declare/,
+                 fn ->
+                   Imp.Optimizer.TrajectoryRunner.run(
+                     program(self()),
+                     undeclared_rows(),
+                     Imp.exact_match(:answer)
+                   )
+                 end
+
+    refute_received :lm_call
+  end
+
+  describe "one-shot datasets are read once and score like lists" do
+    defp score(compiled), do: Imp.Optimizer.Report.fetch(compiled).best_score
+
+    test "MIPROv2" do
+      optimizer =
+        Imp.Optimizer.MIPROv2.new(Imp.exact_match(:answer),
+          auto: nil,
+          num_candidates: 2,
+          num_trials: 2,
+          max_bootstrapped_demos: 0,
+          max_labeled_demos: 0,
+          minibatch: false,
+          startup_trials: 1,
+          prompt_lm: counting_lm(self(), %{"instructions" => ["Answer."]})
+        )
+
+      listed = Imp.optimize!(program(self()), optimizer, declared_rows(), declared_rows())
+
+      for {trainset, valset} <- [
+            {one_shot(declared_rows()), declared_rows()},
+            {declared_rows(), one_shot(declared_rows())}
+          ] do
+        compiled = Imp.optimize!(program(self()), optimizer, trainset, valset)
+        assert score(compiled) == score(listed)
+      end
+    end
+
+    test "InstructionSearch scores every candidate on the rows" do
+      compile = fn trainset, devset ->
+        Imp.Optimizer.InstructionSearch.compile(
+          program(self()),
+          Imp.exact_match(:answer),
+          trainset,
+          devset,
+          ["First.", "Second."]
+        )
+      end
+
+      compiled = compile.(one_shot(declared_rows()), one_shot(declared_rows()))
+      report = Imp.Optimizer.Report.fetch(compiled)
+      assert Enum.map(report.candidates, & &1.score) == [1.0, 1.0, 1.0]
+      assert report.metadata.trainset_size == 2
+      assert_received :lm_call
+    end
+
+    test "SignatureOptimizer" do
+      optimizer =
+        Imp.Optimizer.SignatureOptimizer.new(Imp.exact_match(:answer),
+          candidates: ["First.", "Second."]
+        )
+
+      compiled =
+        Imp.optimize!(
+          program(self()),
+          optimizer,
+          one_shot(declared_rows()),
+          one_shot(declared_rows())
+        )
+
+      report = Imp.Optimizer.Report.fetch(compiled)
+      assert Enum.map(report.candidates, & &1.score) == [1.0, 1.0, 1.0]
     end
   end
 
@@ -213,7 +326,7 @@ defmodule Imp.ExampleInputsDeclaredTest do
            max_demos: 0,
            seed: 11,
            prompt_lm: lm.(%{discussion: "ok", module_advice: %{main: "Answer."}})
-         ), predict, [:trainset]},
+         ), predict, [:trainset, :valset]},
         {"GEPA",
          Imp.Optimizer.GEPA.new(metric,
            generations: 1,

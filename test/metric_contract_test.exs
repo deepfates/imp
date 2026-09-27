@@ -201,7 +201,7 @@ defmodule MetricContractTest do
     assert [
              %{
                index: 0,
-               reason: {:invalid_evaluation_example, ":not_an_example"}
+               reason: {:invalid_evaluation_example, "an atom"}
              }
            ] = result.errors
 

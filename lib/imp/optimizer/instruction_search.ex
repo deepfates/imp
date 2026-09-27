@@ -18,6 +18,10 @@ defmodule Imp.Optimizer.InstructionSearch do
     demos = Keyword.get(opts, :demos, [])
     predictor_name = resolve_predictor_name!(program, Keyword.get(opts, :predictor))
     candidate_instructions = unique_candidates(candidates)
+    # Read each dataset once: every candidate is evaluated on the same rows,
+    # which a one-shot stream could give only once.
+    trainset = materialize(trainset)
+    devset = materialize(devset)
     # Candidate evaluation records any failure as a failed candidate, so an
     # example without declared inputs is refused here instead.
     Imp.Example.require_inputs!(devset, "Imp.Optimizer.InstructionSearch.compile", "devset")
@@ -220,6 +224,8 @@ defmodule Imp.Optimizer.InstructionSearch do
   end
 
   defp unique_candidates(candidates), do: Enum.uniq(candidates)
+
+  defp materialize(rows), do: if(Enumerable.impl_for(rows), do: Enum.to_list(rows), else: rows)
 
   defp put_single_predictor_instruction!(program, instruction) do
     case Imp.ProgramParameters.predictors(program) do
