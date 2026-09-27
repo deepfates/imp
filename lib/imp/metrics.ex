@@ -90,6 +90,13 @@ defmodule Imp.Metrics do
   def normalize_result(value),
     do: %Result{score: 0.0, passed?: false, feedback: {:invalid_metric_result, value}}
 
+  @doc false
+  # Whether feedback is the diagnostic `normalize_result/1` gives a value it
+  # cannot read.
+  @spec invalid_result_feedback?(term()) :: boolean()
+  def invalid_result_feedback?({:invalid_metric_result, _value}), do: true
+  def invalid_result_feedback?(_feedback), do: false
+
   @doc "Returns the normalized numeric score for a metric return value."
   def score(value), do: normalize_result(value).score
 
