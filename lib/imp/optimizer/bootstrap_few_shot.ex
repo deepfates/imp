@@ -114,6 +114,7 @@ defmodule Imp.Optimizer.BootstrapFewShot do
   def compile(%__MODULE__{} = optimizer, student, trainset, opts \\ []) when is_list(opts) do
     opts = validate_compile_options!(opts)
     trainset = Enum.to_list(trainset)
+    Imp.Example.require_inputs!(trainset, "Imp.Optimizer.BootstrapFewShot.compile", "trainset")
 
     teacher =
       case Keyword.fetch(opts, :teacher) do

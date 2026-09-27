@@ -214,6 +214,8 @@ defmodule Imp.Optimizer.SIMBA do
     run_opts = validate_compile_options!(opts)
     trainset = materialize!(trainset, "trainset")
     final_set = if is_nil(final_set), do: trainset, else: materialize!(final_set, "final_set")
+    Imp.Example.require_inputs!(trainset, "Imp.Optimizer.SIMBA.compile", "trainset")
+    Imp.Example.require_inputs!(final_set, "Imp.Optimizer.SIMBA.compile", "final_set")
 
     if length(trainset) < optimizer.bsize do
       raise ArgumentError,

@@ -176,29 +176,17 @@ defmodule MetricContractTest do
                  end
   end
 
-  test "Evaluate normalizes plain map and field-pair devset rows" do
-    program = %Program{
-      handler: fn inputs ->
-        assert Map.has_key?(inputs, :question)
-        {:ok, Imp.prediction(answer: "Paris")}
+  test "Evaluate refuses plain map and field-pair devset rows, which cannot declare inputs" do
+    program = %Program{handler: fn _inputs -> flunk("the program must not be called") end}
+    metric = Imp.Metrics.exact_match(:answer)
+
+    for row <- [%{question: "Capital?", answer: "Paris"}, [question: "Capital?", answer: "Paris"]] do
+      assert_raise ArgumentError, ~r/Imp\.with_inputs\/2/, fn ->
+        [row]
+        |> Imp.Evaluate.new(metric)
+        |> Imp.Evaluate.run(program)
       end
-    }
-
-    metric = fn example, prediction ->
-      assert %Imp.Example{} = example
-      Imp.Metrics.exact_match(:answer).(example, prediction)
     end
-
-    result =
-      [
-        %{question: "Capital?", answer: "Paris"},
-        [question: "French capital?", answer: "Paris"]
-      ]
-      |> Imp.Evaluate.new(metric)
-      |> Imp.Evaluate.run(program)
-
-    assert result.score == 1.0
-    assert Enum.all?(result.rows, &match?(%Imp.Example{}, &1.example))
   end
 
   test "Evaluate records malformed devset rows as failed diagnostics" do
@@ -206,14 +194,14 @@ defmodule MetricContractTest do
     metric = fn _example, _prediction -> true end
 
     result =
-      [:not_an_example, %{question: "Capital?", answer: "Paris"}]
+      [:not_an_example, example("Capital?", "Paris")]
       |> Imp.Evaluate.new(metric, max_errors: :infinity)
       |> Imp.Evaluate.run(program)
 
     assert [
              %{
                index: 0,
-               reason: {:invalid_evaluation_example, ":not_an_example"}
+               reason: {:invalid_evaluation_example, "an atom"}
              }
            ] = result.errors
 

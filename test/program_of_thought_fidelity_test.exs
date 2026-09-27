@@ -71,6 +71,68 @@ defmodule ProgramOfThoughtFidelityTest do
     assert extraction_prompt =~ "sum"
   end
 
+  test "an instruction set through ProgramParameters reaches ProgramOfThought's extraction step" do
+    owner = self()
+
+    lm =
+      static_sequence(owner, [
+        %{program: ~s(%{sum: x + y})},
+        %{answer: 5}
+      ])
+
+    program =
+      "x: int, y: int -> answer: int"
+      |> Imp.program_of_thought(lm: lm)
+      |> Imp.ProgramParameters.put_instruction(:main, "Add the two numbers carefully.")
+
+    assert {:ok, _prediction} = Imp.call(program, %{x: 2, y: 3})
+
+    assert [generation, extraction] = collect_messages(2)
+    assert rendered(generation) =~ "Add the two numbers carefully."
+    assert rendered(extraction) =~ "Add the two numbers carefully."
+  end
+
+  test "an instruction set through ProgramParameters reaches CodeAct's extraction step" do
+    owner = self()
+
+    lm =
+      static_sequence(owner, [
+        %{program: ~s(%{raw: x * 2}), finished: true},
+        %{answer: 12}
+      ])
+
+    program =
+      "x: int -> answer: int"
+      |> Imp.code_act([], lm: lm, max_iters: 2)
+      |> Imp.ProgramParameters.put_instruction(:main, "Double the number.")
+
+    assert {:ok, _prediction} = Imp.call(program, %{x: 6})
+
+    assert [planner, extraction] = collect_messages(2)
+    assert rendered(planner) =~ "Double the number."
+    assert rendered(extraction) =~ "Double the number."
+  end
+
+  test "a ProgramOfThought and a CodeAct with an optimizer's instruction save and load" do
+    pot =
+      "x: int -> answer: int"
+      |> Imp.program_of_thought()
+      |> Imp.ProgramParameters.put_instruction(:main, "Add carefully.")
+
+    loaded = pot |> Imp.Saving.dump() |> Imp.Saving.load!()
+    assert loaded.signature.instructions == "Add carefully."
+    assert loaded.predict.signature.instructions == "Add carefully."
+
+    code_act =
+      "x: int -> answer: int"
+      |> Imp.code_act([])
+      |> Imp.ProgramParameters.put_instruction(:main, "Double it.")
+
+    loaded = code_act |> Imp.Saving.dump() |> Imp.Saving.load!()
+    assert loaded.program_of_thought.signature.instructions == "Double it."
+    assert loaded.program_of_thought.predict.signature.instructions == "Double it."
+  end
+
   test "ProgramOfThought extracts a type-invalid scalar instead of bypassing the signature" do
     owner = self()
 

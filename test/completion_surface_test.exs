@@ -353,7 +353,8 @@ defmodule CompletionSurfaceTest do
 
     program = Imp.predict("question -> answer", lm: lm)
 
-    assert Imp.Streaming.collect(program, %{question: "runtime?"}) == "beam"
+    assert {:ok, prediction} = Imp.Streaming.collect(program, %{question: "runtime?"})
+    assert Imp.get(prediction, :answer) == "beam"
 
     assert Enum.take(Imp.Streaming.stream(program, %{question: "runtime?"}), 2) == [
              "b",
@@ -394,11 +395,13 @@ defmodule CompletionSurfaceTest do
              Imp.Streaming.stream(program, [:not_a_pair], provider_stream: true)
              |> Enum.to_list()
 
-    assert Imp.Streaming.collect(program, %{question: "q"},
-             provider_stream: true,
-             temperature: 0
-           ) ==
-             "beam"
+    assert {:ok, prediction} =
+             Imp.Streaming.collect(program, %{question: "q"},
+               provider_stream: true,
+               temperature: 0
+             )
+
+    assert Imp.get(prediction, :answer) == "beam"
   end
 
   test "provider streaming reports LM misconfiguration as error chunks" do
@@ -497,7 +500,8 @@ defmodule CompletionSurfaceTest do
 
     program = Imp.predict("question -> first, second", lm: lm)
 
-    assert Imp.Streaming.collect(program, %{question: "order?"}) == "onetwo"
+    assert {:ok, prediction} = Imp.Streaming.collect(program, %{question: "order?"})
+    assert Imp.Prediction.to_map(prediction) == %{first: "one", second: "two"}
     assert Enum.take(Imp.Streaming.stream(program, %{question: "order?"}), 6) == ~w(o n e t w o)
   end
 
@@ -505,14 +509,16 @@ defmodule CompletionSurfaceTest do
     lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{program: "n * 2"} end)
     program = Imp.program_of_thought("n: integer -> doubled: integer", lm: lm)
 
-    assert Imp.Streaming.collect(program, %{n: 2}, provider_stream: true) == "4"
+    assert {:ok, prediction} = Imp.Streaming.collect(program, %{n: 2}, provider_stream: true)
+    assert Imp.get(prediction, :doubled) == 4
   end
 
   test "streaming fallback collects wrapper outputs through their task contracts" do
     pot_lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{program: "x * 2"} end)
 
     pot = Imp.program_of_thought("x -> doubled", lm: pot_lm, output_field: :doubled)
-    assert Imp.Streaming.collect(pot, %{x: 21}) == "42"
+    assert {:ok, prediction} = Imp.Streaming.collect(pot, %{x: 21})
+    assert Imp.get(prediction, :doubled) == 42
 
     cot_lm =
       Imp.LM.Static.new(
@@ -520,7 +526,8 @@ defmodule CompletionSurfaceTest do
       )
 
     cot = Imp.chain_of_thought("question -> answer", lm: cot_lm)
-    assert Imp.Streaming.collect(cot, %{question: "France capital?"}) == "knownParis"
+    assert {:ok, prediction} = Imp.Streaming.collect(cot, %{question: "France capital?"})
+    assert Imp.Prediction.to_map(prediction) == %{reasoning: "known", answer: "Paris"}
   end
 
   test "dataset loaders produce examples with declared inputs" do

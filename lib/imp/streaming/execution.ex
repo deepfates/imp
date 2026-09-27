@@ -41,33 +41,31 @@ defmodule Imp.Streaming.Execution do
     end
   end
 
-  defp stream_generate(context, name, %module{} = lm, messages, opts) do
-    cond do
-      Code.ensure_loaded?(module) and function_exported?(module, :stream, 3) ->
-        module.stream(lm, messages, unrecorded(opts))
-        |> consume_stream(context, name, lm)
+  defp stream_generate(context, name, lm, messages, opts) do
+    module = lm_module(lm)
 
-      true ->
-        Imp.LM.generate(lm, messages, opts)
-    end
-  end
+    if is_atom(module) and Code.ensure_loaded?(module) and function_exported?(module, :stream, 3) do
+      request = Imp.LM.new_request(lm, messages, opts, "Imp.stream/3")
 
-  defp stream_generate(context, name, module, messages, opts) when is_atom(module) do
-    if Code.ensure_loaded?(module) and function_exported?(module, :stream, 3) do
-      module.stream(module, messages, unrecorded(opts))
-      |> consume_stream(context, name, module)
+      lm
+      |> Imp.LM.record(request, fn request ->
+        {messages, opts} = Imp.Core.request_parts(request)
+
+        with {:ok, raw} <-
+               lm
+               |> module.stream(messages, opts)
+               |> consume_stream(context, name, lm) do
+          Imp.Core.response(raw)
+        end
+      end)
+      |> Imp.LM.legacy_result()
     else
-      Imp.LM.generate(module, messages, opts)
+      Imp.LM.generate(lm, messages, opts)
     end
   end
 
-  defp stream_generate(_context, _name, lm, messages, opts),
-    do: Imp.LM.generate(lm, messages, opts)
-
-  # A streamed call goes to the provider without `Imp.LM.generate/3`, which is
-  # where `:purpose` is taken off and recorded, and it emits no request event to
-  # record it on; it is dropped so it is never sent.
-  defp unrecorded(opts), do: Keyword.delete(opts, :purpose)
+  defp lm_module(%module{}), do: module
+  defp lm_module(module), do: module
 
   defp consume_stream(stream, context, name, lm) do
     stream = attach_listeners(stream, context, name)
@@ -93,7 +91,6 @@ defmodule Imp.Streaming.Execution do
         |> materialize_chunks()
         |> envelope(normalize_metadata(lm, metadata))
         |> then(&{:ok, &1})
-        |> record_usage()
 
       {:error, _reason} = error ->
         error
@@ -177,13 +174,27 @@ defmodule Imp.Streaming.Execution do
   defp collect_metadata(%StreamResponse{metadata: incoming}, metadata),
     do: Map.merge(metadata, incoming || %{})
 
+  # The streamed output is what the same completion returns unstreamed: text
+  # alone is the joined text, and tool calls, which a provider streams one per
+  # chunk, are all kept in order beside the text that came with them, in the
+  # shape an unstreamed client returns (`Imp.LM.Result.tool_calls/2`).
   defp materialize_chunks(chunks) do
-    chunks = Enum.reverse(chunks)
+    {texts, maps} = chunks |> Enum.reverse() |> Enum.split_with(&is_binary/1)
+    text = Enum.join(texts)
+    calls = Enum.flat_map(maps, &List.wrap(Map.get(&1, :tool_calls, Map.get(&1, "tool_calls"))))
 
     cond do
-      Enum.any?(chunks, &is_binary/1) -> Enum.filter(chunks, &is_binary/1) |> Enum.join()
-      chunks == [] -> ""
-      true -> Enum.reduce(chunks, %{}, &Map.merge(&2, &1))
+      calls != [] ->
+        maps
+        |> Enum.reduce(%{}, &Map.merge(&2, &1))
+        |> Map.drop([:tool_calls, "tool_calls"])
+        |> Map.merge(Imp.LM.Result.tool_calls(calls, text))
+
+      texts != [] or maps == [] ->
+        text
+
+      true ->
+        Enum.reduce(maps, %{}, &Map.merge(&2, &1))
     end
   end
 
@@ -212,11 +223,6 @@ defmodule Imp.Streaming.Execution do
   end
 
   defp normalize_metadata(_lm, metadata), do: metadata
-
-  defp record_usage({:ok, value} = result) do
-    Imp.Usage.maybe_record(value)
-    result
-  end
 
   defp normalize_name(name), do: to_string(name)
 end

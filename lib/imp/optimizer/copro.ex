@@ -114,6 +114,7 @@ defmodule Imp.Optimizer.COPRO do
   def compile(%__MODULE__{} = optimizer, program, trainset, _devset \\ [], eval_opts \\ []) do
     optimizer = %{optimizer | proposer_lm: resolve_proposer_lm!(optimizer)}
     trainset = Enum.to_list(trainset)
+    Imp.Example.require_inputs!(trainset, "Imp.Optimizer.COPRO.compile", "trainset")
     predictors = Imp.ProgramParameters.predictors(program)
 
     if predictors == [],

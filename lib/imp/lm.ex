@@ -12,7 +12,10 @@ defmodule Imp.LM do
   sent. Between the two, a recorded request can be reproduced without repeating
   a roster on every call. Both are redacted like every other event. A request
   made with `generate/3`'s `:purpose` carries it in the request event's
-  metadata as `:purpose`; it is never part of what is sent.
+  metadata as `:purpose`; it is never part of what is sent. A request streamed
+  through the client's `stream/3` (`Imp.stream/3` with `provider_stream: true`)
+  is recorded the same way, with the usage the provider reported at the end of
+  the stream.
 
   The response event's metadata carries the
   money for that call in `:cost`: the provider's reported total in USD as a
@@ -127,26 +130,50 @@ defmodule Imp.LM do
   def generate(lm, messages, opts \\ [])
 
   def generate(lm, messages, opts) do
-    opts = validate_opts!(opts, "Imp.LM.generate/3")
+    lm
+    |> request(new_request(lm, messages, opts, "Imp.LM.generate/3"))
+    |> legacy_result()
+  end
+
+  @doc false
+  # The request `generate/3` sends: `:purpose` moves from the options, where
+  # it would reach the provider, to the request's metadata, where `record/3`
+  # puts it on the record.
+  def new_request(lm, messages, opts, context) do
+    opts = validate_opts!(opts, context)
     {purpose, opts} = Keyword.pop(opts, :purpose)
     request = Imp.Core.request(messages, opts, lm)
 
-    request =
-      if is_nil(purpose),
-        do: request,
-        else: %{request | metadata: Map.put(request.metadata, :purpose, purpose)}
-
-    case request(lm, request) do
-      {:ok, %Imp.Core.LMResponse{} = response} ->
-        {:ok, Imp.Core.legacy_response(response)}
-
-      other ->
-        other
-    end
+    if is_nil(purpose),
+      do: request,
+      else: %{request | metadata: Map.put(request.metadata, :purpose, purpose)}
   end
 
+  @doc false
+  # The output `generate/3` returns for a request's result.
+  def legacy_result({:ok, %Imp.Core.LMResponse{} = response}),
+    do: {:ok, Imp.Core.legacy_response(response)}
+
+  def legacy_result({:error, _reason} = error), do: error
+
   @doc "Executes one provider-neutral LM request and returns a normalized response."
-  def request(lm, %Imp.Core.LMRequest{} = request) do
+  def request(lm, %Imp.Core.LMRequest{} = request),
+    do: record(lm, request, &dispatch_request(lm, &1))
+
+  def request(_lm, request) do
+    {:error, {:invalid_lm_request, request}}
+  end
+
+  @doc false
+  # Performs `request` with `dispatch`, a function from the request to
+  # `{:ok, %Imp.Core.LMResponse{}}` or `{:error, reason}`, and records it:
+  # usage in `Imp.Usage`, and inside an `Imp.Run` the `:tools_sent`,
+  # `:model_request` and `:model_response` events. `request/2` dispatches to
+  # the client's `request/2` or `generate/3`; a provider stream dispatches to
+  # its `stream/3`. How the answer arrives does not change what is recorded.
+  @spec record(t(), Imp.Core.LMRequest.t(), (Imp.Core.LMRequest.t() -> result)) :: result
+        when result: {:ok, Imp.Core.LMResponse.t()} | {:error, term()}
+  def record(lm, %Imp.Core.LMRequest{} = request, dispatch) when is_function(dispatch, 1) do
     if Imp.Run.context() do
       call_id = Imp.Run.new_event_id("model")
       {messages, options} = Imp.Core.request_parts(request)
@@ -179,7 +206,7 @@ defmodule Imp.LM do
           )
       )
 
-      result = perform_request(lm, request)
+      result = perform_request(lm, request, dispatch)
 
       case result do
         {:ok, response} ->
@@ -204,12 +231,8 @@ defmodule Imp.LM do
 
       result
     else
-      perform_request(lm, request)
+      perform_request(lm, request, dispatch)
     end
-  end
-
-  def request(_lm, request) do
-    {:error, {:invalid_lm_request, request}}
   end
 
   # A stable name for one tool roster: the SHA-256 of its canonical JSON, with
@@ -245,8 +268,11 @@ defmodule Imp.LM do
   defp maybe_put_billing(metadata, nil), do: metadata
   defp maybe_put_billing(metadata, billing), do: Map.put(metadata, :billing, billing)
 
-  defp perform_request(lm, request) do
-    with {:ok, response} <- dispatch_request(lm, request) do
+  # A dispatch that raises or throws, a client's `stream/3` failing before it
+  # returns a stream say, fails as `{:lm_failed, lm, reason}` like a raising
+  # `generate/3`, and its `:model_response` is still recorded.
+  defp perform_request(lm, request, dispatch) do
+    with {:ok, response} <- call_request(fn -> dispatch.(request) end, lm) do
       Imp.Usage.maybe_record(Imp.Core.legacy_response(response))
       {:ok, response}
     end

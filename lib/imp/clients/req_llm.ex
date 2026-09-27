@@ -1623,7 +1623,10 @@ defmodule Imp.Clients.ReqLLM do
           response.object || ReqLLM.Response.text(response) || ""
 
         tool_calls ->
-          %{tool_calls: Enum.map(tool_calls, &ReqLLM.ToolCall.from_map/1)}
+          Imp.LM.Result.tool_calls(
+            Enum.map(tool_calls, &ReqLLM.ToolCall.from_map/1),
+            ReqLLM.Response.text(response)
+          )
       end
 
     metadata =

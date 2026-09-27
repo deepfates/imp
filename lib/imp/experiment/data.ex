@@ -5,7 +5,10 @@ defmodule Imp.Experiment.Data do
   Rows are identified before any optimizer or model call. By default identity is
   the deterministic content digest of the complete row. Pass `id: :field_name`
   (or an arity-one function) when the dataset has a stronger source identity.
-  Duplicate identities within or across splits are rejected.
+  Duplicate identities within or across splits are rejected. Every row is an
+  `Imp.Example` that declares its inputs with `Imp.with_inputs/2`; a plain map,
+  a field pair list, or an example without declared inputs raises
+  `ArgumentError` here.
   """
 
   @enforce_keys [:train, :selection, :test, :ids, :digests]
@@ -35,6 +38,13 @@ defmodule Imp.Experiment.Data do
       selection: fetch_rows!(opts, :selection),
       test: fetch_rows!(opts, :test)
     }
+
+    # The rows reach Imp.Evaluate and the optimizers, which run only examples
+    # that declare their inputs; refusing here fails before any identity or
+    # model work instead of at baseline selection.
+    Enum.each(rows, fn {split, values} ->
+      Imp.Example.require_inputs!(values, "Imp.Experiment.Data.new/1", Atom.to_string(split))
+    end)
 
     identity = Keyword.get(opts, :id, :content)
 
@@ -94,7 +104,6 @@ defmodule Imp.Experiment.Data do
     value =
       case row do
         %Imp.Example{} -> Imp.Example.get(row, key)
-        map when is_map(map) -> Map.get(map, key, Map.get(map, alternate_key(key)))
         _ -> nil
       end
 
@@ -138,16 +147,6 @@ defmodule Imp.Experiment.Data do
     if duplicates != [] do
       raise ArgumentError,
             "experiment splits must be identity-disjoint; duplicate rows: #{inspect(duplicates)}"
-    end
-  end
-
-  defp alternate_key(key) when is_atom(key), do: Atom.to_string(key)
-
-  defp alternate_key(key) when is_binary(key) do
-    try do
-      String.to_existing_atom(key)
-    rescue
-      ArgumentError -> nil
     end
   end
 

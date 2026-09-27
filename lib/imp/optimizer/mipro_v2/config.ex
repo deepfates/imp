@@ -193,6 +193,8 @@ defmodule Imp.Optimizer.MIPROv2.Config do
 
   defp validate_datasets!(trainset, valset) do
     trainset = materialize!(trainset, "trainset")
+    # Checked on the materialised rows, so a one-shot stream is read once.
+    Imp.Example.require_inputs!(trainset, "Imp.Optimizer.MIPROv2.compile", "trainset")
 
     if trainset == [], do: raise(ArgumentError, "trainset cannot be empty")
 
@@ -204,6 +206,7 @@ defmodule Imp.Optimizer.MIPROv2.Config do
       Enum.split(trainset, length(trainset) - val_size)
     else
       valset = materialize!(valset, "valset")
+      Imp.Example.require_inputs!(valset, "Imp.Optimizer.MIPROv2.compile", "valset")
       if valset == [], do: raise(ArgumentError, "valset must have at least 1 example")
       {trainset, valset}
     end
