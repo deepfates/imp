@@ -225,51 +225,30 @@ defmodule Imp.Streaming do
     do: [%Imp.Streaming.Messages.StreamResponse{chunk: {:error, reason}, done: true}]
 
   @doc """
-  Collects stream chunks into a string.
+  Runs one program call through `stream/3` and returns what the program
+  returned: `{:ok, %Imp.Prediction{}}` or `{:error, reason}`, the same as
+  `Imp.call/2`. Every output field is on the prediction.
 
-  Successful streams return the collected string. If the stream emits an error
-  chunk, collection stops and returns `{:error, reason}` instead of partial output.
+  With `provider_stream: true` the prediction is the one the stream ends with,
+  whatever `:include_final_prediction` says. Without it, the program runs once
+  and its prediction is returned without chunking it. If the stream emits an
+  error chunk, collection stops and returns `{:error, reason}`.
   """
-  @spec collect(term(), term(), keyword()) :: String.t() | {:error, term()}
+  @spec collect(term(), term(), keyword()) :: {:ok, Imp.Prediction.t()} | {:error, term()}
   def collect(program, inputs, opts \\ []) do
-    validate_opts!(opts, "Imp.Streaming.collect/3")
-    outputs = output_names(program)
+    owned_opts = validate_opts!(opts, "Imp.Streaming.collect/3")
 
-    result =
+    if owned_opts[:provider_stream] do
       program
-      |> stream(inputs, opts)
-      |> Enum.reduce_while([], fn value, chunks ->
-        case stream_error(value) do
-          {:error, reason} ->
-            {:halt, {:error, reason}}
-
-          nil ->
-            cond do
-              match?(%Imp.Prediction{}, value) ->
-                # A completed provider stream has now passed through the
-                # program's adapter and output contract. Prefer that typed
-                # final value over provider wire framing accumulated earlier.
-                {:cont, [collect_value(value, outputs)]}
-
-              true ->
-                {:cont, [collect_value(value, outputs) | chunks]}
-            end
-        end
+      |> stream(inputs, Keyword.put(opts, :include_final_prediction, true))
+      |> Enum.find_value({:error, :stream_ended_without_prediction}, fn
+        %Imp.Prediction{} = prediction -> {:ok, prediction}
+        value -> stream_error(value)
       end)
-
-    case result do
-      {:error, _reason} = error -> error
-      chunks -> chunks |> Enum.reverse() |> Enum.join()
+    else
+      Imp.Module.call(program, inputs)
     end
   end
-
-  defp collect_value(%Imp.Streaming.Messages.StreamResponse{chunk: nil}, _outputs), do: ""
-
-  defp collect_value(%Imp.Streaming.Messages.StreamResponse{chunk: chunk}, outputs),
-    do: collect_value(chunk, outputs)
-
-  defp collect_value(%Imp.Prediction{} = prediction, outputs),
-    do: collect_value(Imp.Prediction.to_map(prediction), outputs)
 
   defp collect_value(value, outputs) when is_map(value) do
     values =

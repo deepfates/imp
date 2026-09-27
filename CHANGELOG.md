@@ -4,8 +4,34 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Changed
+
+- Breaking: `Imp.collect/3` now returns `{:ok, prediction}` or
+  `{:error, reason}`, as `Imp.call/2` does, instead of a string. The string
+  joined the values of every output field with no separator, so
+  `question -> reasoning, answer` collected as `"Because.Paris"`. Code that
+  matched a string reads the field from the prediction instead:
+  `{:ok, prediction} = Imp.collect(program, inputs)`, then
+  `Imp.get(prediction, :answer)`.
+
 ### Fixed
 
+- A call streamed with `Imp.stream(program, inputs, provider_stream: true)`
+  is recorded in its run like any other model call: a `:model_request` event
+  with the request's `:purpose`, and a `:model_response` event with the usage
+  and cost the provider reported. It recorded neither, so a streamed turn left
+  no model record, no cost and no ATIF model step.
+- A model turn that says something and calls tools keeps what it said. Through
+  `Imp.req_llm/2` the text was dropped whenever the reply had tool calls, so a
+  ReActV2 step's `next_thought` was empty; streamed with `provider_stream:
+  true`, the text was kept but the tool calls were lost, all of them when text
+  arrived and all but the last otherwise. Both now return the text and every
+  tool call, and the adapter reads the text as it reads a text reply, into
+  `next_thought` for ReActV2, as DSPy does. So when a ReActV2 run reaches
+  `max_iters` and its last reply has text beside tool calls it did not run,
+  that text is now the answer, where the answer was `nil`; the calls are still
+  listed as unexecuted. The text also appears in history turns and in the ATIF
+  model step.
 - An Avatar tool ends with its caller. Its task kept running after the
   caller was killed, after `Imp.Run.cancel/3` and after the run's owner died;
   it now ends when the caller does. It still runs unlinked, so a crash is an
