@@ -142,7 +142,7 @@ print(context)|},
     end)
 
     assert_receive {:controller_effect_started, effect_pid}, 1_000
-    send(effect_pid, {:expire_deadline, linked_budget(call_task.pid)})
+    send(effect_pid, {:expire_deadline, call_budget(call_task.pid)})
 
     assert {:error, {:rlm_max_time_ms, 60_000, []}} = Task.await(call_task, 1_000)
   end
@@ -753,10 +753,10 @@ missing()|},
     |> String.to_existing_atom()
   end
 
-  defp linked_budget(call_pid) do
-    {:links, links} = Process.info(call_pid, :links)
+  defp call_budget(call_pid) do
+    {:monitored_by, watchers} = Process.info(call_pid, :monitored_by)
 
-    Enum.find(links, fn pid ->
+    Enum.find(watchers, fn pid ->
       case Process.info(pid, :dictionary) do
         {:dictionary, dictionary} ->
           Keyword.get(dictionary, :"$initial_call") == {Budget, :init, 1}
@@ -764,6 +764,6 @@ missing()|},
         nil ->
           false
       end
-    end) || flunk("RLM call did not start a linked budget")
+    end) || flunk("RLM call did not start a budget")
   end
 end

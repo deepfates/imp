@@ -24,6 +24,13 @@ defmodule Imp.Predict.RLM do
   Tool execution is policy-gated. Denied, crashing, or policy-crashing
   registered-tool effects return `{:error, {:rlm_tool_error, reason}}` to the
   interpreter, which records the redacted failure and permits controller repair.
+
+  Each model call and tool call runs in an `Imp.Tasks` task, bounded by the
+  call's remaining `:max_time_ms`, that carries the caller's settings, run
+  context and deadline. Such a task ends with the RLM call: when a run is
+  cancelled or its owner dies, and, inside a run or outside one, when the
+  process making the call is killed; it then gives back its place in the task
+  pool.
   """
 
   @behaviour Imp.Module
@@ -33,12 +40,16 @@ defmodule Imp.Predict.RLM do
 
   @max_llm_calls_scope :subcalls_only
 
+  # Keys an effect task does not copy from its caller or back: the task's own
+  # identity, what `Imp.Tasks` gives the task itself, and the task's own
+  # admission lease, which the caller's would otherwise replace.
   @task_process_keys [
     :"$ancestors",
     :"$callers",
     :"$initial_call",
     :imp_context_stack,
-    :imp_settings_snapshot
+    :imp_settings_snapshot,
+    {Imp.Tasks, :admission_token}
   ]
 
   defstruct [
@@ -317,7 +328,7 @@ defmodule Imp.Predict.RLM do
   end
 
   defp call_with_new_budget(%__MODULE__{} = rlm, vars, opts) do
-    case Budget.start_link(
+    case Budget.start(
            max_lm_calls: rlm.max_llm_calls,
            max_time_ms: rlm.max_time_ms,
            max_recursion_depth: rlm.max_recursion_depth
@@ -1261,7 +1272,7 @@ defmodule Imp.Predict.RLM do
 
   defp run_budgeted(budget, fun) when is_function(fun, 0) do
     with :ok <- Budget.check(budget) do
-      {task, result_ref, inherited_keys} = start_budgeted_effect(fun)
+      {task, result_ref, inherited_keys} = start_budgeted_effect(budget, fun)
 
       case Budget.register_effect(budget, task.pid) do
         :ok ->
@@ -1274,12 +1285,17 @@ defmodule Imp.Predict.RLM do
     end
   end
 
-  defp start_budgeted_effect(fun) do
+  # The effect links itself to the budget before it does anything, so an
+  # effect whose caller dies before registering it still ends with the budget
+  # (see `Budget.start/1`), and one started after the budget is gone ends at
+  # once.
+  defp start_budgeted_effect(budget, fun) do
     inherited_dictionary = effect_process_dictionary()
     result_ref = make_ref()
 
     task =
       Imp.Tasks.async_nolink(fn ->
+        Process.link(budget)
         put_effect_process_dictionary(inherited_dictionary)
         result = fun.()
         {result_ref, result, effect_process_dictionary()}
