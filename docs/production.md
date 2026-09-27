@@ -132,7 +132,9 @@ end)
 #=> {:error, %ReqLLM.Error.API.Timeout{kind: :total, ...}}
 ~~~
 
-`Imp.start_run/3` takes the same bound as `deadline:`. To stop a call from
+`Imp.start_run/3` takes the same bound as `deadline:`. A deadline caps model
+requests and is carried into Imp's workers, but it does not bound the wait for
+a place in Imp's task pool. To stop a call from
 outside, start it as a run and cancel it. Tool calls are
 different from model calls: a tool that times out may already have acted, and
 Imp never retries one (see

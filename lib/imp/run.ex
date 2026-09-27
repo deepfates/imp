@@ -163,9 +163,14 @@ defmodule Imp.Run do
   any run.
 
   A run inherits the caller's `Imp.Deadline`, and `deadline: 30_000` bounds it
-  further: model requests inside the run are capped to the time left, and
-  tasks the run starts carry the same bound. The deadline stops new work; it
-  does not interrupt a tool that is already running. Use `cancel/2` for that.
+  further. Requests made through `Imp.Clients.ReqLLM` inside the run are capped
+  to the time left, `Imp.Predict.ReActV2` makes no further request once it has
+  passed, and tasks the run starts carry the same bound; a custom `Imp.LM`
+  decides for itself whether to read it. The deadline does not bound the wait
+  for a place in the pool: `start/3` waits as it does without one, and returns
+  `{:error, :deadline_exceeded}`, having started no work, when the deadline
+  passed while it waited. Nor does it interrupt a tool that is already
+  running; use `cancel/2` for that.
 
   An option this function does not know raises `ArgumentError`, so a
   misspelled `:authorize` cannot start a run whose tool calls nobody is asked
@@ -203,8 +208,13 @@ defmodule Imp.Run do
              limits:
                Map.new(Keyword.take(opts, [:max_events, :max_event_bytes, :max_snapshot_bytes]))
            ) do
+      gate = make_ref()
+
       body = fn ->
-        if deadline != :infinity, do: Imp.Deadline.bind(deadline)
+        if deadline != :infinity do
+          Imp.Deadline.bind(deadline)
+          await_gate(gate, owner)
+        end
 
         with_context(control, fn ->
           emit(:run_started, component: program.__struct__, input: inputs)
@@ -222,6 +232,20 @@ defmodule Imp.Run do
       end
 
       case start_task(body, admission) do
+        {:ok, task} when deadline != :infinity ->
+          # Admission may have waited for a place in the pool. A run whose
+          # deadline passed meanwhile would fail its first request, so it is
+          # not started at all.
+          if Imp.Deadline.expired?(deadline) do
+            Task.shutdown(task)
+            Control.force_stop(control)
+            {:error, :deadline_exceeded}
+          else
+            :ok = Control.attach_task(control, task.pid)
+            send(task.pid, {gate, :go})
+            {:ok, %__MODULE__{task: task, control: control, id: id}}
+          end
+
         {:ok, task} ->
           :ok = Control.attach_task(control, task.pid)
           {:ok, %__MODULE__{task: task, control: control, id: id}}
@@ -239,6 +263,20 @@ defmodule Imp.Run do
 
   def validate_admission(other),
     do: {:error, "expected {pool, limit} with a positive integer limit, got: #{inspect(other)}"}
+
+  # A run with a deadline waits for `start/3` to check it once the run is
+  # admitted, so that a run whose deadline has passed does no work.
+  defp await_gate(gate, owner) do
+    owner_monitor = Process.monitor(owner)
+
+    receive do
+      {^gate, :go} ->
+        Process.demonitor(owner_monitor, [:flush])
+
+      {:DOWN, ^owner_monitor, :process, ^owner, _reason} ->
+        exit(:shutdown)
+    end
+  end
 
   @doc false
   def validate_deadline(:infinity), do: {:ok, :infinity}

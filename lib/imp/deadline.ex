@@ -20,9 +20,12 @@ defmodule Imp.Deadline do
   the process that started it. `Imp.Run.start/3` also takes `deadline:`, and
   `Imp.Evaluate`'s `:deadline` option and GEPA's coordinator bind their own in
   the workers they start. Each of these is resolved with `resolve/1`, so it can
-  shorten the inherited deadline but never extend it. A process started with
-  plain `spawn/1` or `Task` carries nothing; call `with_deadline/2` inside it
-  with `{:deadline, current()}` captured in the parent.
+  shorten the inherited deadline but never extend it. The deadline does not
+  bound the wait for a place in Imp's task pool; `Imp.Run.start/3` returns
+  `{:error, :deadline_exceeded}` instead of starting a run whose deadline
+  passed while it waited. A process started with plain `spawn/1` or `Task`
+  carries nothing; call `with_deadline/2` inside it with
+  `{:deadline, current()}` captured in the parent.
   """
 
   @key {__MODULE__, :deadline}

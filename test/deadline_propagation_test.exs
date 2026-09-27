@@ -41,11 +41,30 @@ defmodule Imp.DeadlinePropagationTest do
                Imp.Tasks.async_nolink_in_pool(&Imp.Deadline.current/0, make_ref(), 1)
 
       assert bound == Task.await(task)
+
+      # Inside an admitted task: a borrowed task, and a stream the task
+      # enumerates itself, run on the task's own place in the pool.
+      assert {^bound, [{:ok, ^bound}, {:ok, ^bound}]} =
+               Task.await(
+                 Imp.Tasks.async(fn ->
+                   borrowed = Task.await(Imp.Tasks.async_nolink_borrowed(&Imp.Deadline.current/0))
+
+                   streamed =
+                     Enum.to_list(
+                       Imp.Tasks.async_stream([1, 2], fn _ -> Imp.Deadline.current() end)
+                     )
+
+                   {borrowed, streamed}
+                 end)
+               )
     end)
   end
 
-  test "a task of a caller with no deadline has none" do
-    assert :infinity == Task.await(Imp.Tasks.async(&Imp.Deadline.current/0))
+  test "a task of a caller with no deadline has no deadline binding" do
+    missing = fn -> Process.get({Imp.Deadline, :deadline}, :missing) end
+
+    assert :missing == Task.await(Imp.Tasks.async(missing))
+    assert [{:ok, :missing}] = Enum.to_list(Imp.Tasks.async_stream([1], fn _ -> missing.() end))
   end
 
   test "a worker's own deadline can shorten the inherited one but not extend it" do
@@ -152,6 +171,17 @@ defmodule Imp.DeadlinePropagationTest do
 
     assert {:error, _reason} = result
     assert div(microseconds, 1_000) < 2_000
+  end
+
+  test "a run whose deadline has passed by admission is not started" do
+    program = Imp.predict("q -> answer", lm: reporting_lm())
+
+    assert {:error, :deadline_exceeded} = Imp.start_run(program, %{q: "a"}, deadline: 0)
+
+    assert {:error, :deadline_exceeded} =
+             Imp.Deadline.with_deadline(0, fn -> Imp.start_run(program, %{q: "a"}) end)
+
+    refute_receive {:model_deadline, _pid, _deadline}, 200
   end
 
   test "an invalid deadline option raises" do

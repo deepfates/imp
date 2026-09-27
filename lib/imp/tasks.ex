@@ -181,13 +181,13 @@ defmodule Imp.Tasks do
   settings, `Imp.Run` context, telemetry context and `Imp.Deadline` of the
   process that started it, so a model call or tool event inside the task
   belongs to the caller's run, reads the caller's `Imp.configure/1` and
-  `Imp.context/2` settings, and cannot outlive the caller's deadline. A plain
-  `Task` does not carry them.
+  `Imp.context/2` settings, and has its model requests capped to the caller's
+  deadline. A plain `Task` does not carry them.
 
   Every such task takes a place in one machine-wide pool bounded by the
-  `:async_max_workers` setting, and waits for a place when the pool is full. A
-  host that bounds its own runs passes `admission: {pool, limit}` to
-  `Imp.Run.start/3` instead.
+  `:async_max_workers` setting, and waits for a place when the pool is full.
+  The caller's deadline does not bound that wait. A host that bounds its own
+  runs passes `admission: {pool, limit}` to `Imp.Run.start/3` instead.
   """
   @supervisor Imp.TaskSupervisor
   @unlinked_supervisor Imp.UnlinkedTaskSupervisor
@@ -313,9 +313,10 @@ defmodule Imp.Tasks do
 
   @doc false
   # Lazily runs a function through Imp's bounded, supervised task boundary.
-  # Settings are captured when `async_stream/3` is called. Stream-local fan-out
-  # is capped by the effective `:async_max_workers`; concurrent Imp work waits
-  # for capacity instead of turning contention into a prediction failure. A
+  # Settings and the caller's `Imp.Deadline` are captured when
+  # `async_stream/3` is called, not when the stream is enumerated. Stream-local
+  # fan-out is capped by the effective `:async_max_workers`; concurrent Imp work
+  # waits for capacity instead of turning contention into a prediction failure. A
   # stream synchronously enumerated inside an admitted Imp task reuses that
   # task's slot serially, so nested optimizer fan-out remains bounded without
   # self-deadlocking when the limit is one.
