@@ -20,7 +20,7 @@ defmodule Imp.Optimizer.InstructionSearch do
     candidate_instructions = unique_candidates(candidates)
     # Candidate evaluation records any failure as a failed candidate, so an
     # example without declared inputs is refused here instead.
-    Imp.Example.require_inputs!(devset)
+    Imp.Example.require_inputs!(devset, "Imp.Optimizer.InstructionSearch.compile", "devset")
 
     {candidate_results, baseline_result} =
       case new_evaluator(devset, metric) do

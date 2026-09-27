@@ -169,7 +169,8 @@ defmodule Imp.Optimizer.InferRules do
     {trainset, devset} = datasets(trainset, devset)
     # Candidate evaluation records any failure as a scored candidate, so an
     # example without declared inputs is refused here instead.
-    Imp.Example.require_inputs!(trainset ++ devset)
+    Imp.Example.require_inputs!(trainset, "Imp.Optimizer.InferRules.compile", "trainset")
+    Imp.Example.require_inputs!(devset, "Imp.Optimizer.InferRules.compile", "valset")
     ensure_predictors!(program)
     :ok = DurableCallbackIdentity.validate_normalized!(optimizer.metric_identity, "InferRules")
 

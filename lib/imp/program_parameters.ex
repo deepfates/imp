@@ -946,7 +946,10 @@ defmodule Imp.ProgramParameters do
 
   # ProgramOfThought's extraction step reads the outer signature's
   # instructions, so an instruction set on the inner predictor is carried to
-  # it; otherwise extraction would run with the old text.
+  # it; otherwise extraction would run with the old text. DSPy keeps the
+  # extractor a separate predictor that optimizers tune on its own; Imp
+  # exposes one predictor for the program, so one instruction governs both
+  # steps.
   defp update_builtin_predictor(%ProgramOfThought{predict: predictor} = program, update) do
     updated = update.(predictor)
     instructions = updated.signature.instructions

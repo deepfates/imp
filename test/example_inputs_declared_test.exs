@@ -4,8 +4,8 @@ defmodule Imp.ExampleInputsDeclaredTest do
   @moduledoc """
   An example that never declared its inputs cannot say which fields are
   labels, so asking for its inputs is an error rather than a view that hands
-  the labels to the program. Evaluation and every optimizer that runs a
-  program on examples surface that error instead of scoring on leaked labels.
+  the labels to the program. Evaluation, experiments and every optimizer that
+  runs a program on examples refuse such a dataset before any model call.
   """
 
   @undeclared ~r/Imp\.with_inputs\/2/
@@ -16,31 +16,19 @@ defmodule Imp.ExampleInputsDeclaredTest do
 
   defp declared_rows, do: Enum.map(undeclared_rows(), &Imp.with_inputs(&1, :question))
 
-  # The program reports every input map it is called with, so a test can show
-  # that no call carried the label.
-  defp program(owner) do
-    Imp.predict("question -> answer",
-      lm:
-        Imp.LM.Static.new(
-          handler: fn messages, _opts ->
-            send(owner, {:lm_prompt, Enum.map_join(messages, "\n", & &1.content)})
-            %{answer: "secret"}
-          end
-        )
+  # Every model in these tests reports each call, so a test can show that a
+  # refused dataset cost no call at all.
+  defp counting_lm(owner, response) do
+    Imp.LM.Static.new(
+      handler: fn _messages, _opts ->
+        send(owner, :lm_call)
+        response
+      end
     )
   end
 
-  defp prompt_lm(response), do: Imp.LM.Static.new(handler: fn _messages, _opts -> response end)
-
-  defp refute_label_reached_program do
-    receive do
-      {:lm_prompt, prompt} ->
-        refute prompt =~ "secret"
-        refute_label_reached_program()
-    after
-      0 -> :ok
-    end
-  end
+  defp program(owner),
+    do: Imp.predict("question -> answer", lm: counting_lm(owner, %{answer: "secret"}))
 
   describe "Imp.Example" do
     test "inputs and labels raise until inputs are declared" do
@@ -79,99 +67,216 @@ defmodule Imp.ExampleInputsDeclaredTest do
 
   describe "Imp.evaluate" do
     test "raises before calling the program" do
-      for num_threads <- [1, 2],
-          rows <- [undeclared_rows(), Enum.map(undeclared_rows(), &Imp.Example.to_map/1)] do
+      plain = Enum.map(undeclared_rows(), &Imp.Example.to_map/1)
+
+      for num_threads <- [1, 2], rows <- [undeclared_rows(), plain] do
         assert_raise ArgumentError, @undeclared, fn ->
           Imp.evaluate(program(self()), rows, Imp.exact_match(:answer), num_threads: num_threads)
         end
       end
 
-      refute_received {:lm_prompt, _prompt}
+      refute_received :lm_call
+    end
+
+    test "the error names the function called and the row, and no field values" do
+      [declared, _declared] = declared_rows()
+      [_undeclared, undeclared] = undeclared_rows()
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Imp.evaluate(program(self()), [declared, undeclared], Imp.exact_match(:answer))
+        end
+
+      assert Exception.message(error) =~ "Imp.evaluate/4: devset row 1 does not declare"
+      refute Exception.message(error) =~ "secret"
+
+      error =
+        assert_raise ArgumentError, fn ->
+          [declared, %{question: "private question", answer: "secret"}]
+          |> Imp.Evaluate.new(Imp.exact_match(:answer))
+          |> Imp.Evaluate.run(program(self()))
+        end
+
+      assert Exception.message(error) =~ "Imp.Evaluate.run/2: devset row 1 is a plain map"
+      assert Exception.message(error) =~ "[:answer, :question]"
+      refute Exception.message(error) =~ "secret"
+      refute Exception.message(error) =~ "private question"
+    end
+
+    test "enumerates a lazy devset once" do
+      owner = self()
+      devset = Stream.map(declared_rows(), fn row -> send(owner, :row_produced) && row end)
+
+      assert Imp.evaluate(program(owner), devset, Imp.exact_match(:answer)).score == 1.0
+      assert_received :row_produced
+      assert_received :row_produced
+      refute_received :row_produced
+    end
+
+    test "evaluates every row of a one-shot stream" do
+      rows =
+        for index <- 1..3,
+            do: Imp.example(question: "q#{index}", answer: "secret") |> Imp.with_inputs(:question)
+
+      {:ok, agent} = Agent.start_link(fn -> rows end)
+
+      one_shot =
+        Stream.resource(
+          fn -> agent end,
+          fn agent ->
+            case Agent.get_and_update(agent, fn rows -> {rows, []} end) do
+              [] -> {:halt, agent}
+              rows -> {rows, agent}
+            end
+          end,
+          fn _agent -> :ok end
+        )
+
+      result = Imp.evaluate(program(self()), one_shot, Imp.exact_match(:answer))
+      assert length(result.rows) == 3
+      assert result.score == 1.0
+    end
+  end
+
+  test "Imp.Experiment.Data refuses rows that cannot declare inputs" do
+    [declared, other] = declared_rows()
+
+    error =
+      assert_raise ArgumentError, fn ->
+        Imp.Experiment.Data.new(
+          train: [declared],
+          selection: [%{question: "private question", answer: "secret"}],
+          test: [other]
+        )
+      end
+
+    assert Exception.message(error) =~ "Imp.Experiment.Data.new/1: selection row 0 is a plain map"
+    refute Exception.message(error) =~ "secret"
+
+    [undeclared, _undeclared] = undeclared_rows()
+
+    assert_raise ArgumentError, ~r/test row 0 does not declare its inputs/, fn ->
+      Imp.Experiment.Data.new(train: [declared], selection: [other], test: [undeclared])
     end
   end
 
   describe "optimizers" do
-    defp optimizers do
+    # {name, optimizer, program builder, datasets it takes}
+    defp optimizers(owner) do
       metric = Imp.exact_match(:answer)
+      lm = &counting_lm(owner, &1)
+      predict = fn -> program(owner) end
+
+      avatar = fn ->
+        Imp.avatar("question -> answer", [Imp.tool(:lookup, "Look up", fn _ -> "x" end)],
+          lm: lm.(%{action: %{tool_name: "Finish", tool_input_query: %{}}, answer: "secret"}),
+          max_iters: 2
+        )
+      end
 
       [
-        bootstrap_few_shot: {Imp.Optimizer.BootstrapFewShot.new(metric), false},
-        random_search:
-          {Imp.Optimizer.BootstrapFewShotWithRandomSearch.new(metric,
-             num_candidate_programs: 1,
-             max_bootstrapped_demos: 1,
-             max_labeled_demos: 0
-           ), false},
-        copro:
-          {Imp.Optimizer.COPRO.new(metric,
-             breadth: 2,
-             depth: 1,
-             proposer_lm:
-               prompt_lm(
-                 Jason.encode!(%{
-                   "proposed_instruction" => "Answer.",
-                   "proposed_prefix_for_output_field" => "Answer:"
-                 })
-               )
-           ), false},
-        mipro_v2:
-          {Imp.Optimizer.MIPROv2.new(metric,
-             auto: nil,
-             num_candidates: 2,
-             num_trials: 2,
-             max_bootstrapped_demos: 0,
-             max_labeled_demos: 0,
-             minibatch: false,
-             startup_trials: 1,
-             prompt_lm: prompt_lm(%{"instructions" => ["Answer."]})
-           ), true},
-        simba:
-          {Imp.Optimizer.SIMBA.new(metric,
-             bsize: 2,
-             num_candidates: 2,
-             max_steps: 1,
-             max_demos: 0,
-             seed: 11,
-             prompt_lm: prompt_lm(%{discussion: "ok", module_advice: %{main: "Answer."}})
-           ), false},
-        gepa:
-          {Imp.Optimizer.GEPA.new(metric,
-             generations: 1,
-             minibatch_size: 2,
-             seed: 11,
-             reflection_lm: prompt_lm(%{instruction: "Answer."})
-           ), true},
-        infer_rules:
-          {Imp.Optimizer.InferRules.new(metric,
-             num_candidates: 1,
-             num_rules: 1,
-             max_bootstrapped_demos: 0,
-             max_labeled_demos: 0,
-             rule_lm: prompt_lm(%{reasoning: "ok", natural_language_rules: "Answer."})
-           ), false},
-        signature_optimizer:
-          {Imp.Optimizer.SignatureOptimizer.new(metric, candidates: ["Answer."]), true}
+        {"BootstrapFewShot", Imp.Optimizer.BootstrapFewShot.new(metric), predict, [:trainset]},
+        {"BootstrapFewShotWithRandomSearch",
+         Imp.Optimizer.BootstrapFewShotWithRandomSearch.new(metric,
+           num_candidate_programs: 1,
+           max_bootstrapped_demos: 1,
+           max_labeled_demos: 0
+         ), predict, [:trainset, :valset]},
+        {"COPRO",
+         Imp.Optimizer.COPRO.new(metric,
+           breadth: 2,
+           depth: 1,
+           proposer_lm:
+             lm.(
+               Jason.encode!(%{
+                 "proposed_instruction" => "Answer.",
+                 "proposed_prefix_for_output_field" => "Answer:"
+               })
+             )
+         ), predict, [:trainset]},
+        {"MIPROv2",
+         Imp.Optimizer.MIPROv2.new(metric,
+           auto: nil,
+           num_candidates: 2,
+           num_trials: 2,
+           max_bootstrapped_demos: 0,
+           max_labeled_demos: 0,
+           minibatch: false,
+           startup_trials: 1,
+           prompt_lm: lm.(%{"instructions" => ["Answer."]})
+         ), predict, [:trainset, :valset]},
+        {"SIMBA",
+         Imp.Optimizer.SIMBA.new(metric,
+           bsize: 2,
+           num_candidates: 2,
+           max_steps: 1,
+           max_demos: 0,
+           seed: 11,
+           prompt_lm: lm.(%{discussion: "ok", module_advice: %{main: "Answer."}})
+         ), predict, [:trainset]},
+        {"GEPA",
+         Imp.Optimizer.GEPA.new(metric,
+           generations: 1,
+           minibatch_size: 2,
+           seed: 11,
+           reflection_lm: lm.(%{instruction: "Answer."})
+         ), predict, [:trainset, :valset]},
+        {"GEPA",
+         Imp.Optimizer.GEPA.new(metric,
+           execution_profile: :beam_native,
+           generations: 1,
+           minibatch_size: 2,
+           seed: 11,
+           reflection_lm: lm.(%{instruction: "Answer."})
+         ), predict, [:trainset, :valset]},
+        {"InferRules",
+         Imp.Optimizer.InferRules.new(metric,
+           num_candidates: 1,
+           num_rules: 1,
+           max_bootstrapped_demos: 0,
+           max_labeled_demos: 0,
+           rule_lm: lm.(%{reasoning: "ok", natural_language_rules: "Answer."})
+         ), predict, [:trainset, :valset]},
+        {"SignatureOptimizer",
+         Imp.Optimizer.SignatureOptimizer.new(metric, candidates: ["Answer."]), predict,
+         [:trainset, :valset]},
+        {"BetterTogether",
+         Imp.Optimizer.BetterTogether.new(metric, %{p: Imp.Optimizer.BootstrapFewShot.new(metric)}),
+         predict, [:trainset, :valset]},
+        {"Avatar",
+         Imp.Optimizer.Avatar.new(metric,
+           max_iters: 1,
+           comparator_lm: lm.(%{feedback: "f"}),
+           rewrite_lm: lm.(%{new_instruction: "n"})
+         ), avatar, [:trainset]}
       ]
     end
 
-    test "raise instead of scoring on leaked labels" do
-      for {family, {optimizer, needs_validation?}} <- optimizers() do
-        run = fn ->
-          if needs_validation?,
-            do: Imp.optimize!(program(self()), optimizer, undeclared_rows(), undeclared_rows()),
-            else: Imp.optimize!(program(self()), optimizer, undeclared_rows())
-        end
+    defp optimize(optimizer, program, datasets, trainset, valset) do
+      if :valset in datasets,
+        do: Imp.optimize!(program, optimizer, trainset, valset),
+        else: Imp.optimize!(program, optimizer, trainset)
+    end
+
+    test "refuse each dataset without declared inputs before any model call" do
+      for {name, optimizer, program, datasets} <- optimizers(self()),
+          undeclared <- datasets do
+        {trainset, valset} =
+          if undeclared == :trainset,
+            do: {undeclared_rows(), declared_rows()},
+            else: {declared_rows(), undeclared_rows()}
 
         try do
-          run.()
-          flunk("#{family} ran on examples without declared inputs")
+          optimize(optimizer, program.(), datasets, trainset, valset)
+          flunk("#{name} ran with an undeclared #{undeclared}")
         rescue
           error in ArgumentError ->
-            assert Exception.message(error) =~ @undeclared,
-                   "#{family}: #{Exception.message(error)}"
+            message = Exception.message(error)
+            assert message =~ "Imp.Optimizer.#{name}.compile: ", "#{name}: #{message}"
+            assert message =~ "row 0 does not declare its inputs", "#{name}: #{message}"
         end
 
-        refute_label_reached_program()
+        refute_received :lm_call, "#{name} called a model before refusing its #{undeclared}"
       end
     end
 
@@ -186,19 +291,40 @@ defmodule Imp.ExampleInputsDeclaredTest do
       assert {:error, {:optimizer_failed, Imp.Optimizer.GRPO, %ArgumentError{} = error}} =
                Imp.train(program(self()), optimizer, undeclared_rows())
 
-      assert Exception.message(error) =~ @undeclared
+      assert Exception.message(error) =~ "Imp.Optimizer.GRPO.compile: trainset row 0"
       assert Imp.Test.FileGRPOTrainer.events(root) == []
-      refute_received {:lm_prompt, _prompt}
+      refute_received :lm_call
+    end
+
+    test "InstructionSearch refuses a devset without declared inputs before any model call" do
+      assert_raise ArgumentError,
+                   ~r/Imp\.Optimizer\.InstructionSearch\.compile: devset row 0 does not declare/,
+                   fn ->
+                     Imp.Optimizer.InstructionSearch.compile(
+                       program(self()),
+                       Imp.exact_match(:answer),
+                       declared_rows(),
+                       undeclared_rows(),
+                       ["Answer."]
+                     )
+                   end
+
+      refute_received :lm_call
+    end
+
+    test "BootstrapFinetune returns the refusal as its error before any model call" do
+      assert %{error: {:bootstrap_finetune_prepare_failed, message}} =
+               Imp.Optimizer.BootstrapFinetune.new(Imp.exact_match(:answer))
+               |> Imp.Optimizer.BootstrapFinetune.compile(program(self()), undeclared_rows())
+
+      assert message =~ "Imp.Optimizer.BootstrapFinetune.compile: trainset row 0"
+      refute_received :lm_call
     end
 
     test "run when the same rows declare their inputs" do
-      for {family, {optimizer, needs_validation?}} <- optimizers() do
-        compiled =
-          if needs_validation?,
-            do: Imp.optimize!(program(self()), optimizer, declared_rows(), declared_rows()),
-            else: Imp.optimize!(program(self()), optimizer, declared_rows())
-
-        assert {:ok, _prediction} = Imp.call(compiled, %{question: "q"}), "#{family}"
+      for {name, optimizer, program, datasets} <- optimizers(self()) do
+        compiled = optimize(optimizer, program.(), datasets, declared_rows(), declared_rows())
+        assert {:ok, _prediction} = Imp.call(compiled, %{question: "q"}), name
       end
     end
   end

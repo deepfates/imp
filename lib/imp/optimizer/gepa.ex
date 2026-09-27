@@ -356,6 +356,8 @@ defmodule Imp.Optimizer.GEPA do
     ensure_proposal_source!(optimizer)
     trainset = Enum.to_list(trainset)
     devset = Enum.to_list(devset)
+    Imp.Example.require_inputs!(trainset, "Imp.Optimizer.GEPA.compile", "trainset")
+    Imp.Example.require_inputs!(devset, "Imp.Optimizer.GEPA.compile", "valset")
     {feedback, feedback_errors} = feedback(optimizer, trainset)
 
     reflection_feedback =

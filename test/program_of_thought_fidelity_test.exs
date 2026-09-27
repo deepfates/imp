@@ -113,6 +113,26 @@ defmodule ProgramOfThoughtFidelityTest do
     assert rendered(extraction) =~ "Double the number."
   end
 
+  test "a ProgramOfThought and a CodeAct with an optimizer's instruction save and load" do
+    pot =
+      "x: int -> answer: int"
+      |> Imp.program_of_thought()
+      |> Imp.ProgramParameters.put_instruction(:main, "Add carefully.")
+
+    loaded = pot |> Imp.Saving.dump() |> Imp.Saving.load!()
+    assert loaded.signature.instructions == "Add carefully."
+    assert loaded.predict.signature.instructions == "Add carefully."
+
+    code_act =
+      "x: int -> answer: int"
+      |> Imp.code_act([])
+      |> Imp.ProgramParameters.put_instruction(:main, "Double it.")
+
+    loaded = code_act |> Imp.Saving.dump() |> Imp.Saving.load!()
+    assert loaded.program_of_thought.signature.instructions == "Double it."
+    assert loaded.program_of_thought.predict.signature.instructions == "Double it."
+  end
+
   test "ProgramOfThought extracts a type-invalid scalar instead of bypassing the signature" do
     owner = self()
 

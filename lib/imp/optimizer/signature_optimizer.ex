@@ -107,6 +107,8 @@ defmodule Imp.Optimizer.SignatureOptimizer do
 
   @doc false
   def compile(%__MODULE__{} = optimizer, program, trainset, devset) do
+    Imp.Example.require_inputs!(trainset, "Imp.Optimizer.SignatureOptimizer.compile", "trainset")
+    Imp.Example.require_inputs!(devset, "Imp.Optimizer.SignatureOptimizer.compile", "valset")
     predictor = selected_predictor!(program, optimizer.predictor)
     {candidates, proposal} = proposals(optimizer, program, trainset, predictor)
 

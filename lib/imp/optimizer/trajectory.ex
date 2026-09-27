@@ -1112,7 +1112,7 @@ defmodule Imp.Optimizer.TrajectoryRunner do
     timeout = Keyword.get(opts, :timeout, 5_000)
 
     examples = Enum.to_list(examples)
-    Imp.Example.require_inputs!(examples)
+    Imp.Example.require_inputs!(examples, "Imp.Optimizer.TrajectoryRunner.run/4", "examples")
     indexed_examples = Enum.with_index(examples)
 
     case Keyword.get(opts, :deadline) do

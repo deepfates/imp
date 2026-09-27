@@ -24,21 +24,36 @@ User-visible changes to Imp are recorded here.
   recorded in the calling process, which made parallel work that process
   started afterwards (`Imp.Predict.Parallel.map/3`, `Imp.Evaluate.run/2`) run
   one item at a time.
-- `Imp.Example.inputs/1` and `labels/1` raise `ArgumentError` naming
-  `Imp.with_inputs/2` when the example never declared its inputs, as DSPy
-  raises `ValueError`. They returned every field as inputs, labels included,
-  so a program was given the answer and scored on it. `Imp.evaluate/4` and
-  every optimizer that runs a program on examples raise before calling the
-  program; a devset row that is a plain map or field pair list, which cannot
-  declare inputs, raises the same way instead of being evaluated.
-- `Imp.Example.new/1` and `Imp.Prediction.new/2` raise when a field is given
-  twice, as an atom and a string or repeated; one value was silently dropped.
-- `Imp.Signature.new/2` (and `Imp.signature/2`) applies new instructions to an
-  existing signature; it returned the signature unchanged.
 - An instruction an optimizer sets on `Imp.Predict.ProgramOfThought` or
   `Imp.Predict.CodeAct` reaches the extraction step, which kept the old
   instructions when GEPA, MIPROv2, COPRO, SIMBA or InferRules set it.
   `Imp.Optimizer.InstructionSearch` sets instructions the same way.
+- A ProgramOfThought or CodeAct whose instruction an optimizer set saves and
+  loads. `Imp.Saving.load!/1` raised "saved ProgramOfThought planner
+  instructions must match task instructions" for it.
+
+### Examples and datasets
+
+Every change here is breaking for code that relied on the old behaviour.
+
+- `Imp.Example.inputs/1` and `labels/1` raise `ArgumentError` when the example
+  never declared its inputs, as DSPy raises `ValueError`. They returned every
+  field as inputs, labels included, so a program was given the answer and
+  scored on it. `Imp.evaluate/4`, `Imp.Evaluate.run/2`,
+  `Imp.Experiment.Data.new/1` and every optimizer that runs a program on
+  examples check each dataset before any model call, and the error names the
+  function, the dataset and the row. Migration: call `Imp.with_inputs/2` on
+  every example you evaluate or optimize on.
+- `Imp.Evaluate` and `Imp.Experiment.Data` refuse a row that is a plain map or
+  a field pair list, which cannot declare its inputs; Evaluate turned it into
+  an example whose labels reached the program. Migration: build the row with
+  `Imp.example/1 |> Imp.with_inputs(...)`.
+- `Imp.Example.new/1` and `Imp.Prediction.new/2` raise when a field is given
+  twice, as an atom and a string or as a repeated key; one value was silently
+  dropped. Migration: give each field once, under one spelling.
+- `Imp.Signature.new/2` (and `Imp.signature/2`) applies new instructions to an
+  existing signature; it returned the signature unchanged. Migration: to keep
+  a signature's instructions, pass it without instructions.
 
 ### Documentation
 

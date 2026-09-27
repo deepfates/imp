@@ -61,6 +61,9 @@ defmodule Imp.Signature do
 
   `instructions`, when given, replaces the spec's own: an existing signature
   gets the new instructions, and a map's `:instructions` key is overridden.
+  DSPy's `ensure_signature` raises when given a signature and instructions;
+  Imp applies them, as it does for a map, so `Imp.signature/2` sets the
+  instructions of any spec.
   """
   def new(spec, instructions \\ nil)
 

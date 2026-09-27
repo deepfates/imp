@@ -107,32 +107,43 @@ defmodule Imp.Example do
     do: %{example | fields: Imp.FieldMap.drop(example.fields, input_keys!(example, "labels"))}
 
   @doc false
-  # Raises the error `inputs/1` would for the first row of `rows` that cannot
-  # say which of its fields are inputs. Evaluation and optimizers call it
-  # before running anything, outside the per-row recovery that would otherwise
-  # record the error as a failed, scored row. A plain map or field pair list
-  # cannot declare inputs. Any other row, or a `rows` that is not enumerable,
-  # is left to the caller's own checks.
-  def require_inputs!(rows) do
-    if Enumerable.impl_for(rows), do: Enum.each(rows, &require_row_inputs!/1)
+  # Raises when a row of `rows` cannot say which of its fields are inputs,
+  # naming `caller` (the public function the user called), the `dataset` and
+  # the row's index. Evaluation and optimizers call it before any model call,
+  # outside the per-row recovery that would otherwise record the error as a
+  # failed, scored row. A plain map or field pair list cannot declare inputs.
+  # Messages list key names only: values can be private data. Any other row,
+  # or a `rows` that is not enumerable, is left to the caller's own checks.
+  def require_inputs!(rows, caller, dataset) do
+    if Enumerable.impl_for(rows) do
+      rows
+      |> Enum.with_index()
+      |> Enum.each(fn {row, index} -> require_row_inputs!(row, caller, dataset, index) end)
+    end
+
     :ok
   end
 
-  defp require_row_inputs!(row) do
-    case row do
-      %__MODULE__{} = example ->
-        input_keys!(example, "inputs")
-
-      row when (is_map(row) and not is_struct(row)) or is_list(row) ->
-        raise ArgumentError,
-              "a plain map or field pair list cannot declare which fields are inputs; build " <>
-                "the row with Imp.example/1 and call Imp.with_inputs/2 on it. Got: " <>
-                inspect(row)
-
-      _row ->
-        :ok
-    end
+  defp require_row_inputs!(%__MODULE__{input_keys: nil} = example, caller, dataset, index) do
+    raise ArgumentError,
+          "#{caller}: #{dataset} row #{index} does not declare its inputs; call " <>
+            "Imp.with_inputs/2 on it. Its keys: #{inspect(keys(example))}"
   end
+
+  defp require_row_inputs!(%__MODULE__{}, _caller, _dataset, _index), do: :ok
+
+  defp require_row_inputs!(row, caller, dataset, index)
+       when (is_map(row) and not is_struct(row)) or is_list(row) do
+    raise ArgumentError,
+          "#{caller}: #{dataset} row #{index} is a plain map or field pair list, which " <>
+            "cannot declare its inputs; build it with Imp.example/1 and call " <>
+            "Imp.with_inputs/2 on it. Its keys: #{inspect(row_keys(row))}"
+  end
+
+  defp require_row_inputs!(_row, _caller, _dataset, _index), do: :ok
+
+  defp row_keys(row) when is_map(row), do: row |> Map.keys() |> Enum.sort_by(&to_string/1)
+  defp row_keys(row), do: for({key, _value} <- row, do: key)
 
   defp input_keys!(%__MODULE__{input_keys: nil} = example, function) do
     raise ArgumentError,
