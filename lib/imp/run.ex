@@ -112,6 +112,14 @@ defmodule Imp.Run do
       type: :string,
       doc: "The run's id. When absent, a random one is made."
     ],
+    deadline: [
+      type: {:custom, __MODULE__, :validate_deadline, []},
+      doc:
+        "Bounds the run with `Imp.Deadline`: milliseconds counted from the call to " <>
+          "`start/3`, `:infinity`, or `{:deadline, absolute}` in monotonic " <>
+          "milliseconds. It is capped by the caller's own deadline. When absent, " <>
+          "the run inherits the caller's deadline, if any."
+    ],
     max_event_bytes: [
       type: @bound,
       default: 65_536,
@@ -154,6 +162,11 @@ defmodule Imp.Run do
   itself, which runs one item at a time on the run's own place, as it does for
   any run.
 
+  A run inherits the caller's `Imp.Deadline`, and `deadline: 30_000` bounds it
+  further: model requests inside the run are capped to the time left, and
+  tasks the run starts carry the same bound. The deadline stops new work; it
+  does not interrupt a tool that is already running. Use `cancel/2` for that.
+
   An option this function does not know raises `ArgumentError`, so a
   misspelled `:authorize` cannot start a run whose tool calls nobody is asked
   about.
@@ -169,6 +182,7 @@ defmodule Imp.Run do
     authorize = opts[:authorize]
     authorization_timeout = opts[:authorization_timeout]
     admission = opts[:admission]
+    deadline = Imp.Deadline.resolve(Keyword.get(opts, :deadline, :infinity))
 
     id = Keyword.get_lazy(opts, :id, &new_id/0)
     owner = self()
@@ -190,6 +204,8 @@ defmodule Imp.Run do
                Map.new(Keyword.take(opts, [:max_events, :max_event_bytes, :max_snapshot_bytes]))
            ) do
       body = fn ->
+        if deadline != :infinity, do: Imp.Deadline.bind(deadline)
+
         with_context(control, fn ->
           emit(:run_started, component: program.__struct__, input: inputs)
           result = Imp.Module.execute(program, inputs, execution)
@@ -223,6 +239,21 @@ defmodule Imp.Run do
 
   def validate_admission(other),
     do: {:error, "expected {pool, limit} with a positive integer limit, got: #{inspect(other)}"}
+
+  @doc false
+  def validate_deadline(:infinity), do: {:ok, :infinity}
+
+  def validate_deadline(milliseconds) when is_integer(milliseconds) and milliseconds >= 0,
+    do: {:ok, milliseconds}
+
+  def validate_deadline({:deadline, absolute} = deadline) when is_integer(absolute),
+    do: {:ok, deadline}
+
+  def validate_deadline(other),
+    do:
+      {:error,
+       "expected a non-negative timeout in milliseconds, :infinity or {:deadline, absolute}, " <>
+         "got: #{inspect(other)}"}
 
   defp start_task(body, nil), do: {:ok, Imp.Tasks.async_nolink(body)}
   defp start_task(body, {pool, limit}), do: Imp.Tasks.async_nolink_in_pool(body, pool, limit)
