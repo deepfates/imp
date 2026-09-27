@@ -571,7 +571,6 @@ defmodule Imp.LM.Budgeted do
 
   # A decorator is the LM it wraps as far as capabilities go: what the inner
   # client can do is what a request through this one can do.
-  @doc false
   def response_format_capability(%__MODULE__{inner: inner}),
     do: Imp.LM.response_format_capability(inner)
 

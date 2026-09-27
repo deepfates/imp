@@ -1514,6 +1514,8 @@
       "category": "stable",
       "functions": [
         "format_tool_result/1",
+        "render_outputs/3",
+        "render_system/2",
         "tool_error_text/1"
       ],
       "kind": "module",
@@ -1523,6 +1525,12 @@
         "functions": {
           "format_tool_result/1": [
             "format_tool_result(value)"
+          ],
+          "render_outputs/3": [
+            "render_outputs(signature, outputs, missing_field_message)"
+          ],
+          "render_system/2": [
+            "render_system(signature, opts \\\\ [])"
           ],
           "tool_error_text/1": [
             "tool_error_text(reason)"
@@ -1538,7 +1546,9 @@
       "category": "stable",
       "functions": [
         "lm_opts/2",
-        "lm_opts/3"
+        "lm_opts/3",
+        "render_outputs/3",
+        "render_system/2"
       ],
       "kind": "module",
       "macros": [],
@@ -1550,6 +1560,12 @@
           ],
           "lm_opts/3": [
             "lm_opts(signature, opts, capability)"
+          ],
+          "render_outputs/3": [
+            "render_outputs(signature, outputs, missing_field_message)"
+          ],
+          "render_system/2": [
+            "render_system(signature, opts \\\\ [])"
           ]
         }
       },
@@ -2032,11 +2048,23 @@
     {
       "callbacks": [],
       "category": "stable",
-      "functions": [],
+      "functions": [
+        "render_outputs/3",
+        "render_system/2"
+      ],
       "kind": "module",
       "macros": [],
       "module": "Imp.Adapter.XML",
-      "signatures": {},
+      "signatures": {
+        "functions": {
+          "render_outputs/3": [
+            "render_outputs(signature, outputs, missing_field_message)"
+          ],
+          "render_system/2": [
+            "render_system(signature, opts \\\\ [])"
+          ]
+        }
+      },
       "source": "lib/imp/adapter/xml.ex",
       "struct_fields": [],
       "types": []
@@ -8013,6 +8041,7 @@
         "max_iters",
         "react",
         "signature",
+        "tool_order",
         "tool_policy",
         "tools"
       ],
