@@ -6,6 +6,30 @@ User-visible changes to Imp are recorded here.
 
 ### Fixed
 
+- An Avatar tool ends with its caller. Its task kept running after the
+  caller was killed, after `Imp.Run.cancel/3` and after the run's owner died;
+  it now ends when the caller does. It still runs unlinked, so a crash is an
+  observation, and takes no place in the task pool. It sees the caller's
+  `Imp.context/2` settings, run context and deadline, which it did not, and
+  parallel work it starts runs on the caller's place in the pool when the
+  caller has one. A tool that timed out, or whose task exited, reads as
+  `:unknown` in `Imp.Tool.outcome/1` rather than `:result`, since it may have
+  acted.
+  Inside a run, Avatar records each tool call as `:tool_call` and
+  `:tool_result` events with `metadata.outcome`, and arguments that fail the
+  tool's schema are refused before the tool starts.
+- An RLM call made outside a run no longer leaves its model or tool call
+  running, holding a place in the task pool, when the calling process is
+  killed. An RLM call no longer leaves the pool place of one of its own tasks
+  recorded in the calling process, which made parallel work that process
+  started afterwards (`Imp.Predict.Parallel.map/3`, `Imp.Evaluate.run/2`) run
+  one item at a time.
+- The package ships the TRL worker that `Imp.Clients.TRLTrainer` starts by
+  default: `priv/trl_worker/worker.py`, its `pyproject.toml` and `uv.lock`, and
+  the default contract. In 0.5.0 the defaults named files the package did not
+  contain, so GRPO training from Hex needed a source checkout. The default
+  contract now pins transformers 5.10.1, the version the lockfile installs; it
+  named 5.5.0, which the worker refused at startup.
 - An `Imp.react` step asks for one thing. With the Chat adapter and an LM
   that calls tools natively, the step's system message is the inputs and the
   objective with the loop's guidance, and no longer also describes
@@ -27,12 +51,25 @@ User-visible changes to Imp are recorded here.
 - The `[:imp, :adapter, :parse, :json_fallback]` event names the adapter whose
   reply failed as `:adapter` (it always said `Imp.Adapter.Chat`, also for
   XML) and the adapter that retried as `:fallback_adapter`.
-
 - Repairing a Python-style completion keeps its text: `{'answer': 'caf\u00e9'}`
   reads as `café`, not `cafu00e9`, and emoji written as `\ud83d\ude00` or
   `\U0001f600` read as the emoji. An escape the repair cannot read makes the
   parse an `Imp.AdapterParseError` instead of dropping its backslash. This
   reaches the Chat, JSON and XML adapters and GEPA's instruction proposal.
+
+### Documentation
+
+- The install instructions ask for a C and a C++ compiler: jaxon builds native
+  code from C and erlexec from C++. They asked for a C++ compiler only. They
+  also say the first compile needs network access, for erlexec's rebar3
+  plugins.
+- The package's Changelog link opens the changelog on HexDocs, and the 0.4.0
+  entry links the benchmark pages as they were at v0.4.0, not on `main`.
+- Each Livebook's setup cell only installs Imp: from Hex, or from the
+  checkout `IMP_PATH` names. It no longer searches for a source checkout.
+- The MCP example on the Tools and agents page defines its server and its
+  imported tools, where it used an undefined `imported`, and closes the
+  server when the call fails.
 
 ## 0.5.0 — 2026-09-26
 
@@ -950,8 +987,8 @@ Every change here is breaking for code that matches on the old shape.
 - Removed the evidence-certification bookkeeping from the source checkout. It
   never shipped in the package, so a consumer sees no change; the benchmark
   harness it wrapped is unchanged.
-- Added [Benchmarks](https://github.com/deepfates/imp/blob/main/research/BENCHMARKS.md)
-  and its [results table](https://github.com/deepfates/imp/blob/main/research/RESULTS.md).
+- Added [Benchmarks](https://github.com/deepfates/imp/blob/v0.4.0/docs/BENCHMARKS.md)
+  and its [results table](https://github.com/deepfates/imp/blob/v0.4.0/benchmarks/RESULTS.md).
   Every number this repository publishes is one row in that table, carrying
   the dataset and its license, the model, the provider, the date, the commit,
   and the command that produced it; prose elsewhere cites a row rather than

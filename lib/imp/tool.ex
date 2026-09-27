@@ -181,9 +181,9 @@ defmodule Imp.Tool do
     * `:not_sent` — an MCP request that never left.
     * `:unknown` — the tool may have acted and there is no answer to say
       whether it did: a tool function that raised, threw or exited, an RLM
-      budget that stopped or refused the call, an MCP call with no trustworthy
-      answer, or an MCP error result that declares it. Check before repeating
-      it.
+      budget that stopped or refused the call, an Avatar tool that timed out
+      or whose task exited, an MCP call with no trustworthy answer, or an MCP
+      error result that declares it. Check before repeating it.
   """
   @type outcome :: :result | :refused | :auth_refused | :not_sent | :unknown
 
@@ -196,15 +196,15 @@ defmodule Imp.Tool do
   @doc """
   The outcome of a tool call, read from the value the call returned.
 
-  Pass what `call/2` returned, or the `{:error, reason}` a ReActV2 or RLM loop
-  recorded for the call. A tool function can return any term, including one
-  that looks like an Imp refusal, so a value alone never reads as `:refused`
-  unless something that knows declared it: an `Imp.MCP.CallFailure`, which
-  Imp builds where ExMCP's error arrives, or an MCP error result whose
-  `structuredContent.outcome` is `"refused"`, `"auth_refused"` or
-  `"unknown"`. Imp's own refusals are decided by the loop that made them,
-  which records the outcome on the call's `:tool_result` event as
-  `metadata.outcome`; read that rather than this for a recorded call.
+  Pass what `call/2` returned, or the `{:error, reason}` a ReActV2, RLM or
+  Avatar loop recorded for the call. A tool function can return any term,
+  including one that looks like an Imp refusal, so a value alone never reads
+  as `:refused` unless something that knows declared it: an
+  `Imp.MCP.CallFailure`, which Imp builds where ExMCP's error arrives, or an
+  MCP error result whose `structuredContent.outcome` is `"refused"`,
+  `"auth_refused"` or `"unknown"`. Imp's own refusals are decided by the loop
+  that made them, which records the outcome on the call's `:tool_result` event
+  as `metadata.outcome`; read that rather than this for a recorded call.
 
       iex> Imp.Tool.outcome("Paris")
       :result
@@ -236,6 +236,14 @@ defmodule Imp.Tool do
     do: :unknown
 
   defp error_outcome({:tool_error, _name, _reason}), do: :unknown
+
+  # Avatar runs each tool in a task bounded by `:tool_timeout_ms`. A tool that
+  # timed out was killed while it ran, and a task that exited or could not be
+  # awaited may have acted first.
+  defp error_outcome({kind, _name, _reason})
+       when kind in [:tool_timeout, :tool_task_exit, :tool_task_error],
+       do: :unknown
+
   defp error_outcome(_reason), do: :result
 
   # An MCP error result is the tool's own answer. A server that knows more

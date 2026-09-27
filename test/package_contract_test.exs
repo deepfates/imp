@@ -23,6 +23,10 @@ defmodule PackageContractTest do
                    "lib/imp/lm/static.ex",
                    "lib/imp/optimizer/budget.ex",
                    "priv/public_api.json",
+                   "priv/trl_worker/pyproject.toml",
+                   "priv/trl_worker/qwen-one-update-contract.json",
+                   "priv/trl_worker/uv.lock",
+                   "priv/trl_worker/worker.py",
                    "CHANGELOG.md",
                    "LICENSE",
                    "NOTICE",
@@ -62,7 +66,14 @@ defmodule PackageContractTest do
     "lib/mix/tasks/imp.public_api.ex",
     "lib/mix/tasks/imp.package.clean_room.ex",
     "bench/imp/upstream_authority_registry.ex",
-    "priv/public_api_policy.json"
+    "priv/public_api_policy.json",
+    "priv/trl_worker/controlled-conformance-contract.json",
+    "priv/trl_worker/feasibility-contract.json",
+    "priv/trl_worker/qwen-opaque-38-step-contract.json",
+    "priv/trl_worker/qwen-ten-step-contract.json",
+    "priv/trl_worker/qwen-trec-14-step-contract.json",
+    "priv/trl_worker/qwen-trec-source-guided-33-step-contract.json",
+    "priv/trl_worker/qwen-two-step-contract.json"
   ]
 
   @excluded_deployment_files [
@@ -508,6 +519,27 @@ defmodule PackageContractTest do
 
       unless source == expected_source do
         raise "manifest source binding mismatch for \#{entry["module"]}: expected \#{expected_source}, got \#{source}"
+      end
+    end
+
+    trl_trainer =
+      Imp.Clients.TRLTrainer.new(python: "python3.12", model_path: "model", root: "root")
+
+    installed_priv = :imp |> :code.priv_dir() |> to_string() |> canonicalize.()
+
+    for path <- [trl_trainer.worker_script, trl_trainer.contract_path] do
+      unless File.regular?(path) do
+        raise "TRLTrainer default is missing from the installed package: \#{path}"
+      end
+
+      unless path |> canonicalize.() |> String.starts_with?(installed_priv <> "/") do
+        raise "TRLTrainer default resolves outside the installed package: \#{path}"
+      end
+    end
+
+    for file <- ["pyproject.toml", "uv.lock"] do
+      unless installed_priv |> Path.join("trl_worker/\#{file}") |> File.regular?() do
+        raise "the TRL worker's \#{file} is missing from the installed package"
       end
     end
 
