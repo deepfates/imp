@@ -2,6 +2,16 @@
 
 User-visible changes to Imp are recorded here.
 
+## Unreleased
+
+### Fixed
+
+- Repairing a Python-style completion keeps its text: `{'answer': 'caf\u00e9'}`
+  reads as `café`, not `cafu00e9`, and emoji written as `\ud83d\ude00` or
+  `\U0001f600` read as the emoji. An escape the repair cannot read makes the
+  parse an `Imp.AdapterParseError` instead of dropping its backslash. This
+  reaches the Chat, JSON and XML adapters and GEPA's instruction proposal.
+
 ## 0.5.0 — 2026-09-26
 
 ### Security

@@ -13,6 +13,10 @@ defmodule Imp.Adapter.JSONRepair do
   #   * then Python-literal forms: single-quoted strings, `True`/`False`/`None`,
   #     nested dicts/lists, trailing commas.
   #
+  # Text is kept byte for byte, and an escape is decoded to the character it
+  # names (`\u00e9`, a `\ud83d\ude00` surrogate pair, Python's `\U0001f600`
+  # and `\xe9`) or the decode fails.
+  #
   # It is NOT a general Python parser: anything outside those forms is a loud
   # `:error`, so schema validation reports the honest failure instead of a
   # silent guess.
@@ -165,7 +169,13 @@ defmodule Imp.Adapter.JSONRepair do
 
   defp parse_string_body(<<>>, _quote, _acc), do: :error
 
-  defp parse_string_body(<<?\\, escaped, rest::binary>>, quote, acc) do
+  # The escapes JSON and Python string literals share, plus Python's `\x`
+  # and `\U`. A `\u` pair that spells a surrogate pair is one character, as
+  # it is in JSON. Any other escape is one this module cannot read with
+  # certainty, so the whole decode is `:error` rather than a string with its
+  # backslash dropped.
+  defp parse_string_body(<<?\\, escaped, rest::binary>>, quote, acc)
+       when escaped in [?\\, ?', ?", ?/, ?n, ?t, ?r, ?b, ?f] do
     resolved =
       case escaped do
         ?n -> ?\n
@@ -179,12 +189,55 @@ defmodule Imp.Adapter.JSONRepair do
     parse_string_body(rest, quote, [resolved | acc])
   end
 
+  defp parse_string_body(<<?\\, ?u, hex::binary-size(4), rest::binary>>, quote, acc) do
+    with {:ok, high} <- hex_codepoint(hex) do
+      case {high, rest} do
+        {high, <<?\\, ?u, low_hex::binary-size(4), after_pair::binary>>}
+        when high in 0xD800..0xDBFF ->
+          with {:ok, low} when low in 0xDC00..0xDFFF <- hex_codepoint(low_hex) do
+            codepoint = 0x10000 + (high - 0xD800) * 0x400 + (low - 0xDC00)
+            parse_string_body(after_pair, quote, [<<codepoint::utf8>> | acc])
+          else
+            _not_a_pair -> :error
+          end
+
+        {high, _rest} when high in 0xD800..0xDFFF ->
+          :error
+
+        {codepoint, rest} ->
+          parse_string_body(rest, quote, [<<codepoint::utf8>> | acc])
+      end
+    end
+  end
+
+  defp parse_string_body(<<?\\, ?U, hex::binary-size(8), rest::binary>>, quote, acc),
+    do: escaped_codepoint(hex, rest, quote, acc)
+
+  defp parse_string_body(<<?\\, ?x, hex::binary-size(2), rest::binary>>, quote, acc),
+    do: escaped_codepoint(hex, rest, quote, acc)
+
+  defp parse_string_body(<<?\\, _escaped::binary>>, _quote, _acc), do: :error
+
   defp parse_string_body(<<char, rest::binary>>, quote, acc) do
     if char == quote do
       {:ok, acc |> Enum.reverse() |> :erlang.list_to_binary(), rest}
     else
       parse_string_body(rest, quote, [char | acc])
     end
+  end
+
+  defp escaped_codepoint(hex, rest, quote, acc) do
+    case hex_codepoint(hex) do
+      {:ok, codepoint} when codepoint in 0xD800..0xDFFF or codepoint > 0x10FFFF -> :error
+      {:ok, codepoint} -> parse_string_body(rest, quote, [<<codepoint::utf8>> | acc])
+      :error -> :error
+    end
+  end
+
+  defp hex_codepoint(hex) do
+    if hex =~ ~r/\A[0-9a-fA-F]+\z/,
+      do: {:ok, String.to_integer(hex, 16)},
+      else: :error
   end
 
   @number_pattern ~r/^-?\d+(\.\d+)?([eE][+-]?\d+)?/
