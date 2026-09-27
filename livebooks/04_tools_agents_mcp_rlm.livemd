@@ -1,38 +1,14 @@
 # Imp 04: Tools, agents, MCP and RLM
 
 ```elixir
-imp_checkout? = fn path ->
-  is_binary(path) and File.regular?(Path.join(path, "mix.exs")) and
-    File.regular?(Path.join(path, "lib/imp.ex"))
+# Set IMP_PATH to run this notebook against a local Imp checkout.
+case System.get_env("IMP_PATH") do
+  nil -> Mix.install([{:imp, "~> 0.5"}])
+  path -> Mix.install([{:imp, path: path}], lockfile: Path.join(path, "mix.lock"))
 end
+```
 
-explicit_repo = System.get_env("IMP_PATH")
-
-if explicit_repo && not imp_checkout?.(Path.expand(explicit_repo)) do
-  raise "IMP_PATH does not point to an Imp source checkout or unpacked package"
-end
-
-repo =
-  [explicit_repo, Path.expand("..", __DIR__), File.cwd!()]
-  |> Enum.reject(&is_nil/1)
-  |> Enum.map(&Path.expand/1)
-  |> Enum.find(imp_checkout?)
-
-if repo do
-  # Prefer the notebook's own Imp checkout even when Livebook was launched
-  # from an unrelated Mix project. Unpacked package archives may omit
-  # mix.lock, so pin it only when the source checkout actually provides it.
-  install_opts =
-    if File.regular?(Path.join(repo, "mix.lock")),
-      do: [lockfile: Path.join(repo, "mix.lock")],
-      else: []
-
-  Mix.install([{:imp, path: repo}], install_opts)
-else
-  # Standalone notebook: install the released package from Hex.
-  Mix.install([{:imp, "~> 0.5"}])
-end
-
+```elixir
 # Live cells run when LIVE_PROVIDER=1 and a key is set: OPENAI_API_KEY, or
 # OPENROUTER_API_KEY for the same model through OpenRouter. In your own code,
 # any ReqLLM model string works.

@@ -16,7 +16,8 @@ or, for a script or a Livebook notebook:
 Mix.install([{:imp, "~> 0.5"}])
 ~~~
 
-Imp needs Elixir 1.19 and a C++ compiler for one dependency (erlexec).
+Imp needs Elixir 1.19 and a C and C++ compiler, for the native code in two
+dependencies (jaxon and erlexec).
 
 ## Connecting to a model
 
