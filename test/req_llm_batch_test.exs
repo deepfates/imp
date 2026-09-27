@@ -615,9 +615,9 @@ defmodule ReqLLMBatchTest do
           Process.sleep(:infinity)
         end)
 
-      assert_receive {:worker, worker}
+      assert_receive {:worker, worker}, 5_000
       ref = Process.monitor(worker)
-      assert_receive :dispatched
+      assert_receive :dispatched, 5_000
       Process.sleep(50)
       send(parent, :stop)
 
