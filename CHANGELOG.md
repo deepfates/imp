@@ -64,14 +64,16 @@ User-visible changes to Imp are recorded here.
 - The `[:imp, :adapter, :parse, :json_fallback]` event names the adapter whose
   reply failed as `:adapter` (it always said `Imp.Adapter.Chat`, also for
   XML) and the adapter that retried as `:fallback_adapter`.
-- Repairing a Python-style completion keeps its text: `{'answer': 'caf\u00e9'}`
-  reads as `café`, not `cafu00e9`, and emoji written as `\ud83d\ude00` or
-  `\U0001f600` read as the emoji. Escapes are read as Python reads a string
-  literal: `'\d+'` and `'C:\path'` keep their backslash, `\a`, `\v`, `\0` and
-  octal escapes decode, and a backslash before a newline is dropped. A
-  malformed `\x`, `\u` or `\U` escape or a lone surrogate makes the parse an
-  `Imp.AdapterParseError` instead of dropping its backslash. This reaches the
-  Chat, JSON and XML adapters and GEPA's instruction proposal.
+- Repairing a Python-style completion keeps its text and gives the value
+  DSPy parses: `{'answer': 'caf\u00e9'}` reads as `café`, not `cafu00e9`.
+  Escapes are read the way `json_repair`, which DSPy runs first, reads them:
+  `\t`, `\n`, `\r`, `\b`, `\\`, escaped quotes, `\u` with four hex digits and
+  `\x` with two decode, and every other escape (`\d`, `C:\path`, `\a`, `\0`,
+  `\U`, `\N{…}`, a backslash before a newline) keeps its backslash. A `\u`
+  surrogate pair reads as the character it spells; a lone surrogate, which
+  an Elixir string cannot hold, makes the parse an `Imp.AdapterParseError`.
+  This reaches the Chat, JSON and XML adapters and GEPA's instruction
+  proposal.
 
 ### Documentation
 

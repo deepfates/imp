@@ -13,9 +13,9 @@ defmodule Imp.Adapter.JSONRepair do
   #   * then Python-literal forms: single-quoted strings, `True`/`False`/`None`,
   #     nested dicts/lists, trailing commas.
   #
-  # Text is kept byte for byte, and escapes are read as Python reads them
-  # (see `parse_string_body/3`): a changed value is never reported as a
-  # successful decode.
+  # Text is kept byte for byte, and escapes are read as DSPy's own repair
+  # reads them (see `parse_string_body/3`); where Imp cannot give DSPy's value
+  # the decode fails rather than report a different one.
   #
   # It is NOT a general Python parser: anything outside those forms is a loud
   # `:error`, so schema validation reports the honest failure instead of a
@@ -169,100 +169,105 @@ defmodule Imp.Adapter.JSONRepair do
 
   defp parse_string_body(<<>>, _quote, _acc), do: :error
 
-  # Escapes read as Python's `ast.literal_eval` reads them in a string
-  # literal, with one addition from JSON: a `\u` surrogate pair is one
-  # character. A backslash before a newline continues the line and is dropped.
-  # `\x`, `\u` and `\U` take exactly 2, 4 and 8 hex digits, and a code
-  # point past U+10FFFF is refused; each of those is a syntax error in Python
-  # and makes the decode `:error`. So does a lone surrogate, which Python keeps
-  # but an Elixir string cannot hold. An escape Python does
-  # not define (`\d`, `\p`, `\/`) keeps its backslash, as Python keeps it.
-  # `\N{name}` is kept as written: OTP has no Unicode name table to decode
-  # it by, and `json_repair`, the first rung of DSPy's ladder, keeps it too.
-  defp parse_string_body(<<?\\, ?\r, ?\n, rest::binary>>, quote, acc),
-    do: parse_string_body(rest, quote, acc)
-
-  defp parse_string_body(<<?\\, ?\n, rest::binary>>, quote, acc),
-    do: parse_string_body(rest, quote, acc)
+  # Escapes are read as `json_repair` (0.61.4, pinned with DSPy 3.3.1) reads
+  # them, because DSPy runs it before `ast.literal_eval` and it returns a value
+  # for every escape, so its value is the one DSPy parses:
+  #
+  #   * `\t`, `\n`, `\r`, `\b`, `\\` and an escaped closing quote decode; an
+  #     escaped other quote (`\"` in a single-quoted string, `\“`, `\”`) is that
+  #     quote.
+  #   * After `\\`, a run of further backslashes is dropped, and an escaped
+  #     closing quote after them is kept as a quote (the string goes on).
+  #   * `\u` with 4 hex digits and `\x` with 2 decode.
+  #   * Every other escape keeps its backslash: `\f`, `\/`, `\a`, `\v`, `\0`,
+  #     octal, `\U`, `\N{name}`, a `\u` or `\x` without its hex digits, and a
+  #     backslash before a newline.
+  #   * A string ending in a newline loses its trailing whitespace.
+  #
+  # Where Imp cannot give DSPy's value it fails instead: `json_repair` puts a
+  # `\u` surrogate into the string as a lone UTF-16 code unit, which an Elixir
+  # string cannot hold. A `\ud83d\ude00` pair is decoded to the one character it
+  # spells, which is what DSPy's two code units mean, and a surrogate that is
+  # not half of a pair makes the decode `:error`. `json_repair` also recovers a
+  # string whose closing quote it consumed as an escape (`'a\\'}`); this
+  # parser does not, and that decode is `:error` too.
+  defp parse_string_body(<<?\\, ?\\, rest::binary>>, quote, acc) do
+    {char, rest} = after_escaped_backslash(rest, quote)
+    parse_string_body(rest, quote, [char | acc])
+  end
 
   defp parse_string_body(<<?\\, escaped, rest::binary>>, quote, acc)
-       when escaped in [?\\, ?', ?", ?n, ?t, ?r, ?b, ?f, ?a, ?v] do
+       when escaped in [quote, ?t, ?n, ?r, ?b] do
     resolved =
       case escaped do
-        ?n -> ?\n
         ?t -> ?\t
+        ?n -> ?\n
         ?r -> ?\r
         ?b -> ?\b
-        ?f -> ?\f
-        ?a -> 7
-        ?v -> 11
         other -> other
       end
 
     parse_string_body(rest, quote, [resolved | acc])
   end
 
-  defp parse_string_body(<<?\\, ?u, hex::binary-size(4), rest::binary>>, quote, acc) do
-    with {:ok, high} <- hex_codepoint(hex) do
-      case {high, rest} do
-        {high, <<?\\, ?u, low_hex::binary-size(4), after_pair::binary>>}
-        when high in 0xD800..0xDBFF ->
-          with {:ok, low} when low in 0xDC00..0xDFFF <- hex_codepoint(low_hex) do
-            codepoint = 0x10000 + (high - 0xD800) * 0x400 + (low - 0xDC00)
-            parse_string_body(after_pair, quote, [<<codepoint::utf8>> | acc])
-          else
-            _not_a_pair -> :error
-          end
+  defp parse_string_body(<<?\\, ?u, hex::binary-size(4), rest::binary>> = binary, quote, acc) do
+    case hex_codepoint(hex) do
+      {:ok, high} when high in 0xD800..0xDBFF ->
+        with <<?\\, ?u, low_hex::binary-size(4), after_pair::binary>> <- rest,
+             {:ok, low} when low in 0xDC00..0xDFFF <- hex_codepoint(low_hex) do
+          codepoint = 0x10000 + (high - 0xD800) * 0x400 + (low - 0xDC00)
+          parse_string_body(after_pair, quote, [<<codepoint::utf8>> | acc])
+        else
+          _not_a_pair -> :error
+        end
 
-        {high, _rest} when high in 0xD800..0xDFFF ->
-          :error
+      {:ok, low} when low in 0xDC00..0xDFFF ->
+        :error
 
-        {codepoint, rest} ->
-          parse_string_body(rest, quote, [<<codepoint::utf8>> | acc])
-      end
+      {:ok, codepoint} ->
+        parse_string_body(rest, quote, [<<codepoint::utf8>> | acc])
+
+      :error ->
+        keep_escape(binary, quote, acc)
     end
   end
 
-  defp parse_string_body(<<?\\, ?u, _short::binary>>, _quote, _acc), do: :error
-
-  defp parse_string_body(<<?\\, ?U, hex::binary-size(8), rest::binary>>, quote, acc),
-    do: escaped_codepoint(hex, rest, quote, acc)
-
-  defp parse_string_body(<<?\\, ?U, _short::binary>>, _quote, _acc), do: :error
-
-  defp parse_string_body(<<?\\, ?x, hex::binary-size(2), rest::binary>>, quote, acc),
-    do: escaped_codepoint(hex, rest, quote, acc)
-
-  defp parse_string_body(<<?\\, ?x, _short::binary>>, _quote, _acc), do: :error
-
-  defp parse_string_body(<<?\\, rest::binary>>, quote, acc)
-       when binary_part(rest, 0, 1) in ~w(0 1 2 3 4 5 6 7) do
-    {digits, rest} = take_octal(rest, [])
-    parse_string_body(rest, quote, [<<List.to_integer(digits, 8)::utf8>> | acc])
+  defp parse_string_body(<<?\\, ?x, hex::binary-size(2), rest::binary>> = binary, quote, acc) do
+    case hex_codepoint(hex) do
+      {:ok, codepoint} -> parse_string_body(rest, quote, [<<codepoint::utf8>> | acc])
+      :error -> keep_escape(binary, quote, acc)
+    end
   end
 
-  defp parse_string_body(<<?\\, rest::binary>>, quote, acc) when rest != "",
-    do: parse_string_body(rest, quote, [?\\ | acc])
+  defp parse_string_body(<<?\\, other_quote::utf8, rest::binary>>, quote, acc)
+       when other_quote in [?", ?', ?“, ?”] and other_quote != quote,
+       do: parse_string_body(rest, quote, [<<other_quote::utf8>> | acc])
+
+  defp parse_string_body(<<?\\, _::binary>> = binary, quote, acc),
+    do: keep_escape(binary, quote, acc)
 
   defp parse_string_body(<<char, rest::binary>>, quote, acc) do
     if char == quote do
-      {:ok, acc |> Enum.reverse() |> :erlang.list_to_binary(), rest}
+      {:ok, acc |> Enum.reverse() |> :erlang.list_to_binary() |> trim_after_newline(), rest}
     else
       parse_string_body(rest, quote, [char | acc])
     end
   end
 
-  defp take_octal(<<digit, rest::binary>>, digits) when digit in ?0..?7 and length(digits) < 3,
-    do: take_octal(rest, [digit | digits])
+  # The backslash stays and the character after it is read as ordinary text.
+  defp keep_escape(<<?\\, rest::binary>>, _quote, _acc) when rest == "", do: :error
 
-  defp take_octal(rest, digits), do: {Enum.reverse(digits), rest}
+  defp keep_escape(<<?\\, rest::binary>>, quote, acc),
+    do: parse_string_body(rest, quote, [?\\ | acc])
 
-  defp escaped_codepoint(hex, rest, quote, acc) do
-    case hex_codepoint(hex) do
-      {:ok, codepoint} when codepoint in 0xD800..0xDFFF or codepoint > 0x10FFFF -> :error
-      {:ok, codepoint} -> parse_string_body(rest, quote, [<<codepoint::utf8>> | acc])
-      :error -> :error
-    end
+  defp after_escaped_backslash(<<?\\, rest::binary>>, quote),
+    do: after_escaped_backslash(rest, quote)
+
+  defp after_escaped_backslash(<<quote, rest::binary>>, quote), do: {quote, rest}
+  defp after_escaped_backslash(rest, _quote), do: {?\\, rest}
+
+  defp trim_after_newline(text) do
+    if String.ends_with?(text, "\n"), do: String.trim_trailing(text), else: text
   end
 
   defp hex_codepoint(hex) do
