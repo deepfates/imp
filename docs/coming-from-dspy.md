@@ -78,8 +78,9 @@ evaluated is the program you ship.
 That explicit seam is why a test swaps in `Imp.LM.Static` without patching
 anything.
 
-**Supervision is the execution model.** Evaluation rows and parallel calls
-run in supervised tasks from one pool of limited size. A failing example is
+**Supervision is the execution model.** Parallel calls, and evaluation rows
+when you pass `num_threads:` above 1 or a `timeout:`, run in supervised tasks
+from one pool of limited size. A failing example is
 one error row, not a crashed run, and `timeout:` turns a slow one into an
 error row too. Each model request has a receive timeout, and
 `Imp.Deadline.with_deadline/2` cuts it to the time you allow. A tool function

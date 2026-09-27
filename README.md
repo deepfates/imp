@@ -46,24 +46,26 @@ same task reason first, use `Imp.chain_of_thought/2`; to give it tools, use
 ## Measure it and improve it
 
 Give Imp labeled examples and a metric, and it scores the program and
-optimizes it. You need two lists of issues you have already labeled:
-`trainset`, which the optimizer learns from, and `devset`, which it is scored
-on. `strong_lm` is a more capable model that GEPA uses to read failures and
+optimizes it. You need three lists of issues you have already labeled:
+`trainset`, which the optimizer learns from; `valset`, which it uses to choose
+between the programs it tries; and `testset`, which you score on before and
+after. `strong_lm` is a more capable model that GEPA uses to read failures and
 write new instructions.
 
 ```elixir
-# trainset and devset are lists of labeled issues like this one:
-Imp.example(%{issue: "Please add a dark mode to the dashboard", kind: "feature"})
-|> Imp.with_inputs([:issue])
+# Each set is a list of labeled issues like this one:
+example =
+  Imp.example(%{issue: "Please add a dark mode to the dashboard", kind: "feature"})
+  |> Imp.with_inputs([:issue])
 
 metric = Imp.exact_match(:kind)
 
-Imp.evaluate(triage, devset, metric).score
+Imp.evaluate(triage, testset, metric).score
 
 optimizer = Imp.Optimizer.GEPA.new(metric, reflection_lm: strong_lm, max_metric_calls: 300)
-improved = Imp.optimize!(triage, optimizer, trainset, devset)
+improved = Imp.optimize!(triage, optimizer, trainset, valset)
 
-Imp.evaluate(improved, devset, metric).score
+Imp.evaluate(improved, testset, metric).score
 ```
 
 GEPA runs the program, reads where it failed, and rewrites its instructions.
@@ -133,7 +135,7 @@ Imp also includes:
   deadline you set. A tool call that may already have taken effect is
   reported as unknown, never silently retried.
 - **More shapes:** RLM for inputs far larger than a context window, CodeAct
-  and program of thought for tasks that need code, and your own modules
+  and program of thought, which compute with small sandboxed expressions, and your own modules
   composed from these.
 
 The optimizers work on agents too. GEPA reflects on whole agent runs and
@@ -160,7 +162,7 @@ pull requests are welcome.
 - [Getting started](docs/getting-started/index.md) builds one program step by
   step, from the first call to a supervised server, with real scores.
 - [Coming from DSPy](docs/coming-from-dspy.md) maps DSPy's names to Imp's.
-- [Tutorials](livebooks/01_real_lm_front_door.livemd) are Livebook notebooks
+- [Tutorials](https://github.com/deepfates/imp/tree/v0.5.0/livebooks) are Livebook notebooks
   you can run offline or with a key.
 - The [cheatsheet](docs/cheatsheet.cheatmd) has the common calls on one page.
 

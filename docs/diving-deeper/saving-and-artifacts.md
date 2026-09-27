@@ -31,7 +31,7 @@ atomically and readable only by the user that wrote them (mode 0600). Each
 file carries a schema version and a SHA-256 checksum of its payload; loading
 refuses a file whose checksum does not match or whose version it does not
 know, rather than loading part of it. So a saved file is for reading and
-review, not editing: a file changed by hand refuses to load. Change the
+review, not editing: a file whose contents were edited by hand refuses to load. Change the
 program in code and save it again, or work on the map with `Imp.dump/1` and
 `Imp.load/1`, which carry no checksum.
 
