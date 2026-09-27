@@ -28,9 +28,12 @@ does the second.
 
 Both forms are pretty-printed JSON you can diff and review, written
 atomically and readable only by the user that wrote them (mode 0600). Each
-file carries a SHA-256 of its contents and a schema version; loading
+file carries a schema version and a SHA-256 checksum of its payload; loading
 refuses a file whose checksum does not match or whose version it does not
-know, rather than loading part of it.
+know, rather than loading part of it. So a saved file is for reading and
+review, not editing: a file whose values were changed by hand refuses to load. Change the
+program in code and save it again, or work on the map with `Imp.dump/1` and
+`Imp.load/1`, which carry no checksum.
 
 ### 3. Credentials are never saved
 

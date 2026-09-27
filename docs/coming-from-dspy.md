@@ -3,8 +3,11 @@
 You know DSPy. Imp keeps its programming model: signatures, modules,
 examples, metrics, evaluation, optimizers, tools, retrieval, and saved
 programs. What changes is the host. An Imp program is an immutable Elixir
-value, it runs under OTP supervision, and the model is passed to it like any
-other dependency.
+value, it can run as its own supervised process, and the model is passed to
+it like any other dependency.
+
+Imp tracks DSPy 3.3.1 as of September 2026; DSPy 3.4's additions are being
+brought in.
 
 ## The five-minute version
 
@@ -56,7 +59,8 @@ something better.
 | `GRPO` | experimental, through TRL-compatible training workers |
 | `dspy.ChatAdapter`, `JSONAdapter`, `XMLAdapter`, `TwoStepAdapter` | `Imp.Adapter.Chat`, `JSON`, `XML`, `TwoStep` ([Adapters](diving-deeper/adapters.md)) |
 | `use_json_adapter_fallback=False` | `config: [json_fallback: false]` |
-| `program.save(path)`, `dspy.load(path)` | `Imp.save!(program, path)`, `Imp.read!(path)`; `Imp.dump/1` and `Imp.load/1` for maps |
+| `program.save("state.json")`, `program.load(...)` | `Imp.Optimizer.Artifact`: tuned parameters applied to a program your code builds ([Saving and artifacts](diving-deeper/saving-and-artifacts.md)) |
+| `program.save(path, save_program=True)`, `dspy.load(path)` | `Imp.save!(program, path)`, `Imp.read!(path)`: the whole program as checksummed JSON, not a pickle; `Imp.dump/1` and `Imp.load/1` for maps |
 | `dspy.streamify(program, stream_listeners=...)` | `Imp.stream(program, inputs, provider_stream: true, stream_listeners: ...)` |
 | `dspy.inspect_history()` | `prediction.metadata.trace.messages`, `Imp.trace/2`, `Imp.inspect_history/2` |
 | `track_usage=True`, `pred.get_lm_usage()` | `Imp.configure(track_usage: true)`, `Imp.Prediction.get_lm_usage/1` |
@@ -74,10 +78,15 @@ evaluated is the program you ship.
 That explicit seam is why a test swaps in `Imp.LM.Static` without patching
 anything.
 
-**Supervision is the execution model.** Evaluation, parallel calls, tool calls
-and interpreted code run in bounded, supervised tasks. A slow provider call
-ends in a timeout rather than a hung program, and one failing example is one
-error row, not a crashed run. The
+**Supervision is the execution model.** Parallel calls, and evaluation rows
+when you pass `num_threads:` above 1 or a `timeout:`, run in supervised tasks
+from one pool of limited size. A failing example is
+one error row, not a crashed run, and `timeout:` turns a slow one into an
+error row too. Each model request has a receive timeout, and
+`Imp.Deadline.with_deadline/2` cuts it to the time you allow. A tool function
+has no time limit of its own (an MCP tool call does, 30 seconds by default),
+so to bound an agent, start it with `Imp.start_run/3` and cancel it when you
+choose. The
 [deployment example](https://github.com/deepfates/imp/blob/v0.5.0/examples/deployment/README.md)
 is a complete OTP application.
 
@@ -114,7 +123,8 @@ compiled program on your own held-out data.
 
 Python integrations do not carry over. Imp's extension points are
 `Imp.LM`, `Imp.Retrieve`, adapters, tools and training clients. DSPy's `Flex`
-code optimizer has no Imp counterpart.
+code optimizer has no Imp counterpart yet. GEPA's `optimize_anything` is
+`Imp.Optimize.Anything.run/3`, which rewrites any text or JSON you can score.
 
 ## Nearby Elixir work
 

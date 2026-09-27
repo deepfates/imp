@@ -3,23 +3,24 @@ defmodule Imp.Deadline do
   Process-scoped absolute deadlines for cooperative time budgets.
 
   A deadline is either `:infinity` or an absolute monotonic time in
-  milliseconds. Long-running work (evaluation waves, optimizer rollouts,
-  provider calls) resolves its timeout against the current process deadline
-  with `resolve/1`, so a nested call can never outlive its parent's budget.
+  milliseconds. `with_deadline/2` binds one to the calling process for the
+  duration of a function; a nested `with_deadline/2` can shorten the bound but
+  never extend it.
 
-  A host bounds a piece of work by running it inside `with_deadline/2`. What
-  reads the bound: `Imp.Clients.ReqLLM` caps each request's receive and total
-  timeout to the time left, and `Imp.Predict.ReActV2` makes no further request
-  once it has passed. Nothing interrupts code that is already running: a tool
-  call in progress finishes or times out on its own terms, and stopping it is
-  what cancelling an `Imp.Run` is for.
+  The bound is cooperative: only code that reads it is limited by it.
+  `Imp.Clients.ReqLLM` caps each request's `:receive_timeout` and
+  `:total_timeout` (retries included) to the time left, and
+  `Imp.Predict.ReActV2` makes no further model request once it has passed.
+  Apart from Imp's own evaluation and optimizer machinery, nothing is limited
+  by it: a running tool or retriever is not interrupted. To stop work at a time you choose, run it in a process you can
+  cancel, such as a run from `Imp.start_run/3`.
 
   The binding belongs to the calling process. Work Imp starts in other
   processes carries it: every `Imp.Tasks` task, and so `Imp.parallel/3`,
   evaluation rows, optimizer fan-out and `Imp.Run`, runs under the deadline of
   the process that started it. `Imp.Run.start/3` also takes `deadline:`, and
   `Imp.Evaluate`'s `:deadline` option and GEPA's coordinator bind their own in
-  the workers they start. Each of these is resolved with `resolve/1`, so it can
+  the workers they start, and stop those workers when it passes. Each of these is resolved with `resolve/1`, so it can
   shorten the inherited deadline but never extend it. The deadline does not
   bound the wait for a place in Imp's task pool; `Imp.Run.start/3` returns
   `{:error, :deadline_exceeded}` instead of starting a run whose deadline

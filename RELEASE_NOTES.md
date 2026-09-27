@@ -35,6 +35,14 @@ tree calls, and no cowlib release fixes it yet.
 
 ## Headline changes
 
+- GEPA works on agents. Optimizing an `Imp.react` agent, the reflection model
+  reads the whole run (tool calls, tool results, the final answer) and the
+  agent's tools, and GEPA rewrites the agent's instruction. By default
+  `Imp.Optimizer.GEPA` behaves as DSPy's GEPA does; Imp's own search is
+  `execution_profile: :beam_native`.
+- An `Imp.Deadline` reaches the work Imp starts for you: `Imp.parallel/3`,
+  evaluation rows, optimizer workers and runs inherit the caller's deadline,
+  and `Imp.start_run/3` takes `deadline:`.
 - Imp depends on ExMCP 1.5 from Hex, unpatched. What Imp needed from the
   `deepfates/ex_mcp` fork now lives in Imp: stdio MCP servers that end with
   their connection, children included; a clean `PATH` for them inside a
