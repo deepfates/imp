@@ -214,6 +214,99 @@ defmodule AvatarTest do
     refute_receive :blocking_tool_late_side_effect, 300
   end
 
+  test "a timed-out tool reads as unknown, and a run records the call" do
+    lm = hanging_tool_lm()
+
+    avatar =
+      Imp.avatar("question -> answer", [hanging_tool(self())], lm: lm, tool_timeout_ms: 100)
+
+    assert {:ok, run} = Imp.start_run(avatar, %{question: "q"})
+    assert {:ok, prediction} = Task.await(run.task)
+    assert [%ActionOutput{tool_output: timeout}] = Imp.get(prediction, :actions)
+    assert {:error, {:tool_timeout, :hang, 100}} = timeout
+    assert Imp.Tool.outcome(timeout) == :unknown
+
+    events = Imp.Run.events(run)
+    assert [call] = Enum.filter(events, &(&1.kind == :tool_call))
+    assert [result] = Enum.filter(events, &(&1.kind == :tool_result))
+    assert call.tool_call_id == result.tool_call_id
+    assert result.metadata.outcome == :unknown
+    Imp.Run.stop(run)
+  end
+
+  test "a tool sees the caller's settings, run context and deadline" do
+    parent = self()
+
+    tool =
+      Imp.tool(:hang, "Reports what it sees.", fn _arguments ->
+        send(
+          parent,
+          {:seen, Imp.Settings.fetch!(:avatar_marker), Imp.Run.context(), Imp.Deadline.current()}
+        )
+
+        "seen"
+      end)
+
+    avatar = Imp.avatar("question -> answer", [tool], lm: hanging_tool_lm(), max_iters: 1)
+
+    Imp.context([avatar_marker: :from_caller], fn ->
+      Imp.Deadline.with_deadline(60_000, fn ->
+        assert {:ok, _prediction} = Imp.call(avatar, %{question: "q"})
+      end)
+    end)
+
+    assert_received {:seen, :from_caller, nil, deadline}
+    assert deadline != :infinity
+
+    assert {:ok, run} =
+             Imp.context([avatar_marker: :from_run_caller], fn ->
+               Imp.start_run(avatar, %{question: "q"})
+             end)
+
+    assert {:ok, _prediction} = Task.await(run.task)
+    assert_received {:seen, :from_run_caller, control, _deadline}
+    assert is_pid(control)
+    Imp.Run.stop(run)
+  end
+
+  test "a tool ends when its caller is killed" do
+    parent = self()
+    avatar = Imp.avatar("question -> answer", [hanging_tool(parent)], lm: hanging_tool_lm())
+    caller = spawn(fn -> Imp.call(avatar, %{question: "q"}) end)
+
+    assert_receive {:tool_started, tool_pid}, 1_000
+    tool_monitor = Process.monitor(tool_pid)
+    Process.exit(caller, :kill)
+    assert_receive {:DOWN, ^tool_monitor, :process, ^tool_pid, _reason}, 1_000
+  end
+
+  test "a tool ends when its run is cancelled" do
+    parent = self()
+    avatar = Imp.avatar("question -> answer", [hanging_tool(parent)], lm: hanging_tool_lm())
+    assert {:ok, run} = Imp.start_run(avatar, %{question: "q"})
+
+    assert_receive {:tool_started, tool_pid}, 1_000
+    tool_monitor = Process.monitor(tool_pid)
+    assert :ok = Imp.Run.cancel(run, :test_cancel, 1_000)
+    assert_receive {:DOWN, ^tool_monitor, :process, ^tool_pid, _reason}, 1_000
+  end
+
+  test "a tool ends when its run's owner dies" do
+    parent = self()
+    avatar = Imp.avatar("question -> answer", [hanging_tool(parent)], lm: hanging_tool_lm())
+
+    owner =
+      spawn(fn ->
+        {:ok, _run} = Imp.start_run(avatar, %{question: "q"})
+        Process.sleep(:infinity)
+      end)
+
+    assert_receive {:tool_started, tool_pid}, 1_000
+    tool_monitor = Process.monitor(tool_pid)
+    Process.exit(owner, :kill)
+    assert_receive {:DOWN, ^tool_monitor, :process, ^tool_pid, _reason}, 1_000
+  end
+
   test "validates reserved fields and malformed actions" do
     assert_raise ArgumentError, ~r/reserved fields.*avatar_history/, fn ->
       Imp.avatar("avatar_history -> answer", [])
@@ -229,6 +322,21 @@ defmodule AvatarTest do
              Imp.call(avatar, %{question: "q"})
 
     assert message =~ "action.tool_name is required"
+  end
+
+  defp hanging_tool(parent) do
+    Imp.tool(:hang, "Never returns.", fn _arguments ->
+      send(parent, {:tool_started, self()})
+      Process.sleep(:infinity)
+    end)
+  end
+
+  defp hanging_tool_lm do
+    actor_lm(fn prompt ->
+      if finalizer?(prompt),
+        do: %{answer: "done"},
+        else: %{action: %{tool_name: "hang", tool_input_query: %{}}}
+    end)
   end
 
   defp actor_lm(handler) do

@@ -5,9 +5,21 @@ defmodule Imp.Predict.Avatar do
   Avatar asks a typed actor predictor for one action per turn. Tool results,
   including policy denials and execution errors, become structured observations
   for the next turn. A reserved `Finish` action or iteration exhaustion invokes
-  a separate typed finalizer for the task signature. Each tool callback runs in
-  an isolated unlinked task under `:tool_timeout_ms`; a timeout kills that task,
-  records a terminal action observation, and proceeds directly to finalization.
+  a separate typed finalizer for the task signature.
+
+  Each tool callback runs in an `Imp.Tasks` task linked to the caller, bounded
+  by `:tool_timeout_ms` (default 30 seconds). The task carries the caller's
+  settings, `Imp.Run` context and `Imp.Deadline`, and ends when the caller
+  does, so a tool stops when its caller is killed, when its run is cancelled
+  and when the run's owner dies. A timeout kills the task, records a terminal
+  action observation and proceeds directly to finalization; the timed-out call
+  reads as `:unknown` in `Imp.Tool.outcome/1`, since the tool may have acted.
+
+  Inside a run, each tool call is recorded as a `:tool_call` event and a
+  `:tool_result` event whose `metadata.outcome` says how it ended. Avatar does
+  not ask a run's `:authorize` callback, so a run started with one refuses an
+  Avatar program (`{:execution_capability_unsupported, Imp.Predict.Avatar,
+  :authorization}`).
   """
 
   @behaviour Imp.Module
@@ -133,30 +145,48 @@ defmodule Imp.Predict.Avatar do
 
   defp execute_action(avatar, %Action{} = action) do
     canonical_name = Imp.Tool.resolve_name(avatar.tools, action.tool_name)
+    arguments = Imp.Tool.normalize_arguments(action.tool_input_query)
+    tool_call_id = Imp.Run.new_event_id("avatar_tool")
+    tool_name = canonical_name || action.tool_name
 
-    {output, error?, terminal_reason} =
+    :ok =
+      Imp.Run.emit(:tool_call,
+        component: __MODULE__,
+        tool_call_id: tool_call_id,
+        tool_name: tool_name,
+        input: arguments
+      )
+
+    # The outcome is decided where the call is refused or run: a tool can
+    # return any term, so its value alone cannot say it was refused.
+    {output, error?, terminal_reason, outcome} =
       cond do
         is_nil(canonical_name) ->
-          {{:error, {:unknown_tool, action.tool_name}}, true, nil}
+          {{:error, {:unknown_tool, action.tool_name}}, true, nil, :refused}
 
         true ->
-          arguments = Imp.Tool.normalize_arguments(action.tool_input_query)
+          tool = Map.fetch!(avatar.tools, canonical_name)
 
-          case safe_authorize(avatar.tool_policy, canonical_name, arguments) do
-            :ok ->
-              bounded_tool_call(
-                Map.fetch!(avatar.tools, canonical_name),
-                arguments,
-                avatar.tool_timeout_ms
-              )
-
-            {:error, reason} ->
-              {{:error, reason}, true, nil}
+          with :ok <- safe_authorize(avatar.tool_policy, canonical_name, arguments),
+               :ok <- Imp.Tool.validate_input(tool, arguments) do
+            bounded_tool_call(tool, arguments, avatar.tool_timeout_ms)
+          else
+            {:error, reason} -> {{:error, reason}, true, nil, :refused}
           end
       end
 
+    :ok =
+      Imp.Run.emit(:tool_result,
+        component: __MODULE__,
+        tool_call_id: tool_call_id,
+        tool_name: tool_name,
+        output: if(error?, do: nil, else: output),
+        error: if(error?, do: output, else: nil),
+        metadata: %{outcome: outcome}
+      )
+
     observation = %ActionOutput{
-      tool_name: canonical_name || action.tool_name,
+      tool_name: tool_name,
       tool_input_query: Imp.Redaction.redact(action.tool_input_query),
       tool_output: Imp.Redaction.redact(output),
       error?: error?,
@@ -168,38 +198,40 @@ defmodule Imp.Predict.Avatar do
       else: {:continue, observation}
   end
 
+  # The tool runs in a task linked to the caller, so it ends when the caller
+  # does: when the caller is killed, and inside a run when the run is
+  # cancelled or its owner dies, since both end the run's task. The task
+  # carries the caller's settings, run context and deadline, and borrows the
+  # caller's admission place when it has one, because the caller only waits.
   defp bounded_tool_call(tool, arguments, timeout) do
-    task =
-      Task.Supervisor.async_nolink(Imp.UnlinkedTaskSupervisor, fn ->
-        safe_tool_call(tool, arguments)
-      end)
+    task = Imp.Tasks.async_borrowed(fn -> safe_tool_call(tool, arguments) end)
 
     case Task.yield(task, timeout) do
-      {:ok, {output, error?}} ->
-        {output, error?, nil}
+      {:ok, {output, error?, outcome}} ->
+        {output, error?, nil, outcome}
 
       {:exit, reason} ->
-        {{:error, {:tool_task_exit, tool.name, reason}}, true, nil}
+        {{:error, {:tool_task_exit, tool.name, reason}}, true, nil, :unknown}
 
       nil ->
         _ = Task.shutdown(task, :brutal_kill)
-        {{:error, {:tool_timeout, tool.name, timeout}}, true, :tool_timeout}
+        {{:error, {:tool_timeout, tool.name, timeout}}, true, :tool_timeout, :unknown}
     end
   rescue
-    error -> {{:error, {:tool_task_error, tool.name, error}}, true, nil}
+    error -> {{:error, {:tool_task_error, tool.name, error}}, true, nil, :unknown}
   catch
-    kind, reason -> {{:error, {:tool_task_error, tool.name, {kind, reason}}}, true, nil}
+    kind, reason -> {{:error, {:tool_task_error, tool.name, {kind, reason}}}, true, nil, :unknown}
   end
 
   defp safe_tool_call(tool, arguments) do
     case Imp.Tool.call(tool, arguments) do
-      {:error, reason} -> {{:error, reason}, true}
-      result -> {result, false}
+      {:error, _reason} = error -> {error, true, Imp.Tool.outcome(error)}
+      result -> {result, false, :result}
     end
   rescue
-    error -> {{:error, {:tool_error, tool.name, error}}, true}
+    error -> {{:error, {:tool_error, tool.name, error}}, true, :unknown}
   catch
-    kind, reason -> {{:error, {:tool_error, tool.name, {kind, reason}}}, true}
+    kind, reason -> {{:error, {:tool_error, tool.name, {kind, reason}}}, true, :unknown}
   end
 
   defp safe_authorize(policy, name, arguments) do
