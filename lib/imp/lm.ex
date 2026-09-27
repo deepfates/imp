@@ -192,7 +192,7 @@ defmodule Imp.LM do
           )
       )
 
-      result = perform_request(request, dispatch)
+      result = perform_request(lm, request, dispatch)
 
       case result do
         {:ok, response} ->
@@ -217,7 +217,7 @@ defmodule Imp.LM do
 
       result
     else
-      perform_request(request, dispatch)
+      perform_request(lm, request, dispatch)
     end
   end
 
@@ -254,8 +254,11 @@ defmodule Imp.LM do
   defp maybe_put_billing(metadata, nil), do: metadata
   defp maybe_put_billing(metadata, billing), do: Map.put(metadata, :billing, billing)
 
-  defp perform_request(request, dispatch) do
-    with {:ok, response} <- dispatch.(request) do
+  # A dispatch that raises or throws, a client's `stream/3` failing before it
+  # returns a stream say, fails as `{:lm_failed, lm, reason}` like a raising
+  # `generate/3`, and its `:model_response` is still recorded.
+  defp perform_request(lm, request, dispatch) do
+    with {:ok, response} <- call_request(fn -> dispatch.(request) end, lm) do
       Imp.Usage.maybe_record(Imp.Core.legacy_response(response))
       {:ok, response}
     end

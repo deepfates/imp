@@ -94,4 +94,71 @@ defmodule Imp.StreamedRunRecordTest do
     refute Keyword.has_key?(plain_opts, :purpose)
     refute Keyword.has_key?(streamed_opts, :purpose)
   end
+
+  # One scripted completion per request, the same whether it is asked for
+  # whole or streamed: `generate/3` returns the output, and `stream/3` yields
+  # it the way ReqLLM does, text as it arrives and each native tool call as
+  # its own chunk.
+  defmodule ScriptedLM do
+    alias Imp.Streaming.Messages.StreamResponse
+
+    defstruct [:turns]
+
+    def new(turns) do
+      {:ok, agent} = Agent.start_link(fn -> turns end)
+      %__MODULE__{turns: agent}
+    end
+
+    def generate(lm, _messages, _opts) do
+      case next(lm) do
+        {:raise, error} -> raise error
+        {text, []} -> {:ok, text}
+        {text, calls} -> {:ok, %{next_thought: text, tool_calls: calls}}
+      end
+    end
+
+    def stream(lm, _messages, _opts) do
+      case next(lm) do
+        {:raise, error} ->
+          raise error
+
+        {text, calls} ->
+          [%StreamResponse{chunk: text}] ++
+            Enum.map(calls, &%StreamResponse{chunk: %{tool_calls: [&1]}}) ++
+            [%StreamResponse{chunk: nil, done: true}]
+      end
+    end
+
+    defp next(%__MODULE__{turns: agent}),
+      do: Agent.get_and_update(agent, fn [turn | rest] -> {turn, rest} end)
+  end
+
+  defp run(program, provider_stream) do
+    {:ok, run} =
+      Imp.Run.start(%Collecting{program: program, provider_stream: provider_stream}, %{
+        question: "Capital of France?"
+      })
+
+    result = Task.await(run.task)
+    events = Imp.Run.events(run)
+    Imp.Run.stop(run)
+    {result, events}
+  end
+
+  # A client that fails before it returns a stream (ReqLLM validates its
+  # options first) fails the way a client that fails in `generate/3` does.
+  test "a stream/3 that raises is recorded and fails as a raising generate/3 does" do
+    runs =
+      for provider_stream <- [false, true] do
+        lm = ScriptedLM.new([{:raise, ArgumentError.exception("bad opts")}])
+        run(Imp.predict("question -> answer", lm: lm), provider_stream)
+      end
+
+    [{plain, plain_events}, {streamed, streamed_events}] = runs
+
+    assert {:error, {:lm_failed, ScriptedLM, %ArgumentError{message: "bad opts"}}} = streamed
+    assert streamed == plain
+    assert Enum.map(streamed_events, & &1.kind) == Enum.map(plain_events, & &1.kind)
+    assert [%{error: _error}] = Enum.filter(streamed_events, &(&1.kind == :model_response))
+  end
 end
