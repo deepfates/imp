@@ -13,7 +13,11 @@ defmodule Imp.Predict.Avatar do
   `Imp.Deadline`, and ends when the caller does, so a tool stops when its
   caller is killed, when its run is cancelled and when the run's owner dies.
   A tool that crashes, or whose task exits, is an observation, not the
-  caller's crash. A timeout kills the task, records a terminal action
+  caller's crash. When the caller works on a place in the pool, a stream of
+  Imp tasks the tool enumerates (`Imp.Predict.Parallel.map/3`,
+  `Imp.Evaluate.run/2`) runs on that place, one item at a time; an
+  `Imp.Tasks.async/1` the tool starts itself waits for a place of its own, so
+  with a full pool it waits until the tool times out. A timeout kills the task, records a terminal action
   observation and proceeds directly to finalization. A timed-out call and one
   whose task exited read as `:unknown` in `Imp.Tool.outcome/1`, since the
   tool may have acted.
@@ -235,8 +239,9 @@ defmodule Imp.Predict.Avatar do
     kind, reason -> {{:error, {:tool_task_error, tool.name, {kind, reason}}}, true, nil, :unknown}
   end
 
-  # Links a process to the calling tool task that exits when `caller` dies,
-  # taking the task with it, and exits quietly when the task ends first.
+  # Links a process to the calling tool task that kills the task when
+  # `caller` dies, even a tool that traps exits, and exits quietly when the
+  # task ends first. The link ends the watcher with the task.
   defp watch_caller(caller) do
     task = self()
 
@@ -245,7 +250,7 @@ defmodule Imp.Predict.Avatar do
       task_monitor = Process.monitor(task)
 
       receive do
-        {:DOWN, ^caller_monitor, :process, ^caller, reason} -> exit({:caller_down, reason})
+        {:DOWN, ^caller_monitor, :process, ^caller, _reason} -> Process.exit(task, :kill)
         {:DOWN, ^task_monitor, :process, ^task, _reason} -> :ok
       end
     end)

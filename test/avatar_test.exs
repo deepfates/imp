@@ -280,6 +280,25 @@ defmodule AvatarTest do
     assert_receive {:DOWN, ^tool_monitor, :process, ^tool_pid, _reason}, 1_000
   end
 
+  test "a tool that traps exits still ends when its caller is killed" do
+    parent = self()
+
+    tool =
+      Imp.tool(:hang, "Traps exits and never returns.", fn _arguments ->
+        Process.flag(:trap_exit, true)
+        send(parent, {:tool_started, self()})
+        Process.sleep(:infinity)
+      end)
+
+    avatar = Imp.avatar("question -> answer", [tool], lm: hanging_tool_lm())
+    caller = spawn(fn -> Imp.call(avatar, %{question: "q"}) end)
+
+    assert_receive {:tool_started, tool_pid}, 1_000
+    tool_monitor = Process.monitor(tool_pid)
+    Process.exit(caller, :kill)
+    assert_receive {:DOWN, ^tool_monitor, :process, ^tool_pid, :killed}, 1_000
+  end
+
   test "a tool ends when its run is cancelled" do
     parent = self()
     avatar = Imp.avatar("question -> answer", [hanging_tool(parent)], lm: hanging_tool_lm())

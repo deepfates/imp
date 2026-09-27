@@ -446,11 +446,28 @@ defmodule Imp.Tasks do
   @doc false
   # What a task carries from the process that starts it, for a caller that
   # starts a process of its own and binds it there with `with_context/2`.
-  def context, do: capture_context(Imp.Settings.snapshot())
+  # That process also carries the pool place the caller is working on, when
+  # it has one still held, so that a stream of Imp tasks it enumerates runs
+  # on that place, as the caller's own would, rather than waiting for another
+  # while the caller waits for it. The process itself takes no place.
+  def context do
+    ensure_runtime!()
+    Map.put(capture_context(Imp.Settings.snapshot()), :admission, held_admission())
+  end
 
   @doc false
+  def with_context(%{admission: {token, owner}} = context, fun) when is_function(fun, 0),
+    do: with_admission(token, owner, fn -> with_runtime_context(context, fun) end)
+
   def with_context(context, fun) when is_function(fun, 0),
     do: with_runtime_context(context, fun)
+
+  defp held_admission do
+    case current_admission() do
+      {token, owner} = admission -> if @admission.owned_by?(token, owner), do: admission
+      nil -> nil
+    end
+  end
 
   # What a task carries from the process that starts it.
   defp capture_context(snapshot) do

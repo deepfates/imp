@@ -101,6 +101,31 @@ defmodule EffectLifecycleTest do
     Imp.Run.stop(run)
   end
 
+  test "parallel work inside an Avatar tool runs on the run's place with a pool of one" do
+    inner = Imp.Predict.new("question -> answer", lm: Imp.LM.Static.new(answer: "i"))
+
+    tool =
+      Imp.tool(:parallel, "Runs two calls.", fn _arguments ->
+        inner
+        |> Imp.Predict.Parallel.map([%{question: "a"}, %{question: "b"}], num_threads: 2)
+        |> Enum.map(&elem(&1, 0))
+      end)
+
+    avatar =
+      Imp.avatar("question -> answer", [tool],
+        lm: tool_lm("parallel"),
+        max_iters: 1,
+        tool_timeout_ms: 1_500
+      )
+
+    assert {:ok, run} =
+             Imp.context([async_max_workers: 1], fn -> Imp.start_run(avatar, %{question: "q"}) end)
+
+    assert {:ok, {:ok, prediction}} = Task.yield(run.task, 3_000)
+    assert [%{tool_output: [:ok, :ok]}] = Imp.get(prediction, :actions)
+    Imp.Run.stop(run)
+  end
+
   defp lookup, do: Imp.tool(:lookup, "Answers.", fn _arguments -> "found" end)
 
   defp tool_lm(name) do
