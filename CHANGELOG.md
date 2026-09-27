@@ -2,6 +2,17 @@
 
 User-visible changes to Imp are recorded here.
 
+## Unreleased
+
+### Fixed
+
+- The package ships the TRL worker that `Imp.Clients.TRLTrainer` starts by
+  default: `priv/trl_worker/worker.py`, its `pyproject.toml` and `uv.lock`, and
+  the default contract. In 0.5.0 the defaults named files the package did not
+  contain, so GRPO training from Hex needed a source checkout. The default
+  contract now pins transformers 5.10.1, the version the lockfile installs; it
+  named 5.5.0, which the worker refused at startup.
+
 ## 0.5.0 — 2026-09-26
 
 ### Security
