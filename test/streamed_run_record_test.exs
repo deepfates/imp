@@ -33,7 +33,7 @@ defmodule Imp.StreamedRunRecordTest do
            ReqLLM.StreamChunk.text(String.slice(@answer, 20..-1//1)),
            ReqLLM.StreamChunk.meta(%{usage: @usage, finish_reason: "stop"})
          ],
-         metadata_handle: self(),
+         metadata_handle: elem(ReqLLM.StreamResponse.MetadataHandle.start_link(fn -> %{} end), 1),
          cancel: fn -> :ok end,
          model: model,
          context: ReqLLM.Context.new(messages)
@@ -204,7 +204,7 @@ defmodule Imp.StreamedRunRecordTest do
            [ReqLLM.StreamChunk.text(text)] ++
              Enum.map(calls, &ReqLLM.StreamChunk.tool_call(&1.name, &1.arguments, %{id: &1.id})) ++
              [ReqLLM.StreamChunk.meta(%{finish_reason: "stop"})],
-         metadata_handle: self(),
+         metadata_handle: elem(ReqLLM.StreamResponse.MetadataHandle.start_link(fn -> %{} end), 1),
          cancel: fn -> :ok end,
          model: model,
          context: ReqLLM.Context.new(messages)

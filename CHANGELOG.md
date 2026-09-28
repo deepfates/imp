@@ -4,7 +4,7 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
-### Fixed
+### Changed
 
 - Breaking: `Imp.Core.LMResponse.cost`, and the `:cost` on a
   `:model_response` event, is what the provider reported charging, as its
@@ -23,6 +23,34 @@ User-visible changes to Imp are recorded here.
   unknown charge, not a free one; a host that wants the old number for calls
   with no reported charge reads `estimated_cost` for them, knowing it is an
   estimate.
+
+### Fixed
+
+- A call streamed through `Imp.Clients.ReqLLM` records the usage
+  and the cost the provider reported at the end of the stream. ReqLLM's
+  stream is a `Stream.resource`, which reports its end as halted rather than
+  done, and Imp ended such a stream without its terminal event, so every
+  streamed call was recorded with no usage and no cost. The stream now ends
+  with exactly one terminal event, `done: true` with the provider's usage
+  (including its `"cost"`), model and finish reason, taking the finish
+  reason, and usage no chunk reported, from ReqLLM's metadata handle.
+- A stream that did not complete ends in `{:error, %Imp.LMError{}}`, not in
+  a completion of whatever text arrived first: one that carries a provider
+  error, finishes with reason `:error` or `:cancelled`, or is incomplete,
+  its body ending with no finish and no `[DONE]` (reason
+  `{:stream_finished, :incomplete}`). The error event carries the usage and
+  other metadata that arrived before it.
+- A streamed call that fails after the provider reported usage records that
+  usage and cost on its failed `:model_response` event and in
+  `Imp.Usage`, since the provider may have charged for it. The caller still
+  receives `{:error, reason}`.
+- A streamed call to a client built from an inline spec map, with atom or
+  string keys, or a `{provider, opts}` tuple no longer fails with
+  `{:lm_stream_failed, "protocol String.Chars not implemented ..."}`. A
+  streamed call records the model the provider reported, as a non-streamed
+  call does, and otherwise the configured model id (`gpt-test`, where it
+  recorded the whole `openai:gpt-test`), so its `Imp.Usage` key changes the
+  same way.
 - `:reasoning_effort` accepts `max`, when an LM is built, on a call and in a
   saved program. Imp's accepted efforts are read from ReqLLM's own
   `reasoning_effort` option, so they are every effort ReqLLM accepts, on every

@@ -669,6 +669,8 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace.StreamReqLLM do
   @moduledoc false
 
   def stream_text(model, messages, _opts) do
+    {:ok, metadata_handle} = ReqLLM.StreamResponse.MetadataHandle.start_link(fn -> %{} end)
+
     {:ok,
      %ReqLLM.StreamResponse{
        stream: [
@@ -677,7 +679,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Trace.StreamReqLLM do
          ReqLLM.StreamChunk.text("Paris\n\n[[ ## completed ## ]]"),
          ReqLLM.StreamChunk.meta(%{finish_reason: "stop"})
        ],
-       metadata_handle: self(),
+       metadata_handle: metadata_handle,
        cancel: fn -> :ok end,
        model: model,
        context: ReqLLM.Context.new(messages)

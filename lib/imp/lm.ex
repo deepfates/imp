@@ -15,7 +15,9 @@ defmodule Imp.LM do
   metadata as `:purpose`; it is never part of what is sent. A request streamed
   through the client's `stream/3` (`Imp.stream/3` with `provider_stream: true`)
   is recorded the same way, with the usage the provider reported at the end of
-  the stream.
+  the stream. A streamed call that fails after the provider reported usage or
+  cost records them on its failed `:model_response` and in `Imp.Usage`, since
+  the provider may have charged for it.
 
   The response event's metadata carries the money for that call as two
   numbers, each a non-negative float in USD or `nil`, as on
@@ -170,13 +172,16 @@ defmodule Imp.LM do
 
   @doc false
   # Performs `request` with `dispatch`, a function from the request to
-  # `{:ok, %Imp.Core.LMResponse{}}` or `{:error, reason}`, and records it:
+  # `{:ok, %Imp.Core.LMResponse{}}`, `{:error, reason}`, or
+  # `{:error, reason, %Imp.Core.LMResponse{}}` for a failure that carries a
+  # partial response, and records it:
   # usage in `Imp.Usage`, and inside an `Imp.Run` the `:tools_sent`,
   # `:model_request` and `:model_response` events. `request/2` dispatches to
   # the client's `request/2` or `generate/3`; a provider stream dispatches to
   # its `stream/3`. How the answer arrives does not change what is recorded.
-  @spec record(t(), Imp.Core.LMRequest.t(), (Imp.Core.LMRequest.t() -> result)) :: result
-        when result: {:ok, Imp.Core.LMResponse.t()} | {:error, term()}
+  @spec record(t(), Imp.Core.LMRequest.t(), (Imp.Core.LMRequest.t() -> dispatched)) :: result
+        when result: {:ok, Imp.Core.LMResponse.t()} | {:error, term()},
+             dispatched: result | {:error, term(), Imp.Core.LMResponse.t()}
   def record(lm, %Imp.Core.LMRequest{} = request, dispatch) when is_function(dispatch, 1) do
     if Imp.Run.context() do
       call_id = Imp.Run.new_event_id("model")
@@ -230,15 +235,34 @@ defmodule Imp.LM do
               )
           )
 
+        {:error, error, partial} ->
+          Imp.Run.emit(:model_response,
+            error: error,
+            metadata:
+              maybe_put_billing(
+                %{
+                  model_call_id: call_id,
+                  model: request.config.model,
+                  usage: partial.usage,
+                  cost: partial.cost,
+                  estimated_cost: partial.estimated_cost
+                },
+                partial.billing
+              )
+          )
+
         {:error, error} ->
           Imp.Run.emit(:model_response, error: error, metadata: %{model_call_id: call_id})
       end
 
-      result
+      caller_result(result)
     else
-      perform_request(lm, request, dispatch)
+      lm |> perform_request(request, dispatch) |> caller_result()
     end
   end
+
+  defp caller_result({:error, reason, %Imp.Core.LMResponse{}}), do: {:error, reason}
+  defp caller_result(result), do: result
 
   # A stable name for one tool roster: the SHA-256 of its canonical JSON, with
   # object keys sorted, so two requests offering the same definitions hash the
@@ -276,10 +300,23 @@ defmodule Imp.LM do
   # A dispatch that raises or throws, a client's `stream/3` failing before it
   # returns a stream say, fails as `{:lm_failed, lm, reason}` like a raising
   # `generate/3`, and its `:model_response` is still recorded.
+  #
+  # A dispatch that failed after the provider reported usage, a stream broken
+  # after its usage arrived, returns `{:error, reason, partial}`: the call may
+  # have been billed, so the partial response's usage and cost are recorded
+  # like a completed call's, and the caller still receives `{:error, reason}`.
   defp perform_request(lm, request, dispatch) do
-    with {:ok, response} <- call_request(fn -> dispatch.(request) end, lm) do
-      Imp.Usage.maybe_record(Imp.Core.legacy_response(response))
-      {:ok, response}
+    case call_request(fn -> dispatch.(request) end, lm) do
+      {:ok, response} ->
+        Imp.Usage.maybe_record(Imp.Core.legacy_response(response))
+        {:ok, response}
+
+      {:error, _reason, partial} = failed ->
+        Imp.Usage.maybe_record(Imp.Core.legacy_response(partial))
+        failed
+
+      {:error, _reason} = error ->
+        error
     end
   end
 
@@ -332,6 +369,7 @@ defmodule Imp.LM do
   defp call_request(fun, lm) do
     case fun.() do
       {:ok, %Imp.Core.LMResponse{} = response} -> {:ok, response}
+      {:error, _reason, %Imp.Core.LMResponse{}} = failed -> failed
       {:error, _reason} = error -> error
       other -> {:error, {:invalid_lm_response, lm_name(lm), other}}
     end

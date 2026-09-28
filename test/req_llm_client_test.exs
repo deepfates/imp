@@ -60,7 +60,7 @@ defmodule ReqLLMClientTest do
            ReqLLM.StreamChunk.text(~s(ng","score":7})),
            ReqLLM.StreamChunk.meta(%{finish_reason: "stop"})
          ],
-         metadata_handle: self(),
+         metadata_handle: elem(ReqLLM.StreamResponse.MetadataHandle.start_link(fn -> %{} end), 1),
          cancel: fn -> :ok end,
          model: model,
          context: ReqLLM.Context.new(messages)
@@ -110,7 +110,7 @@ defmodule ReqLLMClientTest do
              finish_reason: "stop"
            })
          ],
-         metadata_handle: self(),
+         metadata_handle: elem(ReqLLM.StreamResponse.MetadataHandle.start_link(fn -> %{} end), 1),
          cancel: fn -> :ok end,
          model: model,
          context: ReqLLM.Context.new(messages)
@@ -220,7 +220,7 @@ defmodule ReqLLMClientTest do
            ReqLLM.StreamChunk.text(~s({"answer":"Paris"})),
            ReqLLM.StreamChunk.meta(%{finish_reason: "stop"})
          ],
-         metadata_handle: self(),
+         metadata_handle: elem(ReqLLM.StreamResponse.MetadataHandle.start_link(fn -> %{} end), 1),
          cancel: fn -> :ok end,
          model: model,
          context: ReqLLM.Context.new(messages)
@@ -277,7 +277,7 @@ defmodule ReqLLMClientTest do
            },
            ReqLLM.StreamChunk.meta(%{finish_reason: "tool_calls"})
          ],
-         metadata_handle: self(),
+         metadata_handle: elem(ReqLLM.StreamResponse.MetadataHandle.start_link(fn -> %{} end), 1),
          cancel: fn -> :ok end,
          model: model,
          context: ReqLLM.Context.new(messages)
@@ -321,7 +321,7 @@ defmodule ReqLLMClientTest do
       {:ok,
        %ReqLLM.StreamResponse{
          stream: stream,
-         metadata_handle: self(),
+         metadata_handle: elem(ReqLLM.StreamResponse.MetadataHandle.start_link(fn -> %{} end), 1),
          cancel: fn -> send(test_pid, :provider_cancelled) end,
          model: model,
          context: ReqLLM.Context.new(messages)
@@ -1593,8 +1593,9 @@ defmodule ReqLLMClientTest do
 
     prediction = List.last(events)
 
+    # The stream reported no model, so the key names the configured model id.
     assert Imp.Prediction.get_lm_usage(prediction) == %{
-             "openai/openai:gpt-test" => %{
+             "openai/gpt-test" => %{
                input_tokens: 3,
                output_tokens: 2,
                total_tokens: 5
