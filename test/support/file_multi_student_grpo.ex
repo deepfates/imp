@@ -165,9 +165,11 @@ defmodule Imp.Test.FileMultiStudentGRPOTrainer do
 
     save_session(trainer, updated)
 
-    # The step has been applied and never answers, so the only way the
-    # optimizer learns anything is its callback timeout.
-    if trainer.runtime_mode == {:hang_after_step, model}, do: Process.sleep(:infinity)
+    # The step has been applied and the callback process dies without
+    # answering, so the optimizer cannot tell whether the step landed. Dying
+    # rather than hanging ends the callback at once, so no wall-clock bound
+    # decides which callback fails.
+    if trainer.runtime_mode == {:die_after_step, model}, do: Process.exit(self(), :kill)
     {:ok, updated}
   end
 
