@@ -296,6 +296,8 @@ defmodule Imp.Redaction do
       security token (`X-Amz-Signature`, `X-Amz-Security-Token`,
       `X-Goog-Signature`, Azure's `sig`).
 
+  For example:
+
       iex> Imp.Redaction.redact(%{api_key: "sk-test-secret-1234567890", model: "demo"})
       %{api_key: "[REDACTED]", model: "demo"}
 
