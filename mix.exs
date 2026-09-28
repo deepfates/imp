@@ -128,6 +128,7 @@ defmodule Imp.MixProject do
       {:jason, "~> 1.4"},
       {:jaxon, "~> 2.0.8"},
       {:jsv, "~> 0.21"},
+      {:nimble_csv, "~> 1.3"},
       {:nimble_options, "~> 1.1"},
       {:req, "~> 0.6"},
       # 1.18 is the first release with :total_timeout, which bounds a call

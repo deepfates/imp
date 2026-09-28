@@ -358,12 +358,14 @@ defmodule ReActV2Test do
     # request step), not as ReqLLM's top-level option.
     assert_received {:native_tool_request, _initial_messages, initial_opts}
     refute Keyword.has_key?(initial_opts, :reasoning_effort)
-    assert [_step] = get_in(initial_opts, [:req_http_options, :plugins])
+    # Every call also carries the plugin that keeps an error's headers.
+    error_headers = &Imp.Clients.ReqLLM.plug_error_headers/1
+    assert [_step] = get_in(initial_opts, [:req_http_options, :plugins]) -- [error_headers]
 
     # The forced submit spends no reasoning at all.
     assert_received {:native_tool_request, _forced_messages, forced_opts}
     refute Keyword.has_key?(forced_opts, :reasoning_effort)
-    assert get_in(forced_opts, [:req_http_options, :plugins]) in [nil, []]
+    assert (get_in(forced_opts, [:req_http_options, :plugins]) || []) -- [error_headers] == []
   end
 
   test "forces native submit through the provider-neutral ReqLLM tool choice" do

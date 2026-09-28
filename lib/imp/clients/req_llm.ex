@@ -326,6 +326,7 @@ defmodule Imp.Clients.ReqLLM do
       |> encode_openrouter_reasoning(lm.model)
       |> cap_transport_timeouts()
       |> bind_to_caller()
+      |> keep_error_headers()
       |> enforce_explicit_no_retry()
 
     send_generate(lm, messages, opts)
@@ -386,10 +387,12 @@ defmodule Imp.Clients.ReqLLM do
   defp lm_error(reason), do: lm_error(reason, retryable?(reason))
 
   defp lm_error(reason, retryable) do
+    stripped = only_retry_after_header(reason)
+
     %Imp.LMError{
-      message: lm_error_message(reason),
+      message: lm_error_message(stripped),
       status: status(reason),
-      reason: reason,
+      reason: stripped,
       retryable: retryable,
       context_window_exceeded: context_length_exceeded?(reason)
     }
@@ -401,10 +404,23 @@ defmodule Imp.Clients.ReqLLM do
   # One rule for `retryable` (see `Imp.LMError`): a status that says try
   # later, a status that says no, ReqLLM's own `retryable` where the status
   # does not decide, and otherwise the transport failure. `:timeout` and
-  # `:closed` are retryable even though the request may have run.
+  # `:closed` are retryable even though the request may have run; only the
+  # not-sent reasons say it never left.
   @try_later_statuses [408, 425, 429]
-  @transport_reasons [:econnrefused, :pool_not_available, :closed, :timeout]
+  @not_sent_reasons [:econnrefused, :pool_not_available]
+  @transport_reasons @not_sent_reasons ++ [:closed, :timeout]
   @transport_errors [Req.TransportError, Mint.TransportError, Finch.TransportError]
+
+  @doc false
+  # Whether a failed request provably never reached the provider: no response
+  # came back and the transport failed before sending. A caller may send it
+  # again without risking a second run; any other failure without a status
+  # may have run.
+  @spec not_sent?(Imp.LMError.t()) :: boolean()
+  def not_sent?(%Imp.LMError{status: nil, reason: reason}),
+    do: transport_reason(reason) in @not_sent_reasons
+
+  def not_sent?(%Imp.LMError{}), do: false
 
   defp retryable?(reason) do
     case {status(reason), reason} do
@@ -425,13 +441,22 @@ defmodule Imp.Clients.ReqLLM do
     end
   end
 
-  defp transport_retryable?(%module{reason: reason}) when module in @transport_errors,
-    do: reason in @transport_reasons
+  defp transport_retryable?(reason), do: transport_reason(reason) in @transport_reasons
 
-  defp transport_retryable?(%ReqLLM.Error.API.Request{cause: cause}) when not is_nil(cause),
-    do: transport_retryable?(cause)
+  defp transport_reason(%module{reason: reason}) when module in @transport_errors, do: reason
 
-  defp transport_retryable?(_reason), do: false
+  # Finch reports a pool with no free connection as its own error, which Req
+  # passes on as an HTTP error, not a transport error. A pool checkout that
+  # times out raises a plain RuntimeError that only its message identifies, so
+  # it is not read here: it is not retryable, and so is never sent again.
+  defp transport_reason(%module{reason: :pool_not_available})
+       when module in [Req.HTTPError, Finch.Error],
+       do: :pool_not_available
+
+  defp transport_reason(%ReqLLM.Error.API.Request{cause: cause}) when not is_nil(cause),
+    do: transport_reason(cause)
+
+  defp transport_reason(_reason), do: nil
 
   # OpenAI-compatible providers name this refusal in the structured error code.
   # General HTTP 400s and prose mentioning context are not that signal.
@@ -1329,6 +1354,103 @@ defmodule Imp.Clients.ReqLLM do
 
     request
   end
+
+  # ReqLLM's default provider decoding turns an HTTP error response into an
+  # `ReqLLM.Error.API.Response`, which has no headers, so the error a call
+  # returns has lost the response's `retry-after` (ReqLLM's own retry step
+  # reads it from the response before that). A caller that retries needs it:
+  # `Imp.Clients.ReqLLMBatch` waits for it. The request step below runs after
+  # every provider step is attached; it keeps an error response's
+  # `retry-after` and puts it back on the `ReqLLM.Error.API.Request` the call
+  # returns. It is unnecessary once ReqLLM keeps the header on the errors it
+  # decodes.
+  #
+  # Only `retry-after` is kept: the error is inspected into logs,
+  # checkpoints and run events, and a response's headers carry cookies,
+  # account identifiers and request ids. `lm_error/2` drops any other header
+  # ReqLLM itself left on an error.
+  defp keep_error_headers(opts) do
+    http_opts = Keyword.get(opts, :req_http_options, [])
+
+    if Keyword.keyword?(http_opts) and is_list(Keyword.get(http_opts, :plugins, [])) do
+      plugins = Keyword.get(http_opts, :plugins, []) ++ [&__MODULE__.plug_error_headers/1]
+      Keyword.put(opts, :req_http_options, Keyword.put(http_opts, :plugins, plugins))
+    else
+      opts
+    end
+  end
+
+  @doc false
+  def plug_error_headers(%Req.Request{} = request) do
+    Req.Request.append_request_steps(request,
+      imp_error_headers: &__MODULE__.install_error_headers/1
+    )
+  end
+
+  @doc false
+  def install_error_headers(%Req.Request{} = request) do
+    request
+    |> Req.Request.prepend_response_steps(imp_keep_retry_after: &__MODULE__.keep_retry_after/1)
+    |> Req.Request.append_error_steps(imp_retry_after: &__MODULE__.restore_retry_after/1)
+  end
+
+  @doc false
+  def keep_retry_after({request, %Req.Response{status: status} = response})
+      when status >= 400 do
+    case Req.Response.get_header(response, "retry-after") do
+      [] -> {request, response}
+      values -> {Req.Request.put_private(request, :imp_retry_after, values), response}
+    end
+  end
+
+  def keep_retry_after(pair), do: pair
+
+  @doc false
+  def restore_retry_after({request, %ReqLLM.Error.API.Request{} = error}) do
+    case Req.Request.get_private(request, :imp_retry_after) do
+      nil -> {request, error}
+      values -> {request, %{error | headers: %{"retry-after" => values}}}
+    end
+  end
+
+  def restore_retry_after(pair), do: pair
+
+  # Every error this client returns passes here, streaming ones included, so
+  # no response header but `retry-after` reaches a caller whichever path
+  # built the error, and the error's message is made from what is left.
+  defp only_retry_after_header(%ReqLLM.Error.API.Request{} = error) do
+    values = retry_after_values(error.headers)
+
+    %{
+      error
+      | headers: if(values == [], do: nil, else: %{"retry-after" => values}),
+        cause: only_retry_after_header(error.cause)
+    }
+  end
+
+  # A failed stream wraps the HTTP error and writes it, headers included,
+  # into its own text (`ReqLLM.Streaming`); that text is written again from
+  # the stripped error, in the same words.
+  defp only_retry_after_header(
+         %ReqLLM.Error.API.Stream{cause: %ReqLLM.Error.API.Request{}} = error
+       ) do
+    cause = only_retry_after_header(error.cause)
+    %{error | cause: cause, reason: "Stream failed: #{inspect(cause)}"}
+  end
+
+  defp only_retry_after_header(reason), do: reason
+
+  defp retry_after_values(headers) when is_map(headers) or is_list(headers) do
+    Enum.flat_map(headers, fn
+      {name, value} ->
+        if String.downcase(to_string(name)) == "retry-after", do: List.wrap(value), else: []
+
+      _other ->
+        []
+    end)
+  end
+
+  defp retry_after_values(_headers), do: []
 
   # An explicit caller no-retry policy is applied again in a final request step
   # at the adapter boundary, after every ReqLLM and Req step has run, so no

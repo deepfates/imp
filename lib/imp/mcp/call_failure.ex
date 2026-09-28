@@ -10,7 +10,7 @@ defmodule Imp.MCP.CallFailure do
     * `:refused` — declined before anything ran. The server answered with a
       JSON-RPC error that rejects the request before any method runs (parse
       error, invalid request, method not found), or the HTTP layer refused it
-      with a 4xx status other than 401 (403 included). Nothing ran, so
+      with a 4xx status other than 401 (403 included), a 503 or a 529. Nothing ran, so
       repeating the call is safe; whether it will succeed depends on why it
       was refused (a 408 or 429 may pass later, a 404 will not).
     * `:auth_refused` — the credential was refused before anything ran: an
@@ -22,7 +22,7 @@ defmodule Imp.MCP.CallFailure do
       server stayed busy until the call's timeout (`:no_idle_connection`).
     * `:unknown` — the request was, or may yet be, delivered, and whether the
       tool acted is not known: the caller's timeout, a connection that closed
-      after sending, a 5xx status, a response that could not be read, a stream
+      after sending, a 5xx status other than 503 or 529, a response that could not be read, a stream
       that broke after delivery, a handler that crashed or that the server
       stopped waiting for (it may still be running), invalid params, any other
       JSON-RPC error, an error ExMCP raised itself partway through a call, a
@@ -173,10 +173,16 @@ defmodule Imp.MCP.CallFailure do
 
   defp transport_text_outcome(_text), do: :unknown
 
-  # A 4xx status says the request was rejected as sent, and a 401 that the
-  # credential was. A 5xx says a server on the path failed with it, which may
-  # be after the MCP server acted.
+  # A 401 says the credential was refused. Otherwise `Imp.Errors` reads the
+  # status, as it does for a language-model request: a 4xx, a 503 or a 529 says the
+  # request was rejected before it ran, and any other status may come after
+  # the MCP server acted.
   defp status_outcome(401), do: :auth_refused
-  defp status_outcome(status) when status in 400..499, do: :refused
-  defp status_outcome(_status), do: :unknown
+
+  defp status_outcome(status) do
+    case Imp.Errors.status_outcome(status) do
+      :unknown -> :unknown
+      _not_processed -> :refused
+    end
+  end
 end
