@@ -398,6 +398,8 @@ defmodule Imp.Optimizer.GEPA.Engine do
             end
 
           {:error, reason} ->
+            raise_operational_safety!(reason)
+
             raise RuntimeError,
                   "ComBee profiling trial #{iteration} interrupted with ambiguous provider effects: " <>
                     inspect(reason)
@@ -976,6 +978,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
       end
   catch
     kind, reason ->
+      reraise_shutdown!(kind, reason, __STACKTRACE__)
       raise_operational_safety!(reason)
 
       if Keyword.get(opts, :raise_on_exception, true) do
@@ -1244,7 +1247,9 @@ defmodule Imp.Optimizer.GEPA.Engine do
   rescue
     error -> {:error, {:reflection_strategy_exception, error, __STACKTRACE__}}
   catch
-    kind, reason -> {:error, {:reflection_strategy_throw, kind, reason, __STACKTRACE__}}
+    kind, reason ->
+      reraise_shutdown!(kind, reason, __STACKTRACE__)
+      {:error, {:reflection_strategy_throw, kind, reason, __STACKTRACE__}}
   end
 
   defp normalize_strategy_results(results, fallback, successor_override) do
@@ -4483,6 +4488,8 @@ defmodule Imp.Optimizer.GEPA.Engine do
       end
   catch
     kind, reason ->
+      reraise_shutdown!(kind, reason, __STACKTRACE__)
+
       if Keyword.get(opts, :raise_on_exception, true) do
         :erlang.raise(kind, reason, __STACKTRACE__)
       else
@@ -4832,6 +4839,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
       {:error, Failure.record(:reflective_dataset, :error, error)}
   catch
     kind, reason ->
+      reraise_shutdown!(kind, reason, __STACKTRACE__)
       raise_operational_safety!(reason)
       {:error, Failure.record(:reflective_dataset, kind, reason)}
   end

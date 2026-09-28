@@ -74,7 +74,7 @@
   # defensive fallback paired with the clauses above
   {"lib/imp/optimizer/better_together.ex", :pattern_match_cov, {1302, 8}},
   # defensive clause for already-handled pending-validation states
-  {"lib/imp/optimizer/gepa/engine.ex", :pattern_match_cov, {3015, 7}},
+  {"lib/imp/optimizer/gepa/engine.ex", :pattern_match_cov, {3020, 7}},
   # defensive clause dialyzer pins to the module head (line 1)
   {"lib/imp/optimizer/gepa/evaluation.ex", :pattern_match, 1},
   # MapSet opacity: MapSet.equal? against a literal-typed key set

@@ -412,9 +412,12 @@ Every change here is breaking for code that relied on the old behaviour.
   as it is (candidates, the evaluation cache, proposed instructions and
   reflection data), so a `:checkpoint_fn` consumer treats it as sensitive.
 - GEPA with `raise_on_exception: false` no longer records an exit that asks
-  the process to stop (`:normal`, `:shutdown`, `{:shutdown, _}`, `:kill`) as
-  a failed proposal: the exit goes on up, as it does from a process that
-  traps exits and turns its owner's shutdown into an exit.
+  the process running it to stop (`:normal`, `:shutdown`, `{:shutdown, _}`,
+  `:kill`) as a failed proposal when a module selector, a reflection
+  strategy, or the adapter's evaluation or reflective dataset raises it in
+  that process: the exit goes on up, as it must from a process that traps
+  exits and turns its owner's shutdown into an exit. Before, it was recorded
+  and the run went on.
 - `examples/deployment/agent_optimization.exs` writes the optimizer's
   rejections and history with `Imp.Optimizer.Report.json_safe/1`. It passed
   them to `Jason.encode!/1`, which raised on a failure reason such as

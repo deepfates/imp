@@ -171,7 +171,8 @@ defmodule Imp.Optimizer.GEPA.Coordinator do
             try do
               {:ok, Imp.Settings.with_snapshot(snapshot, fun)}
             rescue
-              # A safety refusal keeps its struct so the owner can raise it.
+              # A safety refusal keeps its struct so the owner can raise it: a
+              # ComBee profiling trial runs a whole iteration in a worker.
               safety in Imp.OperationalSafetyError ->
                 {:error, {:exception, safety, __STACKTRACE__}}
 

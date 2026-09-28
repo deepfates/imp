@@ -339,11 +339,21 @@ defmodule Imp.Optimizer.GEPA.V014CompatibilityTest do
       end)
     end
 
+    def batch_evaluate(%__MODULE__{stage: :evaluation_shutdown} = adapter, items, opts) do
+      if Enum.any?(items, fn {candidate, _batch} -> candidate.main != "0" end),
+        do: exit(:shutdown)
+
+      Enum.map(items, fn {candidate, batch} -> evaluate(adapter, batch, candidate, opts) end)
+    end
+
     def batch_evaluate(adapter, items, opts) do
       Enum.map(items, fn {candidate, batch} -> evaluate(adapter, batch, candidate, opts) end)
     end
 
     @impl true
+    def make_reflective_dataset(%__MODULE__{stage: :reflective_dataset_shutdown}, _, _, _),
+      do: exit(:shutdown)
+
     def make_reflective_dataset(
           %__MODULE__{stage: :reflective_dataset},
           _candidate,
@@ -980,6 +990,41 @@ defmodule Imp.Optimizer.GEPA.V014CompatibilityTest do
              ] = state.rejected
 
       assert List.last(state.history) == rejection
+    end
+  end
+
+  test "a shutdown exit from the adapter goes on up although raise_on_exception is false" do
+    for {stage, overrides} <- [
+          # the strategy path's reflective dataset
+          {:reflective_dataset_shutdown,
+           [
+             proposal_concurrency: 2,
+             sampling_strategy: {:same_parent, 1},
+             selection_strategy: :all_improvements,
+             candidate_selection_strategy: :current_best
+           ]},
+          # the parallel path's reflective dataset
+          {:reflective_dataset_shutdown, [proposal_concurrency: 2]},
+          # the sequential path's evaluation of a proposal
+          {:evaluation_shutdown, [proposal_concurrency: 1]}
+        ] do
+      assert catch_exit(
+               Engine.run(
+                 %StrategyStageFailureAdapter{stage: stage},
+                 %{main: "0"},
+                 [%{id: 1}],
+                 [%{id: 10}],
+                 fn _candidate, _component, _records, _iteration -> "1" end,
+                 [
+                   max_iterations: 1,
+                   minibatch_size: 1,
+                   max_metric_calls: 20,
+                   raise_on_exception: false,
+                   seed: 5
+                 ] ++ overrides
+               )
+             ) == :shutdown,
+             inspect({stage, overrides})
     end
   end
 

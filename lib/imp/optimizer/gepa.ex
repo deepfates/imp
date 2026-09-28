@@ -104,8 +104,10 @@ defmodule Imp.Optimizer.GEPA do
   slot cancelled because a sibling failed first is rejected, not counted as
   failed. An `Imp.OperationalSafetyError` (a budget, cost, route or
   transport guard) ends the run whatever `raise_on_exception` says, and so
-  does an exit that asks the process to stop (`:normal`, `:shutdown`,
-  `{:shutdown, _}`, `:kill`).
+  does an exit that asks the process running GEPA to stop (`:normal`,
+  `:shutdown`, `{:shutdown, _}`, `:kill`) when it is raised in that process:
+  by a module selector, a reflection strategy, or the adapter's evaluation
+  or reflective dataset.
 
   A failure reason is redacted when it is recorded. An exception is recorded
   as its module's name and its message, and a throw or exit as its term, so a

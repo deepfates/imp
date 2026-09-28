@@ -662,44 +662,126 @@ defmodule OptimizerBehavioralCorpusTest do
 
     # A host that traps exits hands its parent's shutdown to the code it runs
     # as an exit, as Imp's interruptible sleeps do.
-    selector = fn _state, _trajectories, _scores, _index, _candidate ->
-      send(parent, {:selector, self()})
+    await_shutdown = fn fallback ->
+      send(parent, {:hook, self()})
       [host_parent | _] = Process.get(:"$ancestors")
 
       receive do
         {:EXIT, ^host_parent, reason} -> exit(reason)
       after
-        300 -> [:main]
+        300 -> fallback
       end
     end
 
-    {:ok, supervisor} = Task.Supervisor.start_link()
+    for hook <- [
+          module_selector: fn _state, _trajectories, _scores, _index, _candidate ->
+            await_shutdown.([:main])
+          end,
+          reflection_strategy: fn _candidate, _dataset, _components ->
+            await_shutdown.(%{new_texts: %{main: "Answer in one word."}})
+          end
+        ] do
+      {:ok, supervisor} = Task.Supervisor.start_link()
 
-    host =
-      Task.Supervisor.async_nolink(supervisor, fn ->
-        Process.flag(:trap_exit, true)
+      host =
+        Task.Supervisor.async_nolink(supervisor, fn ->
+          Process.flag(:trap_exit, true)
 
-        {_compiled, report} =
-          Imp.Optimizer.GEPA.new(metric(),
-            execution_profile: :beam_native,
-            generations: 4,
-            raise_on_exception: false,
-            module_selector: selector,
-            reflection_lm: reflection_lm("Answer in one word."),
-            max_metric_calls: 40
+          {_compiled, report} =
+            Imp.Optimizer.GEPA.new(
+              metric(),
+              [
+                execution_profile: :beam_native,
+                generations: 4,
+                raise_on_exception: false,
+                reflection_lm: reflection_lm("Answer in one word."),
+                max_metric_calls: 40
+              ] ++ [hook]
+            )
+            |> Imp.Optimizer.GEPA.compile_with_report(france_program(), trainset(), devset())
+
+          send(parent, {:returned, report.errors})
+        end)
+
+      assert_receive {:hook, _pid}, 5_000
+      host_ref = Process.monitor(host.pid)
+      :ok = Task.Supervisor.terminate_child(supervisor, host.pid)
+
+      assert_receive {:DOWN, ^host_ref, :process, _pid, :shutdown}, 5_000
+      refute_received {:returned, _errors}
+      refute_received {:hook, _pid}
+    end
+  end
+
+  test "an exit asking GEPA's process to stop goes on up from each hook" do
+    for reason <- [:shutdown, {:shutdown, :bye}],
+        hook <- [
+          module_selector: fn _state, _trajectories, _scores, _index, _candidate ->
+            exit(reason)
+          end,
+          reflection_strategy: fn _candidate, _dataset, _components -> exit(reason) end
+        ] do
+      assert catch_exit(
+               Imp.Optimizer.GEPA.new(
+                 metric(),
+                 [
+                   execution_profile: :beam_native,
+                   generations: 2,
+                   raise_on_exception: false,
+                   reflection_lm: reflection_lm("Answer in one word."),
+                   max_metric_calls: 20
+                 ] ++ [hook]
+               )
+               |> Imp.Optimizer.GEPA.compile(france_program(), trainset(), devset())
+             ) == reason
+    end
+  end
+
+  test "an operational safety refusal inside a ComBee profiling trial ends the run" do
+    refusing_program =
+      Imp.predict("question -> answer",
+        lm:
+          Imp.LM.Static.new(
+            handler: fn messages, _opts ->
+              prompt = Enum.map_join(messages, "\n", & &1.content)
+
+              if prompt =~ "Answer in one word",
+                do:
+                  raise(
+                    Imp.OperationalSafetyError.exception(
+                      kind: :budget,
+                      message: "provider budget exhausted"
+                    )
+                  ),
+                else: %{answer: "unknown"}
+            end
           )
-          |> Imp.Optimizer.GEPA.compile_with_report(france_program(), trainset(), devset())
+      )
 
-        send(parent, {:returned, report.errors})
-      end)
+    trainset =
+      for index <- 1..8 do
+        Imp.example(question: "q#{index}", answer: "Paris") |> Imp.Example.with_inputs(:question)
+      end
 
-    assert_receive {:selector, _pid}, 5_000
-    host_ref = Process.monitor(host.pid)
-    :ok = Task.Supervisor.terminate_child(supervisor, host.pid)
-
-    assert_receive {:DOWN, ^host_ref, :process, _pid, :shutdown}, 5_000
-    refute_received {:returned, _errors}
-    refute_received {:selector, _pid}
+    # The profiling trial runs a whole iteration in a coordinator worker.
+    assert_raise Imp.OperationalSafetyError, "provider budget exhausted", fn ->
+      Imp.Optimizer.GEPA.new(metric(),
+        execution_profile: :beam_native,
+        generations: 3,
+        raise_on_exception: false,
+        combee: [
+          max_concurrency: 1,
+          batch_controller: [
+            candidate_batch_sizes: [2, 4],
+            max_batch_size: 4,
+            profiling_timeout: 10_000
+          ]
+        ],
+        reflection_lm: reflection_lm("Answer in one word."),
+        max_metric_calls: 60
+      )
+      |> Imp.Optimizer.GEPA.compile(refusing_program, trainset, trainset)
+    end
   end
 
   test "GEPA counts a slot cancelled by a sibling's failure as cancelled, not failed" do
@@ -736,6 +818,18 @@ defmodule OptimizerBehavioralCorpusTest do
           [
             module_selector: fn _state, _trajectories, _scores, _index, _candidate ->
               raise "selector saw #{secret}"
+            end,
+            reflection_lm: reflection_lm("Answer in one word.")
+          ],
+          [
+            module_selector: fn _state, _trajectories, _scores, _index, _candidate ->
+              throw({:token, secret})
+            end,
+            reflection_lm: reflection_lm("Answer in one word.")
+          ],
+          [
+            module_selector: fn _state, _trajectories, _scores, _index, _candidate ->
+              exit({:closed, "api_key=#{secret}"})
             end,
             reflection_lm: reflection_lm("Answer in one word.")
           ],
