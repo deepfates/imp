@@ -280,12 +280,10 @@ defmodule Imp.ReActV2ContextTest do
 
     prior = Imp.history([%{intent: "prior", answer: "old"}])
 
-    {:ok, prediction} =
-      Imp.call(Imp.react("intent -> answer", [], lm: lm), %{intent: "now", history: prior})
+    assert {:error, :unrelated_provider_failure} =
+             Imp.call(Imp.react("intent -> answer", [], lm: lm), %{intent: "now", history: prior})
 
-    assert prediction.metadata[:history] == prior
-    assert prediction.metadata[:context_projection] == nil
-    # Existing forced-submit strategy remains; there are no history retries.
+    # The step and its last request, and no history retries.
     assert Agent.get(calls, & &1) == 2
   end
 end

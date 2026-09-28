@@ -62,7 +62,18 @@ defmodule Imp.Predict.ReActV2 do
       records, and the loop continues.
     * `:last_text`, `:forced_submit`, `:extracted`. The turn was interrupted
       and its last request answered (below).
-    * `:incomplete`. The turn was interrupted and has no answer.
+    * `:incomplete`. The turn was interrupted and has no answer: its last
+      request was answered with no valid answer in it, or the turn ran out of
+      time or context window.
+
+  A turn that could not get a model response returns `{:error, reason}`
+  rather than a prediction: its last request failed with an `Imp.LMError`,
+  its LM client raised (`{:lm_failed, client, exception}`), or a renderer
+  raised (`{:adapter_format_failed, adapter, exception}`). `reason` is that
+  request's error as `Imp.Predict` returns it, so `Imp.Errors` classifies it.
+  The steps the turn took before it are in its `Imp.Run` events
+  (`:reasoning`, `:tool_call`, `:tool_result`). A tool call whose outcome is
+  unknown is not such a failure: it is an observation, and the turn goes on.
 
   ## When a turn is interrupted
 
@@ -559,6 +570,11 @@ defmodule Imp.Predict.ReActV2 do
           end
         end
 
+      # DSPy's ReActV2 raises a step's LM error at once. Here a failed step
+      # interrupts the turn like any other interruption, so its last request
+      # is also one more try at a model response after a transient failure,
+      # which a host that answers every turn relies on. The call fails only
+      # when that request gets no response either (`last_request_failed/4`).
       {:error, reason, history} ->
         if Imp.Errors.context_window_exceeded?(reason) do
           incomplete_prediction(history, :context_window_exceeded, reason)
@@ -621,7 +637,7 @@ defmodule Imp.Predict.ReActV2 do
         })
 
       {:error, forced_error, history} ->
-        incomplete_prediction(history, failed_last_request_cause(reason, forced_error), %{
+        last_request_failed(history, reason, forced_error, %{
           initial: initial_error,
           forced_submit: forced_error
         })
@@ -658,7 +674,7 @@ defmodule Imp.Predict.ReActV2 do
           )
 
         {:error, reason, history} ->
-          incomplete_prediction(history, failed_last_request_cause(cause, reason), %{
+          last_request_failed(history, cause, reason, %{
             initial: initial_error,
             last_text: reason
           })
@@ -680,15 +696,28 @@ defmodule Imp.Predict.ReActV2 do
 
   defp deadline_passed?, do: Imp.Deadline.expired?(Imp.Deadline.current())
 
-  # The cause of a turn whose last request failed: the interruption that led to
-  # that request, unless the request failed because the turn is out of time or
-  # its context window is full. Those two would refuse any further request the
-  # same way, so they are what the caller has to change.
-  defp failed_last_request_cause(interruption, error) do
+  # How a turn ends whose last request failed. A turn out of time, or whose
+  # context window is full, is incomplete: any further request would be
+  # refused the same way, so that is what the caller has to change, and it is
+  # named as the cause. A last request the model answered with something that
+  # does not parse leaves the turn incomplete too, under the interruption that
+  # led to it: the model responded and gave no answer. Any other failure means
+  # the turn could not get a model response at all (the LM failed, its client
+  # raised, a renderer raised), so the call fails with that request's error,
+  # unchanged, as `Imp.Predict` returns it, and `Imp.Errors` classifies it.
+  defp last_request_failed(history, interruption, error, termination_error) do
     cond do
-      deadline_passed?() -> :deadline_exceeded
-      Imp.Errors.context_window_exceeded?(error) -> :context_window_exceeded
-      true -> interruption
+      deadline_passed?() ->
+        incomplete_prediction(history, :deadline_exceeded, termination_error)
+
+      Imp.Errors.context_window_exceeded?(error) ->
+        incomplete_prediction(history, :context_window_exceeded, termination_error)
+
+      match?(%Imp.AdapterParseError{}, error) ->
+        incomplete_prediction(history, interruption, termination_error)
+
+      true ->
+        {:error, error}
     end
   end
 
@@ -850,7 +879,7 @@ defmodule Imp.Predict.ReActV2 do
         end
 
       {:error, extraction_error, history} ->
-        incomplete_prediction(history, failed_last_request_cause(reason, extraction_error), %{
+        last_request_failed(history, reason, extraction_error, %{
           initial: initial_error,
           extraction: extraction_error
         })

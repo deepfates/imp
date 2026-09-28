@@ -13,6 +13,20 @@ User-visible changes to Imp are recorded here.
   matched a string reads the field from the prediction instead:
   `{:ok, prediction} = Imp.collect(program, inputs)`, then
   `Imp.get(prediction, :answer)`.
+- Breaking: an `Imp.Predict.ReActV2` turn that could not get a model response
+  returns `{:error, reason}`, where it returned `{:ok, prediction}` with no
+  outputs and `termination_reason: :incomplete`. That is a turn whose last
+  request, after a step failed or the turn was interrupted, failed too: the LM
+  returned an `Imp.LMError`, its client raised (`{:lm_failed, client,
+  exception}`), or a renderer raised (`{:adapter_format_failed, adapter,
+  exception}`). `reason` is that request's error unchanged, so
+  `Imp.Errors.retryable?/1` reads it. A step that fails and whose last request
+  is answered still ends `:last_text`, `:forced_submit` or `:extracted`, and
+  `:incomplete` is kept for a turn whose last request was answered without a
+  valid answer, or that ran out of time or context window. Migration: handle
+  `{:error, reason}` from `Imp.call/2` where you checked
+  `Imp.Prediction.complete?/1` for a model failure; the steps taken before it
+  are in the run's `:tool_call` and `:tool_result` events.
 
 ### Fixed
 

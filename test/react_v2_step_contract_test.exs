@@ -272,11 +272,17 @@ defmodule ReActV2StepContractTest do
 
     agent =
       Imp.react("intent -> answer, confidence: float", [search],
-        lm: lm(false, ["just prose, no call"]),
+        lm:
+          lm(false, [
+            "just prose, no call",
+            "[[ ## next_thought ## ]]\nDone.\n\n[[ ## tool_calls ## ]]\n" <>
+              ~s([{"name": "submit", "arguments": {"answer": "SKU 12", "confidence": 0.5}}])
+          ]),
         max_iters: 1
       )
 
-    assert {:ok, _prediction} = Imp.call(agent, %{intent: "find SKU 12"})
+    assert {:ok, prediction} = Imp.call(agent, %{intent: "find SKU 12"})
+    assert prediction.metadata[:termination_reason] == :forced_submit
 
     for {messages, opts} <- requests() do
       assert opts[:tools] in [nil, []]
