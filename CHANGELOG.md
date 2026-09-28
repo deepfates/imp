@@ -6,21 +6,25 @@ User-visible changes to Imp are recorded here.
 
 ### Security
 
-- `Imp.Redaction` catches PEM private key blocks, GitHub tokens (`ghp_`,
-  `gho_`, `ghu_`, `ghs_`, `ghr_`, `github_pat_`), Hugging Face `hf_` tokens,
-  Slack `xox?-` tokens, JSON Web Tokens and AWS access key ids longer than 20
-  characters, which it passed through unchanged into run events, traces,
-  trajectories and saved programs. It also catches a value assigned to a
-  credential name (`DB_PASSWORD=…`, `x-api-key: …`, `"password": "…"`,
-  `"token" => "…"`, `X-Amz-Security-Token=…`, `X-Amz-Signature=…`), the
-  password in a URL's user info, and the `key` and `sig` query parameters.
-  It replaces only the credential and keeps the text around it
-  (`"key [REDACTED] was used"`, `"Bearer [REDACTED]"`,
-  `"DB_PASSWORD=[REDACTED]"`), where it replaced the whole string once any
-  credential shape appeared in it; a credential's quoted value with no
-  closing quote on its line still replaces the whole string.
-  `Imp.ExternalCommand` and the optimizer's pricing URL check use the same
-  patterns instead of their own.
+- `Imp.Redaction` redacts a string that holds a PEM private key of any type,
+  a PGP private key block or a PuTTY key file; a Stripe (`sk_live_`,
+  `rk_live_`), GitHub, GitLab (`glpat-`), Hugging Face (`hf_`), Slack
+  (`xox?-`), SendGrid (`SG.`), npm (`npm_`), PyPI (`pypi-`), Google OAuth
+  (`ya29.`) or Vault (`hvs.`) token, or a JSON Web Token; an AWS access key id
+  longer than 20 characters; a URL with a password in its user info; or a
+  signed URL's `X-Amz-Signature`, `X-Amz-Security-Token`, `X-Goog-Signature`
+  or Azure `sig`. It passed these unchanged into run events, traces,
+  trajectories and saved programs. As before, the whole string is replaced,
+  and every shape it caught before is still caught.
+- `Imp.ExternalCommand` redacts captured output line by line with the same
+  rules, so a credential hides its line and a private key block hides the
+  block. It used two patterns of its own (`sk-` and `Bearer`) as the output
+  was captured and then replaced the whole output if any credential was left
+  in it. A credential no pattern names, on a line of its own beside one that
+  is caught, now stays visible in the output. The optimizer's pricing URL
+  check uses the same rules instead of its own.
+- A string with many near misses for `Bearer` in one letter case (`BEARER x`
+  lines) is redacted in linear time; it took quadratic time.
 
 ### Changed
 

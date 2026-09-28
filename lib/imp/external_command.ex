@@ -474,7 +474,7 @@ defmodule Imp.ExternalCommand.Lifecycle do
       capture.tail
       |> String.replace_invalid("?")
       |> redact_exact_secrets(secrets)
-      |> Imp.Redaction.redact()
+      |> Imp.Redaction.redact_lines()
 
     %Capture{
       text: text,
@@ -657,7 +657,8 @@ defmodule Imp.ExternalCommand do
   end
 
   defp normalize(capture, status) do
-    output = capture.text |> Imp.Redaction.redact() |> bounded(capture)
+    # The capture's text was redacted line by line as it was captured.
+    output = bounded(capture.text, capture)
 
     %{
       exit_status: status,

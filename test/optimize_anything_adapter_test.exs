@@ -469,8 +469,8 @@ defmodule Imp.Optimize.Anything.AdapterTest do
     assert result.scores == [0.0]
     assert result.outputs == [nil]
     assert result.metadata.failures == 1
-    assert result.side_information.main == [%{"error" => "request failed for [REDACTED]"}]
-    assert [%{error: "request failed for [REDACTED]"}] = result.trajectories.main
+    assert result.side_information.main == [%{"error" => "[REDACTED]"}]
+    assert [%{error: "[REDACTED]"}] = result.trajectories.main
   end
 
   test "captures evaluator IO as stdout and preserves evaluator stdout collisions" do

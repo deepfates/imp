@@ -18,12 +18,13 @@ defmodule Imp.ExternalCommandTest do
     assert redacted.output == "[REDACTED]"
     refute redacted.output =~ secret
 
-    # Output is cleaned by Imp.Redaction's patterns as it is captured, before
-    # the capture leaves the process that owns the command. Fake values only.
-    github = "ghp_" <> String.duplicate("F4ke", 9)
+    # Output is redacted line by line as it is captured, before the capture
+    # leaves the process that owns the command: a credential hides its line,
+    # a private key block hides the block. Fake values only.
+    github = "gh" <> "p_" <> String.duplicate("F4ke", 9)
     pem = "-----BEGIN PRIVATE KEY-----\nMIIFAKEFAKE\n-----END PRIVATE KEY-----"
-    printed = "push #{github}\nAuthorization: Bearer F4keF4keF4keF4ke\n#{pem}\ndone"
-    cleaned = "push [REDACTED]\nAuthorization: Bearer [REDACTED]\n[REDACTED]\ndone"
+    printed = "step 1\npush #{github}\nAuthorization: Bearer F4keF4keF4keF4ke\n#{pem}\ndone"
+    cleaned = "step 1\n[REDACTED]\n[REDACTED]\n[REDACTED]\ndone"
 
     assert {:ok, capture, 0} = Imp.ExternalCommand.Lifecycle.run("printf", ["%s", printed])
     assert capture.text == cleaned
