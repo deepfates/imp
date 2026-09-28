@@ -74,7 +74,7 @@
   # defensive fallback paired with the clauses above
   {"lib/imp/optimizer/better_together.ex", :pattern_match_cov, {1303, 8}},
   # defensive clause for already-handled pending-validation states
-  {"lib/imp/optimizer/gepa/engine.ex", :pattern_match_cov, {3020, 7}},
+  {"lib/imp/optimizer/gepa/engine.ex", :pattern_match_cov, {3023, 7}},
   # defensive clause dialyzer pins to the module head (line 1)
   {"lib/imp/optimizer/gepa/evaluation.ex", :pattern_match, 1},
   # MapSet opacity: MapSet.equal? against a literal-typed key set
@@ -88,7 +88,7 @@
   # defensive clause for non-covered bucket shapes
   {"lib/imp/optimizer/simba.ex", :pattern_match_cov, {700, 8}},
   # defensive clause for non-covered trace entries
-  {"lib/imp/optimizer/trajectory.ex", :pattern_match_cov, {270, 8}},
+  {"lib/imp/optimizer/trajectory.ex", :pattern_match_cov, {280, 8}},
   # defensive error clause on an always-ok retriever call
   {"lib/imp/retrieve.ex", :pattern_match, {121, 8}},
   # defensive fallback paired with the 106 clause
@@ -213,7 +213,7 @@
   {"lib/imp/optimizer/artifact.ex", :call_without_opaque, {745, 52}},
   {"lib/imp/optimizer/artifact.ex", :call_without_opaque, {909, 53}},
   {"lib/imp/optimizer/playbook.ex", :pattern_match_cov, {1020, 8}},
-  {"lib/imp/optimizer/report.ex", :call_without_opaque, {779, 55}},
+  {"lib/imp/optimizer/report.ex", :call_without_opaque, {790, 55}},
   {"lib/imp/schema.ex", :pattern_match_cov, {440, 8}},
   {"bench/imp/benchmark_truth/failure_campaign.ex", :pattern_match_cov, {168, 13}}
 ]

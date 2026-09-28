@@ -2156,7 +2156,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
         {parent.candidate, examples}
       end)
 
-    outputs = batch_evaluate_speculatively(adapter, items, contexts, state, opts)
+    outputs = batch_evaluate_speculatively(adapter, items, contexts, true, state)
 
     raise_on_parallel_worker_error!(contexts, outputs, opts)
 
@@ -2293,7 +2293,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
                   adapter,
                   examples,
                   output.candidate,
-                  capture_traces: true
+                  capture_traces: false
                 )
 
               child_id = reservation_id(:child, context.iteration)
@@ -2369,7 +2369,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
             {context.candidate, examples}
           end)
 
-        batch_evaluate_speculatively(adapter, items, runnable, state, opts)
+        batch_evaluate_speculatively(adapter, items, runnable, false, state)
       end
 
     raise_on_parallel_worker_error!(runnable, output_list, opts)
@@ -2460,7 +2460,9 @@ defmodule Imp.Optimizer.GEPA.Engine do
 
   defp parallel_worker_failure(_output), do: :ok
 
-  defp batch_evaluate_speculatively(adapter, items, contexts, state, _opts) do
+  # A parent is evaluated with traces for reflection to read; a proposed
+  # child is evaluated without them, as the sequential path evaluates it.
+  defp batch_evaluate_speculatively(adapter, items, contexts, capture_traces, state) do
     if adapter_batch_callback?(adapter) do
       result =
         Coordinator.run([items], state.proposal_policy.timeout, 1, fn batch ->
@@ -2468,7 +2470,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
             Evaluation.batch_evaluate(
               adapter,
               batch,
-              capture_traces: true,
+              capture_traces: capture_traces,
               deadline: Coordinator.current_deadline()
             )
           end)
@@ -2488,7 +2490,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
           capture_parallel_evaluation(fn ->
             adapter
             |> Evaluation.batch_evaluate([item],
-              capture_traces: true,
+              capture_traces: capture_traces,
               deadline: Coordinator.current_deadline()
             )
             |> hd()
@@ -2738,7 +2740,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
       is_seed_candidate: false
     }
 
-    notify_evaluation_start(opts, examples, true, event)
+    notify_evaluation_start(opts, examples, false, event)
     notify_evaluation_end(opts, context.child_result, event)
 
     cache =
@@ -2986,6 +2988,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
       parent_ids: pending["parent_ids"],
       candidate: Imp.Optimizer.Report.decode_term(pending["candidate"]),
       validation_instances: pending["validation_ids"],
+      minibatch_candidate_score: nil,
       reason: reason
     }
 
@@ -3619,6 +3622,8 @@ defmodule Imp.Optimizer.GEPA.Engine do
            }),
          {:ok, replacements, aggregation_reports, state} <-
            propose_components_with_budget(
+             adapter,
+             batch,
              proposer,
              parent,
              components,
@@ -3638,7 +3643,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
            }),
          proposed_candidate = Map.merge(parent.candidate, replacements),
          {:ok, proposed_result, state} <-
-           evaluate_changed_candidate(
+           evaluate_sequential_child(
              adapter,
              batch,
              parent.candidate,
@@ -4615,6 +4620,8 @@ defmodule Imp.Optimizer.GEPA.Engine do
   end
 
   defp propose_components_with_budget(
+         adapter,
+         batch,
          proposer,
          parent,
          components,
@@ -4685,19 +4692,119 @@ defmodule Imp.Optimizer.GEPA.Engine do
           end
         )
 
-      finish_sequential_reflection(result, id, opts)
+      finish_sequential_reflection(result, id, adapter, batch, parent, opts)
     else
       {:error, reason} -> {:error, reason, state}
     end
   end
 
-  defp finish_sequential_reflection(result, id, opts) do
+  defp finish_sequential_reflection(result, id, adapter, batch, parent, opts) do
     state = elem(result, tuple_size(result) - 1)
     {_reservation, ledger} = BudgetLedger.release(state.budget_ledger, id)
-    state = %{state | budget_ledger: ledger, pending_proposal_batch: nil}
+    state = %{state | budget_ledger: ledger}
+
+    state =
+      case result do
+        {:ok, replacements, _reports, _state} ->
+          hold_sequential_proposal(state, adapter, batch, parent, replacements, opts)
+
+        _failed ->
+          %{state | pending_proposal_batch: nil}
+      end
+
     checkpoint!(state, opts)
     put_elem(result, tuple_size(result) - 1, state)
   end
+
+  # The checkpoint written after a sequential reflection holds the proposal
+  # as a prepared child batch, so a resume evaluates the same candidate on the
+  # same minibatch rather than starting the iteration over. The reflection is
+  # already charged, so the batch holds no reflection reservation. A proposal
+  # that will not be evaluated (an identical candidate that is rejected, or
+  # one the budget cannot evaluate) is not held.
+  defp hold_sequential_proposal(state, adapter, batch, parent, replacements, opts) do
+    %Proposal.Batch{contexts: [context], deferred_stop_reason: deferred} =
+      state.pending_proposal_batch
+
+    candidate = Map.merge(parent.candidate, replacements)
+
+    rejected_as_identical? =
+      candidate == parent.candidate and Keyword.get(opts, :reject_identical_candidate, false)
+
+    reservation =
+      Adapter.metric_call_reservation(adapter, batch, candidate, capture_traces: false)
+
+    with false <- rejected_as_identical?,
+         {:ok, ledger} <-
+           BudgetLedger.reserve(
+             state.budget_ledger,
+             state.budget,
+             reservation_id(:child, context.iteration),
+             %{metric_calls: reservation}
+           ) do
+      context = %{
+        context
+        | action: :child,
+          replacements: replacements,
+          candidate: candidate,
+          reflection_calls: nil,
+          aggregation_reports: []
+      }
+
+      %{
+        state
+        | budget_ledger: ledger,
+          pending_proposal_batch: Proposal.new_batch(:child, [context], deferred)
+      }
+    else
+      _not_held -> %{state | pending_proposal_batch: nil}
+    end
+  end
+
+  # The held proposal stays prepared while it is evaluated and is let go once
+  # the evaluation returns. A resume from a checkpoint taken during the
+  # evaluation evaluates the same candidate again, as the sequential path
+  # always re-ran the work an interruption cut short; marking it started
+  # would make that resume refuse.
+  defp evaluate_sequential_child(
+         adapter,
+         batch,
+         candidate,
+         proposed_candidate,
+         components,
+         parent_result,
+         state,
+         opts,
+         metadata
+       ) do
+    result =
+      evaluate_changed_candidate(
+        adapter,
+        batch,
+        candidate,
+        proposed_candidate,
+        components,
+        parent_result,
+        state,
+        opts,
+        metadata
+      )
+
+    last = tuple_size(result) - 1
+    put_elem(result, last, release_sequential_child(elem(result, last)))
+  end
+
+  defp release_sequential_child(
+         %State{pending_proposal_batch: %Proposal.Batch{phase: :child, contexts: [context]}} =
+           state
+       ) do
+    {_reservation, ledger} =
+      BudgetLedger.release(state.budget_ledger, reservation_id(:child, context.iteration))
+
+    %{state | pending_proposal_batch: nil, budget_ledger: ledger}
+  end
+
+  defp release_sequential_child(state), do: state
 
   defp propose_component_with_budget(
          proposer,
@@ -5176,6 +5283,8 @@ defmodule Imp.Optimizer.GEPA.Engine do
       "GEPA engine checkpoint"
     )
 
+    load_checkpoint_modules!()
+
     validate_resume_seed!(dumped, seed_candidate)
     validate_cache_identity!(dumped, opts)
 
@@ -5381,13 +5490,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
       aggregate_score: Map.fetch!(result, "aggregate_score"),
       scores: Map.fetch!(result, "scores"),
       objective_scores: result |> Map.fetch!("objective_scores") |> restore(),
-      trajectories:
-        result
-        |> Map.fetch!("trajectories")
-        |> restore()
-        |> Map.new(fn {component, trajectories} ->
-          {component, Enum.map(trajectories, &load_runtime_term/1)}
-        end),
+      trajectories: result |> Map.fetch!("trajectories") |> load_trajectories!(),
       side_information: result |> Map.fetch!("side_information") |> restore(),
       metadata: result |> Map.fetch!("metadata") |> restore()
     }
@@ -5572,11 +5675,58 @@ defmodule Imp.Optimizer.GEPA.Engine do
     )
   end
 
-  defp load_runtime_term(%{"__gepa_type__" => "trajectory", "state" => state}) do
-    Trajectory.load!(state)
+  defp load_runtime_term(term), do: restore(term)
+
+  # A result's trajectories are written as a report-encoded map of component
+  # to trajectory wire maps. The wire map is JSON already, so the report
+  # encoding around it only turned its nulls and booleans into atom tags.
+  # Reading it undoes exactly that and hands the rest to `Trajectory.load!/1`
+  # as it was written: decoding it as a report term too would also decode the
+  # report tags a value inside it carries in its own encoding (an
+  # `Imp.History` does), which its own loader then reads a second time.
+  defp load_trajectories!(%{"__imp_type__" => "map", "entries" => entries} = tagged)
+       when is_list(entries) do
+    require_exact_keys!(tagged, ~w(__imp_type__ entries), "GEPA result trajectories")
+
+    Enum.reduce(entries, %{}, fn
+      [component, trajectories], loaded ->
+        component = restore(component)
+
+        if Map.has_key?(loaded, component),
+          do: raise(ArgumentError, "GEPA result trajectories repeat a component"),
+          else: Map.put(loaded, component, load_trajectory_list!(trajectories))
+
+      _entry, _loaded ->
+        raise ArgumentError, "malformed GEPA result trajectories"
+    end)
   end
 
-  defp load_runtime_term(term), do: restore(term)
+  defp load_trajectories!(trajectories) when is_map(trajectories),
+    do:
+      Map.new(trajectories, fn {component, list} -> {component, load_trajectory_list!(list)} end)
+
+  defp load_trajectory_list!(trajectories) when is_list(trajectories),
+    do: Enum.map(trajectories, &load_trajectory!/1)
+
+  defp load_trajectory_list!(_trajectories),
+    do: raise(ArgumentError, "malformed GEPA result trajectories")
+
+  defp load_trajectory!(%{"__gepa_type__" => "trajectory", "state" => state} = tagged) do
+    require_exact_keys!(tagged, ~w(__gepa_type__ state), "GEPA runtime trajectory")
+    state |> literal_atoms() |> Trajectory.load!()
+  end
+
+  defp load_trajectory!(term), do: restore(term)
+
+  defp literal_atoms(%{"__imp_type__" => "atom", "value" => value} = tag)
+       when map_size(tag) == 2 and value in ["nil", "true", "false"],
+       do: String.to_existing_atom(value)
+
+  defp literal_atoms(map) when is_map(map),
+    do: Map.new(map, fn {key, value} -> {key, literal_atoms(value)} end)
+
+  defp literal_atoms(list) when is_list(list), do: Enum.map(list, &literal_atoms/1)
+  defp literal_atoms(value), do: value
 
   defp normalize_frontier_type!(type) when type in [:instance, :objective, :hybrid, :cartesian],
     do: type
@@ -5618,6 +5768,19 @@ defmodule Imp.Optimizer.GEPA.Engine do
     end
 
     :ok
+  end
+
+  # The report codec decodes only atoms that already exist. A checkpoint holds
+  # atoms that GEPA's modules name (rejection reasons, result metadata), and a
+  # VM that has not run GEPA has not necessarily loaded those modules.
+  defp load_checkpoint_modules! do
+    # A script can run Imp from its code path without loading the application.
+    _ = Application.load(:imp)
+    {:ok, modules} = :application.get_key(:imp, :modules)
+
+    modules
+    |> Enum.filter(&(&1 |> Atom.to_string() |> String.starts_with?("Elixir.Imp.Optimizer.GEPA.")))
+    |> Enum.each(&Code.ensure_loaded!/1)
   end
 
   defp dump_rng(rng_state), do: Random.dump(rng_state)

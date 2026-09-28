@@ -461,6 +461,52 @@ Every change here is breaking for code that relied on the old behaviour.
   that process: the exit goes on up, as it must from a process that traps
   exits and turns its owner's shutdown into an exit. Before, it was recorded
   and the run went on.
+- `Imp.Optimizer.Trajectory.dump/1` and `load!/1` round-trip a trajectory:
+  a map with an atom key is written as its entries, each key tagged as an
+  atom, so a prediction's metadata, a trace step (`%{predictor: :main}`) and
+  metric metadata such as Optimize Anything's `objective_scores` load with the
+  keys they had. Every map key was written as a string, so a trajectory whose
+  prediction had metadata failed to load (`Imp.Prediction.new/2: invalid map
+  in :metadata … got: "trace"`). GEPA checkpoints, Playbook checkpoints and
+  `Imp.dump/1` use this codec; resuming GEPA from a checkpoint whose pending
+  proposal batch held a result from an `Imp.predict` program raised that
+  error. Loading never creates an atom: a key written as an atom the loading
+  VM does not have (a dynamic metric-metadata key, say) loads as its name, a
+  string. A prediction's string metadata keys become their atoms when those
+  exist, so `Imp.Prediction.get_lm_usage/1`, `complete?/1` and readers of
+  `:trace` find them. A map that holds a key as both an atom and a string is
+  refused on load, as on dump. A trajectory written by 0.5.0 still loads, including one
+  whose prediction has metadata; its other map keys load as the strings they
+  were written as. Imp 0.5.0 cannot read a trajectory written with atom keys.
+- GEPA checkpoints an agent. A trajectory, and the report codec GEPA uses for
+  a pending batch's reflective dataset and a result's outputs, write an
+  `Imp.History` with `Imp.History.dump/1` and read it with
+  `Imp.History.load!/1`; the trajectory codec also carries
+  `Imp.Adapter.Types.ToolCalls` and `ToolCallResults`. Before, the first
+  checkpoint that held an `Imp.react` program's trajectories raised
+  `Trajectory.DecodeError: trajectory contains an unsupported struct:
+  Imp.History`, under either profile.
+  An optimizer report (`Imp.Optimizer.Report.encode_term/1`, `dump/1`) that
+  holds an `Imp.History` now writes it under a `"history"` tag, where it wrote
+  a plain map; Imp 0.5.0 and earlier builds cannot read such a report.
+- A GEPA checkpoint resumes in a fresh VM: the loader loads the GEPA modules
+  whose atoms a checkpoint holds before decoding it. Before,
+  `Imp.Optimizer.GEPA.compile_with_report/5` given a checkpoint in a VM that
+  had not yet run GEPA raised `not an already existing atom` on names like
+  `:cache_hits` and `:no_strict_improvement`.
+- The checkpoint GEPA writes after a sequential reflection holds the proposed
+  candidate, as the parallel path's does, so a resume from it, or from a
+  checkpoint taken while that candidate was being evaluated, evaluates that
+  candidate on the same minibatch. It held no proposal, so the resume started
+  the iteration over on the next minibatch and asked for a new reflection.
+- Under `:proposal_concurrency` above 1, GEPA evaluates a proposed candidate
+  on its minibatch without capturing traces, as the sequential path and
+  DSPy's GEPA do: the metric is called without a trace, an
+  `:acceptance_policy` sees `after.trajectories == %{}`, and the child's
+  `on_evaluation_end` carries no trajectories.
+- `Imp.Optimizer.GEPA.compile_with_report/5` no longer raises `KeyError` when
+  it resumes from a checkpoint taken during a full validation; the
+  interrupted validation's rejected candidate is in the report.
 - `examples/deployment/agent_optimization.exs` writes the optimizer's
   rejections and history with `Imp.Optimizer.Report.json_safe/1`. It passed
   them to `Jason.encode!/1`, which raised on a failure reason such as

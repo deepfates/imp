@@ -39,6 +39,7 @@ defmodule Imp.Optimizer.Report do
                    "language"
                  ])
   @map_tag_keys MapSet.new(["__imp_type__", "entries"])
+  @history_tag_keys MapSet.new(["__imp_type__", "value"])
   # Public optimizer identities are part of the portable Report contract. A
   # clean BEAM may not have loaded the owning optimizer module yet, so relying
   # only on binary_to_existing_atom/2 makes a valid saved report depend on
@@ -404,6 +405,10 @@ defmodule Imp.Optimizer.Report do
     }
   end
 
+  # A history is written and read by `Imp.History`'s own dump and load.
+  defp dump_value(%Imp.History{} = history),
+    do: %{"__imp_type__" => "history", "value" => Imp.History.dump(history)}
+
   defp dump_value(%Imp.Adapter.Types.Image{} = image) do
     %{
       "__imp_type__" => "image",
@@ -655,6 +660,12 @@ defmodule Imp.Optimizer.Report do
     else
       raise ArgumentError, "malformed Imp image JSON tag"
     end
+  end
+
+  defp load_value(%{"__imp_type__" => "history", "value" => value} = state, _atom_mode)
+       when is_map(value) do
+    validate_exact_tag!(state, @history_tag_keys, "history")
+    Imp.History.load!(value)
   end
 
   defp load_value(%{"__imp_type__" => "code"} = state, _atom_mode) do

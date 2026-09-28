@@ -1460,4 +1460,17 @@ defmodule OptimizerReportTest do
     assert Enum.any?(candidates, &String.contains?(&1, "Given the fields"))
     assert Enum.any?(candidates, &String.contains?(&1, "Return only fields requested"))
   end
+
+  test "a history round-trips through Imp.History's own dump and load" do
+    history =
+      Imp.History.new([
+        %{question: "Where?", tool_call_results: [%{name: "lookup", error: false}]}
+      ])
+
+    encoded = Imp.Optimizer.Report.encode_term(%{context: history})
+    assert encoded["__imp_type__"] == "map"
+
+    assert encoded |> Jason.encode!() |> Jason.decode!() |> Imp.Optimizer.Report.decode_term() ==
+             %{context: history}
+  end
 end
