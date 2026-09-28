@@ -435,14 +435,41 @@ defmodule DatasetsContractTest do
   end
 
   # The process `pid` monitors, once it monitors one.
+  # The caller also monitors other processes for a moment (the file server
+  # while it reads), so the walk is the monitored process running the CSV code.
   defp wait_for_monitored(pid, tries \\ 500) do
-    case Process.info(pid, :monitors) do
-      {:monitors, [{:process, monitored} | _rest]} ->
-        monitored
+    walk =
+      case Process.info(pid, :monitors) do
+        {:monitors, monitors} ->
+          Enum.find_value(monitors, fn
+            {:process, monitored} when is_pid(monitored) ->
+              if csv_walk?(monitored), do: monitored
 
-      _none when tries > 0 ->
-        Process.sleep(5)
-        wait_for_monitored(pid, tries - 1)
+            _other ->
+              nil
+          end)
+
+        nil ->
+          nil
+      end
+
+    if walk || tries == 0 do
+      walk
+    else
+      Process.sleep(5)
+      wait_for_monitored(pid, tries - 1)
+    end
+  end
+
+  defp csv_walk?(pid) do
+    case Process.info(pid, :current_stacktrace) do
+      {:current_stacktrace, frames} ->
+        Enum.any?(frames, fn {module, _fun, _arity, _location} ->
+          module in [Imp.Datasets, Imp.CSV]
+        end)
+
+      nil ->
+        false
     end
   end
 
