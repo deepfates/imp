@@ -426,6 +426,10 @@ User-visible changes to Imp are recorded here.
 - `Imp.Evaluate.Result.save_as_csv/2` writes with the same CSV module that
   `Imp.Datasets.csv/3` reads with, so what it writes reads back unchanged.
   The bytes it writes are the same as before.
+- A signature field written as `nil`, `true` or `false` keeps that name as
+  text, so `"nil: string -> a"` saves and loads with a field named `"nil"`.
+  The name became the atom `nil`, which saved as `""`. A field given the atom
+  `nil`, `true` or `false` as its name raises `ArgumentError`.
 - An instruction an optimizer sets on `Imp.Predict.ProgramOfThought` or
   `Imp.Predict.CodeAct` reaches the extraction step, which kept the old
   instructions when GEPA, MIPROv2, COPRO, SIMBA or InferRules set it, and such
