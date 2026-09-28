@@ -13,8 +13,18 @@ defmodule Imp.Adapter.XML do
   an `Imp.AdapterParseError` of kind `:missing_fields` if any required output
   remains absent. Typed objects, arrays, mappings, and unions use recursive XML. Saxy
   parses completed responses; declarations, doctypes, and custom entities are
-  rejected before parsing. Tag-free prose is a loud error, never silently
-  stuffed into a field.
+  rejected before parsing.
+
+  A reply with none of the requested output tags (prose, a JSON object, Chat
+  marker sections) is an `Imp.AdapterParseError` of kind `:missing_fields`
+  naming every output, even when every output is optional or has a default, so
+  the caller's fallback or retry runs instead of a prediction made only of
+  defaults. The one exception is the output a signature names in
+  `metadata[:text_field]`, as `Imp.Adapter.Chat` reads it: a non-blank reply
+  with no requested tag is that field, trimmed, and the other outputs take
+  their defaults. A reply with some requested tags and not others is read as
+  Chat reads a partial reply: absent outputs take their defaults or `nil` when
+  optional, and a required one that is still absent is reported missing.
 
   Rendering is byte-verified against real DSPy 3.2.1 by the golden-trace
   differential (`test/fixtures/golden_trace/cases.json`, `xml_*` cases).
@@ -55,15 +65,71 @@ defmodule Imp.Adapter.XML do
 
   @impl true
   def parse(signature, raw, opts) when is_binary(raw) do
+    case text_field_for(signature, raw) do
+      {:ok, name} -> Imp.Adapter.Chat.parse(signature, %{name => String.trim(raw)}, opts)
+      :error -> parse_tagged(signature, raw, opts)
+    end
+  end
+
+  def parse(signature, raw, opts), do: Imp.Adapter.Chat.parse(signature, raw, opts)
+
+  defp parse_tagged(signature, raw, opts) do
     with {:ok, root} <- parse_fragment(raw),
          grouped <- group_children(root),
+         :ok <- require_output_tag(signature, grouped),
          {:ok, fields} <- parse_output_fields(signature.outputs, grouped, raw),
          {:ok, prediction} <- Imp.Adapter.Chat.parse(signature, fields, opts) do
       {:ok, prediction}
     end
   end
 
-  def parse(signature, raw, opts), do: Imp.Adapter.Chat.parse(signature, raw, opts)
+  # DSPy 3.3.1's XMLAdapter.parse fills defaults and `None` for optional
+  # outputs even when the reply has no requested tag, so a signature whose
+  # outputs are all optional or defaulted accepts any reply as an answer built
+  # only from defaults. Imp reports such a reply as missing every output: the
+  # model did not answer in this format, and `Imp.Predict`'s JSON fallback or a
+  # caller's retry is the remedy, not an empty prediction.
+  defp require_output_tag(%{outputs: []}, _grouped), do: :ok
+
+  defp require_output_tag(signature, grouped) do
+    if Enum.any?(signature.outputs, &Map.has_key?(grouped, to_string(&1.name))) do
+      :ok
+    else
+      names = Enum.map(signature.outputs, & &1.name)
+
+      {:error,
+       %Imp.AdapterParseError{
+         kind: :missing_fields,
+         message:
+           "The response has none of the requested output tags: " <>
+             Enum.map_join(names, ", ", &"<#{&1}>") <> ".",
+         reason: names
+       }}
+    end
+  end
+
+  # The output named by `signature.metadata[:text_field]` takes a non-blank
+  # reply in which no requested output tag opens, as `Imp.Adapter.Chat` takes
+  # a marker-free completion. The check is on the text, before XML parsing, so
+  # prose that is not well-formed XML ("R&D", "a < b") is read as prose too.
+  defp text_field_for(signature, raw) do
+    with name when not is_nil(name) <-
+           Map.get(signature.metadata, :text_field, Map.get(signature.metadata, "text_field")),
+         field when not is_nil(field) <-
+           Enum.find(signature.outputs, &(to_string(&1.name) == to_string(name))),
+         true <- String.trim(raw) != "",
+         false <- opens_output_tag?(signature, raw) do
+      {:ok, field.name}
+    else
+      _not_text -> :error
+    end
+  end
+
+  defp opens_output_tag?(signature, raw) do
+    Enum.any?(signature.outputs, fn field ->
+      Regex.match?(~r/<#{Regex.escape(to_string(field.name))}[\s\/>]/, raw)
+    end)
+  end
 
   # ------------------------------------------------------------------
   # XMLAdapter.format_field_with_value dialect for one INPUT section:

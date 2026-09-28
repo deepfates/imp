@@ -16,6 +16,15 @@ User-visible changes to Imp are recorded here.
 
 ### Fixed
 
+- `Imp.Adapter.XML` reports a reply with none of the requested output tags
+  (prose, a JSON object, Chat marker sections) as an `Imp.AdapterParseError`
+  of kind `:missing_fields` naming every output, so the JSON fallback or a
+  retry runs. It parsed as a prediction of defaults and `nil`s when the
+  outputs were optional or defaulted, as a ReActV2 step's are, so an XML agent
+  given prose finished with `answer: nil`. DSPy 3.3.1 fills defaults there;
+  Imp does not. The output a signature names in `metadata[:text_field]` takes
+  such a reply, as in `Imp.Adapter.Chat`, so a ReActV2 step's prose under XML
+  is its `next_thought`.
 - `Imp.inspect_history/2` renders any history. A turn holding a term JSON has
   no encoding for, such as the `{:error, {:unknown_tool, name}}` result a
   ReActV2 history keeps for a call to a tool that does not exist, raised
