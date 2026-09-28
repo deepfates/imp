@@ -109,10 +109,20 @@ defmodule Imp.Optimize.Anything.Result do
     Map.get(candidate, :refiner_prompt, Map.get(candidate, "refiner_prompt"))
   end
 
-  @doc "Converts the result to a JSON-safe schema-versioned map."
+  # The result is redacted before it is encoded, except the candidates and the
+  # engine checkpoint: they are the optimized artifacts and the state a run
+  # resumes from, and are kept as they are.
+  @doc """
+  Converts the result to a JSON-safe schema-versioned map.
+
+  Credentials outside the candidates and the checkpoint are redacted with
+  `Imp.Redaction`.
+  """
   @spec to_map(t()) :: map()
   def to_map(%__MODULE__{} = result) do
     result
+    |> Imp.Redaction.redact_term()
+    |> Map.merge(Map.take(result, [:candidates, :checkpoint]))
     |> Map.from_struct()
     |> Map.update!(:instance_frontier, &dump_frontier/1)
     |> Map.update!(:objective_frontier, &dump_frontier/1)

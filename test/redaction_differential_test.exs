@@ -496,6 +496,67 @@ defmodule Imp.RedactionDifferentialTest do
     assert unexplained == []
   end
 
+  # Pairs written as two-element lists, as JSON writes config, headers and
+  # tool results. Each case sits under a key that is not a credential name.
+  @list_pair_value "FAKElistpairvalue"
+  @list_pairs [
+    {"mixed with a string", [["api_key", @list_pair_value], "note"]},
+    {"mixed with a 3-list", [["api_key", @list_pair_value], ["a", "b", "c"]]},
+    {"one pair", [["api_key", @list_pair_value]]},
+    {"number first beside a pair", [[1, @list_pair_value], ["api_key", @list_pair_value]]},
+    {"keyword list", [api_key: @list_pair_value, model: "gpt"]},
+    {"tuples and 2-lists", [{"model", "gpt"}, ["api_key", @list_pair_value]]},
+    {"pair beside nil", [["api_key", @list_pair_value], nil]},
+    {"flat 2-list", ["api_key", @list_pair_value]},
+    {"map key beside a pair", [[%{"k" => 1}, @list_pair_value], ["api_key", @list_pair_value]]},
+    {"ragged headers", %{"headers" => [["x", "y"], ["api_key", @list_pair_value], ["z"]]}}
+  ]
+
+  defp hides_pair_value?(term),
+    do: :binary.match(:erlang.term_to_binary(term), @list_pair_value) == :nomatch
+
+  test "a pair written as a two-element list is redacted wherever the previous rules redacted it" do
+    for {name, value} <- @list_pairs do
+      input = %{value: value}
+
+      if hides_pair_value?(MainRedaction.redact(input)) and name != "flat 2-list" do
+        for {writer, redact} <- [
+              redact: &Imp.Redaction.redact/1,
+              redact_term: &Imp.Redaction.redact_term/1,
+              drop_credentials: &Imp.Redaction.drop_credentials/1
+            ] do
+          assert hides_pair_value?(redact.(input)), "#{name} came back through #{writer}"
+        end
+      end
+    end
+  end
+
+  # The one recorded divergence: a two-element list held directly as a value
+  # is data, since it has the shape of a list of two names (an example's input
+  # keys, a schema's required fields). The previous rules read it as a pair.
+  test "a flat two-element list held as a value is data, where the previous rules redacted it" do
+    input = %{value: ["api_key", @list_pair_value]}
+
+    assert MainRedaction.redact(input) == %{value: ["api_key", "[REDACTED]"]}
+    assert Imp.Redaction.redact(input) == input
+    assert Imp.Redaction.redact_term(input) == input
+  end
+
+  # A table of rows whose first column holds credential names reads as pairs,
+  # as it did before: the value beside `token` and `session` is redacted.
+  test "a demo answer that is a table of rows is redacted as the previous rules did" do
+    table = [["token", "the"], ["session", "keynote"]]
+    demo = Imp.example(text: "the keynote", answer: table)
+    program = %{Imp.Predict.new(Imp.Signature.new("text -> answer")) | demos: [demo]}
+
+    loaded =
+      program |> Imp.Saving.dump() |> Jason.encode!() |> Jason.decode!() |> Imp.Saving.load!()
+
+    redacted = [["token", "[REDACTED]"], ["session", "[REDACTED]"]]
+    assert MainRedaction.redact(%{answer: table}) == %{answer: redacted}
+    assert Imp.Example.get(hd(loaded.demos), :answer) == redacted
+  end
+
   test "a saved program's instructions and demos survive dump and load unchanged" do
     signature =
       Imp.Signature.new(

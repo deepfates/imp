@@ -324,19 +324,25 @@ defmodule Imp.Experiment.Result do
     }
 
     if include_rows? do
-      Map.merge(summary, %{
-        "rows" => result |> EvaluationResult.output_rows() |> Imp.Optimizer.Report.json_safe(),
-        "errors" =>
-          result.errors
-          |> Imp.Redaction.redact()
-          |> Imp.Optimizer.Report.json_safe()
-      })
+      Map.merge(summary, row_detail(result))
     else
       summary
     end
   end
 
   defp evaluation_map(nil, _include_rows?), do: nil
+
+  # Rows and errors are redacted as they are, before they are turned into
+  # plain maps and encoded.
+  defp row_detail(%EvaluationResult{} = evaluation) do
+    %{
+      "rows" =>
+        evaluation
+        |> EvaluationResult.redacted_output_rows()
+        |> Imp.Optimizer.Report.encode_term(),
+      "errors" => Imp.Optimizer.Report.json_safe(evaluation.errors)
+    }
+  end
 
   defp repetition_map(%{count: _count} = summary, include_rows?) do
     %{
@@ -405,14 +411,7 @@ defmodule Imp.Experiment.Result do
     }
 
     if include_rows? do
-      Map.merge(summary, %{
-        "rows" =>
-          evaluation |> EvaluationResult.output_rows() |> Imp.Optimizer.Report.json_safe(),
-        "errors" =>
-          evaluation.errors
-          |> Imp.Redaction.redact()
-          |> Imp.Optimizer.Report.json_safe()
-      })
+      Map.merge(summary, row_detail(evaluation))
     else
       summary
     end

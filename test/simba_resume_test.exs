@@ -373,6 +373,36 @@ defmodule Imp.Optimizer.SIMBA.ResumeTest do
     assert refused_result["counters"] == %{"task_calls" => 0, "prompt_calls" => 0}
   end
 
+  @tag :tmp_dir
+  test "a checkpoint redacts a failure that holds credentials and resumes to the same result",
+       %{tmp_dir: tmp_dir} do
+    store = Imp.Test.RedactionProbe.store(tmp_dir)
+    probe = Imp.Test.RedactionProbe.value(store)
+    metric = Imp.Metrics.exact_match(:answer)
+
+    run = fn id, opts ->
+      state = start_supervised!({Agent, fn -> counters() end}, id: id)
+      {program, optimizer, trainset, final_set} = fixture(state, metric, metric_identity(), probe)
+      optimizer |> SIMBA.compile(program, trainset, final_set, opts) |> Report.fetch()
+    end
+
+    uninterrupted = run.(:simba_probe_full, [])
+    paused = run.(:simba_probe_pause, max_steps: 1)
+    assert paused.metadata.run_status == :paused
+
+    written = Jason.encode!(paused.metadata.resume_state)
+    assert Imp.Test.RedactionProbe.leaked(written, store) == []
+    assert written =~ "retriever.test/search"
+
+    resumed = run.(:simba_probe_resume, resume_state: Jason.decode!(written))
+    assert resumed.metadata.run_status == :complete
+    assert resumed.candidates == uninterrupted.candidates
+    assert resumed.best_score == uninterrupted.best_score
+    assert resumed.metadata.trial_logs == uninterrupted.metadata.trial_logs
+    assert resumed.metadata.final_candidates == uninterrupted.metadata.final_candidates
+    assert length(resumed.errors) == length(uninterrupted.errors)
+  end
+
   defp captured_metric(state) do
     fn example, prediction ->
       _ = Agent.get(state, & &1.task_calls)
@@ -380,7 +410,13 @@ defmodule Imp.Optimizer.SIMBA.ResumeTest do
     end
   end
 
-  defp fixture(state, metric \\ Imp.Metrics.exact_match(:answer), identity \\ metric_identity()) do
+  # With a probe, the task fails on "train 3" with a reason that holds it.
+  defp fixture(
+         state,
+         metric \\ Imp.Metrics.exact_match(:answer),
+         identity \\ metric_identity(),
+         probe \\ nil
+       ) do
     task_lm =
       Imp.LM.Static.new(
         handler: fn messages, opts ->
@@ -388,9 +424,11 @@ defmodule Imp.Optimizer.SIMBA.ResumeTest do
           prompt = Enum.map_join(messages, "\n", & &1.content)
           rollout_id = Keyword.get(opts, :rollout_id, 0)
 
-          if prompt =~ "Answer yes." or rem(rollout_id, 2) == 0,
-            do: %{answer: "yes"},
-            else: %{answer: "no"}
+          cond do
+            probe && prompt =~ "train 3" -> {:error, {:probe, probe}}
+            prompt =~ "Answer yes." or rem(rollout_id, 2) == 0 -> %{answer: "yes"}
+            true -> %{answer: "no"}
+          end
         end
       )
 

@@ -9,6 +9,10 @@ defmodule Imp.Optimizer.SIMBA.Checkpoint do
 
   @spec dump(map(), map()) :: map()
   def dump(compatibility, state) when is_map(compatibility) and is_map(state) do
+    # Failure reasons are redacted before they are encoded: a resumed run only
+    # reports them, and a client, retriever or OAuth struct in one is still a
+    # struct here. The instructions, demos, scores and hashes the run continues
+    # from are kept as they are.
     payload = %{
       "compatibility" => compatibility,
       "state" => %{
@@ -19,7 +23,7 @@ defmodule Imp.Optimizer.SIMBA.Checkpoint do
         "order" => state.order,
         "cursor" => state.cursor,
         "poisson_rng" => Sampling.dump(state.poisson_rng),
-        "errors" => Report.encode_term(state.errors),
+        "errors" => state.errors |> Imp.Redaction.redact_term() |> Report.encode_term(),
         "trajectory_calls" => state.trajectory_calls,
         "candidate_evaluation_calls" => state.candidate_evaluation_calls,
         "final_evaluation_calls" => state.final_evaluation_calls,
@@ -210,7 +214,7 @@ defmodule Imp.Optimizer.SIMBA.Checkpoint do
       "program" => dump_program(evaluation.program),
       "score" => evaluation.score,
       "scores" => evaluation.scores,
-      "errors" => Report.encode_term(evaluation.errors)
+      "errors" => evaluation.errors |> Imp.Redaction.redact_term() |> Report.encode_term()
     }
   end
 

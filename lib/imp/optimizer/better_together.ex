@@ -1266,6 +1266,8 @@ defmodule Imp.Optimizer.BetterTogether do
     {:error, failure.reason, diagnostics}
   end
 
+  # `Report.dump/1` and `Report.json_safe/1` each redact their term before
+  # converting it, so the diagnostics are not redacted again.
   defp bootstrap_diagnostics(program, failure) do
     report =
       case Report.fetch(program) do
@@ -1278,7 +1280,6 @@ defmodule Imp.Optimizer.BetterTogether do
       "failure" => Report.json_safe(failure),
       "report" => report
     }
-    |> Imp.Redaction.redact()
   end
 
   defp cancellation_deadline(request),

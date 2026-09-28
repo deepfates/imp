@@ -320,26 +320,53 @@ defmodule Imp.Redaction do
       "sha 0badcafe0badcafe0badcafe0badcafe0badcafe"
 
   """
-  def redact(value, keys \\ @default_redact_keys)
+  def redact(value, keys \\ @default_redact_keys), do: walk(value, keys, :plain)
 
-  def redact(%Imp.Adapter.Types.Image{} = image, keys) do
-    %{image | url: redact(image.url, keys), metadata: redact(image.metadata, keys)}
+  @doc false
+  # What a writer calls before it converts a term to a portable or JSON form.
+  # Redaction runs on the original term, where the struct clauses below can see
+  # a connection or OAuth struct; a writer that converted first would hand them
+  # a plain map. Every struct keeps its type, so the converter still recognizes
+  # the ones it encodes by type (examples, code, images, reports), and a value
+  # with nothing to hide converts exactly as it would unredacted.
+  def redact_term(value, keys \\ @default_redact_keys), do: walk(value, keys, {:typed, []})
+
+  @doc false
+  # `redact_term/2` for a term that also holds protocol state a provider needs
+  # back unmodified, under the named keys: a map entry under one of them is
+  # kept as it is.
+  def redact_term_except(value, preserved_keys) when is_list(preserved_keys),
+    do: walk(value, @default_redact_keys, {:typed, preserved_keys})
+
+  # An image's data is left alone when it is only shown; a term kept for
+  # conversion writes the data out, so it is redacted as any string is.
+  defp walk(%Imp.Adapter.Types.Image{} = image, keys, {:typed, _preserved} = mode) do
+    %{
+      image
+      | url: walk(image.url, keys, mode),
+        data: walk(image.data, keys, mode),
+        metadata: walk(image.metadata, keys, mode)
+    }
   end
 
-  # Optimizer reports have an explicit, lossless JSON wire tag. Preserve the
-  # known struct through this sanitization pass so Report.encode_term/1 can
-  # emit that tag after redaction instead of persisting an indistinguishable
-  # plain map. Report fields are still walked recursively, including candidate
-  # and error payloads that may contain credentials.
-  def redact(%Imp.Optimizer.Report{} = report, keys) do
+  defp walk(%Imp.Adapter.Types.Image{} = image, keys, mode) do
+    %{image | url: walk(image.url, keys, mode), metadata: walk(image.metadata, keys, mode)}
+  end
+
+  # Optimizer reports have an explicit, lossless JSON wire tag. The report
+  # keeps its type so a writer converting it afterwards emits that tag rather
+  # than an indistinguishable plain map. Report fields are still walked
+  # recursively, including candidate and error payloads that may hold
+  # credentials.
+  defp walk(%Imp.Optimizer.Report{} = report, keys, mode) do
     %{
       report
-      | optimizer: redact(report.optimizer, keys),
-        best_score: redact(report.best_score, keys),
-        candidate_count: redact(report.candidate_count, keys),
-        candidates: redact(report.candidates, keys),
-        errors: redact(report.errors, keys),
-        metadata: redact(report.metadata, keys)
+      | optimizer: walk(report.optimizer, keys, mode),
+        best_score: walk(report.best_score, keys, mode),
+        candidate_count: walk(report.candidate_count, keys, mode),
+        candidates: walk(report.candidates, keys, mode),
+        errors: walk(report.errors, keys, mode),
+        metadata: walk(report.metadata, keys, mode)
     }
   end
 
@@ -348,8 +375,10 @@ defmodule Imp.Redaction do
   # and user info of every URL. A header's name says nothing reliable about its
   # value (`X-Subscription-Token`, `Cookie`), and a URL's query often carries a
   # key. The struct keeps its type.
-  def redact(%module{} = value, keys) when module in @connection_structs do
-    Map.merge(value, value |> Map.from_struct() |> redact(keys) |> hide_headers_and_urls())
+  defp walk(%module{} = value, keys, _mode) when module in @connection_structs do
+    # The fields are walked as plain terms so that hiding reaches the headers
+    # and URLs of any struct nested inside.
+    Map.merge(value, value |> Map.from_struct() |> walk(keys, :plain) |> hide_headers_and_urls())
   end
 
   # The MCP OAuth structs hold secrets under names that say nothing about them:
@@ -357,106 +386,186 @@ defmodule Imp.Redaction do
   # and the `state` that an authorization URL also carries. Each keeps its type
   # and the fields its `Inspect` implementation shows; the secret fields become
   # the redaction marker.
-  def redact(%Imp.MCP.OAuth.Store{} = store, keys) do
-    %{store | directory: redact(store.directory, keys), key: "[REDACTED]"}
+  defp walk(%Imp.MCP.OAuth.Store{} = store, keys, mode) do
+    %{store | directory: walk(store.directory, keys, mode), key: "[REDACTED]"}
   end
 
-  def redact(%Imp.MCP.OAuth.Flow{} = flow, keys) do
+  defp walk(%Imp.MCP.OAuth.Flow{} = flow, keys, mode) do
     %{
       flow
-      | resource_url: redact(flow.resource_url, keys),
-        redirect_uri: redact(flow.redirect_uri, keys),
+      | resource_url: walk(flow.resource_url, keys, mode),
+        redirect_uri: walk(flow.redirect_uri, keys, mode),
         authorization_url: "[REDACTED]",
         transaction: "[REDACTED]",
         client: "[REDACTED]",
-        issuer: redact(flow.issuer, keys),
-        token_endpoint: redact(flow.token_endpoint, keys),
-        scopes: redact(flow.scopes, keys)
+        issuer: walk(flow.issuer, keys, mode),
+        token_endpoint: walk(flow.token_endpoint, keys, mode),
+        scopes: walk(flow.scopes, keys, mode)
     }
   end
 
-  def redact(%Imp.MCP.OAuth.Pending{} = pending, keys) do
+  defp walk(%Imp.MCP.OAuth.Pending{} = pending, keys, mode) do
     %{
       pending
-      | store: redact(pending.store, keys),
-        credential: redact(pending.credential, keys),
-        server_url: redact(pending.server_url, keys),
+      | store: walk(pending.store, keys, mode),
+        credential: walk(pending.credential, keys, mode),
+        server_url: walk(pending.server_url, keys, mode),
         authorization_url: "[REDACTED]",
-        redirect_uri: redact(pending.redirect_uri, keys),
-        flow: redact(pending.flow, keys),
+        redirect_uri: walk(pending.redirect_uri, keys, mode),
+        flow: walk(pending.flow, keys, mode),
         state: if(is_nil(pending.state), do: nil, else: "[REDACTED]")
     }
   end
 
   # An exception keeps its type, so a redacted failure still matches as the
   # failure it is; only its fields are redacted.
-  def redact(value, keys) when is_exception(value) do
-    struct(value.__struct__, value |> Map.from_struct() |> redact(keys))
+  defp walk(value, keys, mode) when is_exception(value) do
+    struct(value.__struct__, value |> Map.from_struct() |> walk(keys, mode))
   end
 
-  # A URI is redacted as the URL it spells, so its query, fragment and user
-  # info are hidden the same way whether it was given as a string or a struct.
-  def redact(%URI{} = uri, keys), do: uri |> URI.to_string() |> redact(keys)
+  # A URI is redacted as the URL it spells, so a credential in it is found the
+  # same way whether it was given as a string or a struct. A term being kept
+  # for conversion keeps a URI that holds none.
+  defp walk(%URI{} = uri, keys, {:typed, _preserved} = mode) do
+    url = URI.to_string(uri)
+    redacted = walk(url, keys, mode)
+    if redacted == url, do: uri, else: redacted
+  end
 
-  def redact(value, keys) when is_struct(value) do
+  defp walk(%URI{} = uri, keys, mode), do: uri |> URI.to_string() |> walk(keys, mode)
+
+  defp walk(value, keys, {:typed, _preserved} = mode) when is_struct(value) do
+    Map.merge(value, value |> Map.from_struct() |> walk(keys, mode))
+  end
+
+  defp walk(value, keys, mode) when is_struct(value) do
     value
     |> Map.from_struct()
-    |> redact(keys)
+    |> walk(keys, mode)
   end
 
-  def redact(value, keys) when is_map(value) do
+  # A key that is not an atom or a string (a tuple, a list, a struct) can hold
+  # a credential of its own, so it is walked like a value. Two keys that redact
+  # to the same term collapse into one entry: which of their values is kept is
+  # arbitrary, and neither key's secret survives.
+  defp walk(value, keys, mode) when is_map(value) do
     tagged_entry_keys = tagged_map_entry_keys(value)
+
+    tagged_pair_keys = tagged_pair_keys(value)
+
+    preserved =
+      case mode do
+        {:typed, preserved} -> preserved
+        :plain -> []
+      end
 
     Map.new(value, fn {key, nested} ->
       cond do
-        key in tagged_entry_keys -> {key, redact_tagged_entries(nested, keys)}
-        redacted_entry?(key, nested, keys) -> {key, "[REDACTED]"}
-        true -> {key, redact(nested, keys)}
+        key in preserved -> {key, nested}
+        key in tagged_entry_keys -> {key, redact_tagged_entries(nested, keys, mode)}
+        key in tagged_pair_keys -> {key, walk_pair(nested, keys, mode)}
+        redacted_entry?(key, nested, keys) -> {walk_key(key, keys, mode), "[REDACTED]"}
+        true -> {walk_key(key, keys, mode), walk(nested, keys, mode)}
       end
     end)
   end
 
-  def redact([key, nested], keys) when is_atom(key) or is_binary(key) or is_map(key) do
-    cond do
-      redacted_entry?(key, nested, keys) -> [key, "[REDACTED]"]
-      is_map(key) and tagged_key_names(key) == [] -> [redact(key, keys), redact(nested, keys)]
-      true -> [key, redact(nested, keys)]
-    end
+  defp walk([], _keys, _mode), do: []
+
+  defp walk([_ | _] = list, keys, mode), do: walk_cells(list, keys, mode)
+
+  defp walk({key, nested}, keys, mode) when is_atom(key) or is_binary(key) do
+    if redacted_entry?(key, nested, keys),
+      do: {key, "[REDACTED]"},
+      else: {key, walk(nested, keys, mode)}
   end
 
-  def redact([], _keys), do: []
+  defp walk(value, keys, mode) when is_tuple(value) do
+    value
+    |> Tuple.to_list()
+    |> Enum.map(&walk(&1, keys, mode))
+    |> List.to_tuple()
+  end
+
+  defp walk(value, _keys, _mode) when is_binary(value),
+    do: if(secret_value?(value), do: "[REDACTED]", else: value)
+
+  # A term kept for conversion becomes text once encoded, and an atom's text is
+  # redacted there as any string is.
+  defp walk(value, _keys, {:typed, _preserved})
+       when is_atom(value) and value not in [nil, true, false] do
+    if secret_value?(Atom.to_string(value)), do: :"[REDACTED]", else: value
+  end
+
+  defp walk(value, _keys, _mode), do: value
 
   # Provider failures and low-level protocol metadata can contain improper lists.
   # Walking cons cells directly preserves their shape and keeps the observability
   # boundary fail-safe instead of crashing inside Enumerable.
-  def redact([head | tail], keys), do: [redact(head, keys) | redact(tail, keys)]
-
-  def redact({key, nested}, keys) when is_atom(key) or is_binary(key) do
-    if redacted_entry?(key, nested, keys),
-      do: {key, "[REDACTED]"},
-      else: {key, redact(nested, keys)}
+  defp walk_cells([head | tail], keys, mode) do
+    head = if list_pair?(head), do: walk_pair(head, keys, mode), else: walk(head, keys, mode)
+    [head | walk_cells(tail, keys, mode)]
   end
 
-  def redact(value, keys) when is_tuple(value) do
-    value
-    |> Tuple.to_list()
-    |> Enum.map(&redact(&1, keys))
-    |> List.to_tuple()
+  defp walk_cells([], _keys, _mode), do: []
+  defp walk_cells(tail, keys, mode), do: walk(tail, keys, mode)
+
+  defp walk_pair([key, nested], keys, mode) do
+    cond do
+      redacted_entry?(key, nested, keys) ->
+        [key, "[REDACTED]"]
+
+      is_map(key) and tagged_key_names(key) == [] ->
+        [walk(key, keys, mode), walk(nested, keys, mode)]
+
+      true ->
+        [key, walk(nested, keys, mode)]
+    end
   end
 
-  def redact(value, _keys) when is_binary(value),
-    do: if(secret_value?(value), do: "[REDACTED]", else: value)
+  defp walk_pair(value, keys, mode), do: walk(value, keys, mode)
 
-  def redact(value, _keys), do: value
+  # A string key is redacted by its shape alone: its name is what the entry's
+  # value is judged by, not a secret to hide.
+  defp walk_key(key, _keys, _mode) when is_binary(key),
+    do: if(secret_value?(key), do: "[REDACTED]", else: key)
+
+  defp walk_key(key, _keys, _mode) when is_atom(key), do: key
+  defp walk_key(key, keys, mode), do: walk(key, keys, mode)
+
+  @doc false
+  # A two-element list with a name first is a key-value pair when it is an
+  # element of a list, whatever its siblings are, as JSON writes headers,
+  # options and config: `[["api_key", key], ["model", "gpt"]]`. A two-element
+  # list held directly as a field or map value is data: an example's input keys
+  # `[:api_key, :question]`, a schema's `"required" => ["api_key", "query"]`.
+  # So a flat `["api_key", key]` held as a value, under a key that is not itself
+  # a credential name, is not redacted, which 0.5.0 did: it has the shape of a
+  # list of two names. A tuple with a name first is always a pair.
+  def list_pair?([key, _value]) when is_atom(key) or is_binary(key), do: true
+  def list_pair?(_value), do: false
+
+  # An encoded two-element tuple is a pair the codec tagged as one.
+  defp tagged_pair_keys(value) do
+    types = [Map.get(value, "__imp_type__"), Map.get(value, :__imp_type__)]
+
+    if Enum.any?(types, &(&1 in ["tuple", :tuple])) do
+      Enum.filter(["items", :items], &match?([_key, _value], Map.get(value, &1)))
+    else
+      []
+    end
+  end
 
   @doc """
   Recursively removes credential-bearing entries while preserving semantic data.
 
   This is intended for persistence and cache identity boundaries where restoring
-  a redaction marker as a runtime option would be misleading.
+  a redaction marker as a runtime option would be misleading. The term is
+  redacted before entries are removed, so a client, retriever or OAuth struct
+  is still a struct when its header values and URL secrets are hidden.
   """
   def drop_credentials(value) do
-    case drop_credential_value(value) do
+    case value |> redact_term() |> drop_credential_value() do
       {:keep, sanitized} -> sanitized
       :drop -> nil
     end
@@ -518,6 +627,19 @@ defmodule Imp.Redaction do
     |> drop_credential_value()
   end
 
+  # A pair is a tuple, a tagged map's entry, an encoded two-element tuple, or
+  # a two-element list inside a list (see `list_pair?/1`).
+  defp drop_credential_value(%{"__imp_type__" => "tuple", "items" => [key, nested]} = tuple) do
+    if credential_entry?(key, nested) do
+      :drop
+    else
+      case drop_noncredential_pair([key, nested]) do
+        {:keep, items} -> {:keep, %{tuple | "items" => items}}
+        :drop -> :drop
+      end
+    end
+  end
+
   defp drop_credential_value(map) when is_map(map) do
     tagged_entry_keys = tagged_map_entry_keys(map)
 
@@ -539,11 +661,6 @@ defmodule Imp.Redaction do
       end)
 
     {:keep, sanitized}
-  end
-
-  defp drop_credential_value([key, nested])
-       when is_atom(key) or is_binary(key) or is_map(key) do
-    if credential_entry?(key, nested), do: :drop, else: drop_noncredential_pair([key, nested])
   end
 
   defp drop_credential_value(list) when is_list(list), do: drop_list_values(list, [])
@@ -588,7 +705,7 @@ defmodule Imp.Redaction do
 
   defp drop_list_values([head | tail], acc) do
     acc =
-      case drop_credential_value(head) do
+      case drop_list_element(head) do
         {:keep, value} -> [value | acc]
         :drop -> acc
       end
@@ -606,6 +723,12 @@ defmodule Imp.Redaction do
     {:keep, Enum.reduce(acc, sanitized_tail, fn value, rest -> [value | rest] end)}
   end
 
+  defp drop_list_element([key, nested] = pair) when is_atom(key) or is_binary(key) do
+    if credential_entry?(key, nested), do: :drop, else: drop_noncredential_pair(pair)
+  end
+
+  defp drop_list_element(value), do: drop_credential_value(value)
+
   defp keep_tagged_entry(acc, encoded_key, nested) do
     case drop_credential_value(nested) do
       {:keep, sanitized} -> [[encoded_key, sanitized] | acc]
@@ -613,19 +736,19 @@ defmodule Imp.Redaction do
     end
   end
 
-  defp redact_tagged_entries(entries, keys) when is_list(entries) do
+  defp redact_tagged_entries(entries, keys, mode) when is_list(entries) do
     Enum.map(entries, fn
       [encoded_key, nested] ->
         if redacted_entry?(encoded_key, nested, keys),
           do: [encoded_key, "[REDACTED]"],
-          else: [redact(encoded_key, keys), redact(nested, keys)]
+          else: [walk(encoded_key, keys, mode), walk(nested, keys, mode)]
 
       nested ->
-        redact(nested, keys)
+        walk(nested, keys, mode)
     end)
   end
 
-  defp redact_tagged_entries(value, keys), do: redact(value, keys)
+  defp redact_tagged_entries(value, keys, mode), do: walk(value, keys, mode)
 
   defp drop_tagged_entries(entries) when is_list(entries) do
     entries

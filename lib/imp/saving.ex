@@ -159,8 +159,15 @@ defmodule Imp.Saving do
     raise ArgumentError, "saved Imp file is not a checksummed program artifact envelope"
   end
 
+  # Demos and metadata hold arbitrary terms. They are redacted as they are,
+  # before `Imp.Predict.dump/1` encodes them, so that a client, retriever or
+  # OAuth struct among them is still a struct when redacted.
   defp dump_state(%Imp.Predict{} = program) do
-    program
+    %{
+      program
+      | demos: Imp.Redaction.redact_term(program.demos),
+        metadata: Imp.Redaction.redact_term(program.metadata)
+    }
     |> Imp.Predict.dump()
     |> Map.update!("config", &dump_portable_config!(&1, "Predict config"))
     |> Map.put("type", "predict")
@@ -211,7 +218,7 @@ defmodule Imp.Saving do
   defp dump_state(%Imp.Predict.KNN{} = knn) do
     %{
       "type" => "knn",
-      "examples" => Imp.Optimizer.Report.encode_term(knn.trainset),
+      "examples" => encode_redacted(knn.trainset),
       "k" => knn.k,
       "vectorizer" => dump_vectorizer!(knn.vectorizer)
     }
@@ -1003,11 +1010,17 @@ defmodule Imp.Saving do
 
   defp dump_portable_value!(value, context) do
     value
-    |> Imp.Redaction.redact()
+    |> Imp.Redaction.redact_term()
     |> Imp.Optimizer.Report.encode_term()
     |> redact_dump()
     |> require_portable_json!(context)
   end
+
+  # Arbitrary terms Saving encodes itself are redacted as they are first, so
+  # that a client, retriever or OAuth struct among them is still a struct when
+  # redacted.
+  defp encode_redacted(value),
+    do: value |> Imp.Redaction.redact_term() |> Imp.Optimizer.Report.encode_term()
 
   defp redact_dump(value) when is_struct(value) do
     value
@@ -1052,6 +1065,22 @@ defmodule Imp.Saving do
     Map.put(value, "entries", entries)
   end
 
+  # An encoded two-element tuple is a pair the codec tagged as one.
+  defp redact_dump(%{"__imp_type__" => "tuple", "items" => [encoded_key, nested]} = tuple) do
+    items =
+      case json_safe_key_name(encoded_key) do
+        {:ok, key} ->
+          if Imp.Redaction.credential_entry?(key, nested),
+            do: [encoded_key, "[REDACTED]"],
+            else: [redact_dump(encoded_key), redact_dump(nested)]
+
+        :error ->
+          [redact_dump(encoded_key), redact_dump(nested)]
+      end
+
+    %{tuple | "items" => items}
+  end
+
   defp redact_dump(%{provider: :req_llm, model: _model} = value) do
     value
     |> Imp.Redaction.drop_credentials()
@@ -1080,13 +1109,21 @@ defmodule Imp.Saving do
     end)
   end
 
-  defp redact_dump([key, value]) when is_atom(key) or is_binary(key) or is_map(key) do
-    if Imp.Redaction.credential_entry?(key, value),
-      do: [key, "[REDACTED]"],
-      else: [key, redact_dump(value)]
-  end
+  # A two-element list with a name first is a pair inside a list, as JSON
+  # writes config, options and headers (`Imp.Redaction.list_pair?/1`).
+  defp redact_dump(value) when is_list(value) do
+    Enum.map(value, fn
+      [key, nested] = pair ->
+        cond do
+          not Imp.Redaction.list_pair?(pair) -> redact_dump(pair)
+          Imp.Redaction.credential_entry?(key, nested) -> [key, "[REDACTED]"]
+          true -> [key, redact_dump(nested)]
+        end
 
-  defp redact_dump(value) when is_list(value), do: Enum.map(value, &redact_dump/1)
+      item ->
+        redact_dump(item)
+    end)
+  end
 
   defp redact_dump({key, value}) when is_atom(key) or is_binary(key) do
     if Imp.Redaction.credential_entry?(key, value),
@@ -1140,14 +1177,16 @@ defmodule Imp.Saving do
     |> require_portable_json!(context)
   end
 
+  # An Avatar's tool schemas are redacted as they are, before they are encoded,
+  # so that a client, retriever or OAuth struct in one is still a struct when
+  # redacted.
   defp dump_avatar_tools(tools) do
     tools
-    |> dump_tools("Avatar")
-    |> Enum.map(fn tool ->
-      tool
-      |> Map.update!("description", &Imp.Redaction.redact(&1, []))
-      |> Map.update!("schema", &Imp.Redaction.redact/1)
+    |> Map.new(fn {name, tool} ->
+      {name, %{tool | schema: Imp.Redaction.redact_term(tool.schema)}}
     end)
+    |> dump_tools("Avatar")
+    |> Enum.map(&Map.update!(&1, "description", fn text -> Imp.Redaction.redact(text, []) end))
   end
 
   defp require_portable_json!(value, context) do
@@ -1679,7 +1718,7 @@ defmodule Imp.Saving do
   defp dump_retriever(%Imp.Retrieve.Memory{} = retriever) do
     %{
       "type" => "memory",
-      "docs" => Imp.Optimizer.Report.encode_term(retriever.docs),
+      "docs" => encode_redacted(retriever.docs),
       "k" => retriever.k
     }
   end

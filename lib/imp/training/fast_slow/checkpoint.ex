@@ -1,5 +1,14 @@
 defmodule Imp.Training.FastSlow.Checkpoint do
-  @moduledoc "Versioned, checksummed persistence for Fast-Slow training state."
+  @moduledoc """
+  Versioned, checksummed persistence for Fast-Slow training state.
+
+  A checkpoint is not redacted. Its prompts, rollouts and digests are the state
+  a run resumes from, and redacting any of them would change what the resumed
+  run trains on or fail its digest checks. Structs and credential-named keys
+  are refused when the state is built, so no client, retriever or OAuth struct
+  reaches it, but text in a prompt or a rollout is written as it is: treat the
+  file as sensitive.
+  """
 
   alias Imp.Training.FastSlow.{
     Budget,

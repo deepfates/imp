@@ -8,6 +8,16 @@ defmodule Imp.Optimizer.InferRules.Checkpoint do
 
   @spec dump(map(), map()) :: map()
   def dump(compatibility, state) when is_map(compatibility) and is_map(state) do
+    # Failure reasons are redacted before they are encoded: a resumed run only
+    # reports them, and a client, retriever or OAuth struct in one is still a
+    # struct here. The instructions, demos, scores and hashes the run continues
+    # from are kept as they are.
+    state =
+      state
+      |> Map.update!(:proposal_errors, &Imp.Redaction.redact_term/1)
+      |> Map.update!(:candidates, &Enum.map(&1, fn row -> redact_failure(row) end))
+      |> Map.update!(:evaluated, &Enum.map(&1, fn row -> redact_failure(row) end))
+
     payload = %{
       "compatibility" => compatibility,
       "state" => state |> dump_state() |> Report.encode_term()
@@ -58,6 +68,14 @@ defmodule Imp.Optimizer.InferRules.Checkpoint do
 
   def load!(value, _expected_compatibility, _runtime_program) do
     raise ArgumentError, "invalid InferRules resume state: #{inspect(value)}"
+  end
+
+  defp redact_failure(row) do
+    Enum.reduce([:error, :errors], row, fn key, row ->
+      if Map.has_key?(row, key),
+        do: Map.update!(row, key, &Imp.Redaction.redact_term/1),
+        else: row
+    end)
   end
 
   defp dump_state(state) do

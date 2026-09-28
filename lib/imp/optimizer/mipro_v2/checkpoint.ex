@@ -11,6 +11,10 @@ defmodule Imp.Optimizer.MIPROv2.Checkpoint do
   @spec dump(map(), map(), map()) :: map()
   def dump(compatibility, artifacts, state)
       when is_map(compatibility) and is_map(artifacts) and is_map(state) do
+    # Failure reasons are redacted before they are encoded: a resumed run only
+    # reports them, and a client, retriever or OAuth struct in one is still a
+    # struct here. The instructions, demos, scores and hashes the run continues
+    # from are kept as they are.
     payload = %{
       "compatibility" => compatibility,
       "artifacts" => Report.encode_term(artifacts),
@@ -22,7 +26,7 @@ defmodule Imp.Optimizer.MIPROv2.Checkpoint do
         "full_evaluations" => dump_records(state.full_evaluations),
         "next_study_number" => state.next_study_number,
         "evaluation_calls" => state.evaluation_calls,
-        "errors" => Report.encode_term(state.errors)
+        "errors" => state.errors |> Imp.Redaction.redact_term() |> Report.encode_term()
       }
     }
 
@@ -33,6 +37,17 @@ defmodule Imp.Optimizer.MIPROv2.Checkpoint do
       "payload" => payload
     }
   end
+
+  # The modules that name the atoms a checkpoint's trial records, proposal
+  # artifacts and errors hold. A resumed run in a fresh VM skips the work that
+  # would load them, so the loader loads them before decoding.
+  @run_modules [
+    Imp.Optimizer.MIPROv2,
+    Imp.Optimizer.MIPROv2.UpstreamBootstrap,
+    Imp.Optimizer.MIPROv2.UpstreamProposer,
+    Imp.Optimizer.InstructionProposer,
+    Imp.Optimizer.DemoCandidates
+  ]
 
   @spec load!(map(), map()) :: %{artifacts: map(), state: map()}
   def load!(checkpoint, expected_compatibility)
@@ -56,6 +71,8 @@ defmodule Imp.Optimizer.MIPROv2.Checkpoint do
     unless checksum(payload) == payload_sha256 do
       raise ArgumentError, "MIPROv2 resume state checksum does not match its payload"
     end
+
+    Enum.each(@run_modules, &Code.ensure_loaded!/1)
 
     unless compatible?(schema_version, compatibility, expected_compatibility) do
       raise ArgumentError,

@@ -1,6 +1,13 @@
 defmodule Imp.ACP.SessionStore do
   @moduledoc false
 
+  # One JSON file per session, mode 0600 in a 0700 directory. The history and
+  # transcript are redacted when written, except the provider's reasoning
+  # continuation, so a resumed session replays a message or tool result that
+  # held a credential as "[REDACTED]". The session's `_meta` is stored as the
+  # client sent it: Imp puts nothing there and never reads it, only the host's
+  # program factory does, so anything a host puts in `_meta` is persisted.
+
   @version 1
   @session_id ~r/\Aimp_[A-Za-z0-9_-]{24}\z/
 
@@ -32,8 +39,8 @@ defmodule Imp.ACP.SessionStore do
 
   def persist(root, session_id, metadata, history, transcript) do
     with {:ok, existing} <- read(root, session_id),
-         {:ok, dumped_history} <- dump_history(history),
-         {:ok, transcript} <- transcript(transcript) do
+         {:ok, dumped_history} <- history |> redact_history() |> dump_history(),
+         {:ok, transcript} <- transcript |> Imp.Redaction.redact_term() |> transcript() do
       record =
         existing
         |> Map.put("cwd", metadata.cwd)
@@ -201,6 +208,21 @@ defmodule Imp.ACP.SessionStore do
   # the endpoint's own default, rather than being refused.
   defp stored_meta(%{"meta" => meta}) when is_map(meta), do: meta
   defp stored_meta(_record), do: %{}
+
+  # History is redacted as it is, before it is dumped, except the provider's
+  # reasoning continuation: a resumed session sends `reasoning_content` and
+  # `reasoning_details` back to the provider, which needs them unmodified.
+  @reasoning_continuation [
+    :reasoning_content,
+    "reasoning_content",
+    :reasoning_details,
+    "reasoning_details"
+  ]
+
+  defp redact_history(%Imp.History{} = history),
+    do: Imp.Redaction.redact_term_except(history, @reasoning_continuation)
+
+  defp redact_history(history), do: history
 
   defp dump_history(%Imp.History{} = history), do: {:ok, Imp.History.dump(history)}
   defp dump_history(nil), do: {:ok, nil}

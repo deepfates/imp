@@ -68,11 +68,11 @@
   # defensive fallback paired with the 904 clause
   {"lib/imp/clients/training.ex", :pattern_match_cov, {1537, 8}},
   # defensive error clause on an always-ok internal call
-  {"lib/imp/optimizer/better_together.ex", :pattern_match, {1287, 8}},
+  {"lib/imp/optimizer/better_together.ex", :pattern_match, {1288, 8}},
   # defensive error clause on an always-ok internal call
-  {"lib/imp/optimizer/better_together.ex", :pattern_match, {1290, 8}},
+  {"lib/imp/optimizer/better_together.ex", :pattern_match, {1291, 8}},
   # defensive fallback paired with the clauses above
-  {"lib/imp/optimizer/better_together.ex", :pattern_match_cov, {1302, 8}},
+  {"lib/imp/optimizer/better_together.ex", :pattern_match_cov, {1303, 8}},
   # defensive clause for already-handled pending-validation states
   {"lib/imp/optimizer/gepa/engine.ex", :pattern_match_cov, {3020, 7}},
   # defensive clause dialyzer pins to the module head (line 1)
@@ -212,8 +212,8 @@
   {"lib/imp/adapter/xml.ex", :pattern_match_cov, {654, 8}},
   {"lib/imp/optimizer/artifact.ex", :call_without_opaque, {745, 52}},
   {"lib/imp/optimizer/artifact.ex", :call_without_opaque, {909, 53}},
-  {"lib/imp/optimizer/playbook.ex", :pattern_match_cov, {1014, 8}},
-  {"lib/imp/optimizer/report.ex", :call_without_opaque, {769, 55}},
+  {"lib/imp/optimizer/playbook.ex", :pattern_match_cov, {1020, 8}},
+  {"lib/imp/optimizer/report.ex", :call_without_opaque, {779, 55}},
   {"lib/imp/schema.ex", :pattern_match_cov, {440, 8}},
   {"bench/imp/benchmark_truth/failure_campaign.ex", :pattern_match_cov, {168, 13}}
 ]

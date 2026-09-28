@@ -26,10 +26,11 @@ defmodule Imp.Evaluate.Result do
   Writes the per-example rows to `path` as a JSON array of flat objects.
 
   Mirrors DSPy `Evaluate(save_as_json=...)`: one object per devset row with
-  the example fields, the prediction fields, and the score.
+  the example fields, the prediction fields, and the score. Credentials in the
+  rows are redacted with `Imp.Redaction`.
   """
   def save_as_json(%__MODULE__{} = result, path) when is_binary(path) do
-    rows = output_rows(result)
+    rows = redacted_output_rows(result)
     File.write!(path, Jason.encode!(rows))
     :ok
   end
@@ -44,7 +45,7 @@ defmodule Imp.Evaluate.Result do
   The file is RFC 4180 CSV with CRLF line endings, and every field holding a
   comma, a quote or a line break is quoted, so `Imp.Datasets.csv/3` reads it
   back unchanged. Saving an empty result raises: an empty file with no header would be a
-  silent failure.
+  silent failure. Credentials in the rows are redacted with `Imp.Redaction`.
   """
   def save_as_csv(%__MODULE__{rows: []}, _path) do
     raise ArgumentError,
@@ -53,7 +54,7 @@ defmodule Imp.Evaluate.Result do
   end
 
   def save_as_csv(%__MODULE__{} = result, path) when is_binary(path) do
-    rows = output_rows(result)
+    rows = redacted_output_rows(result)
 
     header =
       rows
@@ -69,6 +70,14 @@ defmodule Imp.Evaluate.Result do
     File.write!(path, Imp.CSV.dump_to_iodata(lines))
     :ok
   end
+
+  @doc false
+  # The rows as a writer exports them. They are redacted as they are, before
+  # `output_rows/1` turns examples, predictions and other structs into plain
+  # maps, so a client, retriever or OAuth struct in them is still a struct when
+  # redacted.
+  def redacted_output_rows(%__MODULE__{rows: rows} = result),
+    do: output_rows(%{result | rows: Imp.Redaction.redact_term(rows)})
 
   @doc false
   # One flat map per row, upstream `_prepare_results_output` semantics.

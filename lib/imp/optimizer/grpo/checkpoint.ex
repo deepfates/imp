@@ -8,7 +8,7 @@ defmodule Imp.Optimizer.GRPO.Checkpoint do
       "type" => "imp_grpo_session_checkpoint",
       "schema_version" => 1,
       "phase" => Atom.to_string(phase),
-      "data" => data |> Imp.Optimizer.Report.encode_term() |> Imp.Redaction.redact()
+      "data" => data |> Imp.Redaction.redact_term() |> Imp.Optimizer.Report.encode_term()
     }
 
     artifact = %{
