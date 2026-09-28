@@ -34,6 +34,137 @@ defmodule Imp.RedactionTest do
     "x-api-key": "CANARY_X_API_KEY_9c372"
   ]
 
+  # Every credential shape Imp.Redaction knows, each with a near miss that must
+  # survive. A string holding a credential is replaced whole. All values are
+  # fake, and vendor prefixes are joined at run time so this file holds no
+  # string a secret scanner takes for a live token.
+  @f4 String.duplicate("F4ke", 9)
+  @hex String.duplicate("0badcafe", 5)
+  @basic "Basic " <> Base.encode64("fake-user:fake-pass")
+  @secret_shapes [
+    pem:
+      {"key:\n-----BEGIN PRIVATE KEY-----\nMIIFAKE\n-----END PRIVATE KEY-----",
+       "-----BEGIN PUBLIC KEY-----\nMFkwFAKE\n-----END PUBLIC KEY-----"},
+    pem_openssh:
+      {"-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnFAKE", "-----BEGIN CERTIFICATE-----"},
+    pem_encrypted:
+      {"-----BEGIN ENCRYPTED PRIVATE KEY-----\nFAKE", "BEGIN PRIVATE KEY opens the block"},
+    pgp_private_key:
+      {"-----BEGIN PGP PRIVATE KEY BLOCK-----\n\nlQFAKE", "-----BEGIN PGP PUBLIC KEY BLOCK-----"},
+    putty:
+      {"PuTTY-User-Key-File-3: ssh-ed25519\nEncryption: FAKE", "PuTTY-User-Key-File is a header"},
+    openai: {"key sk-F4keF4keF4keF4ke used", "sk-short and task-runner-F4keF4keF4ke"},
+    anthropic:
+      {"ANTHROPIC_API_KEY=sk-ant-api03-F4keF4keF4keF4ke", "desk-ant-api03-F4keF4keF4keF4ke"},
+    openrouter: {"sk-or-v1-#{@f4}", "ask-or-v1-#{@f4}"},
+    stripe_secret: {"sk" <> "_live_" <> @f4, "sk" <> "_live_ is Stripe's prefix"},
+    stripe_restricted: {"rk" <> "_live_" <> @f4, "work_live_" <> @f4},
+    github_classic: {"token gh" <> "p_" <> @f4 <> " set", "ghp_short"},
+    github_oauth: {"gh" <> "o_" <> @f4, "gho_F4ke"},
+    github_user: {"gh" <> "u_" <> @f4, "ghu_F4ke"},
+    github_server: {"gh" <> "s_" <> @f4, "ghs_F4ke"},
+    github_refresh: {"gh" <> "r_" <> @f4, "ghr_F4ke"},
+    github_fine_grained: {"github" <> "_pat_11F4KE" <> @f4, "github_pat_ is the prefix"},
+    gitlab: {"gl" <> "pat-" <> @f4, "glpat-short"},
+    hugging_face: {"cloned with h" <> "f_" <> @f4, "hf_hub_download"},
+    aws_access_key: {"creds AKIAIOSFODNN7EXAMPLE in prose", "AKIA1234 is too short"},
+    aws_long_access_key: {"id=AKIAIOSFODNN7EXAMPLE1;", "NAKIAIOSFODNN7EXAMPLES"},
+    aws_temporary: {"ASIAIOSFODNN7EXAMPLE", "ASIA is a continent"},
+    google_api_key: {"key=AI" <> "za" <> String.duplicate("Xy-_9", 7) <> ".", "AIzaShort"},
+    google_oauth: {"ya" <> "29." <> @f4, "ya29.short"},
+    slack: {"xo" <> "xb-" <> String.duplicate("0", 10) <> "-" <> @f4, "xoxo-hugs"},
+    sendgrid: {"S" <> "G." <> @f4 <> "." <> @f4, "SG.short.x"},
+    npm: {"n" <> "pm_" <> @f4, "npm_config_registry"},
+    pypi: {"py" <> "pi-AgE" <> @f4, "pypi-server"},
+    vault: {"hv" <> "s." <> @f4, "hvs.short"},
+    jwt:
+      {"FAKE id_token eyJhbGciOiJub25lIn0.eyJzdWIiOiJmYWtlLXVzZXIifQ.ZmFrZS1zaWduYXR1cmU end",
+       "eyJhbGciOiJub25lIn0 alone"},
+    bearer:
+      {"Authorization: Bearer F4keF4keF4keF4ke",
+       "Bearer authentication is an authorization mechanism."},
+    bearer_any_case: {"BeArEr F4keF4keF4keF4ke", "bearer bonds are bearer instruments"},
+    bearer_mid_line:
+      {"curl -H Authorization: Bearer F4ke1234F4ke1234 https://api.test",
+       "Bearer authentication tokens are described below"},
+    bearer_line_end:
+      {"Authorization: Bearer F4keF4keF4keF4ke\nmachine api.test login F4ke",
+       "Bearer authentication is described below.\nnext"},
+    basic: {"Authorization: #{@basic}", "Basic authentication is enabled."},
+    basic_any_case: {"BASIC " <> Base.encode64("fake-user:fake-pass"), "basic setup is enabled."},
+    session: {"a=1&session=F4keSessionF4ke&b=2", "sessions=12 ran"},
+    session_any_case: {"SESSION=F4keSessionF4ke", "session=short"},
+    hex_assignment: {"github_token=#{@hex}", "cache hit #{@hex}"},
+    hex_assignment_any_case: {"API_KEY: #{@hex}", "sha #{@hex}"},
+    url_password: {"postgres://admin:F4ke_pw_1@db.test/app", "https://example.test:8443/path@v2"},
+    amz_signature:
+      {"https://b.s3.test/o?X-Amz-Signature=#{@f4}&x=1",
+       "https://b.s3.test/o?X-Amz-Signature=short"},
+    amz_security_token:
+      {"https://b.s3.test/o?a=1&X-Amz-Security-Token=#{@f4}",
+       "X-Amz-Security-Token is a parameter"},
+    goog_signature:
+      {"https://storage.test/o?X-Goog-Signature=#{@f4}",
+       "https://storage.test/o?X-Goog-Date=20260927"},
+    azure_sig:
+      {"https://acct.blob.test/c?sv=2024&sig=#{@f4}", "https://maps.example.com/?sig=abc"}
+  ]
+
+  for {name, {text, near_miss}} <- @secret_shapes do
+    test "redacts a string holding the #{name} shape and leaves its near miss" do
+      assert Imp.Redaction.redact(unquote(text)) == "[REDACTED]"
+      assert Imp.Redaction.redact(%{note: unquote(text)}) == %{note: "[REDACTED]"}
+      assert Imp.Redaction.redact(unquote(near_miss)) == unquote(near_miss)
+    end
+  end
+
+  # A string of near misses for `Bearer` or `Basic`, all in one letter case,
+  # took time quadratic in its length before the patterns turned off PCRE's
+  # start-of-match optimization (see `compile_secret_patterns/0`). Each input
+  # is timed against ordinary text of the same byte size, alternately, so a
+  # loaded machine slows both: linear time stays within about 2x of the
+  # reference, quadratic time is 25x to 50x at this size.
+  test "strings of near misses in one letter case are redacted in linear time" do
+    time = fn text ->
+      {microseconds, ^text} = :timer.tc(fn -> Imp.Redaction.redact(text) end)
+      microseconds
+    end
+
+    for line <- ["BEARER aaaa\n", "BASIC Zm9vYmFy x\n"] do
+      near_misses = String.duplicate(line, 200_000)
+
+      reference =
+        "plain words here\n"
+        |> String.duplicate(200_000)
+        |> binary_part(0, byte_size(near_misses))
+
+      {adversarial, ordinary} =
+        1..5
+        |> Enum.map(fn _ -> {time.(near_misses), time.(reference)} end)
+        |> Enum.unzip()
+
+      assert Enum.min(adversarial) < 6 * Enum.min(ordinary),
+             "#{inspect(line)}: #{Enum.min(adversarial)}us against #{Enum.min(ordinary)}us"
+    end
+  end
+
+  test "the optimizer's pricing URL check refuses the shapes Imp.Redaction catches" do
+    for token <- ["gh" <> "p_" <> @f4, "h" <> "f_" <> @f4] do
+      assert_raise ArgumentError, fn ->
+        Imp.Optimizer.Budget.validate_pricing_source_url!("https://pricing.example/#{token}")
+      end
+    end
+
+    assert_raise ArgumentError, fn ->
+      Imp.Optimizer.Budget.validate_pricing_source_url!(
+        "https://pricing.example/#{URI.encode("-----BEGIN PRIVATE KEY-----FAKE")}"
+      )
+    end
+
+    url = "https://pricing.example/models/gpt/rates"
+    assert Imp.Optimizer.Budget.validate_pricing_source_url!(url) == url
+  end
+
   defmodule OrdinaryStruct do
     defstruct [:value]
   end
