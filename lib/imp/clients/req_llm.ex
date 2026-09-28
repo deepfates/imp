@@ -158,11 +158,12 @@ defmodule Imp.Clients.ReqLLM do
 
   defp resolve_model(%{capabilities: _} = model), do: {:ok, model}
 
+  # ReqLLM.model/1 returns ok/error tuples. Any other result is a
+  # CaseClauseError, which the rescue turns into an error like any other.
   defp resolve_model(model_spec) do
     case ReqLLM.model(model_spec) do
       {:ok, model} -> {:ok, model}
       {:error, reason} -> {:error, reason}
-      other -> {:error, {:unexpected_registry_result, other}}
     end
   rescue
     error -> {:error, error}
