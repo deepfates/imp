@@ -57,6 +57,29 @@ User-visible changes to Imp are recorded here.
 
 ### Fixed
 
+- A reply that answers none of the requested outputs is a parse error in
+  `Imp.Adapter.Chat`, `Imp.Adapter.JSON` and `Imp.Adapter.XML`: an
+  `Imp.AdapterParseError` of kind `:missing_fields` naming every output, so
+  the JSON fallback or a retry runs. For Chat that is a completion with no
+  `[[ ## field ## ]]` section for any output, for JSON an object with none of
+  the output keys, and for XML a reply with none of the output tags (prose, a
+  JSON object, the other adapters' markers). Such a reply parsed as a
+  prediction of defaults and `nil`s when every output was optional or
+  defaulted, as a ReActV2 step's are, so an XML agent given prose finished
+  with `answer: nil`. DSPy 3.3.1 fills defaults there; Imp does not.
+  For a signature that names an output in `metadata[:text_field]`, Chat and
+  XML read prose as that field and a blank completion as a step that said
+  nothing; the blank completion is the only reply exempt from the rule. So a
+  ReActV2 step's prose under XML is its `next_thought`. A reply that writes
+  the fields in some format (a JSON object with an output's key, a
+  `[[ ## field ## ]]` line, an output's tag) is not prose: Chat and XML parse
+  it in their own format or report it, and the JSON fallback reads it, so a
+  step that spelled out a tool call as JSON runs that tool instead of ending
+  with the JSON text as its answer. A JSON `{}` for a ReActV2 step, under
+  `Imp.Adapter.JSON` or in the fallback, is now `:missing_fields` where it was
+  a step with `nil` fields. `Imp.Predict.ProgramOfThought`, whose outputs are
+  all optional, now sends a prose reply to the JSON fallback instead of
+  regenerating with a missing-program error.
 - `Imp.inspect_history/2` renders any history. A turn holding a term JSON has
   no encoding for, such as the `{:error, {:unknown_tool, name}}` result a
   ReActV2 history keeps for a call to a tool that does not exist, raised

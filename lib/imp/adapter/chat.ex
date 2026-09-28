@@ -8,8 +8,10 @@ defmodule Imp.Adapter.Chat do
 
   `parse/3` accepts an `Imp.Prediction`, a map of output fields, or completion
   text. Text is split on those markers and the first section for each output
-  field wins. A completion that does not cover every output field is a parse
-  error rather than a partial prediction.
+  field wins. An output with no section takes its declared default, or `nil`
+  when optional; a required output with no section is a parse error, and so is
+  a completion with no section for any output, even when every output is
+  optional or defaulted, so the JSON fallback or a retry runs.
 
   One signature-declared exception: `signature.metadata[:text_field]` names an
   output field that takes a completion carrying no marker at all. A native tool
@@ -18,9 +20,12 @@ defmodule Imp.Adapter.Chat do
   plain reading of that completion, not a format failure worth a second LM call
   through `Imp.Adapter.JSON`. Remaining outputs take their declared defaults, so
   the signature says what an unanswered field means. The exception is narrow on
-  purpose: the completion must carry no `[[ ## field ## ]]` line anywhere and
-  must not be blank, and a signature without that metadata parses exactly as
-  before. The text a model writes beside native tool calls is
+  purpose: the completion must carry no `[[ ## field ## ]]` line anywhere, no
+  opening tag for an output, and no JSON object with an output's key, and it
+  must not be blank. A completion in one of those formats tried to answer in
+  fields, so it is parsed by markers, and one with no output section is a
+  parse error that the JSON fallback reads. A signature without that metadata parses by markers
+  alone. A blank completion is a step that said nothing. The text a model writes beside native tool calls is
   read the same way. `Imp.Predict.ReActV2` sets it on its internal step
   signature; see that module.
 
@@ -187,12 +192,13 @@ defmodule Imp.Adapter.Chat do
     if output_field(signature, :text),
       do: build_prediction(signature, map),
       else:
-        build_prediction(
+        build_text_prediction(
           signature,
           signature
           |> parse_fields(text)
           |> Map.drop(["tool_calls"])
-          |> Map.put(:tool_calls, calls)
+          |> Map.put(:tool_calls, calls),
+          text
         )
   end
 
@@ -205,7 +211,7 @@ defmodule Imp.Adapter.Chat do
   # decode, so a bad parse fails loudly and `Imp.Predict`'s JSON-adapter
   # fallback can fire.
   defp do_parse(signature, text) when is_binary(text) do
-    build_prediction(signature, parse_fields(signature, text))
+    build_text_prediction(signature, parse_fields(signature, text), text)
   end
 
   defp do_parse(_signature, raw), do: {:error, Imp.AdapterParseError.unsupported_output(raw)}
@@ -215,6 +221,16 @@ defmodule Imp.Adapter.Chat do
     {:ok, Imp.Example.normalize_demos!(demos, "#{inspect(__MODULE__)}.format/3")}
   rescue
     error in ArgumentError -> {:error, Exception.message(error)}
+  end
+
+  # A completion with no section for any output is missing every output even
+  # when all of them are optional or defaulted, where DSPy fills the defaults;
+  # see `Imp.Adapter.OutputFields.require_any/2` for why Imp departs from it.
+  # A map of fields given to `parse/3` is read as it is.
+  defp build_text_prediction(signature, fields, text) do
+    with :ok <- Imp.Adapter.OutputFields.require_any(signature, fields, text) do
+      build_prediction(signature, fields)
+    end
   end
 
   defp build_prediction(signature, fields) do
@@ -1498,25 +1514,9 @@ defmodule Imp.Adapter.Chat do
   # A completion carrying no marker at all is the whole answer for a signature
   # that declared a text-step field, and marker parsing otherwise.
   defp parse_fields(signature, text) do
-    case text_field_for(signature, text) do
+    case Imp.Adapter.OutputFields.text_answer(signature, text) do
       {:ok, name} -> %{name => String.trim(text)}
       :error -> parse_marker_sections(signature, text)
-    end
-  end
-
-  # `signature.metadata[:text_field]` names the output field that takes a
-  # marker-free completion. Only a completion with no `[[ ## field ## ]]` line
-  # anywhere qualifies: a partially marked completion is still a parse failure,
-  # so a model that half-followed the format is not silently reinterpreted.
-  defp text_field_for(signature, text) do
-    with name when not is_nil(name) <-
-           Map.get(signature.metadata, :text_field, Map.get(signature.metadata, "text_field")),
-         field when not is_nil(field) <- output_field(signature, name),
-         true <- String.trim(text) != "",
-         true <- marker_free?(text) do
-      {:ok, field.name}
-    else
-      _no_text_field -> :error
     end
   end
 
@@ -1525,10 +1525,12 @@ defmodule Imp.Adapter.Chat do
     Enum.find(signature.outputs, &(to_string(&1.name) == name))
   end
 
-  defp marker_free?(text) do
+  # Whether any line of `text` is a `[[ ## field ## ]]` header.
+  @doc false
+  def marker_line?(text) do
     text
     |> String.split(~r/\r\n|\r|\n/)
-    |> Enum.all?(&is_nil(Regex.run(@field_header_pattern, String.trim(&1))))
+    |> Enum.any?(&Regex.match?(@field_header_pattern, String.trim(&1)))
   end
 
   defp parse_marker_sections(signature, text) do
