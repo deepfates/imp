@@ -174,7 +174,7 @@ defmodule Imp.RedactionDifferentialTest do
       {"azure sas sig first", "https://acct.blob.core.windows.net/c/b?sig=FAKEazsig2&sv=1", []},
       # database URLs
       {"db urls",
-       "postgres://u:FAKEpgurlpw@h/d mysql://root:FAKEmyurl@h redis://:FAKEredispw@h:6379 mongodb+srv://u:FAKEmongo@c.mongodb.net/?retryWrites=true amqp://guest:FAKEamqp@h #{sk}",
+       "postgres://u:FAKEpgurlpw@h/d mysql://root:FAKEmyurl@h redis://:FAKEredispw@h:6379 mongodb+srv://u:FAKEmongo@db.example.test/?retryWrites=true amqp://guest:FAKEamqp@h #{sk}",
        []},
       {"db url special chars", "DATABASE_URL=postgres://u:FAKEp@ss:w0rd@h/d and #{sk}", []},
       {"jdbc", "jdbc:postgresql://h:5432/d?user=u&password=FAKEjdbcpw&ssl=true #{sk}", []},
