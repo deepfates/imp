@@ -269,7 +269,13 @@ defmodule Imp.Optimizer.Playbook do
           "observed_weaknesses/2 expects a playbook proposer request with aligned rows and trajectories"
   end
 
-  @doc "Atomically writes a verified completed checkpoint as owner-readable JSON."
+  @doc """
+  Atomically writes a verified completed checkpoint as owner-readable JSON.
+
+  The checkpoint's trajectories were redacted when they were dumped. Its
+  playbooks are written as they are: a restore continues from them and the
+  checkpoint's hash covers them, so treat the file as sensitive.
+  """
   @spec write_checkpoint!(map(), Path.t()) :: :ok
   def write_checkpoint!(checkpoint, path) when is_binary(path) do
     case verify_checkpoint(checkpoint) do

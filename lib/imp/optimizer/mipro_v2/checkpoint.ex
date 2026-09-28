@@ -11,6 +11,10 @@ defmodule Imp.Optimizer.MIPROv2.Checkpoint do
   @spec dump(map(), map(), map()) :: map()
   def dump(compatibility, artifacts, state)
       when is_map(compatibility) and is_map(artifacts) and is_map(state) do
+    # Failure reasons are redacted before they are encoded: a resumed run only
+    # reports them, and a client, retriever or OAuth struct in one is still a
+    # struct here. The instructions, demos, scores and hashes the run continues
+    # from are kept as they are.
     payload = %{
       "compatibility" => compatibility,
       "artifacts" => Report.encode_term(artifacts),
@@ -22,7 +26,7 @@ defmodule Imp.Optimizer.MIPROv2.Checkpoint do
         "full_evaluations" => dump_records(state.full_evaluations),
         "next_study_number" => state.next_study_number,
         "evaluation_calls" => state.evaluation_calls,
-        "errors" => Report.encode_term(state.errors)
+        "errors" => state.errors |> Imp.Redaction.redact_term() |> Report.encode_term()
       }
     }
 

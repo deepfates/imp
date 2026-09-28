@@ -365,6 +365,34 @@ defmodule Imp.Optimizer.MIPROv2.ResumeTest do
     end
   end
 
+  @tag :tmp_dir
+  test "a checkpoint redacts a failure that holds credentials and resumes to the same result",
+       %{state: state, tmp_dir: tmp_dir} do
+    store = Imp.Test.RedactionProbe.store(tmp_dir)
+    probe = Imp.Test.RedactionProbe.value(store)
+
+    {program, optimizer, trainset, valset} =
+      fixture(state, Imp.Metrics.exact_match(:answer), metric_identity(), probe)
+
+    compile = &(optimizer |> MIPROv2.compile(program, trainset, valset, &1) |> Report.fetch())
+
+    uninterrupted = compile.([])
+    paused = compile.(max_trials: 2)
+    assert paused.metadata.run_status == :paused
+    assert paused.errors != []
+
+    written = Jason.encode!(paused.metadata.resume_state)
+    assert Imp.Test.RedactionProbe.leaked(written, store) == []
+    assert written =~ "retriever.test/search"
+
+    resumed = compile.(resume_state: Jason.decode!(written))
+    assert resumed.metadata.run_status == :complete
+    assert resumed.candidates == uninterrupted.candidates
+    assert resumed.best_score == uninterrupted.best_score
+    assert resumed.metadata.full_evaluations == uninterrupted.metadata.full_evaluations
+    assert length(resumed.errors) == length(uninterrupted.errors)
+  end
+
   defp captured_metric(state) do
     fn example, prediction ->
       _ = Agent.get(state, & &1.proposal_calls)
@@ -372,16 +400,21 @@ defmodule Imp.Optimizer.MIPROv2.ResumeTest do
     end
   end
 
+  # With a probe, the task fails on "val 2" with a reason that holds it.
   defp fixture(
          state,
          metric \\ Imp.Metrics.exact_match(:answer),
-         identity \\ metric_identity()
+         identity \\ metric_identity(),
+         probe \\ nil
        ) do
     task_lm =
       Imp.LM.Static.new(
-        handler: fn _messages, _opts ->
+        handler: fn messages, _opts ->
           Agent.update(state, &Map.update!(&1, :task_calls, fn count -> count + 1 end))
-          %{answer: "yes"}
+
+          if probe && Enum.any?(messages, &(to_string(&1.content) =~ "val 2")),
+            do: {:error, {:probe, probe}},
+            else: %{answer: "yes"}
         end
       )
 

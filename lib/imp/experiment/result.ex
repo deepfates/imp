@@ -332,19 +332,15 @@ defmodule Imp.Experiment.Result do
 
   defp evaluation_map(nil, _include_rows?), do: nil
 
-  # Rows and errors are redacted as they are, before `output_rows/1` and the
-  # encoder turn their structs into plain maps. Rows keep their examples and
-  # predictions as structs, which `output_rows/1` reads by type.
+  # Rows and errors are redacted as they are, before they are turned into
+  # plain maps and encoded.
   defp row_detail(%EvaluationResult{} = evaluation) do
-    rows = Imp.Redaction.redact_term(evaluation.rows)
-
     %{
       "rows" =>
-        %{evaluation | rows: rows}
-        |> EvaluationResult.output_rows()
+        evaluation
+        |> EvaluationResult.redacted_output_rows()
         |> Imp.Optimizer.Report.encode_term(),
-      "errors" =>
-        evaluation.errors |> Imp.Redaction.redact() |> Imp.Optimizer.Report.encode_term()
+      "errors" => Imp.Optimizer.Report.json_safe(evaluation.errors)
     }
   end
 

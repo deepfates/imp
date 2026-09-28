@@ -83,14 +83,26 @@ User-visible changes to Imp are recorded here.
 ### Fixed
 
 - Optimizer reports (`Imp.Optimizer.Report.dump/1`, `json_safe/1`,
-  `json_projection/1`), experiment results, BetterTogether's bootstrap
-  diagnostics, optimizer artifact candidates, GRPO session checkpoints and
-  saved programs (a Predict's demos and metadata, KNN examples, memory
-  retriever documents) redact a term before converting it. They converted
-  structs to plain maps first, so a client, retriever or MCP OAuth store in
-  them was written with its header values, URL query secrets or store key.
+  `json_projection/1`), experiment results, `Imp.Evaluate.Result.save_as_json/2`
+  and `save_as_csv/2`, BetterTogether's bootstrap diagnostics, optimizer
+  artifact candidates, GRPO session checkpoints, Optimize Anything results,
+  ACP session records and saved programs (a Predict's demos and metadata, KNN
+  examples, memory retriever documents) redact a term before converting it.
+  They converted first, so a client, retriever or MCP OAuth store in them was
+  written with its header values, URL query secrets or store key, and a
+  secret in a map key that is a tuple, a list or a struct was written as it
+  was. The SIMBA, MIPROv2, InferRules and random-search checkpoints and
+  ComBee reports redact their failure reasons the same way; the instructions,
+  demos and scores a resumed run continues from are kept. An ACP session keeps
+  the provider's `reasoning_content` and `reasoning_details` unmodified.
   `Imp.Redaction.drop_credentials/1` redacts such structs too. Output that
   holds no secret is unchanged.
+- A saved program whose example has an input named like a credential
+  (`with_inputs([:api_key, :question])`), or whose metadata holds such a list,
+  loads back as it was. Saving and `Imp.Redaction.drop_credentials/1` read
+  every two-element list whose first item was a name as a key and its value,
+  and replaced or dropped the second item. A pair is now a tuple or an entry
+  the codec tagged as one.
 - A reply that answers none of the requested outputs is a parse error in
   `Imp.Adapter.Chat`, `Imp.Adapter.JSON` and `Imp.Adapter.XML`: an
   `Imp.AdapterParseError` of kind `:missing_fields` naming every output, so

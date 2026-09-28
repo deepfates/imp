@@ -266,6 +266,36 @@ defmodule Imp.Optimizer.InferRules.ResumeTest do
     {program, optimizer, [row], [row]}
   end
 
+  # The task fails on "q2" with a reason that holds the redaction probe.
+  defp probe_fixture(probe) do
+    task_lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          if Enum.any?(messages, &(to_string(&1.content) =~ "q2")),
+            do: {:error, {:probe, probe}},
+            else: %{answer: "yes"}
+        end
+      )
+
+    program = Imp.predict("question -> answer", lm: task_lm)
+
+    rows =
+      for question <- ["q1", "q2"] do
+        Imp.example(question: question, answer: "yes") |> Imp.with_inputs(:question)
+      end
+
+    optimizer =
+      InferRules.new(&exact_metric/2,
+        candidates: ["Return yes.", "Answer exactly."],
+        metric_identity: metric_identity(),
+        max_bootstrapped_demos: 1,
+        max_labeled_demos: 0,
+        max_errors: :infinity
+      )
+
+    {program, optimizer, rows, rows}
+  end
+
   defp new_explicit_optimizer(metric, identity) do
     InferRules.new(metric,
       candidates: ["Return yes.", "Answer exactly."],
@@ -273,6 +303,32 @@ defmodule Imp.Optimizer.InferRules.ResumeTest do
       max_bootstrapped_demos: 1,
       max_labeled_demos: 0
     )
+  end
+
+  @tag :tmp_dir
+  test "a checkpoint redacts a failure that holds credentials and resumes to the same result",
+       %{tmp_dir: tmp_dir} do
+    store = Imp.Test.RedactionProbe.store(tmp_dir)
+    {program, optimizer, trainset, devset} = probe_fixture(Imp.Test.RedactionProbe.value(store))
+    compile = &(optimizer |> InferRules.compile(program, trainset, devset, &1) |> Report.fetch())
+
+    uninterrupted = compile.([])
+    paused = compile.(max_operations: 4)
+    assert paused.metadata.run_status == :paused
+
+    written = Jason.encode!(paused.metadata.resume_state)
+    assert Imp.Test.RedactionProbe.leaked(written, store) == []
+    assert written =~ "retriever.test/search"
+
+    resumed = compile.(resume_state: Jason.decode!(written))
+    assert resumed.metadata.run_status == :complete
+
+    # A candidate carries its failure reasons, which the checkpoint redacted.
+    assert Enum.map(resumed.candidates, &Map.drop(&1, [:errors])) ==
+             Enum.map(uninterrupted.candidates, &Map.drop(&1, [:errors]))
+
+    assert resumed.best_score == uninterrupted.best_score
+    assert length(resumed.errors) == length(uninterrupted.errors)
   end
 
   defp captured_metric(counter) do

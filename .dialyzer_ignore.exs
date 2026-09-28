@@ -215,7 +215,7 @@
   {"lib/imp/adapter/xml.ex", :pattern_match_cov, {654, 8}},
   {"lib/imp/optimizer/artifact.ex", :call_without_opaque, {745, 52}},
   {"lib/imp/optimizer/artifact.ex", :call_without_opaque, {909, 53}},
-  {"lib/imp/optimizer/playbook.ex", :pattern_match_cov, {1014, 8}},
+  {"lib/imp/optimizer/playbook.ex", :pattern_match_cov, {1020, 8}},
   {"lib/imp/optimizer/report.ex", :call_without_opaque, {773, 55}},
   {"lib/imp/schema.ex", :pattern_match_cov, {440, 8}},
   {"bench/imp/benchmark_truth/failure_campaign.ex", :pattern_match_cov, {168, 13}}

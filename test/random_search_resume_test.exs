@@ -56,6 +56,32 @@ defmodule Imp.Optimizer.BootstrapFewShotWithRandomSearch.ResumeTest do
     assert Agent.get(resumed_counter, & &1) > calls_after_pause
   end
 
+  @tag :tmp_dir
+  test "a checkpoint redacts a failure that holds credentials and resumes to the same result",
+       %{tmp_dir: tmp_dir} do
+    store = Imp.Test.RedactionProbe.store(tmp_dir)
+    {program, optimizer, trainset, devset} = probe_fixture(Imp.Test.RedactionProbe.value(store))
+    compile = &BootstrapFewShotWithRandomSearch.compile(optimizer, program, trainset, devset, &1)
+
+    uninterrupted = [restrict: [-3, -2, -1, 0]] |> compile.() |> Report.fetch()
+    paused = [restrict: [-3, -2, -1, 0], max_candidates: 2] |> compile.() |> Report.fetch()
+    assert paused.metadata.run_status == :paused
+
+    written = Jason.encode!(paused.metadata.resume_state)
+    assert Imp.Test.RedactionProbe.leaked(written, store) == []
+    assert written =~ "retriever.test/search"
+
+    resumed =
+      [restrict: [-3, -2, -1, 0], resume_state: Jason.decode!(written)]
+      |> compile.()
+      |> Report.fetch()
+
+    assert resumed.metadata.run_status == :complete
+    assert resumed.candidates == uninterrupted.candidates
+    assert resumed.best_score == uninterrupted.best_score
+    assert length(resumed.errors) == length(uninterrupted.errors)
+  end
+
   test "metric, program, dataset, and optimizer drift fail before candidate work" do
     counter = start_supervised!({Agent, fn -> 0 end})
     {program, optimizer, trainset, devset} = fixture(counter)
@@ -250,6 +276,27 @@ defmodule Imp.Optimizer.BootstrapFewShotWithRandomSearch.ResumeTest do
 
     {program, random_optimizer(captured_metric(counter), metric_identity()), trainset,
      [hd(trainset)]}
+  end
+
+  # The task fails on "q2" with a reason that holds the redaction probe.
+  defp probe_fixture(probe) do
+    task_lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          if Enum.any?(messages, &(to_string(&1.content) =~ "q2")),
+            do: {:error, {:probe, probe}},
+            else: %{answer: "yes"}
+        end
+      )
+
+    program = Imp.predict("question -> answer", lm: task_lm)
+
+    trainset =
+      for question <- ["q1", "q2"] do
+        Imp.example(question: question, answer: "yes") |> Imp.with_inputs(:question)
+      end
+
+    {program, random_optimizer(&exact_metric/2, metric_identity()), trainset, trainset}
   end
 
   defp random_optimizer(metric, identity) do

@@ -437,8 +437,10 @@ defmodule Imp.Optimizer.GEPA.ComBee do
   @doc false
   def dump_report(nil), do: nil
 
+  # The failure reason is redacted before it is encoded; the counts, seeds and
+  # assignments are kept as they are.
   def dump_report(%Report{} = report) do
-    report
+    %{report | failure: Imp.Redaction.redact_term(report.failure)}
     |> Map.from_struct()
     |> Map.new(fn {key, value} ->
       {Atom.to_string(key), Imp.Optimizer.Report.encode_term(value)}

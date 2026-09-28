@@ -1,14 +1,15 @@
 defmodule Imp.RedactionWritersTest do
   use ExUnit.Case, async: true
 
-  # Every writer of a report, checkpoint, saved program or experiment result
-  # redacts the term it was given before converting it. A client, retriever or
-  # OAuth struct hides its header values and URL secrets only while it is
-  # still a struct, so a writer that converts first writes them out. The probe
-  # below holds secrets that do not look like credentials: only the place each
-  # one sits (a header, a URL's query, an OAuth store's key) hides it.
+  # Every writer of a report, checkpoint, saved program, export or experiment
+  # result redacts the term it was given before converting it. A client,
+  # retriever or OAuth struct hides its header values and URL secrets only
+  # while it is still a struct, and a key that is a tuple, a list or a struct
+  # is only seen before encoding, so a writer that converts first writes them
+  # out. `Imp.Test.RedactionProbe` holds the probe value.
 
   alias Imp.Optimizer.Report
+  alias Imp.Test.RedactionProbe, as: Probe
 
   defmodule InstructionOptimizer do
     @behaviour Imp.Optimizer
@@ -34,12 +35,7 @@ defmodule Imp.RedactionWritersTest do
     end
   end
 
-  @subscription "PROBE-SUBSCRIPTION-VALUE-7F3A"
-  @custom "PROBE-CUSTOM-HEADER-VALUE-7F3A"
-  @url_key "PROBE-URL-KEY-VALUE-7F3A"
-  @url_token "PROBE-URL-TOKEN-VALUE-7F3A"
-  @llm_header "PROBE-LLM-HEADER-VALUE-7F3A"
-  @oauth_secret "PROBE-OAUTH-SECRET-VALUE-7F3A-0123456789"
+  @shaped "sk-proj-" <> String.duplicate("PrObE7f3A", 5)
 
   setup do
     root =
@@ -47,54 +43,11 @@ defmodule Imp.RedactionWritersTest do
 
     File.mkdir_p!(root)
     on_exit(fn -> File.rm_rf!(root) end)
-    store = Imp.MCP.OAuth.store(directory: Path.join(root, "oauth"), secret: @oauth_secret)
-    %{root: root, store: store, probe: probe(store)}
+    store = Probe.store(root)
+    %{root: root, store: store, probe: Probe.value(store)}
   end
 
-  # The retrievers are built without their default body, response and sleep
-  # functions: a function is not JSON, so the writers that encode JSON would
-  # refuse the probe before redaction mattered.
-  defp probe(store) do
-    %{
-      retriever:
-        struct(Imp.Retrievers.HTTP,
-          url: "https://retriever.test/search?key=" <> @url_key,
-          headers: [{"X-Subscription-Token", @subscription}, {"X-Probe-Custom", @custom}]
-        ),
-      token_retriever:
-        struct(Imp.Retrievers.HTTP, url: "https://retriever.test/search?token=" <> @url_token),
-      lm:
-        Imp.req_llm("openai:gpt-4o-mini",
-          req_http_options: [headers: [{"X-Probe-Custom", @llm_header}]]
-        ),
-      store: store
-    }
-  end
-
-  defp secrets(store), do: [@subscription, @custom, @url_key, @url_token, @llm_header, store.key]
-
-  # Everything a writer produced, as bytes: a binary in a term appears in its
-  # external form as the bytes it holds.
-  defp bytes(output) when is_binary(output), do: output
-  defp bytes(output), do: :erlang.term_to_binary(output)
-
-  defp assert_redacted(output, store) do
-    written = bytes(output)
-    leaked = for secret <- secrets(store), :binary.match(written, secret) != :nomatch, do: secret
-    assert leaked == [], "secret values written: #{inspect(leaked)}"
-
-    # The non-secret fields remain: the URL's host and path, the header names,
-    # the model and the store's directory.
-    for kept <- [
-          "retriever.test/search",
-          "X-Subscription-Token",
-          "X-Probe-Custom",
-          "gpt-4o-mini",
-          store.directory
-        ] do
-      assert :binary.match(written, kept) != :nomatch, "#{kept} is missing from the output"
-    end
-  end
+  defp assert_redacted(output, store), do: Probe.assert_redacted(output, store)
 
   test "redaction keeps each struct's type and its non-secret fields", %{probe: probe} do
     redacted = Imp.Redaction.redact_term(probe)
@@ -106,6 +59,13 @@ defmodule Imp.RedactionWritersTest do
     assert %Imp.Clients.ReqLLM{} = redacted.lm
     assert %Imp.MCP.OAuth.Store{key: "[REDACTED]"} = redacted.store
     assert redacted.store.directory == probe.store.directory
+    assert Enum.any?(Map.keys(redacted.keyed), &match?(%Imp.Retrievers.HTTP{}, &1))
+  end
+
+  test "keys that redact to the same term keep one entry" do
+    redacted = Imp.Redaction.redact_term(%{{:note, @shaped} => 1, {:note, @shaped <> "x"} => 2})
+    assert [{{:note, "[REDACTED]"}, value}] = Map.to_list(redacted)
+    assert value in [1, 2]
   end
 
   test "an optimizer report's dump", %{probe: probe, store: store} do
@@ -120,6 +80,13 @@ defmodule Imp.RedactionWritersTest do
     assert_redacted(Report.json_safe(probe), store)
     assert_redacted(Report.json_projection(probe), store)
     assert_redacted(Report.json_safe({:probe, [probe]}), store)
+  end
+
+  test "an image's data is redacted when it is written" do
+    image = %Imp.Adapter.Types.Image{data: @shaped, mime_type: "image/png", metadata: %{}}
+    written = Probe.bytes(Report.json_safe(%{image: image}))
+    assert :binary.match(written, @shaped) == :nomatch
+    assert :binary.match(written, "image/png") != :nomatch
   end
 
   test "an experiment result", %{root: root, probe: probe, store: store} do
@@ -168,6 +135,30 @@ defmodule Imp.RedactionWritersTest do
     result
   end
 
+  # The export's own conversion names every key, so the probe goes in without
+  # its tuple-keyed map.
+  test "an evaluation's JSON and CSV exports", %{root: root, probe: probe, store: store} do
+    probe = Map.delete(probe, :keyed)
+    example = Imp.example(question: "q", answer: "a", note: @shaped, probe: probe)
+
+    result = %Imp.Evaluate.Result{
+      score: 1.0,
+      rows: [%{example: example, prediction: Imp.Prediction.new(%{answer: "a"}), score: 1.0}],
+      errors: []
+    }
+
+    for {save, name} <- [
+          {&Imp.Evaluate.Result.save_as_json/2, "rows.json"},
+          {&Imp.Evaluate.Result.save_as_csv/2, "rows.csv"}
+        ] do
+      path = Path.join(root, name)
+      :ok = save.(result, path)
+      written = File.read!(path)
+      assert Probe.leaked(written, store) == []
+      assert written =~ "retriever.test/search"
+    end
+  end
+
   test "the BetterTogether bootstrap diagnostics", %{probe: probe, store: store} do
     lm =
       Imp.LM.Static.new(model: "probe-base", handler: fn _messages, _opts -> %{answer: "a"} end)
@@ -205,10 +196,8 @@ defmodule Imp.RedactionWritersTest do
     # a retriever without headers and an OAuth store are accepted.
     metadata = %{retriever: probe.token_retriever, store: store}
     candidate = Imp.Optimizer.Artifact.candidate("c2", program, metadata: metadata)
-    written = bytes(candidate["metadata"])
-    assert :binary.match(written, @url_token) == :nomatch
-    assert :binary.match(written, store.key) == :nomatch
-    assert :binary.match(written, "retriever.test/search") != :nomatch
+    assert Probe.leaked(candidate["metadata"], store) == []
+    assert :binary.match(Probe.bytes(candidate["metadata"]), "retriever.test/search") != :nomatch
   end
 
   test "a GRPO session checkpoint", %{root: root, probe: probe, store: store} do
@@ -242,5 +231,125 @@ defmodule Imp.RedactionWritersTest do
     retriever = Imp.Retrieve.Memory.new([%{text: "doc", probe: probe}])
     rag = Imp.rag(Imp.predict("context, question -> answer"), retriever)
     assert_redacted(Imp.Saving.dump(rag), store)
+  end
+
+  # A two-element list is a pair only as a tuple or an entry the codec tagged
+  # as one. An input named `api_key` is data: the program loads back with its
+  # input keys and metadata lists as they were.
+  test "an input named api_key survives saving and loading", %{root: root} do
+    demo =
+      Imp.example(api_key: "which header?", question: "q")
+      |> Imp.with_inputs([:api_key, :question])
+
+    program =
+      "api_key, question -> answer"
+      |> Imp.predict(metadata: %{notes: [:api_key, :question], labels: ["token", "question"]})
+      |> Imp.Predict.with_demos([demo])
+
+    path = Path.join(root, "api-key-input.json")
+    :ok = Imp.save!(program, path)
+    loaded = Imp.Saving.read!(path)
+
+    assert [%Imp.Example{input_keys: [:api_key, :question]}] = loaded.demos
+    assert loaded.metadata.notes == [:api_key, :question]
+    assert loaded.metadata.labels == ["token", "question"]
+
+    candidate = Imp.Optimizer.Artifact.candidate("c1", program)
+    restored = Imp.Saving.load!(candidate["program"])
+    assert [%Imp.Example{input_keys: [:api_key, :question]}] = restored.demos
+    assert restored.metadata.notes == [:api_key, :question]
+
+    knn = Imp.Predict.KNN.new(1, [demo], vectorizer: Imp.Embeddings.BagOfWords)
+
+    assert [%Imp.Example{input_keys: [:api_key, :question]}] =
+             knn |> Imp.Saving.dump() |> Imp.Saving.load!() |> Map.fetch!(:trainset)
+  end
+
+  # The candidates are the optimized artifacts and are kept as they are; side
+  # information is redacted.
+  test "an Optimize Anything result", %{probe: probe, store: store} do
+    result = %Imp.Optimize.Anything.Result{
+      candidates: [%{"config" => "key: " <> @shaped}],
+      parents: [[]],
+      validation_scores: [1.0],
+      validation_subscores: [%{}],
+      candidate_side_information: [%{probe: probe}],
+      instance_frontier: %{},
+      discovery_evaluation_counts: [0],
+      checkpoint: %{}
+    }
+
+    written = Imp.Optimize.Anything.Result.to_map(result)
+    assert Probe.leaked(written["candidate_side_information"], store) == []
+    assert :binary.match(Probe.bytes(written["candidates"]), @shaped) != :nomatch
+  end
+
+  test "a ComBee report's failure", %{probe: probe, store: store} do
+    report = %Imp.Optimizer.GEPA.ComBee.Report{status: :failed, failure: {:probe, probe}}
+    assert Probe.leaked(Imp.Optimizer.GEPA.ComBee.dump_report(report), store) == []
+  end
+
+  # A trajectory refuses a struct it does not know and a key that is not an
+  # atom or a string, so no part of the probe but its text reaches a playbook
+  # checkpoint; the text is redacted.
+  test "an optimizer trajectory, as a playbook checkpoint holds it", %{probe: probe, store: store} do
+    trajectory = fn metadata ->
+      struct(Imp.Optimizer.Trajectory,
+        index: 0,
+        example: %{question: "q"},
+        prediction: %{answer: "a"},
+        score: 1.0,
+        metadata: metadata
+      )
+    end
+
+    dumped = Imp.Optimizer.Trajectory.dump(trajectory.(%{note: @shaped}))
+    assert Probe.leaked(dumped, store) == []
+
+    for part <- [%{retriever: probe.retriever}, probe.keyed] do
+      assert_raise Imp.Optimizer.Trajectory.DecodeError, fn ->
+        Imp.Optimizer.Trajectory.dump(trajectory.(part))
+      end
+    end
+  end
+
+  # A session's history is redacted except the provider's reasoning
+  # continuation, which a resumed session sends back unmodified.
+  test "an ACP session record", %{root: root, probe: probe, store: store} do
+    session_id = "imp_" <> String.duplicate("a", 24)
+    # The reasoning holds a credential shape, which only its key keeps.
+    reasoning = @shaped
+    metadata = %{cwd: root, meta: %{}}
+    :ok = Imp.ACP.SessionStore.create(root, session_id, metadata)
+
+    history =
+      Imp.History.new([
+        %{
+          question: "q",
+          answer: "a",
+          probe: probe,
+          trajectory: [
+            %{role: :assistant, reasoning_content: reasoning, reasoning_details: [reasoning]}
+          ]
+        }
+      ])
+
+    transcript = [%{"user" => "q " <> @shaped, "assistant" => "a"}]
+    :ok = Imp.ACP.SessionStore.persist(root, session_id, metadata, history, transcript)
+
+    [record] = Path.wildcard(Path.join(root, "**/#{session_id}*"))
+    written = File.read!(record)
+    assert written =~ "retriever.test/search"
+
+    leaked = Probe.leaked(String.replace(written, reasoning, ""), store)
+    assert leaked == []
+    assert length(String.split(written, reasoning)) == 3
+
+    {:ok, restored} = Imp.ACP.SessionStore.load(root, session_id, root)
+    {:ok, history} = Imp.ACP.SessionStore.load_history(restored.history)
+    [turn] = Imp.History.messages(history)
+    [step] = turn.trajectory
+    assert step.reasoning_content == reasoning
+    assert step.reasoning_details == [reasoning]
   end
 end

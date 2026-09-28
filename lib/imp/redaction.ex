@@ -329,7 +329,25 @@ defmodule Imp.Redaction do
   # a plain map. Every struct keeps its type, so the converter still recognizes
   # the ones it encodes by type (examples, code, images, reports), and a value
   # with nothing to hide converts exactly as it would unredacted.
-  def redact_term(value, keys \\ @default_redact_keys), do: walk(value, keys, :typed)
+  def redact_term(value, keys \\ @default_redact_keys), do: walk(value, keys, {:typed, []})
+
+  @doc false
+  # `redact_term/2` for a term that also holds protocol state a provider needs
+  # back unmodified, under the named keys: a map entry under one of them is
+  # kept as it is.
+  def redact_term_except(value, preserved_keys) when is_list(preserved_keys),
+    do: walk(value, @default_redact_keys, {:typed, preserved_keys})
+
+  # An image's data is left alone when it is only shown; a term kept for
+  # conversion writes the data out, so it is redacted as any string is.
+  defp walk(%Imp.Adapter.Types.Image{} = image, keys, {:typed, _preserved} = mode) do
+    %{
+      image
+      | url: walk(image.url, keys, mode),
+        data: walk(image.data, keys, mode),
+        metadata: walk(image.metadata, keys, mode)
+    }
+  end
 
   defp walk(%Imp.Adapter.Types.Image{} = image, keys, mode) do
     %{image | url: walk(image.url, keys, mode), metadata: walk(image.metadata, keys, mode)}
@@ -408,16 +426,16 @@ defmodule Imp.Redaction do
   # A URI is redacted as the URL it spells, so a credential in it is found the
   # same way whether it was given as a string or a struct. A term being kept
   # for conversion keeps a URI that holds none.
-  defp walk(%URI{} = uri, keys, :typed) do
+  defp walk(%URI{} = uri, keys, {:typed, _preserved} = mode) do
     url = URI.to_string(uri)
-    redacted = walk(url, keys, :typed)
+    redacted = walk(url, keys, mode)
     if redacted == url, do: uri, else: redacted
   end
 
   defp walk(%URI{} = uri, keys, mode), do: uri |> URI.to_string() |> walk(keys, mode)
 
-  defp walk(value, keys, :typed) when is_struct(value) do
-    Map.merge(value, value |> Map.from_struct() |> walk(keys, :typed))
+  defp walk(value, keys, {:typed, _preserved} = mode) when is_struct(value) do
+    Map.merge(value, value |> Map.from_struct() |> walk(keys, mode))
   end
 
   defp walk(value, keys, mode) when is_struct(value) do
@@ -426,30 +444,37 @@ defmodule Imp.Redaction do
     |> walk(keys, mode)
   end
 
+  # A key that is not an atom or a string (a tuple, a list, a struct) can hold
+  # a credential of its own, so it is walked like a value. Two keys that redact
+  # to the same term collapse into one entry: which of their values is kept is
+  # arbitrary, and neither key's secret survives.
   defp walk(value, keys, mode) when is_map(value) do
     tagged_entry_keys = tagged_map_entry_keys(value)
 
+    {tagged_pair_keys, preserved} =
+      case mode do
+        {:typed, preserved} -> {tagged_pair_keys(value), preserved}
+        :plain -> {[], []}
+      end
+
     Map.new(value, fn {key, nested} ->
       cond do
+        key in preserved -> {key, nested}
         key in tagged_entry_keys -> {key, redact_tagged_entries(nested, keys, mode)}
-        redacted_entry?(key, nested, keys) -> {key, "[REDACTED]"}
-        true -> {key, walk(nested, keys, mode)}
+        key in tagged_pair_keys -> {key, walk_pair(nested, keys, mode)}
+        redacted_entry?(key, nested, keys) -> {walk_key(key, keys, mode), "[REDACTED]"}
+        true -> {walk_key(key, keys, mode), walk(nested, keys, mode)}
       end
     end)
   end
 
-  defp walk([key, nested], keys, mode) when is_atom(key) or is_binary(key) or is_map(key) do
-    cond do
-      redacted_entry?(key, nested, keys) ->
-        [key, "[REDACTED]"]
-
-      is_map(key) and tagged_key_names(key) == [] ->
-        [walk(key, keys, mode), walk(nested, keys, mode)]
-
-      true ->
-        [key, walk(nested, keys, mode)]
-    end
-  end
+  # Plain redaction reads any two-element list with a name first as a
+  # key-value pair, as JSON-decoded headers and options are written. A term
+  # kept for conversion is not read that way: its pairs are tuples, and a list
+  # such as an example's input keys `[:api_key, :question]` is data.
+  defp walk([key, _nested] = pair, keys, :plain)
+       when is_atom(key) or is_binary(key) or is_map(key),
+       do: walk_pair(pair, keys, :plain)
 
   defp walk([], _keys, _mode), do: []
 
@@ -474,7 +499,43 @@ defmodule Imp.Redaction do
   defp walk(value, _keys, _mode) when is_binary(value),
     do: if(secret_value?(value), do: "[REDACTED]", else: value)
 
+  # A term kept for conversion becomes text once encoded, and an atom's text is
+  # redacted there as any string is.
+  defp walk(value, _keys, {:typed, _preserved})
+       when is_atom(value) and value not in [nil, true, false] do
+    if secret_value?(Atom.to_string(value)), do: :"[REDACTED]", else: value
+  end
+
   defp walk(value, _keys, _mode), do: value
+
+  defp walk_pair([key, nested], keys, mode) do
+    cond do
+      redacted_entry?(key, nested, keys) ->
+        [key, "[REDACTED]"]
+
+      is_map(key) and tagged_key_names(key) == [] ->
+        [walk(key, keys, mode), walk(nested, keys, mode)]
+
+      true ->
+        [key, walk(nested, keys, mode)]
+    end
+  end
+
+  defp walk_pair(value, keys, mode), do: walk(value, keys, mode)
+
+  defp walk_key(key, _keys, _mode) when is_atom(key) or is_binary(key), do: key
+  defp walk_key(key, keys, mode), do: walk(key, keys, mode)
+
+  # An encoded two-element tuple is a pair the codec tagged as one.
+  defp tagged_pair_keys(value) do
+    types = [Map.get(value, "__imp_type__"), Map.get(value, :__imp_type__)]
+
+    if Enum.any?(types, &(&1 in ["tuple", :tuple])) do
+      Enum.filter(["items", :items], &match?([_key, _value], Map.get(value, &1)))
+    else
+      []
+    end
+  end
 
   @doc """
   Recursively removes credential-bearing entries while preserving semantic data.
@@ -547,6 +608,21 @@ defmodule Imp.Redaction do
     |> drop_credential_value()
   end
 
+  # A pair is a tuple, a tagged map's entry, or an encoded two-element tuple.
+  # Any other two-element list is data (an example's input keys
+  # `[:api_key, :question]`); a caller holding pairs written as lists, as JSON
+  # writes them, turns them into tuples first.
+  defp drop_credential_value(%{"__imp_type__" => "tuple", "items" => [key, nested]} = tuple) do
+    if credential_entry?(key, nested) do
+      :drop
+    else
+      case drop_noncredential_pair([key, nested]) do
+        {:keep, items} -> {:keep, %{tuple | "items" => items}}
+        :drop -> :drop
+      end
+    end
+  end
+
   defp drop_credential_value(map) when is_map(map) do
     tagged_entry_keys = tagged_map_entry_keys(map)
 
@@ -568,11 +644,6 @@ defmodule Imp.Redaction do
       end)
 
     {:keep, sanitized}
-  end
-
-  defp drop_credential_value([key, nested])
-       when is_atom(key) or is_binary(key) or is_map(key) do
-    if credential_entry?(key, nested), do: :drop, else: drop_noncredential_pair([key, nested])
   end
 
   defp drop_credential_value(list) when is_list(list), do: drop_list_values(list, [])

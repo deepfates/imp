@@ -982,6 +982,7 @@ defmodule Imp.Saving do
 
   defp dump_portable_config!(config, context) do
     config
+    |> saved_pairs()
     |> redact_config_entries()
     |> require_portable_json!(context)
   end
@@ -1010,7 +1011,7 @@ defmodule Imp.Saving do
 
   defp dump_portable_value!(value, context) do
     value
-    |> Imp.Redaction.redact()
+    |> Imp.Redaction.redact_term()
     |> Imp.Optimizer.Report.encode_term()
     |> redact_dump()
     |> require_portable_json!(context)
@@ -1065,6 +1066,23 @@ defmodule Imp.Saving do
     Map.put(value, "entries", entries)
   end
 
+  # An encoded two-element tuple is a pair the codec tagged as one. Any other
+  # two-element list is data, such as an example's input keys.
+  defp redact_dump(%{"__imp_type__" => "tuple", "items" => [encoded_key, nested]} = tuple) do
+    items =
+      case json_safe_key_name(encoded_key) do
+        {:ok, key} ->
+          if Imp.Redaction.credential_entry?(key, nested),
+            do: [encoded_key, "[REDACTED]"],
+            else: [redact_dump(encoded_key), redact_dump(nested)]
+
+        :error ->
+          [redact_dump(encoded_key), redact_dump(nested)]
+      end
+
+    %{tuple | "items" => items}
+  end
+
   defp redact_dump(%{provider: :req_llm, model: _model} = value) do
     value
     |> Imp.Redaction.drop_credentials()
@@ -1091,12 +1109,6 @@ defmodule Imp.Saving do
         true -> {key, redact_dump(nested)}
       end
     end)
-  end
-
-  defp redact_dump([key, value]) when is_atom(key) or is_binary(key) or is_map(key) do
-    if Imp.Redaction.credential_entry?(key, value),
-      do: [key, "[REDACTED]"],
-      else: [key, redact_dump(value)]
   end
 
   defp redact_dump(value) when is_list(value), do: Enum.map(value, &redact_dump/1)
@@ -1137,6 +1149,16 @@ defmodule Imp.Saving do
     if Imp.Redaction.credential_entry?(key, value),
       do: {key, "[REDACTED]"},
       else: {key, redact_dump(value)}
+  end
+
+  # Config, options and headers are written as `[key, value]` lists, since JSON
+  # has no tuples. They are read back as tuples before credentials are removed,
+  # which takes only tuples for pairs.
+  defp saved_pairs(entries) do
+    Enum.map(entries, fn
+      [key, value] when is_atom(key) or is_binary(key) -> {key, value}
+      entry -> entry
+    end)
   end
 
   defp json_safe_key_name(%{"__imp_type__" => "atom", "value" => value})
@@ -1400,6 +1422,7 @@ defmodule Imp.Saving do
 
   defp decode_config(config) when is_list(config) do
     config
+    |> saved_pairs()
     |> Imp.Redaction.drop_credentials()
     |> Enum.map(fn
       {k, v} -> {decode_config_key(k), decode_config_value(k, v)}
@@ -1425,6 +1448,7 @@ defmodule Imp.Saving do
   defp decode_config_value(key, value)
        when key in [:headers, "headers"] and is_list(value) do
     value
+    |> saved_pairs()
     |> Imp.Redaction.drop_credentials()
     |> Enum.map(fn
       {header, header_value} -> {header, header_value}
@@ -1501,6 +1525,7 @@ defmodule Imp.Saving do
 
   defp decode_req_llm_opts(opts) when is_list(opts) do
     opts
+    |> saved_pairs()
     |> Imp.Redaction.drop_credentials()
     |> decode_allowlisted_entries!(@req_llm_option_keys, "saved ReqLLM options", fn key, value ->
       decode_req_llm_option_value!(key, value)
