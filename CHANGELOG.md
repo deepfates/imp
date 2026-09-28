@@ -26,7 +26,7 @@ User-visible changes to Imp are recorded here.
 
 ### Fixed
 
-- A call streamed through `Imp.Clients.ReqLLM.stream/3` records the usage
+- A call streamed through `Imp.Clients.ReqLLM` records the usage
   and the cost the provider reported at the end of the stream. ReqLLM's
   stream is a `Stream.resource`, which reports its end as halted rather than
   done, and Imp ended such a stream without its terminal event, so every
