@@ -12,9 +12,11 @@ User-visible changes to Imp are recorded here.
   catalog estimate for every model in ReqLLM's catalog, so every spend total
   built on it counted an estimate as money spent, and OpenRouter's own charge,
   which OpenRouter responses carry unasked, was overridden by it. OpenRouter
-  calls now report OpenRouter's charge. A call to a provider that reports no
-  charge (Anthropic, OpenAI or Google called directly) now has a `nil` cost
-  where it had the estimate. The estimate is the new `estimated_cost` field on
+  calls now report OpenRouter's charge; one made with the caller's own
+  provider key reports OpenRouter's fee plus the upstream charge, or `nil`
+  when the upstream charge is missing. A call to any catalog-priced provider
+  that reports no charge (Anthropic, OpenAI, Google, Groq, xAI and others)
+  now has a `nil` cost where it had the estimate. The estimate is the new `estimated_cost` field on
   `Imp.Core.LMResponse` and `:estimated_cost` on the `:model_response` event;
   `billing` is the breakdown behind that estimate, as it always was, and its
   docs now say so. Migration: a host that sums `cost` treats `nil` as an

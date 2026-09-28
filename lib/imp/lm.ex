@@ -22,7 +22,8 @@ defmodule Imp.LM do
   `Imp.Core.LMResponse`. `:cost` is what the provider reported charging, and
   `nil` when it reported no charge, which means the charge is unknown rather
   than zero. `:estimated_cost` is ReqLLM's catalog price for the reported
-  tokens, and `nil` when the catalog has no price for the model. A host summing
+  tokens, and `nil` when the catalog has no price for the model or the call
+  was streamed. A host summing
   money spent sums `:cost`; one that falls back on `:estimated_cost` for calls
   with no reported charge is counting an estimate, and should know it.
 

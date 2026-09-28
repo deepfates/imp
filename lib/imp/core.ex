@@ -81,12 +81,17 @@ defmodule Imp.Core do
     its charge, unasked, as the `"cost"` field of its usage object;
     ReqLLM carries that field through unchanged, and Imp reads it from there.
     A provider whose response carries no charge — the Anthropic, OpenAI and
-    Google APIs called directly among them — gives a `nil` cost. An LM client
-    other than ReqLLM reports its charge as `:cost` in its response metadata.
+    Google APIs called directly among them — gives a `nil` cost. On an
+    OpenRouter call made with the caller's own provider key (`"is_byok"`),
+    `cost` is OpenRouter's fee plus the upstream charge it reports in
+    `"cost_details"`, and `nil` when that upstream charge is missing. An LM
+    client other than ReqLLM reports its charge as `:cost` in its response
+    metadata.
 
     `estimated_cost` is ReqLLM's estimate for the call: the reported token
     counts priced from its model catalog, as a non-negative float, or `nil`
-    when the catalog has no price for the model. It is a different number from
+    when the catalog has no price for the model or the call was streamed. It
+    is a different number from
     the charge whenever prices have changed, the provider routed to an endpoint
     with other prices, or the provider prices caching and reasoning differently
     from the catalog, so a host that falls back on it when `cost` is `nil` is
@@ -296,6 +301,21 @@ defmodule Imp.Core do
   # `"cost"`. OpenRouter includes it without being asked (its
   # `usage: %{include: true}` request option is not needed for it). A client
   # that is not ReqLLM reports its charge as `:cost` in its own metadata.
+  #
+  # With the caller's own provider key (`"is_byok"`), OpenRouter's `"cost"` is
+  # only its fee; the provider billed the key separately, and OpenRouter
+  # reports that as `"cost_details"."upstream_inference_cost"`. Counting the fee
+  # alone would understate spend, so without the upstream figure the charge
+  # is unknown.
+  defp reported_cost(_metadata, %{"is_byok" => true} = usage) do
+    upstream = usage |> Map.get("cost_details") |> map_value(:upstream_inference_cost, nil)
+
+    case Map.get(usage, "cost") do
+      fee when is_number(fee) and is_number(upstream) -> fee + upstream
+      _incomplete -> nil
+    end
+  end
+
   defp reported_cost(metadata, usage) do
     Map.get(usage, "cost", map_value(metadata, :cost, nil))
   end
