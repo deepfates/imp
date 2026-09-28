@@ -794,7 +794,9 @@ defmodule Imp.Optimizer.Trajectory do
           else: Map.put(encoded, key, encode_term(nested))
 
       {key, _nested}, _encoded ->
-        decode_error!("trajectory map keys must be atoms or strings, got: #{inspect(key)}")
+        decode_error!(
+          "trajectory map keys must be atoms or strings, got: #{Imp.FieldMap.describe(key)}"
+        )
     end)
   end
 

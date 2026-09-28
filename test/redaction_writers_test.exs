@@ -412,6 +412,15 @@ defmodule Imp.RedactionWritersTest do
         Imp.Optimizer.Trajectory.dump(trajectory.(part))
       end
     end
+
+    # The refusal names the key by its type, not by what it holds.
+    error =
+      assert_raise Imp.Optimizer.Trajectory.DecodeError, fn ->
+        Imp.Optimizer.Trajectory.dump(trajectory.(%{{:api_key, "PROBE-REFUSED-KEY-7F3A"} => 1}))
+      end
+
+    refute Exception.message(error) =~ "PROBE-REFUSED-KEY-7F3A"
+    assert Exception.message(error) =~ "a tuple of 2 elements"
   end
 
   # A session's history is redacted except the provider's reasoning

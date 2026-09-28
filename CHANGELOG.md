@@ -118,6 +118,8 @@ User-visible changes to Imp are recorded here.
   rewriting an Avatar tool schema's `"required" => ["api_key", "query"]` and
   `Imp.Optimizer.Parameter` from refusing input keys `["api_key", "question"]`.
 - A map key that is a string shaped like a credential is redacted.
+  `Imp.Optimizer.Trajectory` names a key it refuses (one that is not an atom
+  or a string) by its type; it printed the key, credential included.
 - `Imp.Optimizer.Report.load!/1` and `Imp.Optimizer.GRPO.Checkpoint.load!/1`
   read the `"[REDACTED]"` atom marker in a VM that has not loaded
   `Imp.Redaction`, and a MIPROv2 checkpoint resumes in a fresh VM: its loader
