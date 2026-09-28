@@ -333,7 +333,9 @@ defmodule ReActV2StepContractTest do
        )}
     end
 
-    model = %{provider: :anthropic, id: "claude-x", capabilities: %{tools: %{enabled: false}}}
+    # The registry lists this model with tool calling; the client says it has
+    # none. Every step follows the client, which is read once, when it is built.
+    model = %{provider: :anthropic, id: "claude-x", capabilities: %{tools: %{enabled: true}}}
 
     lm =
       Imp.req_llm(model,
@@ -342,6 +344,8 @@ defmodule ReActV2StepContractTest do
         max_retries: 0,
         req_http_options: [adapter: adapter, retry: false, max_retries: 0]
       )
+
+    lm = %{lm | tool_calling: false}
 
     assert {:ok, prediction} =
              Imp.call(Imp.react("intent -> answer", [look()], lm: lm), %{intent: "hi"})
@@ -362,5 +366,51 @@ defmodule ReActV2StepContractTest do
     assert Enum.any?(second["messages"], fn message ->
              message |> Jason.encode!() |> String.contains?("tool_call_results")
            end)
+  end
+
+  # A tool with a required argument, an optional one with a default, and a
+  # `$ref`, its properties in the order they were declared.
+  test "the listing shows each tool's whole argument schema" do
+    properties =
+      Jason.OrderedObject.new([
+        {"sku", %{"type" => "string", "description" => "exact SKU"}},
+        {"region", %{"type" => "string", "enum" => ["eu", "us"]}},
+        {"limit", %{"type" => "integer", "default" => 5}},
+        {"ref", %{"$ref" => "#/$defs/Ref"}}
+      ])
+
+    schema = %{
+      "type" => "object",
+      "properties" => properties,
+      "required" => ["sku", "region"],
+      "$defs" => %{
+        "Ref" => %{"type" => "object", "properties" => %{"id" => %{"type" => "string"}}}
+      }
+    }
+
+    search = Imp.tool(:search, "Search the catalog", fn _ -> "ok" end, schema: schema)
+    agent = Imp.react("intent -> answer", [search], lm: lm(false, ["done."]))
+    assert {:ok, _} = Imp.call(agent, %{intent: "find"})
+    [{messages, _opts}] = requests()
+    listing = List.last(messages).content
+
+    expected =
+      ~s(search, whose description is <desc>Search the catalog</desc>. It takes arguments ) <>
+        ~s({"properties":{"sku":{"description":"exact SKU","type":"string"},) <>
+        ~s("region":{"enum":["eu","us"],"type":"string"},"limit":{"default":5,"type":"integer"},) <>
+        ~s("ref":{"$ref":"#/$defs/Ref"}},"required":["sku","region"],) <>
+        ~s("$defs":{"Ref":{"properties":{"id":{"type":"string"}},"type":"object"}}}.)
+
+    assert listing =~ Jason.encode!(expected)
+  end
+
+  # A model that writes its calls is shown the shape `tool_calls` reads.
+  test "a step for an LM that cannot call tools shows how to write a call" do
+    [{[system | _], _opts}] = run(agent(Imp.Adapter.Chat, lm(false, ["done."])))
+
+    assert system.content =~
+             "2. `tool_calls` (list): The tools to call, as a JSON list in which each call has " <>
+               "`name` and `arguments`. Example: " <>
+               ~s([{"name": "search", "arguments": {"query": "cats"}}])
   end
 end

@@ -91,20 +91,28 @@ defmodule ReActV2ToolRosterTest do
     def response_format_capability(%__MODULE__{}), do: Imp.LM.Capability.json_schema()
   end
 
-  # Every step asks whether the LM calls tools. A ReqLLM model the registry
-  # does not know warns on each lookup, so the client keeps its answer.
-  test "a ReqLLM model's tool calling is looked up once" do
+  # Every step asks whether the LM calls tools. A ReqLLM client answers from
+  # what it read from the registry when it was built, not by looking again.
+  test "a ReqLLM client's tool calling is read once, when it is built" do
     spec = "openai:imp-uncatalogued-#{System.unique_integer([:positive])}"
-
-    lm = Imp.req_llm(spec, api_key: "k")
+    lm = ExUnit.CaptureIO.with_io(:stderr, fn -> Imp.req_llm(spec, api_key: "k") end) |> elem(0)
+    assert lm.tool_calling == true
 
     warnings =
       ExUnit.CaptureIO.capture_io(:stderr, fn ->
         for _step <- 1..3, do: assert(Imp.LM.tool_calling_capability(lm))
       end)
 
-    # Other tests may warn while this one captures stderr; count this model's.
-    assert length(String.split(warnings, "Using unverified model: #{spec}\n")) == 2
+    refute warnings =~ "Using unverified model: #{spec}\n"
+
+    # The answer is the struct's: the registry says this model calls tools.
+    tools = %{provider: :openai, id: "m", capabilities: %{tools: %{enabled: true}}}
+    assert Imp.req_llm(tools, api_key: "k").tool_calling == true
+
+    refute Imp.LM.tool_calling_capability(%{
+             Imp.req_llm(tools, api_key: "k")
+             | tool_calling: false
+           })
   end
 
   test "a wrapped LM answers for the LM it wraps" do

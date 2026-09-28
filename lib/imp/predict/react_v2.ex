@@ -122,7 +122,9 @@ defmodule Imp.Predict.ReActV2 do
 
   So a step asks for one thing, whichever adapter formats it. The step has a
   `tools` input, the roster as text in DSPy's shape ("name, whose description
-  is <desc>...</desc>. It takes arguments {...}."), and a `tool_calls` output.
+  is <desc>...</desc>. It takes arguments {...}.", the arguments being the
+  schema's properties, `required` and `$defs` as JSON), and a `tool_calls`
+  output whose description shows how to write a call.
   When the LM calls tools natively (every LM unless its client says
   otherwise; `Imp.Clients.ReqLLM` asks the model registry), the tools are sent
   natively and `Imp.Predict` formats the step without both fields, in every
@@ -265,11 +267,7 @@ defmodule Imp.Predict.ReActV2 do
       raise ArgumentError, "submit is reserved by Imp.Predict.ReActV2"
     end
 
-    if Enum.any?(signature.inputs ++ signature.outputs, &Imp.FieldMap.same_name?(&1.name, :tools)) do
-      raise ArgumentError,
-            "Imp.Predict.ReActV2.new/3: `tools` is reserved for the step's tool list; " <>
-              "rename that field"
-    end
+    reject_reserved_tools!(signature)
 
     tools = put_submit(tools, signature)
 
@@ -280,10 +278,7 @@ defmodule Imp.Predict.ReActV2 do
             [Imp.Signature.Field.new(%{name: :history, type: :history}, :input), tools_field()],
         outputs: [
           Imp.Signature.Field.new(%{name: :next_thought, metadata: %{optional: true}}, :output),
-          Imp.Signature.Field.new(
-            %{name: :tool_calls, type: :array, metadata: %{default: []}},
-            :output
-          )
+          tool_calls_field()
         ],
         instructions: signature.instructions,
         # A step answered in plain text, with no native tool call, is a
@@ -396,6 +391,8 @@ defmodule Imp.Predict.ReActV2 do
   # agent it was saved from asked. A host's own `:adapter_opts` (renderers are
   # functions) are not saved; the host passes them again.
   def restore_loop(%__MODULE__{react: react} = agent) do
+    reject_reserved_tools!(agent.signature)
+
     metadata =
       react.signature.metadata
       |> Map.drop(["text_field", "tool_calls_field", "tools_field"])
@@ -417,7 +414,17 @@ defmodule Imp.Predict.ReActV2 do
           ),
         adapter_opts:
           Keyword.merge(react.adapter_opts, loop_adapter_opts(agent.signature, agent.tools)),
-        signature: %{react.signature | metadata: metadata, inputs: inputs}
+        signature: %{
+          react.signature
+          | metadata: metadata,
+            inputs: inputs,
+            outputs:
+              Enum.map(react.signature.outputs, fn field ->
+                if Imp.FieldMap.same_name?(field.name, :tool_calls),
+                  do: %{field | desc: tool_calls_field().desc},
+                  else: field
+              end)
+        }
     }
 
     %{agent | react: react}
@@ -936,24 +943,47 @@ defmodule Imp.Predict.ReActV2 do
   # and `tools` lists the tools as text. `Imp.Predict` leaves both tool fields
   # out of the prompt when the step sends its tools natively, as DSPy's
   # `Adapter._call_preprocess` does.
+  # `tools` is the step's tool list, so a task field of that name would be
+  # taken for it. A program saved before the name was reserved is refused on
+  # load with the same message.
+  defp reject_reserved_tools!(signature) do
+    if Enum.any?(signature.inputs ++ signature.outputs, &Imp.FieldMap.same_name?(&1.name, :tools)) do
+      raise ArgumentError,
+            "Imp.Predict.ReActV2.new/3: `tools` is reserved for the step's tool list; " <>
+              "rename that field"
+    end
+  end
+
   defp step_metadata,
     do: %{text_field: :next_thought, tool_calls_field: :tool_calls, tools_field: :tools}
+
+  # The written form of a call, for an LM that writes its calls: the shape
+  # `tool_calls` parses (a list; `name` and `arguments`, or `tool`/`args`).
+  @tool_calls_desc "The tools to call, as a JSON list in which each call has `name` and " <>
+                     "`arguments`. Example: " <>
+                     ~s([{"name": "search", "arguments": {"query": "cats"}}])
+
+  defp tool_calls_field,
+    do:
+      Imp.Signature.Field.new(
+        %{name: :tool_calls, type: :array, desc: @tool_calls_desc, metadata: %{default: []}},
+        :output
+      )
 
   defp tools_field,
     do: Imp.Signature.Field.new(%{name: :tools, type: :array, metadata: %{default: []}}, :input)
 
   # The roster as the `tools` input: one line per tool in DSPy's `Tool.__str__`
   # shape, "name, whose description is <desc>...</desc>. It takes arguments
-  # {...}.", with the arguments as the JSON properties of the schema the
-  # provider would get, `submit`'s included.
+  # {...}.", with the arguments as JSON: the `properties` of the schema the
+  # provider would get (`submit`'s included), in the order the schema gives
+  # them, then its `required` list and its `$defs`, so an optional argument
+  # reads as one and a `$ref` resolves.
   defp tool_lines(react) do
     react.tools
     |> ordered_tools(react.tool_order)
     |> Enum.map(fn tool ->
       %{function: function} = tool_description(tool, react.signature)
-
-      arguments =
-        Map.get(function.parameters, "properties", Map.get(function.parameters, :properties, %{}))
 
       description =
         case function.description do
@@ -961,8 +991,32 @@ defmodule Imp.Predict.ReActV2 do
           desc -> ", whose description is <desc>#{String.replace(desc, "\n", "  ")}</desc>."
         end
 
-      "#{function.name}#{description} It takes arguments #{Jason.encode!(arguments)}."
+      "#{function.name}#{description} It takes arguments " <>
+        "#{Jason.encode!(tool_arguments(function.parameters))}."
     end)
+  end
+
+  defp tool_arguments(schema) do
+    [{"properties", schema_value(schema, "properties") || %{}}]
+    |> Kernel.++(
+      for key <- ["required", "$defs"], value = schema_value(schema, key), do: {key, value}
+    )
+    |> Jason.OrderedObject.new()
+  end
+
+  defp schema_value(%Jason.OrderedObject{values: values}, key) do
+    Enum.find_value(values, fn {name, value} -> if to_string(name) == key, do: value end)
+  end
+
+  defp schema_value(schema, key) when is_map(schema),
+    do: Map.get(schema, key) || Map.get(schema, safe_atom(key))
+
+  defp schema_value(_schema, _key), do: nil
+
+  defp safe_atom(key) do
+    String.to_existing_atom(key)
+  rescue
+    ArgumentError -> nil
   end
 
   defp predict(program, react, history, pending) do

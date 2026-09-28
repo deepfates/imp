@@ -114,6 +114,40 @@ defmodule ReActV2NativeReductionTest do
       assert opts[:tools] in [nil, []]
       assert text(messages) =~ "[[ ## tool_calls ## ]]"
       assert text(messages) =~ "alpha_probe, whose description is <desc>A</desc>."
+      assert text(messages) =~ ~s(Example: [{"name": "search", "arguments": {"query": "cats"}}])
     end
+  end
+
+  @reserved "Imp.Predict.ReActV2.new/3: `tools` is reserved for the step's tool list; rename that field"
+
+  test "a task field named tools is refused, on construction and on load" do
+    assert_raise ArgumentError, @reserved, fn ->
+      Imp.react("question, tools: array[str] -> answer", [look()])
+    end
+
+    assert_raise ArgumentError, @reserved, fn ->
+      Imp.react("question -> answer, tools", [look()])
+    end
+
+    # A 0.5.0 save of an agent whose task has its own `tools` input.
+    registry = Imp.Saving.Registry.new(roster_runner: fn _args -> %{"ok" => true} end)
+    state = "test/fixtures/react_v2_saved_0_5_0.json" |> File.read!() |> Jason.decode!()
+
+    field = %{
+      "desc" => nil,
+      "kind" => "input",
+      "metadata" => %{},
+      "name" => "tools",
+      "prefix" => "Tools:",
+      "type" => "array"
+    }
+
+    state =
+      state
+      |> update_in(["signature", "inputs"], &(&1 ++ [field]))
+      |> update_in(["react", "signature", "inputs"], &(&1 ++ [field]))
+
+    error = assert_raise ArgumentError, fn -> Imp.load!(state, registry: registry) end
+    assert Exception.message(error) =~ @reserved
   end
 end

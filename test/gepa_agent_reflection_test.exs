@@ -108,6 +108,10 @@ defmodule Imp.Optimizer.GEPA.AgentReflectionTest do
       assert example =~
                ~s(### tools\n[{"name": "fetch", "description": "Read a web page as text.", "args": {"url": {"type": "string"}}}])
 
+      # The step's own `tools` input is the same roster as text; it is shown
+      # once, as the native roster.
+      assert length(String.split(example, "### tools\n")) == 2
+
       assert example =~ "## Feedback\nThis trajectory got a score of 0.0."
     end
 
@@ -338,5 +342,39 @@ defmodule Imp.Optimizer.GEPA.AgentReflectionTest do
       assert report.metadata.max_metric_calls == 2 * (4 + 4)
       assert report.metadata.max_full_evaluations == :infinity
     end
+  end
+
+  # Only a ReActV2 step's roster input gives way to its native roster; any
+  # other predictor's input called `tools` is its own data and is shown.
+  test "a predictor's own input named tools is kept", ctx do
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> "[[ ## answer ## ]]\nno" end)
+
+    provider_tool = %{
+      type: "function",
+      function: %{
+        name: "fetch",
+        description: "Read a web page.",
+        parameters: %{"type" => "object", "properties" => %{}}
+      }
+    }
+
+    program =
+      Imp.predict("question, tools -> answer", lm: lm, config: [tools: [provider_tool]])
+
+    data =
+      for i <- 0..3 do
+        Imp.example(question: "version #{i}?", tools: "OWN-TOOLS-MARKER", answer: "1.2.3")
+        |> Imp.with_inputs([:question, :tools])
+      end
+
+    optimizer =
+      Imp.Optimizer.GEPA.new(Imp.exact_match(:answer),
+        reflection_lm: ctx.reflection_lm,
+        max_metric_calls: 8
+      )
+
+    Imp.Optimizer.GEPA.compile_with_report(optimizer, program, data, data)
+    assert [prompt | _rest] = prompts(ctx.prompts)
+    assert prompt =~ "### tools\nOWN-TOOLS-MARKER"
   end
 end

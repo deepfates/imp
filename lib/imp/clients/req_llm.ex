@@ -53,14 +53,20 @@ defmodule Imp.Clients.ReqLLM do
   @anthropic_structured_outputs_beta "structured-outputs-2025-11-13"
   @openai_reasoning_model_pattern ~r/^(gpt-5|o[134])(?:[-_:.].*)?$/
 
+  # `tool_calling` is whether the model answers a request's `:tools` natively,
+  # read from the registry once, when the client is built, so an agent loop
+  # that asks on every step does not look the model up again; nil for a
+  # client built without `new/2`, which then looks it up when asked.
   defstruct model: nil,
             opts: [],
-            req_module: ReqLLM
+            req_module: ReqLLM,
+            tool_calling: nil
 
   @type t :: %__MODULE__{
           model: ReqLLM.model_input(),
           opts: keyword(),
-          req_module: module()
+          req_module: module(),
+          tool_calling: boolean() | nil
         }
 
   @new_option_schema [
@@ -81,7 +87,8 @@ defmodule Imp.Clients.ReqLLM do
     %__MODULE__{
       model: model_spec,
       opts: merged_opts,
-      req_module: req_module
+      req_module: req_module,
+      tool_calling: registry_tool_calling(model_spec)
     }
   end
 
@@ -182,26 +189,16 @@ defmodule Imp.Clients.ReqLLM do
   # False only when the ReqLLM/LLMDB registry resolves the model and says it
   # cannot call tools. A model the registry does not know, or knows without
   # saying, is sent the roster natively like any other.
-  #
-  # A ReAct loop asks on every step, and a lookup of a model the registry does
-  # not know logs a warning, so the answer is kept per model for the life of
-  # the node: the registry does not change under a running program.
-  def tool_calling_capability(%__MODULE__{model: model_spec}) do
-    key = {__MODULE__, :tool_calling_capability, model_spec}
+  def tool_calling_capability(%__MODULE__{tool_calling: answer}) when is_boolean(answer),
+    do: answer
 
-    case :persistent_term.get(key, :unknown) do
-      :unknown ->
-        answer =
-          case resolve_model(model_spec) do
-            {:ok, %{capabilities: %{tools: %{enabled: false}}}} -> false
-            _known_or_unknown -> true
-          end
+  def tool_calling_capability(%__MODULE__{model: model_spec}),
+    do: registry_tool_calling(model_spec)
 
-        :persistent_term.put(key, answer)
-        answer
-
-      answer ->
-        answer
+  defp registry_tool_calling(model_spec) do
+    case resolve_model(model_spec) do
+      {:ok, %{capabilities: %{tools: %{enabled: false}}}} -> false
+      _known_or_unknown -> true
     end
   end
 

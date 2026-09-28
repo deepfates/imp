@@ -65,11 +65,16 @@ User-visible changes to Imp are recorded here.
   for a signature with one text output the object became the answer. An LM
   whose client says it cannot call tools (a ReqLLM model the registry lists
   without tool calling, `Imp.Clients.TRLLM`) is sent no tools and asked to
-  write its calls in `tool_calls`, with every tool's description and argument
-  schema listed in a `tools` input as DSPy lists them, and its earlier steps
-  replayed as text rather than as tool blocks a provider without declared
-  tools may refuse. A task signature can no longer have a field named
-  `tools`. The guidance says where a text answer
+  write its calls in `tool_calls`, whose description shows the shape of a
+  call with an example. A `tools` input lists every tool, `submit` included,
+  in DSPy's words: its name, its description, and its arguments as JSON (the
+  schema's properties in their declared order, its `required` list and its
+  `$defs`). Its earlier steps are replayed as text rather than as tool blocks
+  a provider without declared tools may refuse. A task signature can no
+  longer have a field named `tools`, and loading a program saved with one is
+  refused with the same error. `Imp.Clients.ReqLLM` reads whether the model
+  calls tools from the registry once, when the client is built
+  (`:tool_calling`). The guidance says where a text answer
   goes, the same in every format: in `next_thought`, with `tool_calls` left
   empty when the model writes its calls. It no longer asks for plain text
   beside a structure that asks for fields; a plain-text reply to a Chat step
