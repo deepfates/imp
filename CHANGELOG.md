@@ -4,6 +4,31 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Security
+
+- `Imp.Redaction` redacts a string that holds a PEM private key of any type,
+  a PGP private key block or a PuTTY key file; a Stripe (`sk_live_`,
+  `rk_live_`), GitHub, GitLab (`glpat-`), Hugging Face (`hf_`), Slack
+  (`xox?-`), SendGrid (`SG.`), npm (`npm_`), PyPI (`pypi-`), Google OAuth
+  (`ya29.`) or Vault (`hvs.`) token, or a JSON Web Token; an AWS access key id
+  longer than 20 characters; a URL with a password in its user info; or a
+  signed URL's `X-Amz-Signature`, `X-Amz-Security-Token`, `X-Goog-Signature`
+  or Azure `sig`. It passed these unchanged into run events, traces,
+  trajectories and saved programs. As before, the whole string is replaced,
+  and every shape it caught before is still caught.
+- `Imp.ExternalCommand` redacts captured output with the same rules: output
+  that holds a credential is `"[REDACTED]"`, so the credentials printed beside
+  a recognized one (`env | grep AWS`, a credentials file) go with it. It used
+  two patterns of its own (`sk-` and `Bearer`) before the shared rules. The
+  optimizer's pricing URL check uses the same rules instead of its own.
+- A `Bearer` token of 16 or more characters with a digit in it is found
+  wherever it ends: mid-line (`Bearer <token> https://…`) or before a newline
+  in a multi-line string (`"Authorization: Bearer <token>\nmachine …"`).
+  Both were missed. A word without a digit after `Bearer`, followed by more
+  text, is still read as prose and left alone.
+- A string of near misses for `Bearer` or `Basic` in one letter case
+  (`BEARER x` lines) is redacted in linear time; it took quadratic time.
+
 ### Changed
 
 - Breaking: `Imp.collect/3` now returns `{:ok, prediction}` or

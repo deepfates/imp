@@ -1,12 +1,22 @@
-defmodule Imp.Redaction do
+# Imp.Redaction's string rules as of origin/main 52f3e90f (0.5.0 plus the
+# connection-struct and OAuth clauses of #232), renamed MainRedaction.
+#
+# Why this copy exists: test/redaction_differential_test.exs checks that no
+# input the previous rules redacted comes back unredacted under the current
+# ones. That needs both rule sets loaded at once, and a Hex release of Imp
+# cannot be a dependency of Imp itself. It is not used by any code and never
+# changes; delete it and the differential test together when the comparison
+# moves to a released version (for example a script run against the Hex
+# package).
+defmodule MainRedaction do
   @moduledoc """
   Shared redaction helpers for traces, telemetry, and runtime metadata.
 
   Imp keeps prompts, tool inputs, provider metadata, and optimizer reports
   inspectable, but credentials and credential-shaped strings must not leak into
   those artifacts. `redact/2` walks ordinary Elixir maps, lists, tuples, and structs,
-  replacing known secret fields and every string that holds a credential
-  with `"[REDACTED]"`.
+  replacing known secret fields and secret-looking string values with
+  `"[REDACTED]"`.
 
   Clients, retrievers and trackers that hold a credential print through a
   redacting `Inspect` implementation, which hides every header value and the
@@ -109,10 +119,10 @@ defmodule Imp.Redaction do
   @doc """
   Returns the default key names treated as sensitive.
 
-      iex> :api_key in Imp.Redaction.default_keys()
+      iex> :api_key in MainRedaction.default_keys()
       true
 
-      iex> :"x-api-key" in Imp.Redaction.default_keys()
+      iex> :"x-api-key" in MainRedaction.default_keys()
       true
 
   """
@@ -271,53 +281,20 @@ defmodule Imp.Redaction do
   exact keys plus token-delimited or camel-case provider prefixes such as
   `:openai_api_key` are redacted.
 
-  A string that holds a credential is replaced whole: a credential is rarely
-  alone, and the text beside a recognized one (the rest of an env dump, a
-  cookie header, a `.netrc` entry) often holds others no pattern names. This
-  is the one set of credential patterns in Imp; text cleaned anywhere else
-  before it is kept or shown (a command's captured output, as a whole; an
-  optimizer pricing URL) is cleaned with it. A string is a credential when it holds:
-
-    * a private key: a PEM block of any type, a PGP private key block, or a
-      PuTTY key file;
-    * a token in a vendor's format: OpenAI, Anthropic and OpenRouter (`sk-`),
-      Stripe (`sk_live_`, `rk_live_`), GitHub, GitLab (`glpat-`), Hugging
-      Face (`hf_`), AWS access key ids (`AKIA`, `ASIA`), Google API keys
-      (`AIza`) and OAuth tokens (`ya29.`), Slack (`xox?-`), SendGrid
-      (`SG.`), npm (`npm_`), PyPI (`pypi-`), Vault (`hvs.`), or a JSON Web
-      Token;
-    * a `Bearer` token that ends the string or is closed by punctuation, or
-      one of 16 or more characters with a digit in it wherever it ends (a
-      token without a digit, followed by more text, reads as prose: `Bearer
-      token-based-auth`, `Bearer authentication is ...`); or a `Basic` credential that ends the string;
-    * a `session=` value, or a long hex value assigned to a credential name
-      (`token=<hex>`, `api_key: <hex>`);
-    * a URL with a password in its user info, or a signed URL's signature or
-      security token (`X-Amz-Signature`, `X-Amz-Security-Token`,
-      `X-Goog-Signature`, Azure's `sig`).
-
-  For example:
-
-      iex> Imp.Redaction.redact(%{api_key: "sk-test-secret-1234567890", model: "demo"})
+      iex> MainRedaction.redact(%{api_key: "sk-test-secret-1234567890", model: "demo"})
       %{api_key: "[REDACTED]", model: "demo"}
 
-      iex> Imp.Redaction.redact(%{nested: [%{"authorization" => "Bearer abcdefghijklmnop"}]})
+      iex> MainRedaction.redact(%{nested: [%{"authorization" => "Bearer abcdefghijklmnop"}]})
       %{nested: [%{"authorization" => "[REDACTED]"}]}
 
-      iex> Imp.Redaction.redact("sk-test-secret-1234567890")
+      iex> MainRedaction.redact("sk-test-secret-1234567890")
       "[REDACTED]"
 
-      iex> Imp.Redaction.redact(%{tenant_id: "public"}, [:tenant_id])
+      iex> MainRedaction.redact(%{tenant_id: "public"}, [:tenant_id])
       %{tenant_id: "[REDACTED]"}
 
-      iex> Imp.Redaction.redact({:error, "Bearer abcdefghijklmnop"})
+      iex> MainRedaction.redact({:error, "Bearer abcdefghijklmnop"})
       {:error, "[REDACTED]"}
-
-      iex> Imp.Redaction.redact("key sk-test-secret-1234567890 was used")
-      "[REDACTED]"
-
-      iex> Imp.Redaction.redact("sha 0badcafe0badcafe0badcafe0badcafe0badcafe")
-      "sha 0badcafe0badcafe0badcafe0badcafe0badcafe"
 
   """
   def redact(value, keys \\ @default_redact_keys)
@@ -444,8 +421,9 @@ defmodule Imp.Redaction do
     |> List.to_tuple()
   end
 
-  def redact(value, _keys) when is_binary(value),
-    do: if(secret_value?(value), do: "[REDACTED]", else: value)
+  def redact(value, _keys) when is_binary(value) do
+    if secret_value?(value), do: "[REDACTED]", else: value
+  end
 
   def redact(value, _keys), do: value
 
@@ -751,100 +729,54 @@ defmodule Imp.Redaction do
     end)
   end
 
-  # The patterns are compiled once per loaded module and kept in
-  # `:persistent_term`: a regex literal is rebuilt on every evaluation, and
-  # `redact/2` tries every pattern on every string it walks.
-  @secret_patterns_key {__MODULE__, :secret_patterns, System.unique_integer([:positive])}
-
-  defp secret_patterns do
-    case :persistent_term.get(@secret_patterns_key, nil) do
-      nil ->
-        patterns = compile_secret_patterns()
-        :persistent_term.put(@secret_patterns_key, patterns)
-        patterns
-
-      patterns ->
-        patterns
-    end
-  end
-
   defp secret_value?(value) do
     trimmed = String.trim(value)
 
-    Enum.any?(secret_patterns(), fn
-      {:basic, pattern} -> basic_credential?(pattern, trimmed)
-      pattern -> Regex.match?(pattern, trimmed)
-    end)
+    String.match?(
+      value,
+      ~r/(?:\A|[^A-Za-z0-9_-])sk-[A-Za-z0-9_-]{8,}(?=\z|[^A-Za-z0-9_-])/
+    ) or bearer_credential?(trimmed) or basic_credential?(trimmed) or
+      session_assignment?(value) or aws_access_key_id?(value) or google_api_key?(value) or
+      hex_credential_assignment?(value)
   end
 
-  # Each pattern is one credential shape; a string that matches any is
-  # replaced whole. Every token pattern has a boundary on each side, so a
-  # longer word that contains the prefix is not taken for a token.
-  #
-  # `Bearer` and `Basic` are matched in any case, and both patterns turn off
-  # PCRE's start-of-match optimization with `(*NO_START_OPT)`. With it, PCRE
-  # looks for a leading letter that may be either case by searching for each
-  # case separately; when one case never occurs again, each failed attempt
-  # searches to the end of the string, so a string of near misses in one case
-  # (`BEARER x` lines) took quadratic time. `session` does not show this and
-  # keeps the optimization.
-  defp compile_secret_patterns do
-    [
-      # Private keys: a PEM block of any type (PKCS#8, RSA, EC, OpenSSH,
-      # encrypted), a PGP private key block, a PuTTY key file.
-      ~r/-----BEGIN [A-Z0-9 ]{0,40}PRIVATE KEY(?: BLOCK)?-----/,
-      ~r/PuTTY-User-Key-File-[0-9]+:/,
-      # OpenAI (`sk-`, `sk-proj-`), Anthropic (`sk-ant-`), OpenRouter (`sk-or-`).
-      ~r/(?:\A|[^A-Za-z0-9_-])sk-[A-Za-z0-9_-]{8,}(?=\z|[^A-Za-z0-9_-])/,
-      # Stripe secret and restricted live keys.
-      ~r/(?<![A-Za-z0-9_])[sr]k_live_[A-Za-z0-9]{16,}(?![A-Za-z0-9_])/,
-      # GitHub classic, OAuth, user-to-server, server and refresh tokens, and
-      # fine-grained personal access tokens.
-      ~r/(?<![A-Za-z0-9_])(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{22,})(?![A-Za-z0-9_])/,
-      # GitLab personal access tokens.
-      ~r/(?<![A-Za-z0-9_-])glpat-[A-Za-z0-9_-]{20,}(?![A-Za-z0-9_-])/,
-      # Hugging Face user access tokens.
-      ~r/(?<![A-Za-z0-9_])hf_[A-Za-z0-9]{30,}(?![A-Za-z0-9_])/,
-      # AWS access key ids: AKIA (long-term) or ASIA (temporary), then 16 or
-      # more uppercase base-32 characters.
-      ~r/(?:\A|[^A-Z0-9])(?:AKIA|ASIA)[0-9A-Z]{16,}(?=\z|[^A-Z0-9])/,
-      # Google API keys: AIza and exactly 35 url-safe base64 characters.
-      ~r/(?:\A|[^A-Za-z0-9_-])AIza[0-9A-Za-z_-]{35}(?=\z|[^A-Za-z0-9_-])/,
-      # Google OAuth access tokens.
-      ~r/(?<![A-Za-z0-9_.-])ya29\.[A-Za-z0-9_-]{16,}/,
-      # Slack bot, user, app and configuration tokens (`xoxb-`, `xoxp-`, ...).
-      ~r/(?<![A-Za-z0-9_-])xox[a-z]-[A-Za-z0-9-]{10,}(?![A-Za-z0-9_-])/,
-      # SendGrid API keys: `SG.` and two dot-separated parts.
-      ~r/(?<![A-Za-z0-9_.-])SG\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/,
-      # npm access tokens.
-      ~r/(?<![A-Za-z0-9_])npm_[A-Za-z0-9]{30,}(?![A-Za-z0-9_])/,
-      # PyPI API tokens: `pypi-` and a macaroon, which always starts `AgE`.
-      ~r/(?<![A-Za-z0-9_-])pypi-AgE[A-Za-z0-9_-]{16,}/,
-      # HashiCorp Vault service tokens.
-      ~r/(?<![A-Za-z0-9_.-])hvs\.[A-Za-z0-9_-]{20,}/,
-      # JSON Web Tokens: header.payload.signature, each base64url; the first
-      # two are JSON objects, so they start `eyJ`.
-      ~r/(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\./,
-      ~r/(*NO_START_OPT)(?:\A|[\s:;,"'=({\[])Bearer[ \t]+(?:[A-Za-z0-9._~+\/-]{12,}={0,2}(?=\z|["'`}\]),;])|(?=[A-Za-z._~+\/-]*[0-9])[A-Za-z0-9._~+\/-]{16,}={0,2}(?![A-Za-z0-9._~+\/=-]))/i,
-      {:basic, ~r/(*NO_START_OPT)(?:\A|[\s:;,])Basic[ \t]+([A-Za-z0-9+\/]+={0,2})\z/i},
-      ~r/(?:\A|[?&;,\s])session\s*=\s*[A-Za-z0-9._~+\/-]{8,}={0,2}(?=\z|[?&;,\s])/i,
-      # Long hex strings alone are not credentials: Imp passes SHA-1 and
-      # SHA-256 digests around as cache keys and git identities. One is a
-      # credential in an explicit assignment (`token=<hex>`, `secret: <hex>`),
-      # where the name says what it is.
-      ~r/(?:secret|token|password|api[_-]?key|credential)s?\s*[=:]\s*"?[0-9a-fA-F]{32,}"?(?=\z|[^0-9a-fA-F])/i,
-      # A URL with a password in its user info, as a database URL carries one.
-      ~r/:\/\/[^\s\/?#@:]*:[^\s\/?#@]+@/,
-      # A signed URL's signature or session token, with a value long enough
-      # to be one.
-      ~r/[?&](?:X-Amz-Signature|X-Amz-Security-Token|X-Goog-Signature|sig)=[^&#\s]{16,}/
-    ]
-  end
+  # AWS access key ids have a fixed, distinctive shape: a 4-letter prefix
+  # (AKIA long-term, ASIA temporary) followed by exactly 16 uppercase
+  # base-32-ish characters. Distinctive enough to redact standalone.
+  defp aws_access_key_id?(value),
+    do: String.match?(value, ~r/(?:\A|[^A-Z0-9])(?:AKIA|ASIA)[0-9A-Z]{16}(?=\z|[^A-Z0-9])/)
 
-  # `Basic` is followed by base64 in prose too ("Basic authentication"); it is
-  # a credential only when the decoded text is `user:password`.
-  defp basic_credential?(pattern, value) do
-    case Regex.run(pattern, value, capture: :all_but_first) do
+  # Google API keys are "AIza" followed by exactly 35 url-safe base64 chars.
+  defp google_api_key?(value),
+    do:
+      String.match?(
+        value,
+        ~r/(?:\A|[^A-Za-z0-9_-])AIza[0-9A-Za-z_-]{35}(?=\z|[^A-Za-z0-9_-])/
+      )
+
+  # Long hex strings alone are NOT treated as secrets — this codebase passes
+  # SHA-1/SHA-256 digests around as cache keys and git identities, and blanket
+  # hex redaction would destroy them. A long hex value is only redacted when it
+  # sits in an explicit credential assignment (`token=<hex>`, `secret: <hex>`),
+  # where the key name already says what it is.
+  defp hex_credential_assignment?(value),
+    do:
+      String.match?(
+        value,
+        ~r/(?:secret|token|password|api[_-]?key|credential)s?\s*[=:]\s*"?[0-9a-fA-F]{32,}"?(?=\z|[^0-9a-fA-F])/i
+      )
+
+  defp bearer_credential?(value),
+    do:
+      String.match?(
+        value,
+        ~r/(?:\A|[\s:;,"'=({\[])Bearer[ \t]+[A-Za-z0-9._~+\/-]{12,}={0,2}(?=\z|["'`}\]),;])/i
+      )
+
+  defp basic_credential?(value) do
+    case Regex.run(~r/(?:\A|[\s:;,])Basic[ \t]+([A-Za-z0-9+\/]+={0,2})\z/i, value,
+           capture: :all_but_first
+         ) do
       [encoded] ->
         case Base.decode64(encoded) do
           {:ok, decoded} -> String.contains?(decoded, ":")
@@ -855,14 +787,11 @@ defmodule Imp.Redaction do
         false
     end
   end
-end
 
-# A connection struct prints as `Imp.Redaction.redact/1` leaves it: an LM
-# client's `api_key` or headers, a retriever's or tracker's headers. A program
-# prints its LM, so a program in IEx, a log line or a crash report would
-# otherwise carry the key.
-for module <- Imp.Redaction.connection_structs() do
-  defimpl Inspect, for: module do
-    def inspect(struct, opts), do: Inspect.Any.inspect(Imp.Redaction.redact(struct), opts)
+  defp session_assignment?(value) do
+    String.match?(
+      value,
+      ~r/(?:\A|[?&;,\s])session\s*=\s*[A-Za-z0-9._~+\/-]{8,}={0,2}(?=\z|[?&;,\s])/i
+    )
   end
 end

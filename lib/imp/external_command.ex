@@ -474,11 +474,7 @@ defmodule Imp.ExternalCommand.Lifecycle do
       capture.tail
       |> String.replace_invalid("?")
       |> redact_exact_secrets(secrets)
-      |> String.replace(~r/\bsk-[A-Za-z0-9_-]{8,}\b/, "[REDACTED]")
-      |> String.replace(
-        ~r/\bBearer\s+[A-Za-z0-9._~+\/=\-]{12,}\b/i,
-        "Bearer [REDACTED]"
-      )
+      |> Imp.Redaction.redact()
 
     %Capture{
       text: text,
@@ -661,7 +657,9 @@ defmodule Imp.ExternalCommand do
   end
 
   defp normalize(capture, status) do
-    output = capture.text |> Imp.Redaction.redact() |> bounded(capture)
+    # The capture's text was redacted as it was captured: output holding a
+    # credential is `"[REDACTED]"` whole.
+    output = bounded(capture.text, capture)
 
     %{
       exit_status: status,
