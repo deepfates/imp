@@ -387,9 +387,14 @@ defmodule Imp.Adapter.JSON do
   def parse(signature, raw, opts) when is_binary(raw) do
     validate_opts!(opts, "#{inspect(__MODULE__)}.parse/3")
 
+    # An object with none of the requested keys is missing every output even
+    # when all of them are optional or defaulted, where DSPy fills the
+    # defaults; see `Imp.Adapter.OutputFields.require_any/2` for why Imp
+    # departs from it.
     case Imp.Adapter.JSONRepair.decode_object(extract_json(raw)) do
       {:ok, decoded} ->
-        with {:ok, prediction} <- Imp.Adapter.Chat.parse(signature, decoded, opts),
+        with :ok <- Imp.Adapter.OutputFields.require_any(signature, decoded),
+             {:ok, prediction} <- Imp.Adapter.Chat.parse(signature, decoded, opts),
              :ok <-
                Imp.Schema.validate_fields(
                  signature.outputs,

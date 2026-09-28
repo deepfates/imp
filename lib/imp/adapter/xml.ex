@@ -19,10 +19,10 @@ defmodule Imp.Adapter.XML do
   marker sections) is an `Imp.AdapterParseError` of kind `:missing_fields`
   naming every output, even when every output is optional or has a default, so
   the caller's fallback or retry runs instead of a prediction made only of
-  defaults. The one exception is the output a signature names in
-  `metadata[:text_field]`, as `Imp.Adapter.Chat` reads it: a non-blank reply
-  with no requested tag is that field, trimmed, and the other outputs take
-  their defaults. A reply with some requested tags and not others is read as
+  defaults. A signature that names an output in `metadata[:text_field]` is
+  read as `Imp.Adapter.Chat` reads it: a non-blank reply with no requested tag
+  is that field, trimmed, a blank one is a step that said nothing, and the
+  other outputs take their defaults. A reply with some requested tags and not others is read as
   Chat reads a partial reply: absent outputs take their defaults or `nil` when
   optional, and a required one that is still absent is reported missing.
 
@@ -73,38 +73,16 @@ defmodule Imp.Adapter.XML do
 
   def parse(signature, raw, opts), do: Imp.Adapter.Chat.parse(signature, raw, opts)
 
+  # A reply with no requested tag is missing every output even when all of
+  # them are optional or defaulted, where DSPy fills the defaults; see
+  # `Imp.Adapter.OutputFields.require_any/2` for why Imp departs from it.
   defp parse_tagged(signature, raw, opts) do
     with {:ok, root} <- parse_fragment(raw),
          grouped <- group_children(root),
-         :ok <- require_output_tag(signature, grouped),
          {:ok, fields} <- parse_output_fields(signature.outputs, grouped, raw),
+         :ok <- Imp.Adapter.OutputFields.require_any(signature, fields),
          {:ok, prediction} <- Imp.Adapter.Chat.parse(signature, fields, opts) do
       {:ok, prediction}
-    end
-  end
-
-  # DSPy 3.3.1's XMLAdapter.parse fills defaults and `None` for optional
-  # outputs even when the reply has no requested tag, so a signature whose
-  # outputs are all optional or defaulted accepts any reply as an answer built
-  # only from defaults. Imp reports such a reply as missing every output: the
-  # model did not answer in this format, and `Imp.Predict`'s JSON fallback or a
-  # caller's retry is the remedy, not an empty prediction.
-  defp require_output_tag(%{outputs: []}, _grouped), do: :ok
-
-  defp require_output_tag(signature, grouped) do
-    if Enum.any?(signature.outputs, &Map.has_key?(grouped, to_string(&1.name))) do
-      :ok
-    else
-      names = Enum.map(signature.outputs, & &1.name)
-
-      {:error,
-       %Imp.AdapterParseError{
-         kind: :missing_fields,
-         message:
-           "The response has none of the requested output tags: " <>
-             Enum.map_join(names, ", ", &"<#{&1}>") <> ".",
-         reason: names
-       }}
     end
   end
 
@@ -113,10 +91,7 @@ defmodule Imp.Adapter.XML do
   # a marker-free completion. The check is on the text, before XML parsing, so
   # prose that is not well-formed XML ("R&D", "a < b") is read as prose too.
   defp text_field_for(signature, raw) do
-    with name when not is_nil(name) <-
-           Map.get(signature.metadata, :text_field, Map.get(signature.metadata, "text_field")),
-         field when not is_nil(field) <-
-           Enum.find(signature.outputs, &(to_string(&1.name) == to_string(name))),
+    with %{} = field <- Imp.Adapter.OutputFields.text_field(signature),
          true <- String.trim(raw) != "",
          false <- opens_output_tag?(signature, raw) do
       {:ok, field.name}
