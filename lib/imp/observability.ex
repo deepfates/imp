@@ -436,7 +436,9 @@ defmodule Imp.Observability do
   end
 
   defp normalize_status(%OptimizerReport{} = report) do
-    state = if report.errors == [], do: :succeeded, else: :failed
+    # A report exists because the optimizer returned a program, so a run with
+    # errors finished rather than failed.
+    state = if report.errors == [], do: :succeeded, else: :succeeded_with_errors
 
     %Status{
       state: state,
@@ -507,7 +509,16 @@ defmodule Imp.Observability do
   defp event_state(_event, metadata), do: normalize_state(Map.get(metadata, :state, :unknown))
 
   defp normalize_state(state)
-       when state in [:pending, :running, :succeeded, :failed, :cancelled, :unknown], do: state
+       when state in [
+              :pending,
+              :running,
+              :succeeded,
+              :succeeded_with_errors,
+              :failed,
+              :cancelled,
+              :unknown
+            ],
+       do: state
 
   defp normalize_state(state) when state in [:complete, :completed, :success, :ok], do: :succeeded
   defp normalize_state(state) when state in [:error, :exception], do: :failed

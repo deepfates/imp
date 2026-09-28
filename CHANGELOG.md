@@ -363,17 +363,47 @@ Every change here is breaking for code that relied on the old behaviour.
   the report has its credential values redacted.
 - A GEPA candidate rejected because its proposal failed is named "Proposal
   failed: …", not "Program call failed: …".
-- A GEPA run with `raise_on_exception: false` that continued past failed
-  proposals reports them. Each failure (a reflection call, reflection
-  strategy, evaluation or validation that raised, or an iteration that raised)
-  is an entry in `report.errors` with its `iteration`, its `candidate_id` when
-  a candidate was proposed, and its `diagnostics`; `metadata.failed_proposals`
-  counts them, and `status` is `:with_errors`. The program returned is still
-  the best candidate found, the baseline when every proposal failed, as
-  DSPy's GEPA returns it. Before, such a run reported `status: :ok` and no
-  errors: a proposal failure was listed only on a rejected candidate, a
-  failure before a candidate existed was not listed at all, and under
-  `execution_profile: :beam_native` an iteration that raised left no record.
+- A GEPA run that continued past failed proposals reports them. Each
+  failure is an entry in `report.errors` with its `iteration`, its
+  `diagnostics` and its `candidate_id` (the rejected candidate in
+  `candidates`, or `nil` when the failure left none there);
+  `metadata.failed_proposals` counts them, and `status` is `:with_errors`.
+  With `raise_on_exception: false` that is any failure: a reflection call,
+  reflection strategy, evaluation or validation that raised, threw or
+  exited, or an iteration that did. With the default, `true`, it is the
+  failures GEPA already recorded and went on from: a reflection that returned
+  no usable instruction, a failed reflective dataset in a parallel slot, and
+  a reflection interrupted before a resume, so such a run now reports
+  `:with_errors` where it reported `:ok`. The program returned is still the
+  best candidate found, the baseline when every proposal failed, as DSPy's
+  GEPA returns it. A slot cancelled because a sibling failed first is
+  rejected, not counted as failed. Before, such a run reported `status: :ok`
+  and no errors.
+- Under `execution_profile: :beam_native` with `raise_on_exception: false`,
+  an iteration that raised is recorded as a rejection with a
+  `{:proposal_error, reason}` reason, so `Stopper.consecutive_outcome/2`
+  counts it as a `:proposal_error` outcome, as the default profile already
+  did; before, its outcome was `:none`. For example, when evaluating the
+  first two proposals raises and the third proposal solves the task,
+  `consecutive_outcome(:proposal_error, 2)` now stops the run after those two
+  iterations with the baseline, where before the run went on to
+  `:max_iterations` and returned the solving candidate; and
+  `consecutive_outcome(:none, 2)`, which stopped that run after its first
+  iteration, no longer does. An iteration that threw or exited is recorded the
+  same way; before, it crashed the run.
+- GEPA ends the run on an `Imp.OperationalSafetyError` (a budget, cost,
+  route or transport guard) whatever `raise_on_exception` says. Before, with
+  `raise_on_exception: false`, it recorded the refusal as a failed proposal
+  and went on spending.
+- A GEPA checkpoint passed to `:checkpoint_fn` is redacted with
+  `Imp.Redaction`, since its rejections carry failure reasons.
+- `Imp.Observability.status/1` on an optimizer report with errors has state
+  `:succeeded_with_errors`, a new `Imp.Observability.Status` state, where it
+  had `:failed`: the optimizer returned a program.
+- `examples/deployment/agent_optimization.exs` writes the optimizer's
+  rejections and history with `Imp.Optimizer.Report.json_safe/1`. It passed
+  them to `Jason.encode!/1`, which raised on a failure reason such as
+  `{:incomplete_evaluation, 1}`, so a finished run lost its record.
 
 ## 0.5.0 — 2026-09-26
 

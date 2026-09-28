@@ -141,7 +141,7 @@ defmodule Imp.ObservabilityInspectionTest do
     refute Kernel.inspect(inspection) =~ @secret
 
     assert %Status{
-             state: :failed,
+             state: :succeeded_with_errors,
              phase: :optimizer,
              completed: 2,
              total: 2,

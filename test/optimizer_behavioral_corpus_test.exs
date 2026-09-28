@@ -489,6 +489,276 @@ defmodule OptimizerBehavioralCorpusTest do
                &(&1.diagnostics == ["{:reflection_lm_failed, :reflection_down}"])
              ),
              inspect(profile)
+
+      # The run returned a program, so it finished, with errors.
+      assert %Imp.Observability.Status{state: :succeeded_with_errors} =
+               Imp.Observability.status(report)
+    end
+  end
+
+  test "GEPA under the DSPy profile reports an iteration that raised and continued" do
+    # A component feedback callback that raises fails the whole iteration.
+    report =
+      Imp.Optimizer.GEPA.new(metric(),
+        execution_profile: :gepa_v0_1_4_merge,
+        raise_on_exception: false,
+        component_feedback: %{main: fn _context -> raise "feedback service down" end},
+        reflection_lm: reflection_lm("Answer in one word."),
+        max_metric_calls: 6
+      )
+      |> Imp.Optimizer.GEPA.compile(france_program(), trainset(), devset())
+      |> Imp.Optimizer.Report.fetch()
+
+    assert report.metadata.status == :with_errors
+    assert report.metadata.failed_proposals > 0
+    assert report.metadata.failed_proposals == report.metadata.rejected_candidates
+
+    for error <- report.errors do
+      assert %{
+               candidate_id: nil,
+               diagnostics: ["GEPA component feedback failed for :main: feedback service down"]
+             } = error
+    end
+  end
+
+  test "GEPA stops on an operational safety refusal whatever raise_on_exception says" do
+    calls = :counters.new(1, [])
+
+    refusing_program =
+      Imp.predict("question -> answer",
+        lm:
+          Imp.LM.Static.new(
+            handler: fn messages, _opts ->
+              prompt = Enum.map_join(messages, "\n", & &1.content)
+
+              if prompt =~ "Answer in one word" do
+                :counters.add(calls, 1, 1)
+
+                raise Imp.OperationalSafetyError.exception(
+                        kind: :budget,
+                        message: "provider budget exhausted"
+                      )
+              else
+                %{answer: "unknown"}
+              end
+            end
+          )
+      )
+
+    for profile <- [
+          [execution_profile: :gepa_v0_1_4_merge],
+          [execution_profile: :beam_native, generations: 3],
+          [execution_profile: :beam_native, generations: 3, proposal_concurrency: 2],
+          [
+            execution_profile: :beam_native,
+            generations: 3,
+            proposal_concurrency: 2,
+            sampling_strategy: {:same_parent, 1}
+          ]
+        ],
+        raise_on_exception <- [true, false] do
+      :counters.put(calls, 1, 0)
+
+      assert_raise Imp.OperationalSafetyError, "provider budget exhausted", fn ->
+        Imp.Optimizer.GEPA.new(
+          metric(),
+          profile ++
+            [
+              raise_on_exception: raise_on_exception,
+              reflection_lm: reflection_lm("Answer in one word."),
+              max_metric_calls: 12
+            ]
+        )
+        |> Imp.Optimizer.GEPA.compile(refusing_program, trainset(), devset())
+      end
+
+      # The first refused iteration ends the run: only its concurrent slots ran.
+      assert :counters.get(calls, 1) <= Keyword.get(profile, :proposal_concurrency, 1),
+             inspect({profile, raise_on_exception})
+    end
+  end
+
+  test "GEPA under beam_native records iterations that threw or exited" do
+    for {selector, expected} <- [
+          {fn _state, _trajectories, _scores, _index, _candidate -> throw(:selector_gone) end,
+           "{:throw, :selector_gone}"},
+          {fn _state, _trajectories, _scores, _index, _candidate -> exit(:selector_gone) end,
+           "{:exit, :selector_gone}"}
+        ],
+        profile <- [
+          [generations: 2],
+          [generations: 2, proposal_concurrency: 2, sampling_strategy: {:same_parent, 1}]
+        ] do
+      report =
+        Imp.Optimizer.GEPA.new(
+          metric(),
+          profile ++
+            [
+              execution_profile: :beam_native,
+              raise_on_exception: false,
+              module_selector: selector,
+              reflection_lm: reflection_lm("Answer in one word."),
+              max_metric_calls: 12
+            ]
+        )
+        |> Imp.Optimizer.GEPA.compile(france_program(), trainset(), devset())
+        |> Imp.Optimizer.Report.fetch()
+
+      assert report.metadata.status == :with_errors
+      assert report.metadata.failed_proposals == 2
+      assert Enum.all?(report.errors, &(&1.diagnostics == [expected])), inspect(report.errors)
+    end
+  end
+
+  test "a cancelled run stops GEPA although raise_on_exception is false" do
+    parent = self()
+
+    blocking_metric = fn _example, prediction ->
+      if Imp.Prediction.get(prediction, :answer) == "one" do
+        send(parent, {:proposal_metric, self()})
+        Process.sleep(:infinity)
+      end
+
+      0.0
+    end
+
+    optimizer =
+      Imp.Optimizer.GEPA.new(blocking_metric,
+        execution_profile: :beam_native,
+        generations: 3,
+        proposal_concurrency: 2,
+        sampling_strategy: {:same_parent, 1},
+        raise_on_exception: false,
+        reflection_lm: reflection_lm("Answer in one word."),
+        max_metric_calls: 20
+      )
+
+    program = one_word_program()
+
+    host =
+      Imp.predict("question -> answer",
+        lm:
+          Imp.Test.FunLM.new(fn _messages, _opts ->
+            Imp.Optimizer.GEPA.compile(optimizer, program, trainset(), devset())
+            send(parent, :gepa_returned)
+            {:ok, %{answer: "done"}}
+          end)
+      )
+
+    assert {:ok, run} = Imp.start_run(host, %{question: "q"})
+    assert_receive {:proposal_metric, metric_pid}, 5_000
+    metric_ref = Process.monitor(metric_pid)
+    task_ref = Process.monitor(run.task.pid)
+
+    assert :ok = Imp.Run.cancel(run, :test_cancel, 1_000)
+    assert_receive {:DOWN, ^task_ref, :process, _pid, _reason}, 5_000
+    assert_receive {:DOWN, ^metric_ref, :process, _pid, _reason}, 5_000
+    refute_receive :gepa_returned, 200
+    refute_receive {:proposal_metric, _pid}, 200
+  end
+
+  test "GEPA counts a slot cancelled by a sibling's failure as cancelled, not failed" do
+    slow_reflection =
+      Imp.Test.FunLM.new(fn _messages, _opts ->
+        Process.sleep(400)
+        {:ok, %{instruction: "Always answer Paris when asked about France."}}
+      end)
+
+    report =
+      Imp.Optimizer.GEPA.new(metric(),
+        execution_profile: :beam_native,
+        generations: 2,
+        proposal_concurrency: 2,
+        proposal_timeout: 100,
+        raise_on_exception: false,
+        reflection_lm: slow_reflection,
+        max_metric_calls: 12
+      )
+      |> Imp.Optimizer.GEPA.compile(france_program(), trainset(), devset())
+      |> Imp.Optimizer.Report.fetch()
+
+    assert report.metadata.status == :with_errors
+    assert report.metadata.failed_proposals > 0
+    assert report.metadata.rejected_candidates > report.metadata.failed_proposals
+    assert Enum.all?(report.errors, &(&1.diagnostics == ["timeout"])), inspect(report.errors)
+  end
+
+  test "GEPA checkpoints redact failure reasons" do
+    secret = "sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG"
+    parent = self()
+
+    {_compiled, report} =
+      Imp.Optimizer.GEPA.new(metric(),
+        execution_profile: :beam_native,
+        generations: 2,
+        raise_on_exception: false,
+        module_selector: fn _state, _trajectories, _scores, _index, _candidate ->
+          raise "selector saw #{secret}"
+        end,
+        reflection_lm: reflection_lm("Answer in one word."),
+        max_metric_calls: 12
+      )
+      |> Imp.Optimizer.GEPA.compile_with_report(france_program(), trainset(), devset(),
+        checkpoint_fn: fn dumped ->
+          send(parent, {:checkpoint, dumped})
+          :ok
+        end
+      )
+
+    assert report.metadata.failed_proposals == 2
+    checkpoints = collect_checkpoints([])
+    assert Enum.any?(checkpoints, &(Jason.encode!(&1) =~ "proposal_error"))
+    refute Enum.any?(checkpoints, &(Jason.encode!(&1) =~ "abcdefghijklmnop"))
+  end
+
+  test "a GEPA report stopped by a consecutive-outcome stopper loads in a fresh VM" do
+    {_compiled, report} =
+      Imp.Optimizer.GEPA.new(metric(),
+        execution_profile: :beam_native,
+        generations: 6,
+        raise_on_exception: false,
+        stopper: Imp.Optimizer.GEPA.Stopper.consecutive_outcome(:proposal_error, 2),
+        reflection_lm: Imp.Test.FunLM.new(fn _messages, _opts -> {:error, :down} end)
+      )
+      |> Imp.Optimizer.GEPA.compile_with_report(france_program(), trainset(), devset())
+
+    assert {:stopper, [{:consecutive_outcome, :proposal_error, 2, 2, 2}]} =
+             report.metadata.stop_reason
+
+    path =
+      Path.join(
+        System.tmp_dir!(),
+        "gepa-stopper-report-#{System.unique_integer([:positive])}.json"
+      )
+
+    File.write!(path, report |> Imp.Optimizer.Report.dump() |> Jason.encode!())
+    on_exit(fn -> File.rm(path) end)
+
+    # The expression names no metadata atom itself, so the fresh VM has only
+    # the atoms Imp defines.
+    expression = """
+    report = System.argv() |> hd() |> File.read!() |> Jason.decode!() |> Imp.Optimizer.Report.load!()
+    IO.puts(inspect(report.metadata, limit: :infinity))
+    """
+
+    args =
+      "_build/test/lib/*/ebin"
+      |> Path.wildcard()
+      |> Enum.flat_map(&["-pa", &1])
+      |> Kernel.++(["-e", expression, path])
+
+    {output, status} = System.cmd("elixir", args, stderr_to_stdout: true)
+    assert status == 0, output
+    assert output =~ "stop_reason: {:stopper, [{:consecutive_outcome, :proposal_error, 2, 2, 2}]}"
+    assert output =~ "failed_proposals: #{report.metadata.failed_proposals}"
+    assert output =~ "status: :with_errors"
+  end
+
+  defp collect_checkpoints(acc) do
+    receive do
+      {:checkpoint, dumped} -> collect_checkpoints([dumped | acc])
+    after
+      0 -> acc
     end
   end
 

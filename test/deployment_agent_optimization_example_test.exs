@@ -71,6 +71,43 @@ defmodule Imp.DeploymentAgentOptimizationExampleTest do
            end)
   end
 
+  test "the optimizer record is written when rejections carry failure reasons" do
+    dataset = [%{id: 1}, %{id: 2}]
+
+    result =
+      Imp.Optimize.Anything.run("base", nil,
+        dataset: dataset,
+        valset: dataset,
+        batch_evaluator: fn pairs -> Enum.map(pairs, fn {_c, ex} -> {0.0, %{id: ex.id}} end) end,
+        config:
+          Imp.Optimize.Anything.Config.new(
+            engine: [max_candidate_proposals: 2, raise_on_exception: false, seed: 1],
+            reflection: [
+              reflection_minibatch_size: 2,
+              module_selector: fn _state, _trajectories, _scores, _index, _candidate ->
+                raise "selector saw sk-or-v1-0123456789abcdef0123456789abcdef"
+              end
+            ]
+          ),
+        fallback_proposer: fn _candidate, _component, _records, _iteration -> "better" end
+      )
+
+    assert [%{reason: {:proposal_error, %RuntimeError{}}} | _] = result.rejected
+
+    result = %{
+      result
+      | rejected: result.rejected ++ [%{iteration: 3, reason: {:incomplete_evaluation, 1}}]
+    }
+
+    record =
+      apply(ImpDeployment.AgentOptimization.Runner, :optimizer_record, [result])
+      |> then(&Jason.encode!(%{"optimizer" => &1}, pretty: true))
+
+    assert record =~ "incomplete_evaluation"
+    assert record =~ "proposal_error"
+    refute record =~ "sk-or-v1-"
+  end
+
   test "retained live result binds a useful fresh-applicable Artifact" do
     result = @result_path |> File.read!() |> Jason.decode!()
     artifact_bytes = File.read!(@artifact_path)

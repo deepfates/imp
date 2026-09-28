@@ -89,13 +89,21 @@ defmodule Imp.Optimizer.GEPA do
   built-ins, or a validated custom `Imp.Optimizer.GEPA.CandidateSelector`
   module/struct.
 
-  `raise_on_exception: false` keeps the run going when a proposal fails (its
-  reflection call, reflection strategy, evaluation or validation raises) and
-  returns the best candidate found, the baseline when every proposal failed.
-  The report lists each failure in `errors` with its `iteration`, its
-  `candidate_id` when a candidate was proposed, and its `diagnostics`,
-  counts them in `metadata.failed_proposals`, and sets `status` to
-  `:with_errors`. With the default, `true`, the first failure raises.
+  A proposal that fails is recorded and the run goes on to the next
+  iteration: with `raise_on_exception: false`, any failure (a reflection
+  call, reflection strategy, evaluation or validation that raised, threw or
+  exited, or an iteration that did); with the default, `true`, only the
+  failures GEPA always records, such as a reflection that returned no usable
+  instruction, a failed reflective dataset in a parallel slot, or a
+  reflection interrupted before a resume, while any other failure raises.
+  The run returns the best candidate found, the baseline when every proposal
+  failed. The report lists each failure in `errors` with its `iteration`, its
+  `diagnostics`, and its `candidate_id`, the id of the rejected candidate in
+  `candidates`, or `nil` when the failure left no candidate there. It counts
+  them in `metadata.failed_proposals` and sets `status` to `:with_errors`. A
+  slot cancelled because a sibling failed first is rejected, not counted as
+  failed. An `Imp.OperationalSafetyError` (a budget, cost, route or
+  transport guard) ends the run whatever `raise_on_exception` says.
 
   The `:callbacks` option accepts callback modules or `{module, context}`
   tuples implementing any subset of the documented GEPA callback contract.
@@ -756,6 +764,18 @@ defmodule Imp.Optimizer.GEPA do
 
   defp diagnostic_text({:exception, _type, message}) when is_binary(message),
     do: message_text(message)
+
+  # A failure recorded as the exception itself; read back from a checkpoint
+  # it is the exception's fields as a map.
+  defp diagnostic_text(%{__exception__: true} = exception) when is_struct(exception),
+    do: exception |> Exception.message() |> message_text()
+
+  defp diagnostic_text(%{__exception__: true, message: message}) when is_binary(message),
+    do: message_text(message)
+
+  # A throw or exit is shown whole, so its kind is kept.
+  defp diagnostic_text({kind, _reason} = failure) when kind in [:throw, :exit],
+    do: term_text(failure)
 
   defp diagnostic_text({_kind, message}) when is_binary(message), do: message_text(message)
   defp diagnostic_text(value) when is_atom(value), do: Atom.to_string(value)

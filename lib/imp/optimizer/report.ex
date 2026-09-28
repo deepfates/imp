@@ -76,6 +76,8 @@ defmodule Imp.Optimizer.Report do
     "candidate_id" => :candidate_id,
     "candidate_selection_strategy" => :candidate_selection_strategy,
     "component_feedback" => :component_feedback,
+    # A stopper's stop reason, `{:stopper, [{:consecutive_outcome, ...}]}`.
+    "consecutive_outcome" => :consecutive_outcome,
     "components" => :components,
     "descriptions" => :descriptions,
     "diagnostics" => :diagnostics,

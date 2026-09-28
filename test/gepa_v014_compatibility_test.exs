@@ -329,6 +329,16 @@ defmodule Imp.Optimizer.GEPA.V014CompatibilityTest do
       Enum.map(items, fn {candidate, batch} -> evaluate(adapter, batch, candidate, opts) end)
     end
 
+    def batch_evaluate(%__MODULE__{stage: :incomplete_validation} = adapter, items, opts) do
+      Enum.map(items, fn {candidate, batch} ->
+        result = evaluate(adapter, batch, candidate, opts)
+
+        if candidate.main != "0" and Enum.all?(batch, &(&1.id >= 10)),
+          do: %{result | metadata: Map.merge(result.metadata, %{complete?: false, failures: 1})},
+          else: result
+      end)
+    end
+
     def batch_evaluate(adapter, items, opts) do
       Enum.map(items, fn {candidate, batch} -> evaluate(adapter, batch, candidate, opts) end)
     end
@@ -952,12 +962,25 @@ defmodule Imp.Optimizer.GEPA.V014CompatibilityTest do
                %{
                  iteration: 1,
                  candidate: nil,
-                 reason: {:proposal_error, {:proposal_exception, ^message}}
+                 reason: {:proposal_error, %ArgumentError{message: ^message}}
                } = rejection
              ] = state.rejected
 
       assert List.last(state.history) == rejection
     end
+  end
+
+  test "strategy incomplete validation is recorded as a proposal failure" do
+    state = run_strategy_stage_failure(:incomplete_validation, false)
+
+    assert length(state.candidates) == 1
+
+    assert [
+             %{
+               candidate: %{main: "1"},
+               reason: {:proposal_error, {:validation_error, {:incomplete_evaluation, 1}}}
+             }
+           ] = state.rejected
   end
 
   test "strategy iteration exceptions record the failed proposal" do
@@ -987,7 +1010,7 @@ defmodule Imp.Optimizer.GEPA.V014CompatibilityTest do
                iteration: 1,
                candidate: nil,
                parent_ids: [],
-               reason: {:proposal_error, {:proposal_exception, "selector exploded"}}
+               reason: {:proposal_error, %RuntimeError{message: "selector exploded"}}
              } = rejection
            ] = state.rejected
 
