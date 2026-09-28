@@ -169,7 +169,8 @@ defmodule Imp.ReqLLMStreamEndTest do
   test "the client names the provider and model id of every model shape it accepts" do
     for model <- [
           "openai:gpt-x",
-          {:openai, "gpt-x"},
+          {:openai, id: "gpt-x"},
+          {:openai, model: "gpt-x"},
           {:openai, "gpt-x", []},
           %{provider: :openai, id: "gpt-x"},
           %{"provider" => "openai", "id" => "gpt-x"}
@@ -250,10 +251,10 @@ defmodule Imp.ReqLLMStreamEndTest do
     assert usage == %{"openrouter/m" => %{input_tokens: 7, output_tokens: 1}}
   end
 
-  # Tuple and string-keyed map specs are model shapes `Imp.req_llm/2`
-  # accepts; a streamed call through either records its provider and model.
+  # A `{provider, opts}` tuple and a string-keyed map are model shapes
+  # ReqLLM accepts; a streamed call through either records its provider and model.
   test "a streamed call records provider and model for tuple and string-keyed specs" do
-    for model <- [{:openai, "local-model"}, %{"provider" => "openai", "id" => "local-model"}] do
+    for model <- [{:openai, id: "local-model"}, %{"provider" => "openai", "id" => "local-model"}] do
       lm =
         Imp.req_llm(model,
           req_module: FinishStub,

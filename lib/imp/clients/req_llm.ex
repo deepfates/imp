@@ -1843,7 +1843,11 @@ defmodule Imp.Clients.ReqLLM do
   defp model_id(%{"id" => id}) when is_binary(id), do: id
   defp model_id(%{model: id}) when is_binary(id), do: id
   defp model_id(%{"model" => id}) when is_binary(id), do: id
-  defp model_id({_provider, id}) when is_binary(id), do: id
+  # ReqLLM's two-element tuple is `{provider, opts}`, naming the model in
+  # `:id` or `:model` (`ReqLLM.model/1`).
+  defp model_id({_provider, opts}) when is_list(opts),
+    do: to_string(opts[:id] || opts[:model] || "")
+
   defp model_id({_provider, id, _opts}) when is_binary(id), do: id
 
   defp model_id(model) when is_binary(model) do
@@ -1930,7 +1934,7 @@ defmodule Imp.Clients.ReqLLM do
   @doc false
   # The provider, as a string, and the model id of any model shape
   # `Imp.req_llm/2` accepts: a `"provider:model"` string, a
-  # `{provider, model}` or `{provider, model, opts}` tuple, or a spec map
+  # `{provider, opts}` or `{provider, model, opts}` tuple, or a spec map
   # with atom or string keys. The provider is `nil` when the shape names none.
   @spec model_identity(term()) :: {String.t() | nil, String.t()}
   def model_identity(model), do: {provider_label(model), model_id(model)}
