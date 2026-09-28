@@ -49,18 +49,26 @@ defmodule Imp.Adapter.JSON do
     # DSPy's JSONAdapter overrides `format_assistant_message_content` so demo /
     # history ASSISTANT turns emit a pretty-printed JSON object, NOT the chat
     # `[[ ## field ## ]]` markers. We inject that assistant renderer into Chat's
-    # message assembly (dee-0bwu) instead of delegating Chat.render_outputs.
+    # message assembly (dee-0bwu) in place of Chat's markers.
+    #
+    # A host's renderers are the program's, and a JSON-fallback request is the
+    # same request in this format: a `:system_renderer` writes the system
+    # message and an `:output_renderer` the assistant turns, as they do for
+    # Chat, and their `:default_system` and `:default_outputs` are this
+    # format's; loop `:guidance` is part of the objective. The request always
+    # ends with a user message, since it carries the output requirements, so
+    # `:omit_empty_request` never drops it.
     format_opts =
       opts
       |> Keyword.put(:response_instruction, false)
-      |> Keyword.put(:output_renderer, &render_assistant_json/3)
+      |> Keyword.put(:omit_empty_request, false)
 
-    messages = Imp.Adapter.Chat.format(signature, inputs, format_opts)
-
-    [_chat_system | rest] = messages
-    system = %{role: :system, content: render_system(signature)}
-
-    [system | append_output_requirements(rest, signature)]
+    signature
+    |> Imp.Adapter.Chat.assemble(inputs, format_opts, %{
+      system: &default_system/2,
+      outputs: &default_outputs/3
+    })
+    |> append_output_requirements(signature)
   end
 
   # DSPy's JSONAdapter appends `user_message_output_requirements` to the final
@@ -72,6 +80,9 @@ defmodule Imp.Adapter.JSON do
     init ++ [Map.update!(last, :content, &append_text(&1, tail))]
   end
 
+  # A blank request (a tool loop whose inputs are all in the history) is the
+  # output requirements alone.
+  defp append_text("", suffix), do: String.trim_leading(suffix)
   defp append_text(content, suffix) when is_binary(content), do: content <> suffix
   defp append_text(content, suffix) when is_list(content), do: content ++ [suffix]
 
@@ -79,9 +90,9 @@ defmodule Imp.Adapter.JSON do
   # DSPy JSONAdapter system message: format_field_description (inherited from
   # ChatAdapter) + JSONAdapter.format_field_structure + format_task_description.
   # ------------------------------------------------------------------
-  defp render_system(signature) do
+  defp default_system(signature, opts) do
     field_description(signature) <>
-      "\n" <> field_structure(signature) <> "\n" <> task_description(signature)
+      "\n" <> field_structure(signature) <> "\n" <> task_description(signature, opts)
   end
 
   # ChatAdapter.format_field_description / utils.get_field_description_string.
@@ -154,9 +165,9 @@ defmodule Imp.Adapter.JSON do
   defp translate_field_type(field, kind), do: Imp.Adapter.FieldType.placeholder(field, kind)
 
   # ChatAdapter.format_task_description.
-  defp task_description(signature) do
+  defp task_description(signature, opts) do
     "In adhering to this structure, your objective is: " <>
-      Imp.Adapter.Instructions.objective_text(signature.instructions)
+      Imp.Adapter.Chat.objective(signature, opts)
   end
 
   # JSONAdapter.user_message_output_requirements.
@@ -177,7 +188,7 @@ defmodule Imp.Adapter.JSON do
   #   json.dumps(serialize_for_json(d), indent=2, ensure_ascii=False)
   # Value resolution (key-presence, present-nil kept) is shared with Chat so the
   # two adapters differ only in serialization: markers here become a JSON object.
-  defp render_assistant_json(signature, outputs, missing_field_message) do
+  defp default_outputs(signature, outputs, missing_field_message) do
     signature
     |> Imp.Adapter.Chat.resolve_demo_outputs(outputs, missing_field_message)
     |> Enum.map(fn {name, value} -> {to_string(name), json_value(value)} end)

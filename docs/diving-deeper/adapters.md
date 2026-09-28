@@ -47,7 +47,9 @@ followed by one more request, not an error straight away:
 
 - The Chat and XML adapters retry through the JSON adapter, which asks for a
   JSON object instead. This is on by default, as in DSPy; turn it off with
-  `config: [json_fallback: false]`.
+  `config: [json_fallback: false]`. The retry is the same request in JSON:
+  it keeps the program's demos, its `adapter_opts` renderers and an agent
+  loop's guidance.
 - The JSON and single-field adapters retry only when asked:
   `config: [json_retries: n]` makes up to `n` more requests. Each repeats the
   original request with the latest failure's message added as a user turn, so
@@ -186,6 +188,32 @@ a JSON object with the fields in order. The single-field adapter's is shorter:
 the objective, the inputs, the one output with its type, and an instruction
 to return only the value.
 
+### Shaping the prompt yourself
+
+`adapter_opts` replaces parts of the prompt without changing how the reply is
+read: `:system_renderer` writes the system message, `:output_renderer` the
+assistant side of demos and stored turns, `:input_section_renderer` each
+input. The adapter formatting the request is not always the program's, since
+a Chat reply that cannot be parsed is asked again through the JSON adapter
+with the same renderers. So a renderer's options carry that adapter's own
+rendering as `opts[:default_system]`, and a renderer that adds to the default
+calls it rather than naming an adapter:
+
+```elixir
+terse = fn signature, opts ->
+  "Answer in one word.\n\n" <> opts[:default_system].(signature, opts)
+end
+
+router = Imp.predict(signature, lm: lm, adapter_opts: [system_renderer: terse])
+{:ok, prediction} = Imp.call(router, %{ticket: "We were charged twice this month."})
+
+String.starts_with?(hd(prediction.metadata.trace.messages).content, "Answer in one word.")
+#=> true
+```
+
+An `:output_renderer` that takes a fourth argument receives the same options,
+with the adapter's own assistant-turn rendering as `opts[:default_outputs]`.
+
 ### When the answer does not fit
 
 A reply that cannot be read as the signature's outputs, after any retry,
@@ -225,7 +253,9 @@ provider itself failed is an `Imp.LMError`, and an adapter that makes its own
 request (TwoStep) returns that request's failure as it is.
 
 Each fallback, retry and final parse failure also emits telemetry:
-`[:imp, :adapter, :parse, :json_fallback | :retry | :error]`.
+`[:imp, :adapter, :parse, :json_fallback | :retry | :error]`. A fallback's
+metadata names the adapter whose reply failed as `:adapter` and the one that
+retried it as `:fallback_adapter`.
 
 ### Choosing an adapter for a call
 

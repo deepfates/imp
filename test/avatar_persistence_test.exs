@@ -53,8 +53,8 @@ defmodule AvatarPersistenceTest do
     restored = encoded |> Jason.decode!(keys: :strings) |> Imp.load!(registry: registry)
 
     assert %Imp.Predict.Avatar{max_iters: 4, tool_timeout_ms: 1_234} = restored
-    assert restored.actor.lm == %Imp.Clients.ReqLLM{model: "openai:gpt-avatar", opts: []}
-    assert restored.finisher.lm == %Imp.Clients.ReqLLM{model: "openai:gpt-avatar", opts: []}
+    assert restored.actor.lm == Imp.req_llm("openai:gpt-avatar")
+    assert restored.finisher.lm == Imp.req_llm("openai:gpt-avatar")
     assert restored.tool_policy == policy
     assert restored.tools.lookup.run == runner
     assert restored.tools.lookup.description == "[REDACTED]"

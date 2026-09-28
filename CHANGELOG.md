@@ -102,6 +102,74 @@ User-visible changes to Imp are recorded here.
   recorded in the calling process, which made parallel work that process
   started afterwards (`Imp.Predict.Parallel.map/3`, `Imp.Evaluate.run/2`) run
   one item at a time.
+- The package ships the TRL worker that `Imp.Clients.TRLTrainer` starts by
+  default: `priv/trl_worker/worker.py`, its `pyproject.toml` and `uv.lock`, and
+  the default contract. In 0.5.0 the defaults named files the package did not
+  contain, so GRPO training from Hex needed a source checkout. The default
+  contract now pins transformers 5.10.1, the version the lockfile installs; it
+  named 5.5.0, which the worker refused at startup.
+- An `Imp.react` step asks for one thing, whichever adapter formats it. With
+  an LM that calls tools natively, the tools are sent natively and the step's
+  prompt no longer also describes `tool_calls` as a field to write, in the
+  Chat, JSON and XML adapters, their demos and the JSON fallback: the step
+  output that native calls fill is left out before any adapter formats, as
+  DSPy does. A model that followed that description wrote a JSON object, and
+  for a signature with one text output the object became the answer. An LM
+  whose client says it cannot call tools (a ReqLLM model the registry lists
+  without tool calling, `Imp.Clients.TRLLM`) is sent no tools and asked to
+  write its calls in `tool_calls`, whose description shows the shape of a
+  call with an example. A `tools` input lists every tool, `submit` included,
+  in DSPy's words: its name, its description, and its arguments as JSON (the
+  schema's properties, its `required` list and its `$defs`; the properties in
+  the schema's order when it keeps one, a `Jason.OrderedObject`, and by name
+  for an ordinary map). Its earlier steps are replayed as text rather than as tool blocks
+  a provider without declared tools may refuse. A task signature can no
+  longer have a field named `tools`, and loading a program saved with one is
+  refused with the same error. `Imp.Clients.ReqLLM` reads whether the model
+  calls tools from the registry once, when the client is built, and keeps it
+  with the model it was read for (`:tool_calling`); a client whose model is
+  swapped looks the new model up. So a client built by `Imp.req_llm/2`, or
+  loaded, no longer equals a bare `%Imp.Clients.ReqLLM{}` for the same model. The guidance says where a text answer
+  goes, the same in every format: in `next_thought`, with `tool_calls` left
+  empty when the model writes its calls. It no longer asks for plain text
+  beside a structure that asks for fields; a plain-text reply to a Chat step
+  is still read as the answer. A stored turn that carries only
+  the task's answer is replayed as that answer, not as step fields marked
+  "Not supplied"; it is replayed by the adapter itself, so a host
+  `:output_renderer` is not consulted for it. `Imp.LM.Budgeted` and BootstrapFewShot's rollout LM answer
+  for the LM they wrap, for this and for reasoning and response-format
+  support.
+- `Imp.react` sends its tool roster in the order the tools were declared, then
+  `submit`, and a saved agent keeps that order. It was the order of the tool
+  names' atoms, which can differ between processes and changed the prompt a
+  provider caches.
+- The JSON fallback after an unparseable Chat or XML reply sends the same
+  request in JSON: the program's `adapter_opts` renderers (`:system_renderer`,
+  `:output_renderer`), an agent loop's guidance and the demos go with it.
+  Before, it sent the stock JSON prompt, so a host that shapes its prompt with
+  renderers got a different prompt on every fallback, and an `Imp.react` step
+  lost its tool guidance. `Imp.Adapter.JSON` and `Imp.Adapter.XML` now honor
+  `:system_renderer`, `:output_renderer` and `:guidance` whenever they are
+  used, and end a request whose inputs are all in the history with the output
+  requirements as a user message of their own instead of appending them to the
+  last tool result. A renderer receives the formatting adapter's own
+  rendering in its options, as `:default_system` and, for an
+  `:output_renderer` that takes the options as a fourth argument,
+  `:default_outputs`, so one that builds on the default builds on the format
+  of the request and a fallback never asks for two formats.
+- The `[:imp, :adapter, :parse, :json_fallback]` event names the adapter whose
+  reply failed as `:adapter` (it always said `Imp.Adapter.Chat`, also for
+  XML) and the adapter that retried as `:fallback_adapter`.
+- Repairing a Python-style completion keeps its text and gives the value
+  DSPy parses: `{'answer': 'caf\u00e9'}` reads as `café`, not `cafu00e9`.
+  Escapes are read the way `json_repair`, which DSPy runs first, reads them:
+  `\t`, `\n`, `\r`, `\b`, `\\`, escaped quotes, `\u` with four hex digits and
+  `\x` with two decode, and every other escape (`\d`, `C:\path`, `\a`, `\0`,
+  `\U`, `\N{…}`, a backslash before a newline) keeps its backslash. A `\u`
+  surrogate pair reads as the character it spells; a lone surrogate, which
+  an Elixir string cannot hold, makes the parse an `Imp.AdapterParseError`.
+  This reaches the Chat, JSON and XML adapters and GEPA's instruction
+  proposal.
 - `Imp.Clients.ReqLLMBatch` no longer sends a request again when it may
   already have run. A dispatch that timed out, crashed, threw or exited was
   retried as transient, so one request could run and be billed several
@@ -213,15 +281,6 @@ Every change here is breaking for code that relied on the old behaviour.
 - The MCP example on the Tools and agents page defines its server and its
   imported tools, where it used an undefined `imported`, and closes the
   server when the call fails.
-
-### Fixed
-
-- The package ships the TRL worker that `Imp.Clients.TRLTrainer` starts by
-  default: `priv/trl_worker/worker.py`, its `pyproject.toml` and `uv.lock`, and
-  the default contract. In 0.5.0 the defaults named files the package did not
-  contain, so GRPO training from Hex needed a source checkout. The default
-  contract now pins transformers 5.10.1, the version the lockfile installs; it
-  named 5.5.0, which the worker refused at startup.
 
 ### GEPA
 

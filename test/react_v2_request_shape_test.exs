@@ -38,8 +38,8 @@ defmodule ReActV2RequestShapeTest do
 
     [{r1, _}, {r2, _}, {r3, _}] = requests(3)
 
-    # Remove `response_instruction: false` or reinstate the `tools` input field
-    # in ReActV2.new/3: the first user message changes between steps 1 and 2.
+    # Remove `response_instruction: false`, or render the `tools` input for a
+    # native step: the first user message changes between steps 1 and 2.
     assert Enum.map(r1, &render/1) == Enum.take(Enum.map(r2, &render/1), length(r1))
     assert Enum.map(r2, &render/1) == Enum.take(Enum.map(r3, &render/1), length(r2))
     assert length(r2) == length(r1) + 2
@@ -69,7 +69,7 @@ defmodule ReActV2RequestShapeTest do
     assert system.role == :system
 
     assert system.content =~
-             "When the final answer is ready, write it as plain text without calling a tool."
+             "When the final answer is ready, write it in `next_thought`."
 
     assert system.content =~ "The available tools are: `look`."
     refute system.content =~ "submit"
@@ -169,5 +169,42 @@ defmodule ReActV2RequestShapeTest do
 
     [{[system | _], _} | _] = requests(2)
     assert system.content == "You are Gregory. Outputs: answer."
+  end
+
+  test "a step answered in prose returns that prose" do
+    lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts -> "The thing holds 1, 2 and 3.\n\nThat is all." end
+      )
+
+    program = Imp.react("intent -> answer", [look()], lm: lm)
+    assert {:ok, prediction} = Imp.call(program, %{intent: "what is in it?"})
+    assert Imp.get(prediction, :answer) == "The thing holds 1, 2 and 3.\n\nThat is all."
+    assert prediction.metadata.termination_reason == :answered
+  end
+
+  defmodule TextOnlyLM do
+    @behaviour Imp.LM
+    defstruct [:handler]
+
+    @impl true
+    def generate(%__MODULE__{handler: handler}, messages, opts),
+      do: {:ok, handler.(messages, opts)}
+
+    def tool_calling_capability(%__MODULE__{}), do: false
+  end
+
+  test "tool calling is the LM's to declare" do
+    refute Imp.LM.tool_calling_capability(%TextOnlyLM{})
+    assert Imp.LM.tool_calling_capability(Imp.LM.Static.new())
+    refute Imp.LM.tool_calling_capability(%Imp.Clients.TRLLM{})
+
+    no_tools = %{provider: :openai, id: "m", capabilities: %{tools: %{enabled: false}}}
+    tools = %{provider: :openai, id: "m", capabilities: %{tools: %{enabled: true}}}
+    silent = %{provider: :openai, id: "m", capabilities: %{}}
+
+    refute Imp.LM.tool_calling_capability(%Imp.Clients.ReqLLM{model: no_tools})
+    assert Imp.LM.tool_calling_capability(%Imp.Clients.ReqLLM{model: tools})
+    assert Imp.LM.tool_calling_capability(%Imp.Clients.ReqLLM{model: silent})
   end
 end

@@ -25,7 +25,9 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
           metric: function(),
           component_order: [Candidate.component_name()],
           component_feedback: %{optional(atom()) => ComponentFeedback.callback()},
-          component_tools: %{optional(Candidate.component_name()) => [map()]},
+          component_tools: %{
+            optional(Candidate.component_name()) => {[map()], String.t() | nil}
+          },
           reflection_record_mode: :beam_native | :gepa_v0_1_4,
           seed: non_neg_integer(),
           max_concurrency: pos_integer(),
@@ -348,7 +350,7 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
         reflection_inputs(
           step.inputs,
           trajectory.prediction,
-          Map.get(adapter.component_tools, component, [])
+          Map.get(adapter.component_tools, component, {[], nil})
         ),
       "Generated Outputs" => stringify_fields(step.outputs),
       "Feedback" => feedback_text(feedback || trajectory.feedback, trajectory.score)
@@ -371,7 +373,7 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
   # shown as `Context`, one line per turn, and is taken out of the other
   # inputs. The tools the predictor offered the model are shown as `tools`,
   # which is how DSPy's agent loops pass them to their step predictor.
-  defp reflection_inputs(inputs, prediction, tools) when is_map(inputs) do
+  defp reflection_inputs(inputs, prediction, {tools, roster_input}) when is_map(inputs) do
     {histories, others} = Enum.split_with(inputs, fn {_key, value} -> history?(value) end)
 
     fields = Map.new(others, fn {key, value} -> {to_string(key), text(plain(value))} end)
@@ -391,9 +393,17 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
                   inspect(Enum.map(several, &elem(&1, 0)))
       end
 
-    if tools == [] or Map.has_key?(fields, "tools"),
-      do: fields,
-      else: Map.put(fields, "tools", text(tools))
+    # A ReActV2 step also has a `tools` input (`roster_input`, the one its
+    # signature names), the same roster as text for an LM that cannot call
+    # tools natively; the native roster shown here takes its place, so the
+    # reflection model reads each tool once. Any other predictor's own input
+    # called `tools` is kept.
+    cond do
+      tools == [] -> fields
+      roster_input -> Map.put(fields, "tools", text(tools))
+      Map.has_key?(fields, "tools") -> fields
+      true -> Map.put(fields, "tools", text(tools))
+    end
   end
 
   defp reflection_inputs(inputs, _prediction, _tools), do: text(plain(inputs))
@@ -455,8 +465,20 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
   defp component_tools(program) do
     program
     |> Imp.ProgramParameters.predictors()
-    |> Map.new(fn %{name: name, predictor: predictor} -> {name, predictor_tools(predictor)} end)
+    |> Map.new(fn %{name: name, predictor: predictor} ->
+      {name, {predictor_tools(predictor), roster_input(predictor)}}
+    end)
   end
+
+  # The input a ReActV2 step lists its tools in, named in its signature.
+  defp roster_input(%{signature: %Imp.Signature{metadata: metadata}}) do
+    case Map.get(metadata, :tools_field, Map.get(metadata, "tools_field")) do
+      nil -> nil
+      name -> to_string(name)
+    end
+  end
+
+  defp roster_input(_predictor), do: nil
 
   defp predictor_tools(%{config: config}) when is_list(config) do
     config
