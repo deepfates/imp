@@ -44,14 +44,15 @@ tree calls, and no cowlib release fixes it yet.
 
 - An agent's step prompt asks for one format, as DSPy's does. With an LM that
   calls tools natively, the step no longer also asks for a `tool_calls` field;
-  an LM that cannot call tools natively is sent no tools and is told them, with
-  their descriptions and arguments, in a `tools` input.
+  an LM that cannot is shown each tool's description and arguments in the
+  prompt and writes its calls in `tool_calls`.
 - Failures are reported instead of passing as success. A ReActV2 turn whose
   model fails returns `Imp.Predict.ReActV2.StepError` with the history as far
   as it got; a GEPA run that continued past failed proposals reports
   `:with_errors`; the Chat, JSON and XML adapters report a reply that answers
   no output as a parse error; and evaluation and optimizers refuse examples
-  that never declared their inputs, which gave the program the answer.
+  that never declared their inputs, whose labels were passed to the program
+  as inputs.
 - Redaction runs before a term is converted, in reports, results,
   checkpoints, session records and saved programs, so a client, retriever or
   OAuth store in them is no longer written with its secrets. Redaction still
@@ -104,7 +105,11 @@ tree calls, and no cowlib release fixes it yet.
 12. Keep 0.5.0 away from files 0.6.0 writes: it cannot read a trajectory with
     atom keys (GEPA and Playbook checkpoints, `Imp.dump/1`), an optimizer
     report that holds an `Imp.History`, or a `ReqLLMBatch` checkpoint.
-13. Re-evaluate saved agents on held-out data: the step prompt and tool roster
+13. A ReActV2 turn that reaches `max_iters` with text beside tool calls it
+    did not run now answers with that text, where it answered `nil`; the calls
+    are still listed as unexecuted. A host that publishes every non-empty
+    answer should decide whether to publish such a turn's text.
+14. Re-evaluate saved agents on held-out data: the step prompt and tool roster
     order changed, so they send different prompt text.
 
 ## Known limits
