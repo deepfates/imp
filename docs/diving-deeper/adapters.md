@@ -224,7 +224,7 @@ the messages and the raw reply:
 | `kind` | Meaning | `reason` |
 | --- | --- | --- |
 | `:malformed` | not in the adapter's format at all: no JSON object, XML that does not parse, a single-field reply that is not exactly a value | the raw reply |
-| `:missing_fields` | required outputs are absent | their names |
+| `:missing_fields` | required outputs are absent, or an XML reply has none of the requested tags | their names; every output's for a tagless XML reply |
 | `:invalid_fields` | every field is present, but a value does not fit its type or constraints | the fields that were read |
 | `:unsupported_output` | the model returned something that is not a completion | what it returned |
 | `:other` | a custom adapter returned an error of its own | that error |
