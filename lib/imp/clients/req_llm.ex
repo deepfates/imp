@@ -25,6 +25,15 @@ defmodule Imp.Clients.ReqLLM do
   relays an upstream refusal, is returned as that error, never as an empty
   completion.
 
+  `stream/3` ends with exactly one terminal event. A provider stream that runs
+  to its end closes with `done: true` and the metadata the provider reported
+  along the way: usage (with any `"cost"` the provider charged), model and
+  finish reason. One that raises, carries a provider error, or finishes with
+  reason `:error` or `:cancelled` closes with `{:error, %Imp.LMError{}}`
+  instead, never a completion, and that event carries the metadata that
+  arrived before it stopped. A consumer that stops early receives no terminal
+  event, and the provider stream is cancelled.
+
   `:reasoning_effort` is the one reasoning option, on the client or on a call.
   It takes `none`, `minimal`, `low`, `medium`, `high`, `xhigh` or `default`, as
   an atom or a string. A call naming `nil` spends no reasoning on that call
@@ -388,26 +397,28 @@ defmodule Imp.Clients.ReqLLM do
   # says nothing has declined to answer (`Imp.Predict.ReActV2`), so a refused
   # request would be recorded as a choice. It is the failed request it reports,
   # in the shape ReqLLM gives an HTTP error.
-  defp relayed_error(%ReqLLM.Response{provider_meta: %{} = meta}) do
-    case Map.get(meta, "error") || Map.get(meta, :error) do
-      %{} = error ->
-        code = Map.get(error, "code") || Map.get(error, :code)
-
-        %ReqLLM.Error.API.Request{
-          reason: Map.get(error, "message") || Map.get(error, :message) || inspect(error),
-          status: if(is_integer(code), do: code),
-          response_body: %{"error" => error}
-        }
-
-      message when is_binary(message) and message != "" ->
-        %ReqLLM.Error.API.Request{reason: message, response_body: %{"error" => message}}
-
-      _none ->
-        nil
-    end
-  end
+  defp relayed_error(%ReqLLM.Response{provider_meta: %{} = meta}),
+    do: provider_error(Map.get(meta, "error") || Map.get(meta, :error))
 
   defp relayed_error(_response), do: nil
+
+  # A provider's error object or message, as ReqLLM carries it in a response's
+  # `provider_meta` or a stream's metadata, in the shape ReqLLM gives an HTTP
+  # error; `nil` when there is none.
+  defp provider_error(%{} = error) do
+    code = Map.get(error, "code") || Map.get(error, :code)
+
+    %ReqLLM.Error.API.Request{
+      reason: Map.get(error, "message") || Map.get(error, :message) || inspect(error),
+      status: if(is_integer(code), do: code),
+      response_body: %{"error" => error}
+    }
+  end
+
+  defp provider_error(message) when is_binary(message) and message != "",
+    do: %ReqLLM.Error.API.Request{reason: message, response_body: %{"error" => message}}
+
+  defp provider_error(_none), do: nil
 
   # Every failed request becomes one `Imp.LMError`, classified here, where the
   # provider library's error shapes are known, so no caller has to know them.
@@ -2100,21 +2111,44 @@ defmodule Imp.Clients.ReqLLM do
              metadata: metadata
          }}
 
-      {:done, _acc} ->
-        {[
-           %Imp.Streaming.Messages.StreamResponse{
-             done: true,
-             metadata: state.metadata
-           }
-         ], %{state | continuation: nil, started?: true, completed?: true}}
-
-      {:halted, _acc} ->
-        {:halt, %{state | continuation: nil, started?: true, completed?: true}}
+      # The reducer only ever suspends and is only ever resumed with
+      # `{:cont, _}`, so neither result means a consumer stopped early: a list
+      # that runs out reports `{:done, _}`, and a `Stream.resource` (ReqLLM's
+      # stream is one) that runs out after a suspension reports `{:halted, _}`.
+      # Both are the provider stream's end.
+      {finished, _acc} when finished in [:done, :halted] ->
+        finish_stream(%{state | continuation: nil, started?: true})
     end
   rescue
     error -> stream_failure(state, error)
   catch
     kind, reason -> stream_failure(state, {kind, reason})
+  end
+
+  # The end of the provider stream closes with one terminal event carrying
+  # the metadata accumulated along the way. A stream whose metadata reports an
+  # error, or a finish reason of `:error` or `:cancelled`, did not complete,
+  # and ends as a failure; this is how ReqLLM's own event projection
+  # (`ReqLLM.StreamResponse.events/1`) classifies the same end.
+  defp finish_stream(state) do
+    case stream_end_error(state.metadata) do
+      nil ->
+        {[%Imp.Streaming.Messages.StreamResponse{done: true, metadata: state.metadata}],
+         %{state | completed?: true}}
+
+      error ->
+        stream_failure(state, error)
+    end
+  end
+
+  defp stream_end_error(metadata) do
+    with nil <- provider_error(Map.get(metadata, :error) || Map.get(metadata, "error")) do
+      case Map.get(metadata, :finish_reason) || Map.get(metadata, "finish_reason") do
+        reason when reason in [:error, "error"] -> {:stream_finished, :error}
+        reason when reason in [:cancelled, "cancelled"] -> {:stream_finished, :cancelled}
+        _other -> nil
+      end
+    end
   end
 
   defp suspend_stream(stream) do
@@ -2132,11 +2166,18 @@ defmodule Imp.Clients.ReqLLM do
 
   # The stream had opened, so the request reached the provider: sending it
   # again may be billed again, and repeats chunks the caller already has.
+  # The terminal event is an error, never a completion, and carries whatever
+  # metadata (usage, cost, finish reason) arrived before the stream broke.
   defp stream_failure(state, error) do
     reason = lm_error(error, true, state.provider)
 
-    {[%Imp.Streaming.Messages.StreamResponse{chunk: {:error, reason}, done: true}],
-     %{state | completed?: true, failed?: true}}
+    {[
+       %Imp.Streaming.Messages.StreamResponse{
+         chunk: {:error, reason},
+         done: true,
+         metadata: state.metadata
+       }
+     ], %{state | completed?: true, failed?: true}}
   end
 
   defp cleanup_stream(state, lm) do

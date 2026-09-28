@@ -2,6 +2,25 @@
 
 User-visible changes to Imp are recorded here.
 
+## Unreleased
+
+### Fixed
+
+- A call streamed through `Imp.Clients.ReqLLM.stream/3` records the usage
+  and the cost the provider reported at the end of the stream. ReqLLM's
+  stream is a `Stream.resource`, which reports its end as halted rather than
+  done, and Imp ended such a stream without its terminal event, so every
+  streamed call was recorded with no usage and no cost. The stream now ends with exactly one
+  terminal event, `done: true` with the provider's usage (including its
+  `"cost"`), model and finish reason.
+- A stream that carries a provider error, or finishes with reason `:error`
+  or `:cancelled`, ends in `{:error, %Imp.LMError{}}`, not in a completion
+  of whatever text arrived first. An error that ends a stream carries, in
+  its metadata, the usage and other metadata that arrived before it.
+- A streamed call to a client built from an inline model spec
+  (`Imp.req_llm(%{provider: ..., id: ...})`) no longer fails with
+  `{:lm_stream_failed, "protocol String.Chars not implemented for Map ..."}`.
+
 ## 0.6.0 — 2026-09-28
 
 ### Security

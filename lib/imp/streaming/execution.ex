@@ -203,16 +203,12 @@ defmodule Imp.Streaming.Execution do
   defp envelope(output, metadata),
     do: %{__imp_lm_output__: output, __imp_lm_metadata__: metadata}
 
+  # The model is a `"provider:model"` string or an inline spec map, as
+  # `Imp.req_llm/2` accepts either.
   defp normalize_metadata(%Imp.Clients.ReqLLM{model: model}, metadata) do
-    provider =
-      case to_string(model) |> String.split(":", parts: 2) do
-        [provider, _model] -> provider
-        _other -> nil
-      end
-
     req_llm = %{
-      provider: provider,
-      model: to_string(model),
+      provider: model_provider(model),
+      model: model_name(model),
       usage: metadata[:usage] || metadata["usage"],
       finish_reason: metadata[:finish_reason] || metadata["finish_reason"]
     }
@@ -223,6 +219,20 @@ defmodule Imp.Streaming.Execution do
   end
 
   defp normalize_metadata(_lm, metadata), do: metadata
+
+  defp model_provider(%{provider: provider}), do: to_string(provider)
+
+  defp model_provider(model) when is_binary(model) do
+    case String.split(model, ":", parts: 2) do
+      [provider, _model] -> provider
+      _other -> nil
+    end
+  end
+
+  defp model_provider(_model), do: nil
+
+  defp model_name(%{} = model), do: to_string(Map.get(model, :model) || Map.get(model, :id))
+  defp model_name(model), do: to_string(model)
 
   defp normalize_name(name), do: to_string(name)
 end
