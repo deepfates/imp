@@ -604,7 +604,7 @@ defmodule Imp.Optimizer.TrajectoryContractTest do
     assert restored.metric_metadata == %{"objective_scores" => %{"accuracy" => 1.0}}
   end
 
-  test "prediction metadata that holds a key as both an atom and a string is refused" do
+  test "the entries decoder refuses a map that holds a key as both an atom and a string" do
     trajectory =
       Trajectory.project(:gepa, %{
         index: 0,
@@ -631,6 +631,25 @@ defmodule Imp.Optimizer.TrajectoryContractTest do
     string_keyed = put_in(wire, ["prediction", "metadata"], %{"trace" => 2})
     assert {:ok, restored} = Trajectory.load(string_keyed)
     assert restored.prediction.metadata == %{trace: 2}
+  end
+
+  test "a map with many keys loads in time linear in its size" do
+    # One atom key makes the map written as entries; the rest are strings, so
+    # the test creates no atoms.
+    metadata = Map.new(1..20_000, &{"key-#{&1}", &1}) |> Map.put(:ok, 0)
+
+    wire =
+      Trajectory.project(:evaluation, %{
+        index: 0,
+        score: 1.0,
+        trace: [],
+        metric_metadata: metadata
+      })
+      |> Trajectory.dump()
+
+    {microseconds, restored} = :timer.tc(fn -> Trajectory.load!(wire) end)
+    assert restored.metric_metadata == metadata
+    assert microseconds < 500_000, "loading 20,001 keys took #{microseconds} microseconds"
   end
 
   @tag :tmp_dir

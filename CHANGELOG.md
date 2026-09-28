@@ -471,8 +471,8 @@ Every change here is breaking for code that relied on the old behaviour.
   VM does not have (a dynamic metric-metadata key, say) loads as its name, a
   string. A prediction's string metadata keys become their atoms when those
   exist, so `Imp.Prediction.get_lm_usage/1`, `complete?/1` and readers of
-  `:trace` find them; metadata that would hold a key as both an atom and a
-  string is refused. A trajectory written by 0.5.0 still loads, including one
+  `:trace` find them. A map that holds a key as both an atom and a string is
+  refused on load, as on dump. A trajectory written by 0.5.0 still loads, including one
   whose prediction has metadata; its other map keys load as the strings they
   were written as. Imp 0.5.0 cannot read a trajectory written with atom keys.
 - GEPA checkpoints an agent. A trajectory, and the report codec GEPA uses for
@@ -483,6 +483,9 @@ Every change here is breaking for code that relied on the old behaviour.
   checkpoint that held an `Imp.react` program's trajectories raised
   `Trajectory.DecodeError: trajectory contains an unsupported struct:
   Imp.History`, under either profile.
+  An optimizer report (`Imp.Optimizer.Report.encode_term/1`, `dump/1`) that
+  holds an `Imp.History` now writes it under a `"history"` tag, where it wrote
+  a plain map; Imp 0.5.0 and earlier builds cannot read such a report.
 - A GEPA checkpoint resumes in a fresh VM: the loader loads the GEPA modules
   whose atoms a checkpoint holds before decoding it. Before,
   `Imp.Optimizer.GEPA.compile_with_report/5` given a checkpoint in a VM that

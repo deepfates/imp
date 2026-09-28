@@ -16,8 +16,8 @@ defmodule Imp.Optimizer.Trajectory do
   does not exist in the loading VM loads as its name, a string. A prediction's
   metadata keys that are strings (written that way, or loaded as names) become
   their atoms when those atoms exist, so `Imp.Prediction.get_lm_usage/1` and
-  `Imp.Prediction.complete?/1` read them; metadata that would then hold a key
-  as both an atom and a string is refused.
+  `Imp.Prediction.complete?/1` read them. A map that holds a key as both an
+  atom and a string is refused on load, as on dump.
   """
 
   alias __MODULE__.{Cache, DecodeError, Event, Failure, Parameter, Timing, Usage}
@@ -898,17 +898,21 @@ defmodule Imp.Optimizer.Trajectory do
        when is_list(entries) do
     require_typed_keys!(tagged, ~w(__trajectory_type__ entries))
 
-    Enum.reduce(entries, %{}, fn
-      [key, nested], decoded ->
-        key = decode_key(key)
+    {decoded, _names} =
+      Enum.reduce(entries, {%{}, MapSet.new()}, fn
+        [key, nested], {decoded, names} ->
+          key = decode_key(key)
+          name = to_string(key)
 
-        if Enum.any?(Map.keys(decoded), &(to_string(&1) == to_string(key))),
-          do: decode_error!("trajectory map contains colliding key #{inspect(to_string(key))}"),
-          else: Map.put(decoded, key, decode_term(nested))
+          if MapSet.member?(names, name),
+            do: decode_error!("trajectory map contains colliding key #{inspect(name)}"),
+            else: {Map.put(decoded, key, decode_term(nested)), MapSet.put(names, name)}
 
-      _entry, _decoded ->
-        decode_error!("malformed trajectory map entry")
-    end)
+        _entry, _acc ->
+          decode_error!("malformed trajectory map entry")
+      end)
+
+    decoded
   end
 
   defp decode_term(%{"__trajectory_type__" => "map", "value" => value} = tagged)
@@ -954,15 +958,13 @@ defmodule Imp.Optimizer.Trajectory do
   # `:termination_reason`). A key written as a string, as every key was
   # before keys kept their type, or loaded as its name above, becomes its
   # atom when that atom exists; `Imp.Prediction.new/2` refuses other string
-  # keys, so the metadata is set on the struct as it stands.
+  # keys, so the metadata is set on the struct as it stands. No two keys can
+  # share a name here: the entries decoder refuses that pair, and a JSON
+  # object or string-keyed map cannot hold it.
   defp prediction_metadata(metadata) do
-    Enum.reduce(metadata, %{}, fn {key, value}, converted ->
-      key = if is_binary(key), do: existing_atom_or_name(key), else: key
-
-      if Enum.any?(Map.keys(converted), &(to_string(&1) == to_string(key))),
-        do:
-          decode_error!("prediction metadata contains colliding key #{inspect(to_string(key))}"),
-        else: Map.put(converted, key, value)
+    Map.new(metadata, fn
+      {key, value} when is_binary(key) -> {existing_atom_or_name(key), value}
+      {key, value} -> {key, value}
     end)
   end
 

@@ -228,8 +228,33 @@ defmodule Imp.Optimizer.TrajectoryTest do
     assert third.score == 1.0
   end
 
+  defp program(fail_after_first) do
+    hint_lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{hint: "capital clue"} end)
+
+    answer_lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "Paris"} end)
+
+    %TwoStage{
+      first: Imp.predict("question -> hint", lm: hint_lm),
+      second: Imp.predict("question, hint -> answer", lm: answer_lm),
+      fail_after_first: fail_after_first
+    }
+  end
+end
+
+defmodule Imp.Optimizer.TrajectoryLogTest do
+  # capture_log sees every process's log, so a test that asserts a warning is
+  # absent cannot run beside async tests that log kill warnings.
+  use ExUnit.Case, async: false
+
   test "successful rows are not marked killed and emit no kill warning" do
-    program = program(false)
+    hint_lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{hint: "capital clue"} end)
+    answer_lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "Paris"} end)
+
+    program = %Imp.Optimizer.TrajectoryTest.TwoStage{
+      first: Imp.predict("question -> hint", lm: hint_lm),
+      second: Imp.predict("question, hint -> answer", lm: answer_lm)
+    }
+
     example = Imp.example(question: "France?", answer: "Paris") |> Imp.with_inputs(:question)
     metric = fn _example, _prediction -> 1.0 end
 
@@ -241,17 +266,5 @@ defmodule Imp.Optimizer.TrajectoryTest do
     [trajectory] = trajectories
     refute Imp.Optimizer.Trajectory.killed?(trajectory)
     refute log =~ "killed"
-  end
-
-  defp program(fail_after_first) do
-    hint_lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{hint: "capital clue"} end)
-
-    answer_lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "Paris"} end)
-
-    %TwoStage{
-      first: Imp.predict("question -> hint", lm: hint_lm),
-      second: Imp.predict("question, hint -> answer", lm: answer_lm),
-      fail_after_first: fail_after_first
-    }
   end
 end
