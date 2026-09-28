@@ -722,7 +722,7 @@ defmodule Imp.Optimizer.Artifact do
   defp normalize_report(%Report{} = report), do: report |> Report.dump() |> sanitize()
 
   defp normalize_report(report) when is_map(report),
-    do: report |> Report.encode_term() |> sanitize()
+    do: report |> Report.json_safe() |> sanitize()
 
   defp normalize_report(report) do
     raise ArgumentError,

@@ -228,7 +228,15 @@ defmodule Imp.Optimizer.Report do
           "Imp.Optimizer.Report.new/1 expects a map or keyword list; got: #{inspect(attrs)}"
   end
 
+  # Redaction runs on the report as it is, before conversion, so that a client,
+  # retriever or OAuth struct in it is still a struct when redacted.
   def dump(%__MODULE__{} = report) do
+    report
+    |> Imp.Redaction.redact_term()
+    |> dump_fields()
+  end
+
+  defp dump_fields(%__MODULE__{} = report) do
     %{
       "optimizer" => dump_value(report.optimizer),
       "best_score" => dump_value(report.best_score),
@@ -237,7 +245,6 @@ defmodule Imp.Optimizer.Report do
       "errors" => Enum.map(report.errors, &dump_value/1),
       "metadata" => dump_value(report.metadata)
     }
-    |> Imp.Redaction.redact()
   end
 
   def load!(state) when is_map(state), do: load_report(state, :atoms)
@@ -312,10 +319,10 @@ defmodule Imp.Optimizer.Report do
   def decode_term_portable(value), do: load_value(value, :strings)
 
   @doc "Returns a JSON-encodable projection with credential-bearing data redacted."
-  def json_safe(value), do: value |> dump_value() |> Imp.Redaction.redact()
+  def json_safe(value), do: value |> Imp.Redaction.redact_term() |> dump_value()
 
   @doc false
-  def json_projection(value), do: value |> dump_projection() |> Imp.Redaction.redact()
+  def json_projection(value), do: value |> Imp.Redaction.redact_term() |> dump_projection()
 
   def attach(program, %__MODULE__{} = report) do
     attached = Imp.ProgramAccess.put_metadata(program, :optimizer_report, report)

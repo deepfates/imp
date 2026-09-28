@@ -324,19 +324,29 @@ defmodule Imp.Experiment.Result do
     }
 
     if include_rows? do
-      Map.merge(summary, %{
-        "rows" => result |> EvaluationResult.output_rows() |> Imp.Optimizer.Report.json_safe(),
-        "errors" =>
-          result.errors
-          |> Imp.Redaction.redact()
-          |> Imp.Optimizer.Report.json_safe()
-      })
+      Map.merge(summary, row_detail(result))
     else
       summary
     end
   end
 
   defp evaluation_map(nil, _include_rows?), do: nil
+
+  # Rows and errors are redacted as they are, before `output_rows/1` and the
+  # encoder turn their structs into plain maps. Rows keep their examples and
+  # predictions as structs, which `output_rows/1` reads by type.
+  defp row_detail(%EvaluationResult{} = evaluation) do
+    rows = Imp.Redaction.redact_term(evaluation.rows)
+
+    %{
+      "rows" =>
+        %{evaluation | rows: rows}
+        |> EvaluationResult.output_rows()
+        |> Imp.Optimizer.Report.encode_term(),
+      "errors" =>
+        evaluation.errors |> Imp.Redaction.redact() |> Imp.Optimizer.Report.encode_term()
+    }
+  end
 
   defp repetition_map(%{count: _count} = summary, include_rows?) do
     %{
@@ -405,14 +415,7 @@ defmodule Imp.Experiment.Result do
     }
 
     if include_rows? do
-      Map.merge(summary, %{
-        "rows" =>
-          evaluation |> EvaluationResult.output_rows() |> Imp.Optimizer.Report.json_safe(),
-        "errors" =>
-          evaluation.errors
-          |> Imp.Redaction.redact()
-          |> Imp.Optimizer.Report.json_safe()
-      })
+      Map.merge(summary, row_detail(evaluation))
     else
       summary
     end

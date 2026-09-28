@@ -68,11 +68,11 @@
   # defensive fallback paired with the 904 clause
   {"lib/imp/clients/training.ex", :pattern_match_cov, {1537, 8}},
   # defensive error clause on an always-ok internal call
-  {"lib/imp/optimizer/better_together.ex", :pattern_match, {1287, 8}},
+  {"lib/imp/optimizer/better_together.ex", :pattern_match, {1288, 8}},
   # defensive error clause on an always-ok internal call
-  {"lib/imp/optimizer/better_together.ex", :pattern_match, {1290, 8}},
+  {"lib/imp/optimizer/better_together.ex", :pattern_match, {1291, 8}},
   # defensive fallback paired with the clauses above
-  {"lib/imp/optimizer/better_together.ex", :pattern_match_cov, {1302, 8}},
+  {"lib/imp/optimizer/better_together.ex", :pattern_match_cov, {1303, 8}},
   # raise-only helper: every raise_parallel_worker_error/1 clause raises
   # (engine.ex:2469-2530); the catch-all covers these shapes at runtime
   {"lib/imp/optimizer/gepa/engine.ex", :call, {3962, 35}},
@@ -216,7 +216,7 @@
   {"lib/imp/optimizer/artifact.ex", :call_without_opaque, {745, 52}},
   {"lib/imp/optimizer/artifact.ex", :call_without_opaque, {909, 53}},
   {"lib/imp/optimizer/playbook.ex", :pattern_match_cov, {1014, 8}},
-  {"lib/imp/optimizer/report.ex", :call_without_opaque, {766, 55}},
+  {"lib/imp/optimizer/report.ex", :call_without_opaque, {773, 55}},
   {"lib/imp/schema.ex", :pattern_match_cov, {440, 8}},
   {"bench/imp/benchmark_truth/failure_campaign.ex", :pattern_match_cov, {168, 13}}
 ]

@@ -82,6 +82,15 @@ User-visible changes to Imp are recorded here.
 
 ### Fixed
 
+- Optimizer reports (`Imp.Optimizer.Report.dump/1`, `json_safe/1`,
+  `json_projection/1`), experiment results, BetterTogether's bootstrap
+  diagnostics, optimizer artifact candidates, GRPO session checkpoints and
+  saved programs (a Predict's demos and metadata, KNN examples, memory
+  retriever documents) redact a term before converting it. They converted
+  structs to plain maps first, so a client, retriever or MCP OAuth store in
+  them was written with its header values, URL query secrets or store key.
+  `Imp.Redaction.drop_credentials/1` redacts such structs too. Output that
+  holds no secret is unchanged.
 - A reply that answers none of the requested outputs is a parse error in
   `Imp.Adapter.Chat`, `Imp.Adapter.JSON` and `Imp.Adapter.XML`: an
   `Imp.AdapterParseError` of kind `:missing_fields` naming every output, so

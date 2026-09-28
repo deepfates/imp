@@ -159,8 +159,15 @@ defmodule Imp.Saving do
     raise ArgumentError, "saved Imp file is not a checksummed program artifact envelope"
   end
 
+  # Demos and metadata hold arbitrary terms. They are redacted as they are,
+  # before `Imp.Predict.dump/1` encodes them, so that a client, retriever or
+  # OAuth struct among them is still a struct when redacted.
   defp dump_state(%Imp.Predict{} = program) do
-    program
+    %{
+      program
+      | demos: Imp.Redaction.redact_term(program.demos),
+        metadata: Imp.Redaction.redact_term(program.metadata)
+    }
     |> Imp.Predict.dump()
     |> Map.update!("config", &dump_portable_config!(&1, "Predict config"))
     |> Map.put("type", "predict")
@@ -211,7 +218,7 @@ defmodule Imp.Saving do
   defp dump_state(%Imp.Predict.KNN{} = knn) do
     %{
       "type" => "knn",
-      "examples" => Imp.Optimizer.Report.encode_term(knn.trainset),
+      "examples" => encode_redacted(knn.trainset),
       "k" => knn.k,
       "vectorizer" => dump_vectorizer!(knn.vectorizer)
     }
@@ -1009,6 +1016,12 @@ defmodule Imp.Saving do
     |> require_portable_json!(context)
   end
 
+  # Arbitrary terms Saving encodes itself are redacted as they are first, so
+  # that a client, retriever or OAuth struct among them is still a struct when
+  # redacted.
+  defp encode_redacted(value),
+    do: value |> Imp.Redaction.redact_term() |> Imp.Optimizer.Report.encode_term()
+
   defp redact_dump(value) when is_struct(value) do
     value
     |> Map.from_struct()
@@ -1679,7 +1692,7 @@ defmodule Imp.Saving do
   defp dump_retriever(%Imp.Retrieve.Memory{} = retriever) do
     %{
       "type" => "memory",
-      "docs" => Imp.Optimizer.Report.encode_term(retriever.docs),
+      "docs" => encode_redacted(retriever.docs),
       "k" => retriever.k
     }
   end

@@ -681,8 +681,8 @@ defmodule Imp.Optimizer.GRPO do
 
   defp checkpoint_safe_batches(batches) do
     batches
+    |> Imp.Redaction.redact_term()
     |> Imp.Optimizer.Report.encode_term()
-    |> Imp.Redaction.redact()
     |> Imp.Optimizer.Report.decode_term()
   end
 
