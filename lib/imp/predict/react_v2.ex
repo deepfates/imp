@@ -8,8 +8,8 @@ defmodule Imp.Predict.ReActV2 do
   ## Which signatures get `submit`
 
   A task signature with exactly one output of type `:string` and no
-  constraints has an answer that the model can write as plain text, so its
-  loop offers no `submit` tool. Every other signature (several outputs, one
+  constraints has an answer that the model can write as text, so its loop
+  offers no `submit` tool. Every other signature (several outputs, one
   output that is not text, or one text output with constraints such as an
   `enum`, whose allowed values reach the model in `submit`'s schema) gets
   the reserved `submit` tool, whose parameters are the signature's outputs,
@@ -120,6 +120,28 @@ defmodule Imp.Predict.ReActV2 do
   `args` or `parameters` for `arguments` (`Imp.Adapter.Types.ToolCall`); a map
   that names no tool at all is kept as a malformed-call observation.
 
+  So a step asks for one thing, whichever adapter formats it. The step has a
+  `tools` input, the roster as text in DSPy's shape ("name, whose description
+  is <desc>...</desc>. It takes arguments {...}.", the arguments being the
+  schema's properties, `required` and `$defs` as JSON, the properties in the
+  schema's order when it keeps one and by name otherwise), and a `tool_calls`
+  output whose description shows how to write a call.
+  When the LM calls tools natively (every LM unless its client says
+  otherwise; `Imp.Clients.ReqLLM` asks the model registry), the tools are sent
+  natively and `Imp.Predict` formats the step without both fields, in every
+  adapter and in the JSON fallback: the model answers with tool calls or with
+  text. When the LM cannot (the registry says the model has no tool calling,
+  or the LM is `Imp.Clients.TRLLM`), no tools are sent: the step lists them in
+  `tools`, the model writes its calls in `tool_calls`, and earlier steps are
+  replayed as text (the step's fields, then the results), never as native
+  tool messages. This is DSPy's structure. The guidance says where a text
+  answer goes, the same in every format: in `next_thought`, with
+  `tool_calls` left empty when that field is described. A reply in plain text
+  is still read as `next_thought` by `Imp.Adapter.Chat`. A stored turn that
+  carries a one-text-output task's answer and no step outputs is replayed as
+  a step that answered in text. The name `tools` is reserved: a task
+  signature cannot have a field of that name.
+
   On a recognized context-window refusal, up to eight smaller requests omit
   oldest prior episodes from the prompt, preserving their full durable history.
   Completed signature outputs delimit episodes; a trailing unfinished prior
@@ -146,6 +168,7 @@ defmodule Imp.Predict.ReActV2 do
     :react,
     :last_request_note,
     tools: %{},
+    tool_order: [],
     max_iters: 20,
     tool_policy: :allow,
     finish_on: %{}
@@ -238,11 +261,14 @@ defmodule Imp.Predict.ReActV2 do
     opts =
       Imp.Predict.Options.validate!(opts, @option_schema, "Imp.Predict.ReActV2.new/3")
 
+    tool_order = declared_order(tools)
     tools = Imp.Tool.index_tools!(tools, "Imp.Predict.ReActV2.new/3")
 
     if Imp.Tool.resolve_name(tools, :submit) do
       raise ArgumentError, "submit is reserved by Imp.Predict.ReActV2"
     end
+
+    reject_reserved_tools!(signature, "Imp.Predict.ReActV2.new/3")
 
     tools = put_submit(tools, signature)
 
@@ -250,13 +276,10 @@ defmodule Imp.Predict.ReActV2 do
       %Imp.Signature{
         inputs:
           Enum.map(signature.inputs, &Imp.Signature.Field.optional/1) ++
-            [Imp.Signature.Field.new(%{name: :history, type: :history}, :input)],
+            [Imp.Signature.Field.new(%{name: :history, type: :history}, :input), tools_field()],
         outputs: [
           Imp.Signature.Field.new(%{name: :next_thought, metadata: %{optional: true}}, :output),
-          Imp.Signature.Field.new(
-            %{name: :tool_calls, type: :array, metadata: %{default: []}},
-            :output
-          )
+          tool_calls_field()
         ],
         instructions: signature.instructions,
         # A step answered in plain text, with no native tool call, is a
@@ -264,16 +287,17 @@ defmodule Imp.Predict.ReActV2 do
         # completion as `next_thought`, and `tool_calls` takes its declared
         # default of none, which ends the turn: as the answer when the
         # signature has one text output, and at the forced submit otherwise.
-        metadata: %{text_field: :next_thought}
+        metadata: step_metadata()
       }
 
-    config = Keyword.merge(opts[:config], provider_tool_config(tools, signature))
+    config = Keyword.merge(opts[:config], provider_tool_config(tools, tool_order, signature))
 
-    # The roster goes to the provider once, natively, in `config`. The loop's
-    # guidance goes to the adapter as data. Nothing about tools is written into
-    # the signature or rendered into a user message, so a step's request is the
-    # previous step's request plus the newest exchange, which is what a
-    # provider's prompt cache is keyed on.
+    # The roster goes to the provider once, natively, in `config`, and the
+    # loop's guidance goes to the adapter as data. For an LM that calls tools
+    # natively, `Imp.Predict` leaves the `tools` input and `tool_calls` output
+    # out of the prompt, so a step's request is the previous step's request
+    # plus the newest exchange, which is what a provider's prompt cache is
+    # keyed on. For an LM that cannot, the roster is the `tools` input, as text.
     adapter_opts =
       Keyword.merge(Keyword.get(opts, :adapter_opts, []), loop_adapter_opts(signature, tools))
 
@@ -287,6 +311,7 @@ defmodule Imp.Predict.ReActV2 do
           |> Keyword.merge(config: config, adapter_opts: adapter_opts)
         ),
       tools: tools,
+      tool_order: tool_order,
       max_iters: opts[:max_iters],
       tool_policy: opts[:tool_policy],
       last_request_note: opts[:last_request_note],
@@ -367,17 +392,40 @@ defmodule Imp.Predict.ReActV2 do
   # agent it was saved from asked. A host's own `:adapter_opts` (renderers are
   # functions) are not saved; the host passes them again.
   def restore_loop(%__MODULE__{react: react} = agent) do
+    reject_reserved_tools!(agent.signature, "loading a ReActV2 program")
+
     metadata =
       react.signature.metadata
-      |> Map.delete("text_field")
-      |> Map.put(:text_field, :next_thought)
+      |> Map.drop(["text_field", "tool_calls_field", "tools_field"])
+      |> Map.merge(step_metadata())
+
+    # A program saved before the step had a `tools` input gets one, so it
+    # describes its tools to an LM that cannot call them natively.
+    inputs =
+      if Enum.any?(react.signature.inputs, &Imp.FieldMap.same_name?(&1.name, :tools)),
+        do: react.signature.inputs,
+        else: react.signature.inputs ++ [tools_field()]
 
     react = %{
       react
-      | config: Keyword.merge(react.config, provider_tool_config(agent.tools, agent.signature)),
+      | config:
+          Keyword.merge(
+            react.config,
+            provider_tool_config(agent.tools, agent.tool_order, agent.signature)
+          ),
         adapter_opts:
           Keyword.merge(react.adapter_opts, loop_adapter_opts(agent.signature, agent.tools)),
-        signature: %{react.signature | metadata: metadata}
+        signature: %{
+          react.signature
+          | metadata: metadata,
+            inputs: inputs,
+            outputs:
+              Enum.map(react.signature.outputs, fn field ->
+                if Imp.FieldMap.same_name?(field.name, :tool_calls),
+                  do: %{field | desc: tool_calls_field().desc},
+                  else: field
+              end)
+        }
     }
 
     %{agent | react: react}
@@ -389,7 +437,11 @@ defmodule Imp.Predict.ReActV2 do
 
     react = %{
       agent.react
-      | config: Keyword.merge(agent.react.config, provider_tool_config(tools, agent.signature)),
+      | config:
+          Keyword.merge(
+            agent.react.config,
+            provider_tool_config(tools, agent.tool_order, agent.signature)
+          ),
         adapter_opts:
           Keyword.put(agent.react.adapter_opts, :guidance, guidance(agent.signature, tools))
     }
@@ -764,7 +816,10 @@ defmodule Imp.Predict.ReActV2 do
       react.react
       | config:
           Keyword.merge(react.react.config,
-            tools: Enum.map(Map.values(react.tools), &tool_description(&1, react.signature)),
+            tools:
+              react.tools
+              |> ordered_tools(react.tool_order)
+              |> Enum.map(&tool_description(&1, react.signature)),
             tool_choice: tool_choice,
             reasoning_effort: nil
           )
@@ -884,9 +939,90 @@ defmodule Imp.Predict.ReActV2 do
 
   defp error_text(value), do: inspect(value)
 
-  defp predict(program, _react, history, pending) do
+  # What the step signature says about its fields: a reply with no marker is
+  # `next_thought` (`Imp.Adapter.Chat`), native tool calls fill `tool_calls`,
+  # and `tools` lists the tools as text. `Imp.Predict` leaves both tool fields
+  # out of the prompt when the step sends its tools natively, as DSPy's
+  # `Adapter._call_preprocess` does.
+  # `tools` is the step's tool list, so a task field of that name would be
+  # taken for it. A program saved before the name was reserved is refused on
+  # load with the same words, naming what the caller did.
+  defp reject_reserved_tools!(signature, context) do
+    if Enum.any?(signature.inputs ++ signature.outputs, &Imp.FieldMap.same_name?(&1.name, :tools)) do
+      raise ArgumentError,
+            "#{context}: `tools` is reserved for the step's tool list; rename that field"
+    end
+  end
+
+  defp step_metadata,
+    do: %{text_field: :next_thought, tool_calls_field: :tool_calls, tools_field: :tools}
+
+  # The written form of a call, for an LM that writes its calls: the shape
+  # `tool_calls` parses (a list; `name` and `arguments`, or `tool`/`args`).
+  @tool_calls_desc "The tools to call, as a JSON list in which each call has `name` and " <>
+                     "`arguments`. Example: " <>
+                     ~s([{"name": "search", "arguments": {"query": "cats"}}])
+
+  defp tool_calls_field,
+    do:
+      Imp.Signature.Field.new(
+        %{name: :tool_calls, type: :array, desc: @tool_calls_desc, metadata: %{default: []}},
+        :output
+      )
+
+  defp tools_field,
+    do: Imp.Signature.Field.new(%{name: :tools, type: :array, metadata: %{default: []}}, :input)
+
+  # The roster as the `tools` input: one line per tool in DSPy's `Tool.__str__`
+  # shape, "name, whose description is <desc>...</desc>. It takes arguments
+  # {...}.", with the arguments as JSON: the `properties` of the schema the
+  # provider would get (`submit`'s included), then its `required` list and its
+  # `$defs`, so an optional argument reads as one and a `$ref` resolves. The
+  # properties keep their order only when the schema keeps one (a
+  # `Jason.OrderedObject`); a map's are listed by name.
+  defp tool_lines(react) do
+    react.tools
+    |> ordered_tools(react.tool_order)
+    |> Enum.map(fn tool ->
+      %{function: function} = tool_description(tool, react.signature)
+
+      description =
+        case function.description do
+          desc when desc in [nil, ""] -> "."
+          desc -> ", whose description is <desc>#{String.replace(desc, "\n", "  ")}</desc>."
+        end
+
+      "#{function.name}#{description} It takes arguments " <>
+        "#{Jason.encode!(tool_arguments(function.parameters))}."
+    end)
+  end
+
+  defp tool_arguments(schema) do
+    [{"properties", schema_value(schema, "properties") || %{}}]
+    |> Kernel.++(
+      for key <- ["required", "$defs"], value = schema_value(schema, key), do: {key, value}
+    )
+    |> Jason.OrderedObject.new()
+  end
+
+  defp schema_value(%Jason.OrderedObject{values: values}, key) do
+    Enum.find_value(values, fn {name, value} -> if to_string(name) == key, do: value end)
+  end
+
+  defp schema_value(schema, key) when is_map(schema),
+    do: Map.get(schema, key) || Map.get(schema, safe_atom(key))
+
+  defp safe_atom(key) do
+    String.to_existing_atom(key)
+  rescue
+    ArgumentError -> nil
+  end
+
+  defp predict(program, react, history, pending) do
     context_call(history, fn projected ->
-      Imp.Predict.call(program, Map.put(pending, :history, projected))
+      projected = %{projected | messages: Enum.map(projected.messages, &step_turn(&1, react))}
+      inputs = pending |> Map.put(:history, projected) |> Map.put(:tools, tool_lines(react))
+      Imp.Predict.call(program, inputs)
     end)
   end
 
@@ -1224,6 +1360,27 @@ defmodule Imp.Predict.ReActV2 do
     %{full: history, boundaries: boundaries, omitted: 0, omitted_groups: 0, retries: 0}
   end
 
+  # A stored turn that carries the answer of a one-text-output task but no
+  # step outputs (a host wrote it, or it predates the loop's own events) is,
+  # in the step's terms, a step that answered in text: `next_thought` is the
+  # answer and it called nothing. Read that way, every adapter replays it as
+  # the answer the model gave, not as step fields it never filled. Only the
+  # prompt's view changes; the history the caller holds does not.
+  defp step_turn(turn, %__MODULE__{signature: signature}) when is_map(turn) do
+    with {:text, [%Imp.Signature.Field{name: name}]} <- text_output(signature),
+         false <- Imp.FieldMap.has_key?(turn, :next_thought),
+         false <- Imp.FieldMap.has_key?(turn, :tool_calls),
+         answer when is_binary(answer) <- Imp.FieldMap.get(turn, name) do
+      if Enum.any?(Map.keys(turn), &is_binary/1),
+        do: turn |> Map.put("next_thought", answer) |> Map.put("tool_calls", []),
+        else: turn |> Map.put(:next_thought, answer) |> Map.put(:tool_calls, [])
+    else
+      _step_turn -> turn
+    end
+  end
+
+  defp step_turn(turn, _react), do: turn
+
   defp append_history(context, event),
     do: %{context | full: Imp.History.append(context.full, event)}
 
@@ -1334,7 +1491,7 @@ defmodule Imp.Predict.ReActV2 do
 
   # What the adapter needs to say about the loop, as data. `submit_tool` is the
   # tool that ends the turn, so a renderer never has to know its name, and nil
-  # when the signature has no `submit` and the answer is plain text. `outputs`
+  # when the signature has no `submit` and the answer is text. `outputs`
   # are the task's output fields, so each step says what every output means;
   # otherwise their descriptions reach the model only inside `submit`'s schema.
   defp guidance(signature, tools) do
@@ -1347,12 +1504,41 @@ defmodule Imp.Predict.ReActV2 do
     }
   end
 
-  defp provider_tool_config(tools, signature) do
+  defp provider_tool_config(tools, order, signature) do
     [
-      tools: Enum.map(Map.values(tools), &tool_description(&1, signature)),
+      tools: tools |> ordered_tools(order) |> Enum.map(&tool_description(&1, signature)),
       tool_choice: "auto"
     ]
   end
+
+  # The roster is sent in the order the tools were declared, then `submit`.
+  # A map's order would be the order the tool names' atoms were created in,
+  # which differs between processes and would change the prompt a provider
+  # caches. A name missing from the order (a program saved before it was
+  # recorded) comes after the declared ones, sorted.
+  defp ordered_tools(tools, order) do
+    declared = Enum.filter(order, &Map.has_key?(tools, &1))
+
+    rest =
+      tools
+      |> Map.keys()
+      |> Enum.reject(&(&1 in declared or &1 == :submit))
+      |> Enum.sort_by(&to_string/1)
+
+    submit = if Map.has_key?(tools, :submit), do: [:submit], else: []
+    Enum.map(declared ++ rest ++ submit, &Map.fetch!(tools, &1))
+  end
+
+  defp declared_order(tools) when is_list(tools),
+    do:
+      tools
+      |> Enum.flat_map(fn
+        %Imp.Tool{name: name} -> [name]
+        _other -> []
+      end)
+      |> Enum.uniq()
+
+  defp declared_order(_tools), do: []
 
   defp tool_description(%Imp.Tool{name: :submit} = tool, signature),
     do:

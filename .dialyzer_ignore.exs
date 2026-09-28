@@ -54,11 +54,11 @@
   {"bench/imp/benchmark_truth/runner.ex", :guard_fail, {651, 55}},
   # defensive clause: ReqLLM.model/1 contracts to ok/error tuples only; the
   # catch-all turns any unexpected registry result into a loud error (#75)
-  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {154, 7}},
+  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {163, 7}},
   # defensive guard: ReqLLM.Response types provider_meta as map() with a %{}
   # default, but the struct does not enforce it (a caller can build one with
   # nil), and ReqLLM's own OpenTelemetry attributes guard it with is_map/1.
-  {"lib/imp/clients/req_llm.ex", :guard_fail, 1742},
+  {"lib/imp/clients/req_llm.ex", :guard_fail, 1769},
   # defensive error clause on an always-ok internal call
   {"lib/imp/clients/training.ex", :pattern_match, {1215, 13}},
   # defensive error clause on an always-ok internal call
@@ -211,8 +211,8 @@
   # Defensive fallbacks and MapSet opacity retained at the 0.3 cut. These are
   # individually pinned so a changed success type makes the gate ask again.
   {"bench/imp/benchmark_truth/multimodal_runner.ex", :pattern_match_cov, {340, 16}},
-  {"lib/imp/adapter/chat.ex", :pattern_match_cov, {731, 8}},
-  {"lib/imp/adapter/xml.ex", :pattern_match_cov, {623, 8}},
+  {"lib/imp/adapter/chat.ex", :pattern_match_cov, {804, 8}},
+  {"lib/imp/adapter/xml.ex", :pattern_match_cov, {631, 8}},
   {"lib/imp/optimizer/artifact.ex", :call_without_opaque, {745, 52}},
   {"lib/imp/optimizer/artifact.ex", :call_without_opaque, {909, 53}},
   {"lib/imp/optimizer/playbook.ex", :pattern_match_cov, {1014, 8}},

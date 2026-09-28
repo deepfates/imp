@@ -40,6 +40,11 @@ defmodule Imp.Clients.TRLLM do
 
   def response_format_capability(%__MODULE__{}), do: Imp.LM.Capability.none()
 
+  @doc false
+  # The worker is sent the rendered messages and nothing else, so a request's
+  # `:tools` never reach the model.
+  def tool_calling_capability(%__MODULE__{}), do: false
+
   @impl true
   def generate(%__MODULE__{} = lm, messages, opts) do
     with :ok <- validate_rollout_source(lm),

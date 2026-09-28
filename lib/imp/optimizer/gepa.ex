@@ -372,7 +372,9 @@ defmodule Imp.Optimizer.GEPA do
         {name,
          %{
            "Inputs" =>
-             ["Context", "tools"] ++ Enum.map(predictor.signature.inputs, &to_string(&1.name)),
+             Enum.uniq(
+               ["Context", "tools"] ++ Enum.map(predictor.signature.inputs, &to_string(&1.name))
+             ),
            "Generated Outputs" => Enum.map(predictor.signature.outputs, &to_string(&1.name))
          }}
       end)

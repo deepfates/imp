@@ -2460,7 +2460,8 @@
       "struct_fields": [
         "model",
         "opts",
-        "req_module"
+        "req_module",
+        "tool_calling"
       ],
       "types": [
         {
@@ -8013,6 +8014,7 @@
         "max_iters",
         "react",
         "signature",
+        "tool_order",
         "tool_policy",
         "tools"
       ],

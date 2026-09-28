@@ -292,7 +292,7 @@ defmodule Imp.Saving do
       "type" => "react_v2",
       "signature" => Imp.Signature.dump(react.signature),
       "react" => dump(react.react),
-      "tools" => dump_tools(Map.delete(react.tools, :submit), "ReActV2"),
+      "tools" => dump_tools(Map.delete(react.tools, :submit), "ReActV2", react.tool_order),
       "max_iters" => react.max_iters,
       "last_request_note" => react.last_request_note,
       "finish_on" => dump_finish_on(react.finish_on),
@@ -629,6 +629,10 @@ defmodule Imp.Saving do
       signature: signature,
       react: require_predict!(load_state!(state["react"]), "ReActV2"),
       tools: Imp.Predict.ReActV2.put_submit(tools, signature),
+      # The roster is sent in the saved list's order: declared order when this
+      # version saved it, name order in a 0.5.0 file, which sorted it.
+      tool_order:
+        Enum.map(state["tools"], &Imp.Optimizer.Report.decode_term_compatible(&1["name"])),
       max_iters: require_non_negative_integer!(state["max_iters"], "ReActV2 max_iters"),
       last_request_note: load_react_v2_last_request_note!(state["last_request_note"]),
       finish_on: load_finish_on!(state["finish_on"]),
@@ -1157,10 +1161,14 @@ defmodule Imp.Saving do
               __STACKTRACE__
   end
 
-  defp dump_tools(tools, context) when is_map(tools) do
+  # Tools are saved in `order`, where one is given (a ReActV2's declared order),
+  # and by name after it.
+  defp dump_tools(tools, context, order \\ []) when is_map(tools) do
+    position = order |> Enum.with_index() |> Map.new()
+
     tools
     |> Map.values()
-    |> Enum.sort_by(&to_string(&1.name))
+    |> Enum.sort_by(&{Map.get(position, &1.name, length(order)), to_string(&1.name)})
     |> Enum.map(fn tool ->
       %{
         "name" => Imp.Optimizer.Report.encode_term(tool.name),

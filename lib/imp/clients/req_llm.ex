@@ -53,14 +53,22 @@ defmodule Imp.Clients.ReqLLM do
   @anthropic_structured_outputs_beta "structured-outputs-2025-11-13"
   @openai_reasoning_model_pattern ~r/^(gpt-5|o[134])(?:[-_:.].*)?$/
 
+  # `tool_calling` is whether the model answers a request's `:tools` natively,
+  # read from the registry once, when the client is built, together with the
+  # model it was read for, so an agent loop that asks on every step does not
+  # look the model up again. It is trusted only while `model` is still that
+  # model: a client whose model is swapped (a trainer rebinding it to a new
+  # artifact) or a bare struct (nil) looks the model up when asked.
   defstruct model: nil,
             opts: [],
-            req_module: ReqLLM
+            req_module: ReqLLM,
+            tool_calling: nil
 
   @type t :: %__MODULE__{
           model: ReqLLM.model_input(),
           opts: keyword(),
-          req_module: module()
+          req_module: module(),
+          tool_calling: {ReqLLM.model_input(), boolean()} | nil
         }
 
   @new_option_schema [
@@ -81,7 +89,8 @@ defmodule Imp.Clients.ReqLLM do
     %__MODULE__{
       model: model_spec,
       opts: merged_opts,
-      req_module: req_module
+      req_module: req_module,
+      tool_calling: {model_spec, registry_tool_calling(model_spec)}
     }
   end
 
@@ -175,6 +184,24 @@ defmodule Imp.Clients.ReqLLM do
 
       {:error, _reason} ->
         false
+    end
+  end
+
+  @doc false
+  # False only when the ReqLLM/LLMDB registry resolves the model and says it
+  # cannot call tools. A model the registry does not know, or knows without
+  # saying, is sent the roster natively like any other.
+  def tool_calling_capability(%__MODULE__{model: model_spec, tool_calling: known}) do
+    case known do
+      {^model_spec, answer} -> answer
+      _other_model_or_none -> registry_tool_calling(model_spec)
+    end
+  end
+
+  defp registry_tool_calling(model_spec) do
+    case resolve_model(model_spec) do
+      {:ok, %{capabilities: %{tools: %{enabled: false}}}} -> false
+      _known_or_unknown -> true
     end
   end
 

@@ -173,6 +173,16 @@ defmodule ReActV2Test do
     end
   end
 
+  # The step signature as `Imp.Predict` formats it for an LM that calls tools
+  # natively: without the `tools` input and the `tool_calls` output.
+  defp native_step(signature) do
+    %{
+      signature
+      | inputs: Enum.reject(signature.inputs, &(&1.name == :tools)),
+        outputs: Enum.reject(signature.outputs, &(&1.name == :tool_calls))
+    }
+  end
+
   test "executes parallel calls, preserves IDs and results, and submits final outputs" do
     parent = self()
     lookup = Imp.tool(:lookup, "lookup", fn %{"query" => query} -> "found #{query}" end)
@@ -752,7 +762,7 @@ defmodule ReActV2Test do
       ])
 
     messages =
-      Imp.Adapter.Chat.format(program.react.signature, %{history: history, tools: []}, [])
+      Imp.Adapter.Chat.format(native_step(program.react.signature), %{history: history}, [])
 
     assert [
              %{role: :system},
@@ -789,7 +799,7 @@ defmodule ReActV2Test do
     end
 
     no_submit = [guidance: %{submit_tool: nil, input_names: [], output_names: [], tool_names: []}]
-    signature = Imp.react("question -> answer", []).react.signature
+    signature = native_step(Imp.react("question -> answer", []).react.signature)
 
     alone =
       submitted.(
@@ -799,7 +809,7 @@ defmodule ReActV2Test do
       )
 
     assert [%{role: :system}, %{role: :user}, answer, %{role: :user}] =
-             Imp.Adapter.Chat.format(signature, %{history: alone, tools: []}, no_submit)
+             Imp.Adapter.Chat.format(signature, %{history: alone}, no_submit)
 
     assert answer == %{role: :assistant, content: "Seven, exactly."}
 
@@ -835,7 +845,7 @@ defmodule ReActV2Test do
              %{role: :tool},
              %{role: :user}
            ] =
-             Imp.Adapter.Chat.format(signature, %{history: alone, tools: []}, [])
+             Imp.Adapter.Chat.format(signature, %{history: alone}, [])
 
     assert kept.function.name == "submit"
   end
@@ -846,7 +856,7 @@ defmodule ReActV2Test do
   # by name, so the results of the step's other calls are kept.
   test "a rejected or id-less recorded submit is replayed only as what the loop accepted" do
     no_submit = [guidance: %{submit_tool: nil, input_names: [], output_names: [], tool_names: []}]
-    signature = Imp.react("question -> answer", []).react.signature
+    signature = native_step(Imp.react("question -> answer", []).react.signature)
 
     step = fn fields, calls, results ->
       Map.merge(fields, %{
@@ -878,7 +888,7 @@ defmodule ReActV2Test do
       |> Imp.History.dump()
       |> Imp.History.load!()
 
-    messages = Imp.Adapter.Chat.format(signature, %{history: history, tools: []}, no_submit)
+    messages = Imp.Adapter.Chat.format(signature, %{history: history}, no_submit)
 
     assert [
              %{role: :system},
@@ -920,7 +930,7 @@ defmodule ReActV2Test do
   # tool; otherwise the model reads its history in one format and its present
   # in another.
   test "a history turn with tool calls uses the host's input section renderer" do
-    signature = Imp.react("question -> answer", []).react.signature
+    signature = native_step(Imp.react("question -> answer", []).react.signature)
     plain = fn _field, value -> value end
 
     history =
@@ -946,7 +956,7 @@ defmodule ReActV2Test do
            ] =
              Imp.Adapter.Chat.format(
                signature,
-               %{history: history, tools: []},
+               %{history: history},
                input_section_renderer: plain
              )
 

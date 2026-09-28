@@ -136,14 +136,11 @@ defmodule Imp.Predict do
          :ok <- validate_inputs(predict.signature, inputs),
          {:ok, request_signature, request_config, reasoning_fields} <-
            prepare_native_reasoning(predict.signature, lm, predict.config),
-         {:ok, messages} <-
-           format_with_adapter(
-             adapter,
-             request_signature,
-             inputs,
-             Keyword.put(predict.adapter_opts, :demos, predict.demos)
-           ),
-         {:ok, lm_opts} <- adapter_lm_opts(adapter, request_signature, request_config, lm),
+         {format_signature, request_config} =
+           prepare_native_tool_calls(request_signature, lm, request_config),
+         format_opts = Keyword.put(predict.adapter_opts, :demos, predict.demos),
+         {:ok, messages} <- format_with_adapter(adapter, format_signature, inputs, format_opts),
+         {:ok, lm_opts} <- adapter_lm_opts(adapter, format_signature, request_config, lm),
          {:ok, lm_opts} <- multi_completion_opts(lm_opts),
          {:ok, raw} <-
            Imp.Streaming.Execution.generate(
@@ -162,7 +159,7 @@ defmodule Imp.Predict do
              lm,
              lm_opts,
              inputs,
-             predict.demos
+             {format_signature, format_opts}
            ),
          {:ok, prediction} <-
            restore_native_reasoning(prediction, reasoning_fields, trace_lm_metadata) do
@@ -170,6 +167,42 @@ defmodule Imp.Predict do
       Imp.Optimizer.Trace.capture(predict, inputs, prediction)
       {:ok, prediction}
     end
+  end
+
+  # A signature can name the output that native tool calls fill
+  # (`metadata[:tool_calls_field]`) and the input that lists the tools as text
+  # (`metadata[:tools_field]`), as `Imp.Predict.ReActV2`'s step does. When the
+  # LM answers the request's `:tools` natively, the adapter
+  # formats the signature without both, so no format describes the tools or a
+  # written list of calls while the provider holds the tools; the reply is
+  # still parsed against the whole signature, where native calls fill the
+  # field and a reply without them takes its default. When the LM cannot call
+  # tools, both stay, for the model to read the tools and write its calls, and
+  # no tools are sent. This is DSPy's `Adapter._call_preprocess`.
+  defp prepare_native_tool_calls(signature, lm, config) do
+    calls = named_field(signature.outputs, signature, :tool_calls_field)
+
+    cond do
+      is_nil(calls) ->
+        {signature, config}
+
+      Imp.LM.tool_calling_capability(lm) ->
+        listing = named_field(signature.inputs, signature, :tools_field)
+
+        {%{
+           signature
+           | outputs: List.delete(signature.outputs, calls),
+             inputs: List.delete(signature.inputs, listing)
+         }, config}
+
+      true ->
+        {signature, Keyword.drop(config, [:tools, :tool_choice, :parallel_tool_calls])}
+    end
+  end
+
+  defp named_field(fields, signature, key) do
+    name = Map.get(signature.metadata, key) || Map.get(signature.metadata, Atom.to_string(key))
+    name && Enum.find(fields, &(to_string(&1.name) == to_string(name)))
   end
 
   defp prepare_native_reasoning(signature, lm, config) do
@@ -625,7 +658,7 @@ defmodule Imp.Predict do
   # and `completions` holds all K in order. A parse failure on any one of them
   # fails the whole call, reporting the failing index, after the chat-to-JSON
   # fallback has been tried for the call.
-  defp parse_with_retry(adapter, signature, raw, messages, lm, opts, inputs, demos)
+  defp parse_with_retry(adapter, signature, raw, messages, lm, opts, inputs, request)
        when is_list(raw) do
     case parse_completions(adapter, signature, raw) do
       {:ok, prediction, completion_metadata} ->
@@ -639,11 +672,12 @@ defmodule Imp.Predict do
           chat_json_fallback?(adapter, opts) ->
             retry_completions_with_json_adapter(
               error,
+              adapter,
               signature,
               lm,
               opts,
               inputs,
-              demos,
+              request,
               messages,
               raw
             )
@@ -655,7 +689,7 @@ defmodule Imp.Predict do
     end
   end
 
-  defp parse_with_retry(adapter, signature, raw, messages, lm, opts, inputs, demos) do
+  defp parse_with_retry(adapter, signature, raw, messages, lm, opts, inputs, request) do
     with {:ok, output, lm_metadata} <- Imp.LM.Result.split(raw) do
       case adapter.parse(signature, output, []) do
         {:ok, prediction} ->
@@ -670,20 +704,40 @@ defmodule Imp.Predict do
             lm,
             opts,
             inputs,
-            demos,
+            request,
             output
           )
       end
     end
   end
 
-  defp recover_parse_failure(error, adapter, signature, messages, lm, opts, inputs, demos, raw) do
+  defp recover_parse_failure(
+         error,
+         adapter,
+         signature,
+         messages,
+         lm,
+         opts,
+         inputs,
+         request,
+         raw
+       ) do
     cond do
       lm_failure?(error) ->
         error
 
       chat_json_fallback?(adapter, opts) ->
-        retry_with_json_adapter(error, signature, lm, opts, inputs, demos, messages, raw)
+        retry_with_json_adapter(
+          error,
+          adapter,
+          signature,
+          lm,
+          opts,
+          inputs,
+          request,
+          messages,
+          raw
+        )
 
       adapter_parse_error?(error) and Keyword.get(opts, :json_retries, 0) > 0 ->
         retry_with_feedback(error, adapter, signature, messages, lm, opts, raw)
@@ -692,6 +746,18 @@ defmodule Imp.Predict do
         emit_parse_error(adapter, signature, error)
         parse_error(error, messages, raw, signature)
     end
+  end
+
+  # The fallback is the same request in the JSON format: the program's adapter
+  # options (renderers, loop guidance) and demos go with it, and the event
+  # names the adapter whose reply failed and the one that retries it.
+  defp emit_json_fallback(adapter, signature, error) do
+    Imp.Telemetry.execute([:imp, :adapter, :parse, :json_fallback], %{count: 1}, %{
+      adapter: adapter,
+      fallback_adapter: Imp.Adapter.JSON,
+      signature: Imp.Signature.to_spec(signature),
+      error: parse_error_message(error)
+    })
   end
 
   # The chat and XML adapters retry any parse failure through the JSON adapter
@@ -743,26 +809,22 @@ defmodule Imp.Predict do
   # output per completion.
   defp retry_completions_with_json_adapter(
          error,
+         adapter,
          signature,
          lm,
          opts,
          inputs,
-         demos,
+         {format_signature, format_opts},
          original_messages,
          original_raw
        ) do
-    Imp.Telemetry.execute([:imp, :adapter, :parse, :json_fallback], %{count: 1}, %{
-      adapter: Imp.Adapter.Chat,
-      signature: Imp.Signature.to_spec(signature),
-      error: parse_error_message(error)
-    })
-
-    retry_messages = Imp.Adapter.JSON.format(signature, inputs, demos: demos)
+    emit_json_fallback(adapter, signature, error)
+    retry_messages = Imp.Adapter.JSON.format(format_signature, inputs, format_opts)
 
     retry_opts =
       opts
       |> Keyword.merge(
-        Imp.Adapter.JSON.lm_opts(signature, opts, Imp.LM.response_format_capability(lm))
+        Imp.Adapter.JSON.lm_opts(format_signature, opts, Imp.LM.response_format_capability(lm))
       )
       |> Keyword.put(:json_fallback, false)
 
@@ -790,26 +852,22 @@ defmodule Imp.Predict do
 
   defp retry_with_json_adapter(
          error,
+         adapter,
          signature,
          lm,
          opts,
          inputs,
-         demos,
+         {format_signature, format_opts},
          original_messages,
          original_raw
        ) do
-    Imp.Telemetry.execute([:imp, :adapter, :parse, :json_fallback], %{count: 1}, %{
-      adapter: Imp.Adapter.Chat,
-      signature: Imp.Signature.to_spec(signature),
-      error: parse_error_message(error)
-    })
-
-    retry_messages = Imp.Adapter.JSON.format(signature, inputs, demos: demos)
+    emit_json_fallback(adapter, signature, error)
+    retry_messages = Imp.Adapter.JSON.format(format_signature, inputs, format_opts)
 
     retry_opts =
       opts
       |> Keyword.merge(
-        Imp.Adapter.JSON.lm_opts(signature, opts, Imp.LM.response_format_capability(lm))
+        Imp.Adapter.JSON.lm_opts(format_signature, opts, Imp.LM.response_format_capability(lm))
       )
       |> Keyword.put(:json_fallback, false)
 

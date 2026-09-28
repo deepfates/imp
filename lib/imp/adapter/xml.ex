@@ -30,22 +30,27 @@ defmodule Imp.Adapter.XML do
     # DSPy XMLAdapter subclasses ChatAdapter and overrides only the field
     # dialect (`format_field_with_value`), the structure/system text, and the
     # output-requirements sentence; message assembly (demos, history, main
-    # request) is inherited. Mirror that by delegating to Chat.format with the
-    # XML input-section and assistant renderers injected, then substituting
-    # the XML system message and appending the XML output requirements to the
-    # main-request user message.
+    # request) is inherited. Mirror that by using Chat's message assembly with
+    # the XML system message, assistant turns and input sections, and
+    # appending the XML output requirements to the main-request user message.
+    #
+    # A host's renderers are honored as in `Imp.Adapter.JSON`: a
+    # `:system_renderer` and an `:output_renderer` get this format's
+    # `:default_system` and `:default_outputs`, loop `:guidance` is part of the
+    # objective, and the request always ends on the output requirements. The
+    # input sections are this format's dialect.
     format_opts =
       opts
       |> Keyword.put(:response_instruction, false)
-      |> Keyword.put(:output_renderer, &render_assistant_xml/3)
       |> Keyword.put(:input_section_renderer, &xml_input_section/2)
+      |> Keyword.put(:omit_empty_request, false)
 
-    [_chat_system | rest] = Imp.Adapter.Chat.format(signature, inputs, format_opts)
-
-    [
-      %{role: :system, content: render_system(signature)}
-      | append_output_requirements(rest, signature)
-    ]
+    signature
+    |> Imp.Adapter.Chat.assemble(inputs, format_opts, %{
+      system: &default_system/2,
+      outputs: &default_outputs/3
+    })
+    |> append_output_requirements(signature)
   end
 
   @impl true
@@ -72,7 +77,7 @@ defmodule Imp.Adapter.XML do
   #   format_field_with_value({field: outputs.get(k, missing_field_message)})
   # -> `<name>\nvalue\n</name>` blocks joined by blank lines, stripped once,
   # with NO trailing `[[ ## completed ## ]]` marker (that is Chat's dialect).
-  defp render_assistant_xml(signature, outputs, missing_field_message) do
+  defp default_outputs(signature, outputs, missing_field_message) do
     resolved =
       Map.new(Imp.Adapter.Chat.resolve_demo_outputs(signature, outputs, missing_field_message))
 
@@ -99,6 +104,9 @@ defmodule Imp.Adapter.XML do
     init ++ [Map.update!(last, :content, &append_text(&1, tail))]
   end
 
+  # A blank request (a tool loop whose inputs are all in the history) is the
+  # output requirements alone.
+  defp append_text("", suffix), do: String.trim_leading(suffix)
   defp append_text(content, suffix) when is_binary(content), do: content <> suffix
   defp append_text(content, suffix) when is_list(content), do: content ++ [suffix]
 
@@ -123,9 +131,9 @@ defmodule Imp.Adapter.XML do
   # XMLAdapter.format_field_structure + ChatAdapter.format_task_description,
   # joined with single newlines (base.Adapter.format_system_message).
   # ------------------------------------------------------------------
-  defp render_system(signature) do
+  defp default_system(signature, opts) do
     field_description(signature) <>
-      "\n" <> field_structure(signature) <> "\n" <> task_description(signature)
+      "\n" <> field_structure(signature) <> "\n" <> task_description(signature, opts)
   end
 
   # ChatAdapter.format_field_description / utils.get_field_description_string.
@@ -191,9 +199,9 @@ defmodule Imp.Adapter.XML do
   defp translate_field_type(field, kind), do: Imp.Adapter.FieldType.placeholder(field, kind)
 
   # ChatAdapter.format_task_description (inherited by XMLAdapter).
-  defp task_description(signature) do
+  defp task_description(signature, opts) do
     "In adhering to this structure, your objective is: " <>
-      Imp.Adapter.Instructions.objective_text(signature.instructions)
+      Imp.Adapter.Chat.objective(signature, opts)
   end
 
   # ------------------------------------------------------------------
