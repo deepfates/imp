@@ -94,8 +94,12 @@ User-visible changes to Imp are recorded here.
   matches its error structs) and `decimal` `~> 2.0 or ~> 3.0` as an optional
   dependency (`Imp.Core` reads a reported cost given as a `Decimal`). It
   declares `plug` and `plug_cowboy` with `runtime: false` for the demo MCP
-  servers, which the package leaves out; ExMCP already requires both, so an
-  application resolves no new package, and neither is started at boot.
+  servers, which the package leaves out: Imp starts neither, and no Imp code
+  that ships uses them. It declares `mint` `~> 1.11` (see Security). Of these,
+  only `mint` moves an existing lock: an application that locked `mint` below
+  1.11.0 moves to 1.11.0 on `mix deps.get`. The other requirements are ones
+  Req and ExMCP already set (ExMCP requires `decimal` `~> 3.0`), so an
+  application resolves no new package and keeps the versions it has.
 - Imp no longer depends on `jsv`, which nothing in Imp uses. ReqLLM still
   requires it.
 

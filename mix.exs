@@ -84,7 +84,9 @@ defmodule Imp.MixProject do
       "livebook.check": :test,
       "livebook.execute.check": :test,
       "package.check": :test,
-      "quality.check": :test
+      "quality.check": :test,
+      # Every declared dependency is built only in :test.
+      "imp.deps.check": :test
     ]
 
     if benchmark_tasks_available?() do
@@ -144,14 +146,14 @@ defmodule Imp.MixProject do
       {:nimble_options, "~> 1.1"},
       # The demo MCP servers (Imp.ACP.DemoMCPHTTPPlug, DemoMCPOAuthPlug, the
       # imp_acp.demo_mcp_http_server task) and a bench failure campaign serve
-      # HTTP with Plug and Plug.Cowboy. The Hex package leaves those files out
-      # and nothing it ships names Plug, so neither is started at boot. They
-      # would be dev and test dependencies, but ExMCP requires both in every
-      # environment and Mix refuses an :only restriction on a dependency
-      # another dependency needs in :prod; declaring them adds nothing to a
-      # consumer's resolution. Once ExMCP no longer requires them, they become
-      # only: [:dev, :test].
-      {:plug, "~> 1.18", runtime: false},
+      # HTTP with Plug and Plug.Cowboy. The Hex package leaves those files out:
+      # Imp starts neither, and no Imp code that ships uses them. They would be
+      # dev and test dependencies, but ExMCP requires both in every environment
+      # and Mix refuses an :only restriction on a dependency another dependency
+      # needs in :prod. The requirements are ExMCP's, so declaring them adds
+      # nothing to a consumer's resolution. Once ExMCP no longer requires them,
+      # they become only: [:dev, :test].
+      {:plug, "~> 1.16", runtime: false},
       {:plug_cowboy, "~> 2.7", runtime: false},
       {:req, "~> 0.6"},
       # 1.18 is the first release with :total_timeout, which bounds a call
