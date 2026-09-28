@@ -2,7 +2,7 @@
 
 User-visible changes to Imp are recorded here.
 
-## Unreleased
+## 0.7.0 — 2026-09-28
 
 ### Changed
 
@@ -16,13 +16,34 @@ User-visible changes to Imp are recorded here.
   provider key reports OpenRouter's fee plus the upstream charge, or `nil`
   when the upstream charge is missing. A call to any catalog-priced provider
   that reports no charge (Anthropic, OpenAI, Google, Groq, xAI and others)
-  now has a `nil` cost where it had the estimate. The estimate is the new `estimated_cost` field on
-  `Imp.Core.LMResponse` and `:estimated_cost` on the `:model_response` event;
-  `billing` is the breakdown behind that estimate, as it always was, and its
-  docs now say so. Migration: a host that sums `cost` treats `nil` as an
-  unknown charge, not a free one; a host that wants the old number for calls
-  with no reported charge reads `estimated_cost` for them, knowing it is an
-  estimate.
+  now has a `nil` cost where it had the estimate. The estimate is the new
+  `estimated_cost` field on `Imp.Core.LMResponse` and `:estimated_cost` on
+  the `:model_response` event, `nil` for a streamed call; `billing` is the
+  breakdown behind that estimate, as it always was, and its docs now say so.
+  Migration: a host that sums `cost` treats `nil` as an unknown charge, not a
+  free one; a host that wants the old number for calls with no reported
+  charge reads `estimated_cost` for them, knowing it is an estimate.
+- Breaking: a stream from `Imp.Clients.ReqLLM` that did not complete ends in
+  `{:error, %Imp.LMError{}}`, not in a completion of whatever text arrived
+  first: one that carries a provider error, finishes with reason `:error` or
+  `:cancelled`, or is incomplete, its body ending with no finish and no
+  `[DONE]` (reason `{:stream_finished, :incomplete}`). The error event
+  carries the usage and other metadata that arrived before it. Migration: a
+  caller of `Imp.stream/3` with `provider_stream: true` handles that error as
+  any failed call; the request reached the provider, so it may have been
+  charged.
+- Breaking: a call streamed through `Imp.Clients.ReqLLM` records the model
+  the provider reported, as a non-streamed call does, and otherwise the
+  configured model id (`gpt-test`, where it recorded the whole
+  `openai:gpt-test`), in the `req_llm` metadata of its `:model_response`
+  event's `:response` and in its `Imp.Usage` key (`"openai/gpt-test"`).
+  A call to a client built from a string-keyed spec map or a
+  `{provider, opts}` or `{provider, model, opts}` tuple, streamed or not,
+  records its provider, where it recorded none, so its `Imp.Usage` key gains
+  the `"provider/"` prefix. Migration: a host that matched the
+  provider-prefixed model of a streamed call matches the model id, or the
+  model the provider reported, and one that reads `Imp.Usage` by key for such
+  a client uses the prefixed key.
 
 ### Fixed
 
@@ -34,23 +55,13 @@ User-visible changes to Imp are recorded here.
   with exactly one terminal event, `done: true` with the provider's usage
   (including its `"cost"`), model and finish reason, taking the finish
   reason, and usage no chunk reported, from ReqLLM's metadata handle.
-- A stream that did not complete ends in `{:error, %Imp.LMError{}}`, not in
-  a completion of whatever text arrived first: one that carries a provider
-  error, finishes with reason `:error` or `:cancelled`, or is incomplete,
-  its body ending with no finish and no `[DONE]` (reason
-  `{:stream_finished, :incomplete}`). The error event carries the usage and
-  other metadata that arrived before it.
 - A streamed call that fails after the provider reported usage records that
   usage and cost on its failed `:model_response` event and in
   `Imp.Usage`, since the provider may have charged for it. The caller still
   receives `{:error, reason}`.
 - A streamed call to a client built from an inline spec map, with atom or
   string keys, or a `{provider, opts}` tuple no longer fails with
-  `{:lm_stream_failed, "protocol String.Chars not implemented ..."}`. A
-  streamed call records the model the provider reported, as a non-streamed
-  call does, and otherwise the configured model id (`gpt-test`, where it
-  recorded the whole `openai:gpt-test`), so its `Imp.Usage` key changes the
-  same way.
+  `{:lm_stream_failed, "protocol String.Chars not implemented ..."}`.
 - `:reasoning_effort` accepts `max`, when an LM is built, on a call and in a
   saved program. Imp's accepted efforts are read from ReqLLM's own
   `reasoning_effort` option, so they are every effort ReqLLM accepts, on every
