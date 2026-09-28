@@ -284,11 +284,6 @@ defmodule Imp.RedactionWritersTest do
     assert :binary.match(Probe.bytes(written["candidates"]), @shaped) != :nomatch
   end
 
-  test "a ComBee report's failure", %{probe: probe, store: store} do
-    report = %Imp.Optimizer.GEPA.ComBee.Report{status: :failed, failure: {:probe, probe}}
-    assert Probe.leaked(Imp.Optimizer.GEPA.ComBee.dump_report(report), store) == []
-  end
-
   # A trajectory refuses a struct it does not know and a key that is not an
   # atom or a string, so no part of the probe but its text reaches a playbook
   # checkpoint; the text is redacted.

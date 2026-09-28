@@ -158,7 +158,13 @@ defmodule Imp.Optimizer.GEPA.ParallelProposalTest do
     assert state.budget.reflection_calls == 1
     assert length(state.candidates) == 1
 
-    assert [%{reason: {:proposal_error, {:proposal_exception, "sequential reflection failed"}}}] =
+    assert [
+             %{
+               reason:
+                 {:proposal_error,
+                  {:proposal_exception, "ArgumentError", "sequential reflection failed"}}
+             }
+           ] =
              state.rejected
   end
 
@@ -198,6 +204,75 @@ defmodule Imp.Optimizer.GEPA.ParallelProposalTest do
     Process.exit(worker, :kill)
 
     assert Task.await(task) == [{:error, {:worker_exit, :killed}}]
+  end
+
+  test "failure reasons are redacted when recorded and every checkpoint still resumes" do
+    secret = "sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG"
+
+    for {name, proposer} <- [
+          secret_in_error: fn _candidate, _component, _records, iteration ->
+            if iteration == 1, do: raise("bad key #{secret}"), else: "proposal-#{iteration}"
+          end,
+          secret_in_instruction: fn _candidate, _component, _records, iteration ->
+            "proposal-#{iteration} key #{secret}"
+          end
+        ] do
+      owner = self()
+
+      run_engine(
+        proposer: proposer,
+        raise_on_exception: false,
+        checkpoint_fn: fn dumped ->
+          send(owner, {:checkpoint, dumped})
+          :ok
+        end
+      )
+
+      checkpoints = receive_checkpoints([])
+      assert Enum.any?(checkpoints, &(&1["pending_proposal_batch"] != nil)), inspect(name)
+
+      for checkpoint <- checkpoints do
+        failures =
+          [checkpoint["rejected"], checkpoint["history"], checkpoint["pending_proposal_batch"]]
+          |> Jason.encode!()
+
+        if name == :secret_in_error,
+          do: refute(failures =~ "abcdefghijklmnop", inspect(name))
+
+        # A batch started before the checkpoint is refused by design; every
+        # other checkpoint resumes, the proposed text included as it was.
+        try do
+          resumed =
+            run_engine(
+              proposer: proposer,
+              raise_on_exception: false,
+              resume_state: json_round_trip(checkpoint)
+            )
+
+          assert resumed.iteration == 2
+        rescue
+          error in ArgumentError ->
+            assert checkpoint["pending_proposal_batch"]["status"] == "started"
+            assert Exception.message(error) =~ "ambiguous external effects"
+        end
+      end
+
+      if name == :secret_in_error do
+        assert Enum.any?(checkpoints, fn checkpoint ->
+                 Enum.any?(checkpoint["rejected"] || [], &(Jason.encode!(&1) =~ "[REDACTED]"))
+               end)
+      else
+        assert Enum.any?(checkpoints, &(Jason.encode!(&1) =~ "abcdefghijklmnop"))
+      end
+    end
+  end
+
+  defp receive_checkpoints(acc) do
+    receive do
+      {:checkpoint, dumped} -> receive_checkpoints([dumped | acc])
+    after
+      0 -> Enum.reverse(acc)
+    end
   end
 
   test "schema 8 replays prepared work, rejects ambiguous work, tampering, and config mismatch" do
