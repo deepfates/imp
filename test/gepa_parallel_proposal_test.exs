@@ -267,6 +267,229 @@ defmodule Imp.Optimizer.GEPA.ParallelProposalTest do
     end
   end
 
+  defmodule EvaluationRecorder do
+    @behaviour Imp.Optimizer.GEPA.Callback
+
+    @impl true
+    def on_evaluation_end(%{has_trajectories: true} = event, owner) do
+      send(owner, {:evaluation_end, {event.iteration, event.candidate_idx, event.trajectories}})
+    end
+
+    def on_evaluation_end(_event, _owner), do: :ok
+  end
+
+  test "a predict program resumes from every checkpoint to the uninterrupted result" do
+    for profile <- [
+          [execution_profile: :beam_native, generations: 3, proposal_concurrency: 2],
+          [execution_profile: :gepa_v0_1_4_merge]
+        ] do
+      owner = self()
+      checkpoint_fn = fn dumped -> send(owner, {:checkpoint, dumped}) && :ok end
+      expected = compile_predict_program(profile, checkpoint_fn: checkpoint_fn)
+      evaluations = receive_evaluations([])
+      checkpoints = receive_checkpoints([])
+
+      # The proposed instruction carries a digest of the reflection prompt, so
+      # a resumed run that reflects on other records proposes other text.
+      refute expected.best == Imp.Optimizer.GEPA.Candidate.from_program(predict_program())
+      assert Enum.all?(Map.values(expected.best), &(&1 =~ "Always answer Paris"))
+
+      # A prepared batch holds the parent's trajectories, which a resumed run
+      # hands to the evaluation callbacks as the uninterrupted run did.
+      assert Enum.any?(checkpoints, fn checkpoint ->
+               match?(
+                 %{"status" => "prepared", "contexts" => [%{"parent_result" => %{}} | _]},
+                 checkpoint["pending_proposal_batch"]
+               )
+             end),
+             inspect(profile)
+
+      for checkpoint <- checkpoints,
+          resume_state <- [checkpoint, json_round_trip(checkpoint)] do
+        context =
+          inspect({profile, checkpoint["iteration"], checkpoint["pending_proposal_batch"]})
+
+        case {checkpoint["pending_proposal_batch"], checkpoint["pending_validation"]} do
+          # Evaluation that started before the checkpoint is refused.
+          {%{"status" => "started", "phase" => phase}, nil} when phase in ["parent", "child"] ->
+            assert_raise ArgumentError, ~r/ambiguous external effects/, fn ->
+              compile_predict_program(profile, resume_state: resume_state)
+            end
+
+          # Reflection that started before the checkpoint is charged as an
+          # interrupted proposal, and a pending full validation is charged
+          # and its candidate rejected; the run goes on from there.
+          {%{"status" => "started", "phase" => "reflection"}, nil} ->
+            resumed = compile_predict_program(profile, resume_state: resume_state)
+            assert inspect(resumed.report.errors) =~ "interrupted_reflection", context
+
+          {nil, %{}} ->
+            resumed = compile_predict_program(profile, resume_state: resume_state)
+            assert resumed.report.metadata.rejected_candidates >= 1, context
+
+          {batch, nil} ->
+            resumed = compile_predict_program(profile, resume_state: resume_state)
+            assert {resumed.best, resumed.score} == {expected.best, expected.score}, context
+
+            # A parent evaluation the batch holds reaches the callbacks with
+            # the trajectories the uninterrupted run gave them.
+            replayed =
+              for %{"iteration" => iteration, "parent_id" => parent, "parent_result" => %{}} <-
+                    (batch || %{})["contexts"] || [],
+                  do: {iteration, parent}
+
+            for {iteration, candidate, _} = evaluation <- receive_evaluations([]),
+                {iteration, candidate} in replayed do
+              assert evaluation in evaluations, context
+            end
+        end
+
+        receive_evaluations([])
+      end
+    end
+  end
+
+  # The fresh VM compiles the same fixture module, so its program and seed
+  # candidate match the checkpoint's.
+  @fresh_fixture """
+  defmodule Imp.Test.GEPAFreshFixture do
+    def run(opts) do
+      answer = fn messages, _opts ->
+        prompt = Enum.map_join(messages, "\\n", & &1.content)
+        if prompt =~ "Always answer Paris", do: %{answer: "Paris"}, else: %{answer: "unknown"}
+      end
+
+      reflect = fn messages, _opts ->
+        prompt = Enum.map_join(messages, "\\n", & &1.content)
+        %{instruction: "Always answer Paris. " <> Integer.to_string(:erlang.phash2(prompt))}
+      end
+
+      examples =
+        for question <- ["Capital of France?", "France's capital?", "Where is the Louvre?"] do
+          Imp.example(question: question, answer: "Paris") |> Imp.Example.with_inputs(:question)
+        end
+
+      {compiled, report} =
+        Imp.Optimizer.GEPA.new(Imp.Metrics.exact_match(:answer),
+          execution_profile: :beam_native,
+          generations: 3,
+          proposal_concurrency: 2,
+          reflection_lm: Imp.LM.Static.new(handler: reflect),
+          max_metric_calls: 24,
+          seed: 5
+        )
+        |> Imp.Optimizer.GEPA.compile_with_report(
+          Imp.predict("question -> answer", lm: Imp.LM.Static.new(handler: answer)),
+          examples,
+          Enum.take(examples, 2),
+          opts
+        )
+
+      Enum.join([Map.fetch!(Imp.Optimizer.GEPA.Candidate.from_program(compiled), :main), report.best_score], " | ")
+    end
+  end
+  """
+
+  @tag :tmp_dir
+  test "a checkpoint holding a prepared batch resumes in a fresh VM", %{tmp_dir: tmp_dir} do
+    fixture_path = Path.join(tmp_dir, "fixture.exs")
+    File.write!(fixture_path, @fresh_fixture)
+    Code.require_file(fixture_path)
+
+    owner = self()
+
+    uninterrupted =
+      apply(Imp.Test.GEPAFreshFixture, :run, [
+        [checkpoint_fn: fn dumped -> send(owner, {:checkpoint, dumped}) && :ok end]
+      ])
+
+    checkpoint =
+      receive_checkpoints([])
+      |> Enum.filter(fn checkpoint ->
+        match?(
+          %{"status" => "prepared", "contexts" => [%{"parent_result" => %{}} | _]},
+          checkpoint["pending_proposal_batch"]
+        )
+      end)
+      |> List.last()
+
+    path = Path.join(tmp_dir, "checkpoint.json")
+    File.write!(path, Jason.encode!(checkpoint))
+
+    # The fresh VM loads no GEPA module ahead of the resume, so the checkpoint
+    # loader has to load the modules whose atoms it decodes.
+    expression = """
+    {:ok, _} = Application.ensure_all_started(:imp)
+    [fixture, checkpoint] = System.argv()
+    Code.require_file(fixture)
+    resume_state = checkpoint |> File.read!() |> Jason.decode!()
+    IO.puts("resumed " <> Imp.Test.GEPAFreshFixture.run(resume_state: resume_state))
+    """
+
+    args =
+      "_build/test/lib/*/ebin"
+      |> Path.wildcard()
+      |> Enum.flat_map(&["-pa", &1])
+      |> Kernel.++(["-e", expression, fixture_path, path])
+
+    {output, status} = System.cmd("elixir", args, stderr_to_stdout: true)
+    assert status == 0, output
+    assert output =~ "resumed #{uninterrupted}"
+  end
+
+  defp compile_predict_program(profile, compile_opts) do
+    reflect = fn messages, _opts ->
+      prompt = Enum.map_join(messages, "\n", & &1.content)
+      %{instruction: "Always answer Paris. #{:erlang.phash2(prompt)}"}
+    end
+
+    examples =
+      for question <- ["Capital of France?", "France's capital?", "Where is the Louvre?"] do
+        Imp.example(question: question, answer: "Paris") |> Imp.Example.with_inputs(:question)
+      end
+
+    {compiled, report} =
+      Imp.Optimizer.GEPA.new(
+        Imp.Metrics.exact_match(:answer),
+        profile ++
+          [
+            reflection_lm: Imp.LM.Static.new(handler: reflect),
+            callbacks: [{EvaluationRecorder, self()}],
+            max_metric_calls: 24,
+            seed: 5
+          ]
+      )
+      |> Imp.Optimizer.GEPA.compile_with_report(
+        predict_program(),
+        examples,
+        Enum.take(examples, 2),
+        compile_opts
+      )
+
+    %{
+      best: Imp.Optimizer.GEPA.Candidate.from_program(compiled),
+      score: report.best_score,
+      report: report
+    }
+  end
+
+  defp receive_evaluations(acc) do
+    receive do
+      {:evaluation_end, evaluation} -> receive_evaluations([evaluation | acc])
+    after
+      0 -> Enum.reverse(acc)
+    end
+  end
+
+  defp predict_program do
+    answer = fn messages, _opts ->
+      prompt = Enum.map_join(messages, "\n", & &1.content)
+      if prompt =~ "Always answer Paris", do: %{answer: "Paris"}, else: %{answer: "unknown"}
+    end
+
+    Imp.predict("question -> answer", lm: Imp.LM.Static.new(handler: answer))
+  end
+
   defp receive_checkpoints(acc) do
     receive do
       {:checkpoint, dumped} -> receive_checkpoints([dumped | acc])

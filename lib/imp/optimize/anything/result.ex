@@ -134,6 +134,7 @@ defmodule Imp.Optimize.Anything.Result do
   @doc "Restores a version-2 Optimize Anything result."
   @spec from_map(map()) :: t()
   def from_map(map) when is_map(map) do
+    Engine.load_checkpoint_modules!()
     map = OptimizerReport.decode_term(map)
     version = fetch(map, :validation_schema_version, 0)
 

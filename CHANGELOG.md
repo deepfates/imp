@@ -458,6 +458,25 @@ Every change here is breaking for code that relied on the old behaviour.
   that process: the exit goes on up, as it must from a process that traps
   exits and turns its owner's shutdown into an exit. Before, it was recorded
   and the run went on.
+- A GEPA checkpoint restores a result's trajectories as the run held them:
+  map keys keep their atom or string type, and a trajectory's prediction,
+  example, events, usage, timing, history and adapter values come back as the
+  same structs. It wrote them in the portable `Trajectory.dump/1` form, which
+  writes every map key as a string, so resuming from a checkpoint whose
+  pending proposal batch held a result from an `Imp.predict` program raised
+  `Imp.Prediction.new/2: invalid map in :metadata … got: "trace"`, and an
+  Optimize Anything run resumed with its trajectories' metric metadata keyed
+  by strings. A checkpoint written before this change that holds trajectories,
+  such as an Optimize Anything `gepa_state.json`, does not load: the
+  resume raises `invalid GEPA checkpoint trajectory`.
+- A GEPA checkpoint resumes in a fresh VM: the loader loads the GEPA modules
+  whose atoms a checkpoint holds before decoding it. Before,
+  `Imp.Optimizer.GEPA.compile_with_report/5` given a checkpoint in a VM that
+  had not yet run GEPA raised `not an already existing atom` on names like
+  `:cache_hits` and `:no_strict_improvement`.
+- `Imp.Optimizer.GEPA.compile_with_report/5` no longer raises `KeyError` when
+  it resumes from a checkpoint taken during a full validation; the
+  interrupted validation's rejected candidate is in the report.
 - `examples/deployment/agent_optimization.exs` writes the optimizer's
   rejections and history with `Imp.Optimizer.Report.json_safe/1`. It passed
   them to `Jason.encode!/1`, which raised on a failure reason such as
