@@ -17,16 +17,20 @@ defmodule Imp.LM do
   is recorded the same way, with the usage the provider reported at the end of
   the stream.
 
-  The response event's metadata carries the
-  money for that call in `:cost`: the provider's reported total in USD as a
-  non-negative float, or `nil` when the provider reported nothing Imp can read
-  as a number. A host summing spend reads that number and nothing else.
+  The response event's metadata carries the money for that call as two
+  numbers, each a non-negative float in USD or `nil`, as on
+  `Imp.Core.LMResponse`. `:cost` is what the provider reported charging, and
+  `nil` when it reported no charge, which means the charge is unknown rather
+  than zero. `:estimated_cost` is ReqLLM's catalog price for the reported
+  tokens, and `nil` when the catalog has no price for the model or the call
+  was streamed. A host summing
+  money spent sums `:cost`; one that falls back on `:estimated_cost` for calls
+  with no reported charge is counting an estimate, and should know it.
 
-  Providers report the total as a bare number, a string, a `Decimal` or a cost
-  breakdown map, and Imp reads the number out of all four. When the provider
-  reported a breakdown, that map is also on the event as `:billing`, unchanged;
-  when it reported none, there is no `:billing` key. A breakdown's shape is the
-  provider's, so treat it as evidence to inspect, not as a contract.
+  When ReqLLM priced the call, the breakdown behind `:estimated_cost` is also
+  on the event as `:billing`, unchanged; otherwise there is no `:billing` key.
+  A breakdown's shape is ReqLLM's, so treat it as evidence to inspect, not as
+  a contract.
   """
 
   @typedoc """
@@ -219,6 +223,7 @@ defmodule Imp.LM do
                   model: request.config.model,
                   usage: response.usage,
                   cost: response.cost,
+                  estimated_cost: response.estimated_cost,
                   response: response.metadata
                 },
                 response.billing
