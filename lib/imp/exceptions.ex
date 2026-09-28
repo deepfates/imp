@@ -140,9 +140,10 @@ defmodule Imp.Errors do
   Reads the failure classes callers act on, through the wrappers Imp puts
   around an error.
 
-  An LM error reaches a caller directly (`{:error, %Imp.LMError{}}`), or from
-  a client that raised (`{:lm_failed, client, exception}`). These functions
-  accept either, with or without the `{:error, _}` around it.
+  An LM error reaches a caller directly (`{:error, %Imp.LMError{}}`), from
+  a client that raised (`{:lm_failed, client, exception}`), or inside the
+  `Imp.Predict.ReActV2.StepError` of a turn that got no model response. These
+  functions accept any of them, with or without the `{:error, _}` around it.
   """
 
   @doc """
@@ -201,6 +202,7 @@ defmodule Imp.Errors do
 
   defp lm_error({:error, reason}), do: lm_error(reason)
   defp lm_error({:lm_failed, _client, reason}), do: lm_error(reason)
+  defp lm_error(%Imp.Predict.ReActV2.StepError{reason: reason}), do: lm_error(reason)
   defp lm_error(%Imp.LMError{} = error), do: error
   defp lm_error(_other), do: nil
 end

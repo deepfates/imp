@@ -239,6 +239,26 @@ defmodule Imp.ACP.Session do
     end
   end
 
+  # A ReActV2 turn that got no model response still ran its steps, and the
+  # tools they called have happened, so its history is saved as a finished
+  # turn's is before the turn fails. The failure is reported by the model
+  # error that stopped it.
+  defp complete(
+         {:error, %Imp.Predict.ReActV2.StepError{history: %Imp.History{} = history} = error},
+         state
+       ) do
+    case Imp.ACP.SessionStore.persist(
+           state.options.session_store,
+           state.session_id,
+           state.metadata,
+           history,
+           state.transcript
+         ) do
+      :ok -> fail_turn(error.reason, %{state | history: history})
+      {:error, reason} -> fail_turn({:session_persistence_failed, reason}, state)
+    end
+  end
+
   defp complete({:error, reason}, state), do: fail_turn(reason, state)
   defp complete(other, state), do: fail_turn({:invalid_imp_result, result_shape(other)}, state)
 

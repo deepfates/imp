@@ -980,6 +980,11 @@
     },
     {
       "category": "internal",
+      "module": "Inspect.Imp.Predict.ReActV2.StepError",
+      "source": "lib/imp/predict/react_v2/step_error.ex"
+    },
+    {
+      "category": "internal",
       "module": "Inspect.Imp.Retrievers.HTTP",
       "source": "lib/imp/redaction.ex"
     },
@@ -8017,6 +8022,32 @@
         "tool_order",
         "tool_policy",
         "tools"
+      ],
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
+    },
+    {
+      "callbacks": [],
+      "category": "stable",
+      "functions": [],
+      "kind": "struct",
+      "macros": [],
+      "module": "Imp.Predict.ReActV2.StepError",
+      "signatures": {
+        "types": {
+          "t/0": []
+        }
+      },
+      "source": "lib/imp/predict/react_v2/step_error.ex",
+      "struct_fields": [
+        "__exception__",
+        "history",
+        "message",
+        "reason"
       ],
       "types": [
         {

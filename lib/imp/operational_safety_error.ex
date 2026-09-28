@@ -27,6 +27,11 @@ defmodule Imp.OperationalSafetyError do
   @doc false
   def find(%__MODULE__{} = error), do: error
 
+  # A ReActV2 turn's history records what its tools returned, a guard's
+  # refusal among them, as observations the turn went on from. Only the
+  # request that stopped the turn says why it stopped.
+  def find(%Imp.Predict.ReActV2.StepError{reason: reason}), do: find(reason)
+
   def find(%_{} = struct), do: struct |> Map.from_struct() |> find()
 
   def find(map) when is_map(map) do

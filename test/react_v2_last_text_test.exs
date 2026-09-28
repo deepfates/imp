@@ -188,18 +188,27 @@ defmodule ReActV2LastTextTest do
     assert note =~ "Last one."
   end
 
-  test "a failed last request records both failures under :initial and :last_text" do
+  # A turn whose step and last request both got no response has no answer and
+  # nothing the model said: the call fails with the last request's error.
+  test "a failed step whose last request also fails returns that request's error" do
+    counter = :counters.new(1, [])
+
     lm =
       Imp.LM.Static.new(
-        handler: fn _messages, _opts -> raise(RuntimeError, "provider unavailable") end
+        handler: fn _messages, _opts ->
+          :counters.add(counter, 1, 1)
+          raise(RuntimeError, "provider unavailable #{:counters.get(counter, 1)}")
+        end
       )
 
     program = Imp.react("intent -> answer", [look()], lm: lm)
 
-    assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
-    assert prediction.metadata[:termination_cause] == :prediction_error
-    assert %{initial: _first, last_text: _last} = error = prediction.metadata[:termination_error]
-    assert Map.keys(error) |> Enum.sort() == [:initial, :last_text]
+    assert {:error,
+            %Imp.Predict.ReActV2.StepError{
+              reason: {:lm_failed, Imp.LM.Static, %RuntimeError{message: message}}
+            }} = Imp.call(program, %{intent: "hello"})
+
+    assert message == "provider unavailable 2"
   end
 
   test "a step that calls nothing and says nothing is an empty answer, with no further request" do
@@ -396,8 +405,18 @@ defmodule ReActV2LastTextTest do
            ), 5}
         ] do
       program = Imp.react("intent -> answer", [look()], lm: lm, max_iters: max_iters)
-      assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
-      refute Imp.get(prediction, :answer) == "none was sent"
+
+      # The LM that fails every request that does not say "none" leaves the
+      # turn with no response, which is an error, not "none was sent".
+      case Imp.call(program, %{intent: "hello"}) do
+        {:ok, prediction} ->
+          refute Imp.get(prediction, :answer) == "none was sent"
+
+        {:error, error} ->
+          assert %Imp.Predict.ReActV2.StepError{
+                   reason: {:lm_failed, Imp.LM.Static, %RuntimeError{}}
+                 } = error
+      end
     end
 
     choices = collect_choices([])

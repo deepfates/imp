@@ -171,6 +171,32 @@ defmodule AdapterOffFormatReplyTest do
       end
     end
 
+    test "a JSON {} is missing every output, under JSON and in the fallback" do
+      signature = step_signature(%{text_field: :next_thought})
+
+      assert {:error,
+              %Imp.AdapterParseError{kind: :missing_fields, reason: [:next_thought, :tool_calls]}} =
+               Imp.Adapter.JSON.parse(signature, "{}", [])
+
+      replies = [~s({"next_thought": "I should look."}), "{}"]
+      counter = :counters.new(1, [])
+
+      lm =
+        Imp.LM.Static.new(
+          handler: fn _messages, _opts ->
+            :counters.add(counter, 1, 1)
+            Enum.at(replies, :counters.get(counter, 1) - 1)
+          end
+        )
+
+      assert {:error, %Imp.AdapterParseError{kind: :missing_fields}} =
+               signature
+               |> Imp.Predict.new(lm: lm)
+               |> Imp.Predict.call(%{question: "Capital?"})
+
+      assert :counters.get(counter, 1) == 2
+    end
+
     test "a reply with a requested tag parses by tags" do
       signature = step_signature(%{text_field: :next_thought})
 
