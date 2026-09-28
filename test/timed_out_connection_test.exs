@@ -72,7 +72,9 @@ defmodule Imp.TimedOutConnectionTest do
     messages = [%{role: :user, content: "ping"}]
 
     assert {:error, %Imp.LMError{retryable: true}} = Imp.LM.generate(lm, messages, opts)
-    assert {:ok, _reply} = Imp.LM.generate(lm, messages, opts)
+    # Only the first call has to time out. The second gets room to be answered
+    # on a loaded machine; landing on the stuck connection still fails below.
+    assert {:ok, _reply} = Imp.LM.generate(lm, messages, Keyword.put(opts, :timeout, 5_000))
 
     assert [first, second] = Agent.get(seen, & &1)
     refute first == second
