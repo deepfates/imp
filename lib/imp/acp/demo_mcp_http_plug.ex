@@ -37,9 +37,10 @@ defmodule Imp.ACP.DemoMCPHTTPPlug do
     end
   end
 
+  # :crypto.hash_equals/2 compares in constant time and requires equal sizes.
   defp authorized?([supplied], expected)
        when byte_size(supplied) == byte_size(expected),
-       do: Plug.Crypto.secure_compare(supplied, expected)
+       do: :crypto.hash_equals(supplied, expected)
 
   defp authorized?(_supplied, _expected), do: false
 

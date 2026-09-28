@@ -93,11 +93,11 @@ defmodule Imp.Optimizer.GEPA.ConfidenceAdapter do
 
   defp openai_chat_lm!(%Imp.Clients.ReqLLM{} = lm) do
     case ReqLLM.model(lm.model) do
-      {:ok, %LLMDB.Model{provider: :openai} = model} ->
+      {:ok, %{provider: :openai} = model} ->
         extra = put_wire_protocol(model.extra || %{}, "openai_chat")
         %{lm | model: %{model | extra: extra}}
 
-      {:ok, %LLMDB.Model{provider: provider}} ->
+      {:ok, %{provider: provider}} ->
         raise ArgumentError,
               "GEPA confidence adapter requires an OpenAI Chat ReqLLM model, got provider: #{inspect(provider)}"
 

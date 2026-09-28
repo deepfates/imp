@@ -84,7 +84,9 @@ defmodule Imp.MixProject do
       "livebook.check": :test,
       "livebook.execute.check": :test,
       "package.check": :test,
-      "quality.check": :test
+      "quality.check": :test,
+      # Every declared dependency is built only in :test.
+      "imp.deps.check": :test
     ]
 
     if benchmark_tasks_available?() do
@@ -125,9 +127,15 @@ defmodule Imp.MixProject do
       # why it is started on the first stdio connection and not at boot.
       {:ex_mcp, "~> 1.5", runtime: false},
       {:erlexec, "~> 2.2", runtime: false},
+      # Imp.Core reads a cost reported as a Decimal when the provider library
+      # returns one; Imp creates none itself, so it needs Decimal only when
+      # something else brings it.
+      {:decimal, "~> 2.0 or ~> 3.0", optional: true},
+      # Imp.Clients.ReqLLM matches Finch's error structs (Finch.TransportError,
+      # Finch.Error) to tell a request that was never sent; 0.21 is Req's floor.
+      {:finch, "~> 0.21"},
       {:jason, "~> 1.4"},
       {:jaxon, "~> 2.0.8"},
-      {:jsv, "~> 0.21"},
       # Imp matches Mint's error structs (Mint.TransportError, Mint.HTTPError)
       # to tell a request that was never sent from one that may have run
       # (Imp.Clients.ReqLLM, Imp.MCP.CallFailure), so it depends on Mint
@@ -136,6 +144,17 @@ defmodule Imp.MixProject do
       {:mint, "~> 1.11"},
       {:nimble_csv, "~> 1.3"},
       {:nimble_options, "~> 1.1"},
+      # The demo MCP servers (Imp.ACP.DemoMCPHTTPPlug, DemoMCPOAuthPlug, the
+      # imp_acp.demo_mcp_http_server task) and a bench failure campaign serve
+      # HTTP with Plug and Plug.Cowboy. The Hex package leaves those files out:
+      # Imp starts neither, and no Imp code that ships uses them. They would be
+      # dev and test dependencies, but ExMCP requires both in every environment
+      # and Mix refuses an :only restriction on a dependency another dependency
+      # needs in :prod. The requirements are ExMCP's, so declaring them adds
+      # nothing to a consumer's resolution. Once ExMCP no longer requires them,
+      # they become only: [:dev, :test].
+      {:plug, "~> 1.16", runtime: false},
+      {:plug_cowboy, "~> 2.7", runtime: false},
       {:req, "~> 0.6"},
       # 1.18 is the first release with :total_timeout, which bounds a call
       # under an Imp.Deadline including ReqLLM's retries (Imp.Clients.ReqLLM).
@@ -143,6 +162,9 @@ defmodule Imp.MixProject do
       {:saxy, "~> 1.6"},
       {:telemetry, "~> 1.3"},
       {:bandit, "~> 1.0", only: :test},
+      # test/support/local_http.ex reads the port of the Bandit server it
+      # starts from ThousandIsland, which Bandit's documentation points to.
+      {:thousand_island, "~> 1.5", only: :test},
       {:mox, "~> 1.2", only: :test},
       {:stream_data, "~> 1.1", only: :test},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
@@ -183,9 +205,8 @@ defmodule Imp.MixProject do
       Path.wildcard("lib/imp/benchmark*.ex") ++
       [
         # The demo MCP servers the demo tasks and the tests run. Nothing the
-        # package ships uses them, and they were its only use of Plug, which is
-        # therefore not a dependency of Imp; the source checkout gets it
-        # through ExMCP.
+        # package ships uses them, and they are its only use of Plug (see the
+        # :plug entry in deps/0).
         "lib/imp/acp/demo_mcp_http_plug.ex",
         "lib/imp/acp/demo_mcp_oauth_plug.ex",
         "lib/imp/acp/demo_mcp_server.ex",
@@ -496,8 +517,11 @@ defmodule Imp.MixProject do
       # .audit_ignore -- one file holding each id next to what was verified and
       # what retires it. Both run as child invocations: mix deps.audit stops the
       # VM when it finds something.
+      # imp.deps.check fails when Imp names a module from an application
+      # mix.exs does not declare.
       "quality.check": [
         "credo --only warning",
+        "imp.deps.check",
         "cmd mix deps.audit --ignore-file .audit_ignore",
         "cmd mix hex.audit"
       ]
