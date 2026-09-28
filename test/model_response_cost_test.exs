@@ -1,7 +1,7 @@
 defmodule Imp.ModelResponseCostTest do
-  # The money a host reads off a model call. Imp owns this boundary: the cost
-  # on a `:model_response` event is a number, never a provider library's
-  # private breakdown shape.
+  # The money a host reads off a model call. Imp owns this boundary: `cost` is
+  # what the provider reported charging and `estimated_cost` is ReqLLM's catalog
+  # price, each a number or nil, never a provider library's private shape.
   use ExUnit.Case, async: false
 
   @breakdown %{
@@ -20,8 +20,9 @@ defmodule Imp.ModelResponseCostTest do
   }
 
   defmodule BilledStub do
-    # A ReqLLM response whose usage carries a billing breakdown, the shape
-    # ReqLLM.Usage.Cost.merge/3 leaves on a priced call.
+    # A ReqLLM response with the usage map a test gives it. ReqLLM's usage step
+    # leaves its catalog estimate under atom keys (ReqLLM.Usage.Cost.merge/3)
+    # and a provider's own fields, such as OpenRouter's "cost", under strings.
     def generate_text(model, messages, opts) do
       usage = Keyword.fetch!(opts, :stub_usage)
 
@@ -78,8 +79,10 @@ defmodule Imp.ModelResponseCostTest do
     {events, response}
   end
 
-  test "a billed call reports the total as a number with the breakdown beside it" do
+  test "a priced call reports the provider's charge as cost and the catalog price apart" do
     usage = %{
+      "cost" => 0.0021,
+      "cost_details" => %{"upstream_inference_cost" => 0.0021},
       input_tokens: 3,
       output_tokens: 2,
       total_tokens: 5,
@@ -92,24 +95,99 @@ defmodule Imp.ModelResponseCostTest do
 
     {_events, response} = model_response(usage)
 
-    assert response.metadata.cost == 0.001858
+    assert response.metadata.cost == 0.0021
     assert is_float(response.metadata.cost)
+    assert response.metadata.estimated_cost == 0.001858
     assert response.metadata.billing == @breakdown
     assert response.metadata.billing.line_items == @breakdown.line_items
   end
 
-  test "a call the provider did not price reports no cost and no billing" do
+  test "a call ReqLLM priced but the provider did not report has no cost, only an estimate" do
+    usage = %{input_tokens: 3, output_tokens: 2, total_tokens: 5, cost: @breakdown}
+
+    {_events, response} = model_response(usage)
+
+    assert response.metadata.cost == nil
+    assert response.metadata.estimated_cost == 0.001858
+    assert response.metadata.billing == @breakdown
+  end
+
+  test "a call nobody priced reports no cost, no estimate and no billing" do
     usage = %{input_tokens: 3, output_tokens: 2, total_tokens: 5}
 
     {_events, response} = model_response(usage)
 
     assert response.metadata.cost == nil
+    assert response.metadata.estimated_cost == nil
     refute Map.has_key?(response.metadata, :billing)
     assert response.metadata.usage == usage
   end
 
-  test "the ATIF export carries the number, not the breakdown map" do
-    usage = %{input_tokens: 3, output_tokens: 2, total_tokens: 5, cost: @breakdown}
+  # The whole path a resident's call takes: an OpenRouter-shaped body over
+  # HTTP, ReqLLM's decoding and its usage step pricing the tokens from the
+  # model's catalog entry, then Imp. The entry prices 7000 input and 3000
+  # output tokens at 0.0019; OpenRouter says it charged 0.0025.
+  test "an OpenRouter response keeps OpenRouter's charge as cost and ReqLLM's price as the estimate" do
+    base_url =
+      Imp.Test.LocalHTTP.start(fn _request ->
+        {200,
+         %{
+           "id" => "gen-cost",
+           "object" => "chat.completion",
+           "model" => "openai/gpt-4.1-nano",
+           "choices" => [
+             %{
+               "index" => 0,
+               "finish_reason" => "stop",
+               "message" => %{"role" => "assistant", "content" => "pong"}
+             }
+           ],
+           "usage" => %{
+             "prompt_tokens" => 7000,
+             "completion_tokens" => 3000,
+             "total_tokens" => 10_000,
+             "cost" => 0.0025,
+             "is_byok" => false,
+             "cost_details" => %{"upstream_inference_cost" => 0.0025}
+           }
+         }}
+      end)
+
+    lm =
+      Imp.req_llm(
+        %{
+          provider: :openrouter,
+          id: "openai/gpt-4.1-nano",
+          model: "openai/gpt-4.1-nano",
+          base_url: base_url <> "/v1",
+          pricing: %{
+            currency: "USD",
+            components: [
+              %{id: "token.input", kind: "token", unit: "token", per: 1_000_000, rate: 0.1},
+              %{id: "token.output", kind: "token", unit: "token", per: 1_000_000, rate: 0.4}
+            ]
+          }
+        },
+        api_key: "local-test-key",
+        cache: false
+      )
+
+    request = Imp.LM.new_request(lm, [%{role: :user, content: "ping"}], [], "cost test")
+    assert {:ok, response} = Imp.Clients.ReqLLM.request(lm, request)
+
+    assert response.cost == 0.0025
+    assert_in_delta response.estimated_cost, 0.0019, 1.0e-12
+    assert response.billing.total == response.estimated_cost
+  end
+
+  test "the ATIF export carries both numbers, not the breakdown map in their place" do
+    usage = %{
+      "cost" => 0.002,
+      input_tokens: 3,
+      output_tokens: 2,
+      total_tokens: 5,
+      cost: @breakdown
+    }
 
     {events, _response} = model_response(usage)
     document = Imp.Trajectory.to_atif(events)
@@ -119,19 +197,23 @@ defmodule Imp.ModelResponseCostTest do
       |> Enum.map(&get_in(&1, ["extra", "model_observation"]))
       |> Enum.find(&is_map/1)
 
-    assert observation["cost"] == 0.001858
+    assert observation["cost"] == 0.002
+    assert observation["estimated_cost"] == 0.001858
     assert observation["billing"]["total"] == 0.001858
   end
 
-  test "a total reported as a string or a Decimal reads as the same number" do
+  test "a figure reported as a string or a Decimal reads as the same number" do
     for total <- ["0.001858", " 0.001858 ", Decimal.new("0.001858")] do
       raw = %{
         __imp_lm_output__: "pong",
-        __imp_lm_metadata__: %{req_llm: %{usage: %{cost: %{@breakdown | total: total}}}}
+        __imp_lm_metadata__: %{
+          req_llm: %{usage: %{:cost => %{@breakdown | total: total}, "cost" => total}}
+        }
       }
 
       assert {:ok, response} = Imp.Core.response(raw)
       assert response.cost == 0.001858
+      assert response.estimated_cost == 0.001858
       assert response.billing.total == total
     end
 
@@ -141,19 +223,29 @@ defmodule Imp.ModelResponseCostTest do
     }
 
     assert {:ok, response} = Imp.Core.response(bare)
-    assert response.cost == 0.5
+    assert response.cost == nil
+    assert response.estimated_cost == 0.5
     assert response.billing == nil
   end
 
-  test "a cost that cannot be read as a non-negative number is nothing, not a guess" do
+  test "a client other than ReqLLM reports its charge in its own metadata" do
+    raw = %{__imp_lm_output__: "pong", __imp_lm_metadata__: %{cost: 0.25}}
+
+    assert {:ok, response} = Imp.Core.response(raw)
+    assert response.cost == 0.25
+    assert response.estimated_cost == nil
+  end
+
+  test "a figure that cannot be read as a non-negative number is nothing, not a guess" do
     for reported <- ["free", %{total: "free"}, %{total: nil}, -0.5, %{total: -0.5}] do
       raw = %{
         __imp_lm_output__: "pong",
-        __imp_lm_metadata__: %{req_llm: %{usage: %{cost: reported}}}
+        __imp_lm_metadata__: %{req_llm: %{usage: %{:cost => reported, "cost" => reported}}}
       }
 
       assert {:ok, response} = Imp.Core.response(raw)
       assert response.cost == nil
+      assert response.estimated_cost == nil
     end
   end
 

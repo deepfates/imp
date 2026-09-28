@@ -75,25 +75,47 @@ defmodule Imp.Core do
     @moduledoc """
     Provider-neutral LM response: normalized outputs, usage, cost, and raw data.
 
-    `cost` is the provider's reported total for this call in USD as a
-    non-negative float, or `nil` when the provider reported nothing Imp can
-    read as a number. Providers report that total in several shapes — a bare
-    number, a string, a `Decimal`, or a cost breakdown map carrying a `total`
-    — and Imp reads the number out of all of them here, so a host reading a
-    call's money never has to learn a provider library's private shape.
+    `cost` is what the provider says it charged for this call, in USD, as a
+    non-negative float, or `nil` when the provider reported no charge. `nil`
+    means the charge is unknown, not that the call was free. OpenRouter reports
+    its charge, unasked, as the `"cost"` field of its usage object;
+    ReqLLM carries that field through unchanged, and Imp reads it from there.
+    A provider whose response carries no charge — the Anthropic, OpenAI and
+    Google APIs called directly among them — gives a `nil` cost. An LM client
+    other than ReqLLM reports its charge as `:cost` in its response metadata.
 
-    `billing` is the provider's cost breakdown map, untouched, when the
-    provider reported one, and `nil` otherwise. It is the detail behind `cost`
-    (line items, input and output splits); its shape belongs to the provider,
-    so it is evidence to inspect rather than a contract to depend on.
+    `estimated_cost` is ReqLLM's estimate for the call: the reported token
+    counts priced from its model catalog, as a non-negative float, or `nil`
+    when the catalog has no price for the model. It is a different number from
+    the charge whenever prices have changed, the provider routed to an endpoint
+    with other prices, or the provider prices caching and reasoning differently
+    from the catalog, so a host that falls back on it when `cost` is `nil` is
+    choosing to count an estimate as spend.
+
+    Either figure may arrive as a bare number, a string, a `Decimal` or a
+    breakdown map carrying a `total`, and Imp reads the number out of each, so
+    a host reading a call's money never has to learn a provider library's
+    private shape.
+
+    `billing` is the breakdown behind `estimated_cost` — ReqLLM's catalog line
+    items and input, output and reasoning splits — untouched, when there is
+    one, and `nil` otherwise. Its shape belongs to ReqLLM, so it is evidence to
+    inspect rather than a contract to depend on.
     """
 
-    defstruct outputs: [], usage: %{}, cost: nil, billing: nil, metadata: %{}, raw: nil
+    defstruct outputs: [],
+              usage: %{},
+              cost: nil,
+              estimated_cost: nil,
+              billing: nil,
+              metadata: %{},
+              raw: nil
 
     @type t :: %__MODULE__{
             outputs: list(),
             usage: map(),
-            cost: number() | nil,
+            cost: float() | nil,
+            estimated_cost: float() | nil,
             billing: map() | nil,
             metadata: map(),
             raw: term()
@@ -118,15 +140,15 @@ defmodule Imp.Core do
   def response(raw) do
     with {:ok, outputs, metadata} <- split_outputs(raw) do
       usage = response_usage(metadata)
-
-      reported = reported_cost(metadata, usage)
+      estimate = Map.get(usage, :cost)
 
       {:ok,
        %LMResponse{
          outputs: outputs,
          usage: usage,
-         cost: cost_number(reported),
-         billing: billing_breakdown(reported),
+         cost: cost_number(reported_cost(metadata, usage)),
+         estimated_cost: cost_number(estimate),
+         billing: billing_breakdown(estimate),
          metadata: metadata,
          raw: raw
        }}
@@ -267,12 +289,19 @@ defmodule Imp.Core do
     end
   end
 
+  # In ReqLLM's usage map the atom keys are ReqLLM's own: its usage step
+  # prices the token counts from the model catalog and stores that estimate as
+  # `:cost` and `:total_cost`. The provider's wire fields that ReqLLM does not
+  # interpret stay under their string keys, so OpenRouter's charge is
+  # `"cost"`. OpenRouter includes it without being asked (its
+  # `usage: %{include: true}` request option is not needed for it). A client
+  # that is not ReqLLM reports its charge as `:cost` in its own metadata.
   defp reported_cost(metadata, usage) do
-    map_value(usage, :cost, map_value(metadata, :cost, nil))
+    Map.get(usage, "cost", map_value(metadata, :cost, nil))
   end
 
-  # A cost breakdown is the provider's own map. Anything else a provider
-  # reports as a cost is a value, not a breakdown, so there is nothing to keep.
+  # A cost breakdown is ReqLLM's map. Anything else under `:cost` is a value,
+  # not a breakdown, so there is nothing to keep.
   defp billing_breakdown(%_struct{}), do: nil
   defp billing_breakdown(reported) when is_map(reported), do: reported
   defp billing_breakdown(_reported), do: nil
