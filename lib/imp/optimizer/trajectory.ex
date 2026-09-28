@@ -6,9 +6,18 @@ defmodule Imp.Optimizer.Trajectory do
   runtime identity and typed events for GEPA, MIPROv2, SIMBA, RLM, ReAct, and
   generic evaluation adapters. `dump/1` is the canonical cross-runtime wire
   representation: it is JSON-safe, deterministic, and redacts secrets in
-  structured fields. Opaque attachment bytes are preserved unchanged, and map
-  keys load as the atoms or strings they were. `load/1` validates the complete
-  envelope and fails closed.
+  structured fields. Opaque attachment bytes are preserved unchanged. An
+  `Imp.History` is written by `Imp.History.dump/1` and read by
+  `Imp.History.load!/1`. `load/1` validates the complete envelope and fails
+  closed.
+
+  Map keys load as the atoms or strings they were written as, with one
+  exception: loading never creates an atom, so a key written as an atom that
+  does not exist in the loading VM loads as its name, a string. A prediction's
+  metadata keys that are strings (written that way, or loaded as names) become
+  their atoms when those atoms exist, so `Imp.Prediction.get_lm_usage/1` and
+  `Imp.Prediction.complete?/1` read them; metadata that would then hold a key
+  as both an atom and a string is refused.
   """
 
   alias __MODULE__.{Cache, DecodeError, Event, Failure, Parameter, Timing, Usage}
@@ -709,6 +718,10 @@ defmodule Imp.Optimizer.Trajectory do
     }
   end
 
+  # A history is written and read by `Imp.History`'s own dump and load.
+  defp encode_term(%Imp.History{} = history),
+    do: %{"__trajectory_type__" => "history", "value" => Imp.History.dump(history)}
+
   defp encode_term(%Failure{} = failure) do
     validate_failure!(failure)
 
@@ -734,7 +747,9 @@ defmodule Imp.Optimizer.Trajectory do
               Imp.Adapter.Types.Code,
               Imp.Adapter.Types.Reasoning,
               Imp.Adapter.Types.ToolCall,
-              Imp.Adapter.Types.ToolResult
+              Imp.Adapter.Types.ToolResult,
+              Imp.Adapter.Types.ToolCalls,
+              Imp.Adapter.Types.ToolCallResults
             ] do
     %{
       "__trajectory_type__" => module |> Module.split() |> List.last() |> Macro.underscore(),
@@ -848,13 +863,16 @@ defmodule Imp.Optimizer.Trajectory do
 
     unless is_map(metadata), do: decode_error!("prediction metadata must be a map")
 
-    # A trajectory written before map keys kept their type holds prediction
-    # metadata with string keys, which `Imp.Prediction.new/2` refuses; it
-    # loads with the keys it was written with.
     prediction =
       Imp.Prediction.new(decode_term(fields), completions: decode_term(completions), score: score)
 
-    %{prediction | metadata: metadata}
+    %{prediction | metadata: prediction_metadata(metadata)}
+  end
+
+  defp decode_term(%{"__trajectory_type__" => "history", "value" => value} = tagged)
+       when is_map(value) do
+    require_typed_keys!(tagged, ~w(__trajectory_type__ value))
+    Imp.History.load!(value)
   end
 
   defp decode_term(%{"__trajectory_type__" => "tuple", "value" => value} = tagged)
@@ -882,13 +900,10 @@ defmodule Imp.Optimizer.Trajectory do
 
     Enum.reduce(entries, %{}, fn
       [key, nested], decoded ->
-        key = decode_term(key)
+        key = decode_key(key)
 
-        unless is_atom(key) or is_binary(key),
-          do: decode_error!("trajectory map keys must be atoms or strings")
-
-        if Map.has_key?(decoded, key),
-          do: decode_error!("trajectory map contains a repeated key"),
+        if Enum.any?(Map.keys(decoded), &(to_string(&1) == to_string(key))),
+          do: decode_error!("trajectory map contains colliding key #{inspect(to_string(key))}"),
           else: Map.put(decoded, key, decode_term(nested))
 
       _entry, _decoded ->
@@ -922,6 +937,41 @@ defmodule Imp.Optimizer.Trajectory do
 
   defp decode_term(value), do: decode_error!("invalid JSON trajectory value #{inspect(value)}")
 
+  # A key tagged as an atom loads as that atom when the atom exists and as its
+  # name otherwise, so a trajectory loads in a VM that has not created the
+  # atoms it names. Loading never creates an atom.
+  defp decode_key(%{"__trajectory_type__" => "atom", "value" => name} = tagged)
+       when is_binary(name) do
+    require_typed_keys!(tagged, ~w(__trajectory_type__ value))
+
+    existing_atom_or_name(name)
+  end
+
+  defp decode_key(key) when is_binary(key), do: key
+  defp decode_key(_key), do: decode_error!("trajectory map keys must be atoms or strings")
+
+  # Readers of a prediction's metadata use atom keys (`:lm_usage`, `:trace`,
+  # `:termination_reason`). A key written as a string, as every key was
+  # before keys kept their type, or loaded as its name above, becomes its
+  # atom when that atom exists; `Imp.Prediction.new/2` refuses other string
+  # keys, so the metadata is set on the struct as it stands.
+  defp prediction_metadata(metadata) do
+    Enum.reduce(metadata, %{}, fn {key, value}, converted ->
+      key = if is_binary(key), do: existing_atom_or_name(key), else: key
+
+      if Enum.any?(Map.keys(converted), &(to_string(&1) == to_string(key))),
+        do:
+          decode_error!("prediction metadata contains colliding key #{inspect(to_string(key))}"),
+        else: Map.put(converted, key, value)
+    end)
+  end
+
+  defp existing_atom_or_name(name) do
+    String.to_existing_atom(name)
+  rescue
+    ArgumentError -> name
+  end
+
   defp typed_modules do
     %{
       "image" => Imp.Adapter.Types.Image,
@@ -932,6 +982,8 @@ defmodule Imp.Optimizer.Trajectory do
       "reasoning" => Imp.Adapter.Types.Reasoning,
       "tool_call" => Imp.Adapter.Types.ToolCall,
       "tool_result" => Imp.Adapter.Types.ToolResult,
+      "tool_calls" => Imp.Adapter.Types.ToolCalls,
+      "tool_call_results" => Imp.Adapter.Types.ToolCallResults,
       "failure" => Failure
     }
   end

@@ -5490,13 +5490,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
       aggregate_score: Map.fetch!(result, "aggregate_score"),
       scores: Map.fetch!(result, "scores"),
       objective_scores: result |> Map.fetch!("objective_scores") |> restore(),
-      trajectories:
-        result
-        |> Map.fetch!("trajectories")
-        |> restore()
-        |> Map.new(fn {component, trajectories} ->
-          {component, Enum.map(trajectories, &load_runtime_term/1)}
-        end),
+      trajectories: result |> Map.fetch!("trajectories") |> load_trajectories!(),
       side_information: result |> Map.fetch!("side_information") |> restore(),
       metadata: result |> Map.fetch!("metadata") |> restore()
     }
@@ -5681,11 +5675,58 @@ defmodule Imp.Optimizer.GEPA.Engine do
     )
   end
 
-  defp load_runtime_term(%{"__gepa_type__" => "trajectory", "state" => state}) do
-    Trajectory.load!(state)
+  defp load_runtime_term(term), do: restore(term)
+
+  # A result's trajectories are written as a report-encoded map of component
+  # to trajectory wire maps. The wire map is JSON already, so the report
+  # encoding around it only turned its nulls and booleans into atom tags.
+  # Reading it undoes exactly that and hands the rest to `Trajectory.load!/1`
+  # as it was written: decoding it as a report term too would also decode the
+  # report tags a value inside it carries in its own encoding (an
+  # `Imp.History` does), which its own loader then reads a second time.
+  defp load_trajectories!(%{"__imp_type__" => "map", "entries" => entries} = tagged)
+       when is_list(entries) do
+    require_exact_keys!(tagged, ~w(__imp_type__ entries), "GEPA result trajectories")
+
+    Enum.reduce(entries, %{}, fn
+      [component, trajectories], loaded ->
+        component = restore(component)
+
+        if Map.has_key?(loaded, component),
+          do: raise(ArgumentError, "GEPA result trajectories repeat a component"),
+          else: Map.put(loaded, component, load_trajectory_list!(trajectories))
+
+      _entry, _loaded ->
+        raise ArgumentError, "malformed GEPA result trajectories"
+    end)
   end
 
-  defp load_runtime_term(term), do: restore(term)
+  defp load_trajectories!(trajectories) when is_map(trajectories),
+    do:
+      Map.new(trajectories, fn {component, list} -> {component, load_trajectory_list!(list)} end)
+
+  defp load_trajectory_list!(trajectories) when is_list(trajectories),
+    do: Enum.map(trajectories, &load_trajectory!/1)
+
+  defp load_trajectory_list!(_trajectories),
+    do: raise(ArgumentError, "malformed GEPA result trajectories")
+
+  defp load_trajectory!(%{"__gepa_type__" => "trajectory", "state" => state} = tagged) do
+    require_exact_keys!(tagged, ~w(__gepa_type__ state), "GEPA runtime trajectory")
+    state |> literal_atoms() |> Trajectory.load!()
+  end
+
+  defp load_trajectory!(term), do: restore(term)
+
+  defp literal_atoms(%{"__imp_type__" => "atom", "value" => value} = tag)
+       when map_size(tag) == 2 and value in ["nil", "true", "false"],
+       do: String.to_existing_atom(value)
+
+  defp literal_atoms(map) when is_map(map),
+    do: Map.new(map, fn {key, value} -> {key, literal_atoms(value)} end)
+
+  defp literal_atoms(list) when is_list(list), do: Enum.map(list, &literal_atoms/1)
+  defp literal_atoms(value), do: value
 
   defp normalize_frontier_type!(type) when type in [:instance, :objective, :hybrid, :cartesian],
     do: type

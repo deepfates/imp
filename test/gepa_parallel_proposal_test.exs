@@ -290,21 +290,29 @@ defmodule Imp.Optimizer.GEPA.ParallelProposalTest do
   end
 
   test "a predict program resumes from every checkpoint to the uninterrupted result" do
+    assert_resumes_from_every_checkpoint(:predict)
+  end
+
+  test "an agent with a tool resumes from every checkpoint to the uninterrupted result" do
+    assert_resumes_from_every_checkpoint(:react)
+  end
+
+  defp assert_resumes_from_every_checkpoint(kind) do
     for profile <- [
           [execution_profile: :beam_native, generations: 3, proposal_concurrency: 2],
           [execution_profile: :gepa_v0_1_4_merge]
         ] do
       owner = self()
       checkpoint_fn = fn dumped -> send(owner, {:checkpoint, dumped}) && :ok end
-      expected = compile_predict_program(profile, checkpoint_fn: checkpoint_fn)
+      expected = compile_program(kind, profile, checkpoint_fn: checkpoint_fn)
       evaluations = receive_evaluations([])
       starts = receive_starts([])
       checkpoints = receive_checkpoints([])
 
       # The proposed instruction carries a digest of the reflection prompt, so
       # a resumed run that reflects on other records proposes other text.
-      refute expected.best == Imp.Optimizer.GEPA.Candidate.from_program(predict_program())
-      assert Enum.all?(Map.values(expected.best), &(&1 =~ "Always answer Paris"))
+      refute expected.best == Imp.Optimizer.GEPA.Candidate.from_program(program(kind))
+      assert Enum.any?(Map.values(expected.best), &(&1 =~ "Always answer Paris"))
 
       # A prepared batch holds the parent's trajectories, which a resumed run
       # hands to the evaluation callbacks as the uninterrupted run did.
@@ -325,23 +333,28 @@ defmodule Imp.Optimizer.GEPA.ParallelProposalTest do
           # Evaluation that started before the checkpoint is refused.
           {%{"status" => "started", "phase" => phase}, nil} when phase in ["parent", "child"] ->
             assert_raise ArgumentError, ~r/ambiguous external effects/, fn ->
-              compile_predict_program(profile, resume_state: resume_state)
+              compile_program(kind, profile, resume_state: resume_state)
             end
 
           # Reflection that started before the checkpoint is charged as an
           # interrupted proposal, and a pending full validation is charged
           # and its candidate rejected; the run goes on from there.
           {%{"status" => "started", "phase" => "reflection"}, nil} ->
-            resumed = compile_predict_program(profile, resume_state: resume_state)
+            resumed = compile_program(kind, profile, resume_state: resume_state)
             assert inspect(resumed.report.errors) =~ "interrupted_reflection", context
 
           {nil, %{}} ->
-            resumed = compile_predict_program(profile, resume_state: resume_state)
+            resumed = compile_program(kind, profile, resume_state: resume_state)
             assert resumed.report.metadata.rejected_candidates >= 1, context
 
           {_prepared_or_none, nil} ->
-            resumed = compile_predict_program(profile, resume_state: resume_state)
-            assert {resumed.best, resumed.score} == {expected.best, expected.score}, context
+            resumed = compile_program(kind, profile, resume_state: resume_state)
+
+            assert {resumed.best, resumed.score} == {expected.best, expected.score},
+                   inspect(
+                     {resumed.best, resumed.score, expected.best, expected.score,
+                      is_map(resume_state)}
+                   )
 
             # Every evaluation the resumed run makes, the uninterrupted run
             # made: the same iteration, parent and examples.
@@ -447,7 +460,7 @@ defmodule Imp.Optimizer.GEPA.ParallelProposalTest do
     assert output =~ "resumed #{uninterrupted}"
   end
 
-  defp compile_predict_program(profile, compile_opts) do
+  defp compile_program(kind, profile, compile_opts) do
     reflect = fn messages, _opts ->
       prompt = Enum.map_join(messages, "\n", & &1.content)
       %{instruction: "Always answer Paris. #{:erlang.phash2(prompt)}"}
@@ -470,7 +483,7 @@ defmodule Imp.Optimizer.GEPA.ParallelProposalTest do
           ]
       )
       |> Imp.Optimizer.GEPA.compile_with_report(
-        predict_program(),
+        program(kind),
         examples,
         Enum.take(examples, 2),
         compile_opts
@@ -497,6 +510,41 @@ defmodule Imp.Optimizer.GEPA.ParallelProposalTest do
     after
       0 -> Enum.reverse(acc)
     end
+  end
+
+  defp program(:predict), do: predict_program()
+
+  # An agent that calls its tool, then answers Paris once its instruction says
+  # so; the tool call and its result are in every trajectory's history.
+  defp program(:react) do
+    lookup =
+      Imp.tool(:lookup, "Look up a city.", fn %{"city" => city} -> "#{city} is in France" end,
+        schema: %{
+          "type" => "object",
+          "properties" => %{"city" => %{"type" => "string"}},
+          "required" => ["city"]
+        }
+      )
+
+    lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          text = inspect(messages, limit: :infinity, printable_limit: :infinity)
+
+          cond do
+            not (text =~ "is in France") ->
+              %{tool_calls: [%{name: "lookup", arguments: %{"city" => "Paris"}}]}
+
+            text =~ "Always answer Paris" ->
+              "Paris"
+
+            true ->
+              "unknown"
+          end
+        end
+      )
+
+    Imp.react("question -> answer", [lookup], lm: lm, max_iters: 3)
   end
 
   defp predict_program do
