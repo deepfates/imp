@@ -6,11 +6,12 @@ User-visible changes to Imp are recorded here.
 
 ### Security
 
-- The lock file takes `mint` 1.11.0 (and `hpax` 1.1.0), which fixes
-  EEF-CVE-2026-91043, EEF-CVE-2026-92103 and EEF-CVE-2026-94194 in the HTTP
-  client Req uses. The example projects' lock files take the same versions.
-  Imp's lock file does not bind an application that depends on Imp, and Imp
-  sets no `mint` floor: run `mix deps.update mint hpax` in your own project.
+- Imp depends on `mint` `~> 1.11` directly, which fixes EEF-CVE-2026-91043,
+  EEF-CVE-2026-92103 and EEF-CVE-2026-94194 in the HTTP client Req uses. Imp
+  matches Mint's error structs to tell a request that was never sent from one
+  that may have run, and did not declare the dependency. `mix deps.get` in an
+  application that locked `mint` 1.10.1 moves it to 1.11.0. Imp's lock file
+  and the example projects' take `mint` 1.11.0 and `hpax` 1.1.0.
 - `Imp.Redaction` redacts a string that holds a PEM private key of any type,
   a PGP private key block or a PuTTY key file; a Stripe (`sk_live_`,
   `rk_live_`), GitHub, GitLab (`glpat-`), Hugging Face (`hf_`), Slack

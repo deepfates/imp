@@ -68,16 +68,15 @@ tree calls, and no cowlib release fixes it yet.
   and tool calls keeps all of them, streamed or not.
 - GEPA checkpoints resume: from a pending proposal batch, from a program that
   is an agent, and in a fresh VM.
-- Imp's lock file takes `mint` 1.11.0, which fixes three advisories
-  (EEF-CVE-2026-91043, EEF-CVE-2026-92103, EEF-CVE-2026-94194). That lock
-  does not reach your application, and Imp sets no `mint` floor: update your
-  own lock (Upgrading, step 1).
+- Imp requires `mint` 1.11, which fixes three advisories
+  (EEF-CVE-2026-91043, EEF-CVE-2026-92103, EEF-CVE-2026-94194). Imp uses
+  Mint's error structs directly and now declares the dependency, so
+  `mix deps.get` moves an application's locked `mint` to 1.11.
 
 ## Upgrading from 0.5
 
-1. Change the dependency to `{:imp, "~> 0.6"}`, run `mix deps.get` and
-   `mix deps.update mint hpax`, and commit `mix.lock`. `nimble_csv` is a new
-   dependency.
+1. Change the dependency to `{:imp, "~> 0.6"}`, run `mix deps.get`, and
+   commit `mix.lock`. `nimble_csv` and `mint` are new direct dependencies.
 2. `Imp.collect/3` returns `{:ok, prediction}` or `{:error, reason}`; read
    fields with `Imp.get(prediction, :answer)` instead of matching a string.
 3. Where you checked `Imp.Prediction.complete?/1` after a ReActV2 model

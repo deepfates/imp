@@ -128,6 +128,12 @@ defmodule Imp.MixProject do
       {:jason, "~> 1.4"},
       {:jaxon, "~> 2.0.8"},
       {:jsv, "~> 0.21"},
+      # Imp matches Mint's error structs (Mint.TransportError, Mint.HTTPError)
+      # to tell a request that was never sent from one that may have run
+      # (Imp.Clients.ReqLLM, Imp.MCP.CallFailure), so it depends on Mint
+      # directly. 1.11.0 is the first release without EEF-CVE-2026-91043,
+      # EEF-CVE-2026-92103 and EEF-CVE-2026-94194.
+      {:mint, "~> 1.11"},
       {:nimble_csv, "~> 1.3"},
       {:nimble_options, "~> 1.1"},
       {:req, "~> 0.6"},
