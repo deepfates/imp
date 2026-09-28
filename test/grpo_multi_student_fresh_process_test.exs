@@ -3,13 +3,6 @@ defmodule GRPOMultiStudentFreshProcessTest do
 
   alias Imp.Clients.TrainingJob
 
-  # Every trainer callback in these fresh BEAMs runs under this bound, including
-  # the first `start_reinforcement`, which loads modules from disk and on a cold
-  # machine can take hundreds of milliseconds. Only the hung step is meant to reach
-  # the bound, and it never returns, so the bound needs only to exceed an
-  # ordinary callback.
-  @callback_timeout_ms 3_000
-
   setup do
     root =
       Path.join(
@@ -27,13 +20,13 @@ defmodule GRPOMultiStudentFreshProcessTest do
   } do
     first =
       run_fresh(root,
-        mode: {:hang_after_step, "fresh-base-b"},
+        mode: {:die_after_step, "fresh-base-b"},
         reward_id: "fresh-multi-reward-v1",
         reward: 1.0
       )
 
-    assert first =~ "grpo_step_outcome_unknown"
-    assert first =~ "reinforcement_callback_timeout"
+    assert first =~
+             ~r/\{:error,\s*\{:grpo_step_outcome_unknown,\s*"grpo-step:[0-9a-f]+",\s*\{:reinforcement_callback_exit, :reinforcement_step, :killed\}\}\}/
 
     first_events = [
       "start fresh-base-a",
@@ -148,7 +141,6 @@ defmodule GRPOMultiStudentFreshProcessTest do
       checkpoint_path: Path.join(root, "checkpoint.json"),
       num_train_steps: 1,
       num_rollouts_per_grpo_step: 2,
-      callback_timeout_ms: #{@callback_timeout_ms},
       status_poll_interval_ms: 0
     )
     trainset = [
