@@ -40,7 +40,7 @@ containing CR or LF, and a fresh `mix deps.get` resolves Cowboy 2.19.0. The seco
 for an outgoing `Cookie` request header, which nothing in Imp's dependency
 tree calls, and no cowlib release fixes it yet.
 
-Imp declares `mint` `~> 1.10`, and a fresh `mix deps.get` resolves `mint`
+Imp declares `mint` `~> 1.8`, as Finch does, and a fresh `mix deps.get` resolves `mint`
 1.11.0. That release fixes three advisories but reuses HTTP/1 connections
 that timed out; Imp's own lock holds 1.10.1. See Known limits for the choice
 an application has.
