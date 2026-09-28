@@ -35,11 +35,13 @@ defmodule Imp.Clients.ReqLLM do
   event, and the provider stream is cancelled.
 
   `:reasoning_effort` is the one reasoning option, on the client or on a call.
-  It takes `none`, `minimal`, `low`, `medium`, `high`, `xhigh` or `default`, as
-  an atom or a string. A call naming `nil` spends no reasoning on that call
-  whatever the client is configured with. Native reasoning fields
-  (`Imp.Predict`) set the same option, so a client configured with an effort
-  and a program that asks for one never disagree.
+  It takes any value of ReqLLM's own `reasoning_effort` option, such as `high`,
+  `xhigh`, `max` or `default`, as an atom or a string, on every provider;
+  ReqLLM's provider maps or clamps it to what that provider's API takes. A
+  call naming `nil` spends no reasoning on that call whatever the client is
+  configured with. Native reasoning fields (`Imp.Predict`) set the same
+  option, so a client configured with an effort and a program that asks for
+  one never disagree.
 
   OpenRouter accepts the effort in two wire fields, and its endpoint catalog
   says which one an endpoint supports: ReqLLM's top-level `reasoning_effort`
@@ -165,11 +167,12 @@ defmodule Imp.Clients.ReqLLM do
 
   defp resolve_model(%{capabilities: _} = model), do: {:ok, model}
 
+  # ReqLLM.model/1 returns ok/error tuples. Any other result is a
+  # CaseClauseError, which the rescue turns into an error like any other.
   defp resolve_model(model_spec) do
     case ReqLLM.model(model_spec) do
       {:ok, model} -> {:ok, model}
       {:error, reason} -> {:error, reason}
-      other -> {:error, {:unexpected_registry_result, other}}
     end
   rescue
     error -> {:error, error}
@@ -360,6 +363,7 @@ defmodule Imp.Clients.ReqLLM do
     opts =
       opts
       |> encode_openrouter_reasoning(lm.model)
+      |> atomize_reasoning_effort()
       |> cap_transport_timeouts()
       |> bind_to_caller()
       |> keep_error_headers()
@@ -736,6 +740,7 @@ defmodule Imp.Clients.ReqLLM do
     opts =
       opts
       |> encode_openrouter_reasoning(lm.model)
+      |> atomize_reasoning_effort()
       |> cap_transport_timeouts()
       |> enforce_explicit_no_retry()
 
@@ -834,7 +839,20 @@ defmodule Imp.Clients.ReqLLM do
     end
   end
 
-  @reasoning_efforts ~w(none minimal low medium high xhigh default)
+  # The accepted efforts are ReqLLM's own `reasoning_effort` option, read from
+  # its generation schema so Imp keeps no second list. The match fails the
+  # build if ReqLLM changes the option's shape.
+  {:in, req_llm_efforts} =
+    ReqLLM.Provider.Options.generation_schema().schema
+    |> Keyword.fetch!(:reasoning_effort)
+    |> Keyword.fetch!(:type)
+
+  @reasoning_efforts Enum.map(req_llm_efforts, &Atom.to_string/1)
+
+  @doc false
+  @spec reasoning_efforts() :: [String.t()]
+  def reasoning_efforts, do: @reasoning_efforts
+
   @reasoning_wires ~w(top_level nested)
 
   defp normalize_reasoning_effort_option!(opts, context) do
@@ -895,6 +913,22 @@ defmodule Imp.Clients.ReqLLM do
   defp unsupported_effort!(effort) do
     raise ArgumentError,
           ":reasoning_effort must be one of #{inspect(@reasoning_efforts)}, got: #{inspect(effort)}"
+  end
+
+  # ReqLLM checks `:reasoning_effort` against its atom list before most
+  # providers (OpenRouter, Anthropic, Google, Groq) see it; only OpenAI, xAI
+  # and Meta turn the string form into the atom first. A string effort would
+  # fail ReqLLM's option validation on the others. The effort is kept as
+  # given in the client's options, where it is part of the cache key, and
+  # becomes the atom only on its way into ReqLLM.
+  defp atomize_reasoning_effort(opts) do
+    case Keyword.fetch(opts, :reasoning_effort) do
+      {:ok, effort} when is_binary(effort) and effort in @reasoning_efforts ->
+        Keyword.put(opts, :reasoning_effort, String.to_existing_atom(effort))
+
+      _other ->
+        opts
+    end
   end
 
   # With `openrouter_reasoning_wire: :nested` the effort leaves the ReqLLM

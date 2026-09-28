@@ -107,6 +107,14 @@ defmodule Imp.SavingReqLLMTransportTest do
     assert loaded.lm.opts[:reasoning_effort] == "high"
     assert loaded.lm.opts[:openrouter_reasoning_wire] == :nested
 
+    max =
+      Imp.predict("question -> answer",
+        lm: Imp.req_llm("openrouter:provider/model", reasoning_effort: :max)
+      )
+
+    assert Imp.load!(max |> Imp.dump() |> json_round_trip()).lm.opts[:reasoning_effort] ==
+             "max"
+
     root = tmp_dir("openrouter-reasoning-fresh-beam")
     artifact = Path.join(root, "program.json")
     receipt = Path.join(root, "receipt.bin")
