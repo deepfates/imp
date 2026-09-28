@@ -393,6 +393,87 @@ defmodule Imp.Optimizer.MIPROv2.ResumeTest do
     assert length(resumed.errors) == length(uninterrupted.errors)
   end
 
+  # The fresh VM compiles the same fixture module, so its callbacks have the
+  # identities the checkpoint was written with.
+  @fresh_fixture """
+  defmodule Imp.Test.MIPROv2FreshFixture do
+    def build do
+      task_lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "yes"} end)
+
+      prompt_lm =
+        Imp.LM.Static.new(handler: fn _messages, _opts ->
+          ["Answer consistently.", "Return yes.", "Use the demonstrations."]
+        end)
+
+      program = Imp.predict("question -> answer", lm: task_lm)
+      rows = fn name -> for index <- 1..3, do: Imp.example(question: name <> " " <> Integer.to_string(index), answer: "yes") |> Imp.with_inputs(:question) end
+
+      optimizer =
+        Imp.Optimizer.MIPROv2.new(Imp.Metrics.exact_match(:answer),
+          auto: nil,
+          num_candidates: 3,
+          num_trials: 6,
+          max_bootstrapped_demos: 0,
+          max_labeled_demos: 1,
+          minibatch: true,
+          minibatch_size: 1,
+          minibatch_full_eval_steps: 2,
+          prompt_lm: prompt_lm,
+          metric_identity: %{"id" => "exact-answer", "version" => 1, "config" => %{"field" => "answer"}},
+          startup_trials: 1,
+          seed: 31
+        )
+
+      {program, optimizer, rows.("train"), Enum.take(rows.("val"), 2)}
+    end
+  end
+  """
+
+  @tag :tmp_dir
+  test "a checkpoint resumes in a fresh VM", %{tmp_dir: tmp_dir} do
+    fixture_path = Path.join(tmp_dir, "fixture.exs")
+    File.write!(fixture_path, @fresh_fixture)
+    Code.require_file(fixture_path)
+    {program, optimizer, trainset, valset} = apply(Imp.Test.MIPROv2FreshFixture, :build, [])
+
+    uninterrupted = optimizer |> MIPROv2.compile(program, trainset, valset) |> Report.fetch()
+
+    paused =
+      optimizer |> MIPROv2.compile(program, trainset, valset, max_trials: 2) |> Report.fetch()
+
+    path = Path.join(tmp_dir, "checkpoint.json")
+    File.write!(path, Jason.encode!(paused.metadata.resume_state))
+
+    # The fresh VM loads no Imp module ahead of the resume, so the checkpoint
+    # loader has to load the modules whose atoms it decodes.
+    expression = """
+    {:ok, _} = Application.ensure_all_started(:imp)
+    [fixture, checkpoint] = System.argv()
+    Code.require_file(fixture)
+    resume_state = checkpoint |> File.read!() |> Jason.decode!()
+    {program, optimizer, trainset, valset} = Imp.Test.MIPROv2FreshFixture.build()
+
+    report =
+      optimizer
+      |> Imp.Optimizer.MIPROv2.compile(program, trainset, valset, resume_state: resume_state)
+      |> Imp.Optimizer.Report.fetch()
+
+    IO.puts(Enum.join(["resumed", report.metadata.run_status, report.best_score, report.candidate_count], " "))
+    """
+
+    args =
+      "_build/test/lib/*/ebin"
+      |> Path.wildcard()
+      |> Enum.flat_map(&["-pa", &1])
+      |> Kernel.++(["-e", expression, fixture_path, path])
+
+    {output, status} = System.cmd("elixir", args, stderr_to_stdout: true)
+    assert status == 0, output
+
+    assert output =~
+             "resumed complete #{uninterrupted.best_score} #{uninterrupted.candidate_count}"
+  end
+
   defp captured_metric(state) do
     fn example, prediction ->
       _ = Agent.get(state, & &1.proposal_calls)

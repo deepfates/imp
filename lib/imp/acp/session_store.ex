@@ -1,6 +1,13 @@
 defmodule Imp.ACP.SessionStore do
   @moduledoc false
 
+  # One JSON file per session, mode 0600 in a 0700 directory. The history and
+  # transcript are redacted when written, except the provider's reasoning
+  # continuation, so a resumed session replays a message or tool result that
+  # held a credential as "[REDACTED]". The session's `_meta` is stored as the
+  # client sent it: Imp puts nothing there and never reads it, only the host's
+  # program factory does, so anything a host puts in `_meta` is persisted.
+
   @version 1
   @session_id ~r/\Aimp_[A-Za-z0-9_-]{24}\z/
 

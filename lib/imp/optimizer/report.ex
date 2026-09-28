@@ -67,6 +67,9 @@ defmodule Imp.Optimizer.Report do
     # loaded in a fresh OS process, so this portable marker cannot depend on
     # incidental module load order.
     "augmented" => :augmented,
+    # `Imp.Redaction.redact_term/2` writes an atom that spells a credential as
+    # this marker; a fresh VM may not have loaded `Imp.Redaction`.
+    "[REDACTED]" => :"[REDACTED]",
     "better_together" => :better_together,
     "batch_controller" => :batch_controller,
     "bootstrap_few_shot" => :bootstrap_few_shot,

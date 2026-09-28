@@ -146,15 +146,17 @@ defmodule Imp.Redaction do
   end
 
   def drop_headers(value) when is_list(value) do
+    pairs? = pair_list?(value)
+
     value
     |> Enum.reject(fn
       {key, _value} -> header_key?(key)
-      [key, _value] -> header_key?(key)
+      [key, _value] when pairs? -> header_key?(key)
       _item -> false
     end)
     |> Enum.map(fn
       {key, nested} -> {key, drop_headers(nested)}
-      [key, nested] when is_atom(key) or is_binary(key) -> [key, drop_headers(nested)]
+      [key, nested] when pairs? -> [key, drop_headers(nested)]
       item -> drop_headers(item)
     end)
   end
@@ -451,10 +453,12 @@ defmodule Imp.Redaction do
   defp walk(value, keys, mode) when is_map(value) do
     tagged_entry_keys = tagged_map_entry_keys(value)
 
-    {tagged_pair_keys, preserved} =
+    tagged_pair_keys = tagged_pair_keys(value)
+
+    preserved =
       case mode do
-        {:typed, preserved} -> {tagged_pair_keys(value), preserved}
-        :plain -> {[], []}
+        {:typed, preserved} -> preserved
+        :plain -> []
       end
 
     Map.new(value, fn {key, nested} ->
@@ -468,20 +472,13 @@ defmodule Imp.Redaction do
     end)
   end
 
-  # Plain redaction reads any two-element list with a name first as a
-  # key-value pair, as JSON-decoded headers and options are written. A term
-  # kept for conversion is not read that way: its pairs are tuples, and a list
-  # such as an example's input keys `[:api_key, :question]` is data.
-  defp walk([key, _nested] = pair, keys, :plain)
-       when is_atom(key) or is_binary(key) or is_map(key),
-       do: walk_pair(pair, keys, :plain)
-
   defp walk([], _keys, _mode), do: []
 
-  # Provider failures and low-level protocol metadata can contain improper lists.
-  # Walking cons cells directly preserves their shape and keeps the observability
-  # boundary fail-safe instead of crashing inside Enumerable.
-  defp walk([head | tail], keys, mode), do: [walk(head, keys, mode) | walk(tail, keys, mode)]
+  defp walk([_ | _] = list, keys, mode) do
+    if pair_list?(list),
+      do: Enum.map(list, &walk_pair(&1, keys, mode)),
+      else: walk_cells(list, keys, mode)
+  end
 
   defp walk({key, nested}, keys, mode) when is_atom(key) or is_binary(key) do
     if redacted_entry?(key, nested, keys),
@@ -508,6 +505,15 @@ defmodule Imp.Redaction do
 
   defp walk(value, _keys, _mode), do: value
 
+  # Provider failures and low-level protocol metadata can contain improper lists.
+  # Walking cons cells directly preserves their shape and keeps the observability
+  # boundary fail-safe instead of crashing inside Enumerable.
+  defp walk_cells([head | tail], keys, mode),
+    do: [walk(head, keys, mode) | walk_cells(tail, keys, mode)]
+
+  defp walk_cells([], _keys, _mode), do: []
+  defp walk_cells(tail, keys, mode), do: walk(tail, keys, mode)
+
   defp walk_pair([key, nested], keys, mode) do
     cond do
       redacted_entry?(key, nested, keys) ->
@@ -523,8 +529,28 @@ defmodule Imp.Redaction do
 
   defp walk_pair(value, keys, mode), do: walk(value, keys, mode)
 
-  defp walk_key(key, _keys, _mode) when is_atom(key) or is_binary(key), do: key
+  # A string key is redacted by its shape alone: its name is what the entry's
+  # value is judged by, not a secret to hide.
+  defp walk_key(key, _keys, _mode) when is_binary(key),
+    do: if(secret_value?(key), do: "[REDACTED]", else: key)
+
+  defp walk_key(key, _keys, _mode) when is_atom(key), do: key
   defp walk_key(key, keys, mode), do: walk(key, keys, mode)
+
+  @doc false
+  # A two-element list is a key-value pair only inside a list whose every
+  # element is a pair with a name first, as JSON writes headers, options and
+  # config: `[["api_key", key], ["model", "gpt"]]`. A flat list of names, such
+  # as an example's input keys `[:api_key, :question]` or a schema's
+  # `"required" => ["api_key", "query"]`, is data. A tuple with a name first is
+  # always a pair.
+  def pair_list?(list) when is_list(list) and list != [], do: pairs?(list)
+  def pair_list?(_value), do: false
+
+  defp pairs?([]), do: true
+  defp pairs?([[key, _value] | rest]) when is_atom(key) or is_binary(key), do: pairs?(rest)
+  defp pairs?([{key, _value} | rest]) when is_atom(key) or is_binary(key), do: pairs?(rest)
+  defp pairs?(_list), do: false
 
   # An encoded two-element tuple is a pair the codec tagged as one.
   defp tagged_pair_keys(value) do
@@ -608,10 +634,8 @@ defmodule Imp.Redaction do
     |> drop_credential_value()
   end
 
-  # A pair is a tuple, a tagged map's entry, or an encoded two-element tuple.
-  # Any other two-element list is data (an example's input keys
-  # `[:api_key, :question]`); a caller holding pairs written as lists, as JSON
-  # writes them, turns them into tuples first.
+  # A pair is a tuple, a tagged map's entry, an encoded two-element tuple, or
+  # a two-element list inside a list of pairs (see `pair_list?/1`).
   defp drop_credential_value(%{"__imp_type__" => "tuple", "items" => [key, nested]} = tuple) do
     if credential_entry?(key, nested) do
       :drop
@@ -646,7 +670,31 @@ defmodule Imp.Redaction do
     {:keep, sanitized}
   end
 
-  defp drop_credential_value(list) when is_list(list), do: drop_list_values(list, [])
+  defp drop_credential_value(list) when is_list(list) do
+    if pair_list?(list) do
+      list
+      |> Enum.flat_map(fn
+        [key, nested] ->
+          if credential_entry?(key, nested) do
+            []
+          else
+            case drop_noncredential_pair([key, nested]) do
+              {:keep, pair} -> [pair]
+              :drop -> []
+            end
+          end
+
+        pair ->
+          case drop_credential_value(pair) do
+            {:keep, value} -> [value]
+            :drop -> []
+          end
+      end)
+      |> then(&{:keep, &1})
+    else
+      drop_list_values(list, [])
+    end
+  end
 
   defp drop_credential_value({key, nested}) when is_atom(key) or is_binary(key) do
     if credential_entry?(key, nested) do

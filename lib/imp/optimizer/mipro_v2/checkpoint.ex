@@ -38,6 +38,17 @@ defmodule Imp.Optimizer.MIPROv2.Checkpoint do
     }
   end
 
+  # The modules that name the atoms a checkpoint's trial records, proposal
+  # artifacts and errors hold. A resumed run in a fresh VM skips the work that
+  # would load them, so the loader loads them before decoding.
+  @run_modules [
+    Imp.Optimizer.MIPROv2,
+    Imp.Optimizer.MIPROv2.UpstreamBootstrap,
+    Imp.Optimizer.MIPROv2.UpstreamProposer,
+    Imp.Optimizer.InstructionProposer,
+    Imp.Optimizer.DemoCandidates
+  ]
+
   @spec load!(map(), map()) :: %{artifacts: map(), state: map()}
   def load!(checkpoint, expected_compatibility)
 
@@ -60,6 +71,8 @@ defmodule Imp.Optimizer.MIPROv2.Checkpoint do
     unless checksum(payload) == payload_sha256 do
       raise ArgumentError, "MIPROv2 resume state checksum does not match its payload"
     end
+
+    Enum.each(@run_modules, &Code.ensure_loaded!/1)
 
     unless compatible?(schema_version, compatibility, expected_compatibility) do
       raise ArgumentError,

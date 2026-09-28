@@ -99,17 +99,30 @@ User-visible changes to Imp are recorded here.
   written with its header values, URL query secrets or store key, and a
   secret in a map key that is a tuple, a list or a struct was written as it
   was. The SIMBA, MIPROv2, InferRules and random-search checkpoints redact
-  their failure reasons the same way; the instructions,
-  demos and scores a resumed run continues from are kept. An ACP session keeps
-  the provider's `reasoning_content` and `reasoning_details` unmodified.
-  `Imp.Redaction.drop_credentials/1` redacts such structs too. Output that
-  holds no secret is unchanged.
+  their failure reasons the same way; the instructions, demos and scores a
+  resumed run continues from are kept. `Imp.Redaction.drop_credentials/1`
+  redacts such structs too. Output that holds no secret is unchanged.
+- An ACP session store redacts the history and transcript it writes, except
+  the provider's `reasoning_content` and `reasoning_details`. A resumed session
+  therefore replays a user message or tool result that held a credential as
+  `"[REDACTED]"`, both to the client and in the model's history. The session's
+  `_meta` is stored as sent; Imp never reads it.
 - A saved program whose example has an input named like a credential
   (`with_inputs([:api_key, :question])`), or whose metadata holds such a list,
   loads back as it was. Saving and `Imp.Redaction.drop_credentials/1` read
   every two-element list whose first item was a name as a key and its value,
-  and replaced or dropped the second item. A pair is now a tuple or an entry
-  the codec tagged as one.
+  and replaced or dropped the second item. A two-element list is now a pair
+  only inside a list whose every element is a pair with a name first, as JSON
+  writes config and headers (`[["api_key", key], ["model", "gpt"]]`); a flat
+  list of names is data. This also stops `Imp.Redaction.redact/1` from
+  rewriting an Avatar tool schema's `"required" => ["api_key", "query"]` and
+  `Imp.Optimizer.Parameter` from refusing input keys `["api_key", "question"]`.
+- A map key that is a string shaped like a credential is redacted.
+- `Imp.Optimizer.Report.load!/1` and `Imp.Optimizer.GRPO.Checkpoint.load!/1`
+  read the `"[REDACTED]"` atom marker in a VM that has not loaded
+  `Imp.Redaction`, and a MIPROv2 checkpoint resumes in a fresh VM: its loader
+  loads the modules whose atoms it decodes. It failed with "not an already
+  existing atom".
 - A reply that answers none of the requested outputs is a parse error in
   `Imp.Adapter.Chat`, `Imp.Adapter.JSON` and `Imp.Adapter.XML`: an
   `Imp.AdapterParseError` of kind `:missing_fields` naming every output, so

@@ -73,7 +73,11 @@ defmodule Imp.ACP.Options do
       type: {:custom, __MODULE__, :validate_session_store, []},
       doc:
         "A directory that keeps each session's history and transcript, which " <>
-          "enables `session/load`, `list`, `resume` and `delete`."
+          "enables `session/load`, `list`, `resume` and `delete`. Each session is " <>
+          "one owner-readable JSON file. History and transcript are redacted with " <>
+          "`Imp.Redaction`, except the provider's reasoning continuation; the " <>
+          "session's `_meta` is stored as sent, so anything the host puts there " <>
+          "is persisted."
     ],
     permission_policy: [
       type: {:or, [{:in, [:client, :unrestricted]}, {:fun, 1}, {:fun, 2}]},

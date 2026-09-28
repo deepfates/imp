@@ -62,6 +62,112 @@ defmodule Imp.RedactionWritersTest do
     assert Enum.any?(Map.keys(redacted.keyed), &match?(%Imp.Retrievers.HTTP{}, &1))
   end
 
+  # JSON writes a pair as a two-element list inside a list of pairs: decoded
+  # tool results, config and ReqLLM options arrive that way.
+  @list_pairs [
+    {[["api_key", "PROBE-LIST-PAIR-VALUE-7F3A"]], "PROBE-LIST-PAIR-VALUE-7F3A"},
+    {%{headers: [["X-Api-Key", "PROBE-LIST-HEADER-VALUE-7F3A"]]}, "PROBE-LIST-HEADER-VALUE-7F3A"},
+    {%{"config" => [["password", "PROBE-LIST-PASSWORD-VALUE-7F3A"], ["model", "gpt"]]},
+     "PROBE-LIST-PASSWORD-VALUE-7F3A"},
+    {Jason.decode!(
+       ~s({"req_http_options": [["headers", [["authorization", "PROBE-LIST-JSON-VALUE-7F3A"]]]]})
+     ), "PROBE-LIST-JSON-VALUE-7F3A"}
+  ]
+
+  test "a pair written as a two-element list is redacted by every writer" do
+    writers = [
+      &Imp.Redaction.redact/1,
+      &Imp.Redaction.redact_term/1,
+      &Imp.Redaction.drop_credentials/1,
+      &Report.json_safe/1,
+      &Report.json_projection/1,
+      &Report.dump(Report.new(optimizer: :probe, metadata: %{probe: &1})),
+      &Imp.Saving.dump(Imp.predict("question -> answer", metadata: %{probe: &1}))
+    ]
+
+    for {value, secret} <- @list_pairs, writer <- writers do
+      written = Probe.bytes(writer.(value))
+      assert :binary.match(written, secret) == :nomatch, "#{inspect(value)} leaked"
+    end
+
+    assert Imp.Redaction.redact(%{"config" => [["password", "x"], ["model", "gpt"]]}) ==
+             %{"config" => [["password", "[REDACTED]"], ["model", "gpt"]]}
+
+    assert Imp.Redaction.drop_credentials([["password", "x"], ["model", "gpt"]]) ==
+             [["model", "gpt"]]
+  end
+
+  test "a list of names is data, not a pair" do
+    for names <- [[:api_key, :question], ["api_key", "question"], ["token", "question"]] do
+      assert Imp.Redaction.redact(names) == names
+      assert Imp.Redaction.redact_term(names) == names
+      assert Imp.Redaction.drop_credentials(names) == names
+    end
+
+    :ok = Imp.Optimizer.Parameter.validate_value!(%{"input_keys" => ["api_key", "question"]})
+  end
+
+  test "a string key shaped like a credential is redacted" do
+    written = Probe.bytes(Report.json_safe(%{@shaped => 1, "model" => "gpt"}))
+    assert :binary.match(written, @shaped) == :nomatch
+    assert :binary.match(written, "model") != :nomatch
+  end
+
+  test "an Avatar tool schema's required names survive saving" do
+    runner = fn args -> args end
+    registry = Imp.Saving.Registry.new(lookup_runner: runner)
+
+    schema = %{
+      "type" => "object",
+      "properties" => %{"api_key" => %{"type" => "string"}, "query" => %{"type" => "string"}},
+      "required" => ["api_key", "query"]
+    }
+
+    avatar =
+      Imp.avatar("question -> answer", [Imp.tool(:lookup, "lookup", runner, schema: schema)])
+
+    restored =
+      avatar
+      |> Imp.dump(registry: registry)
+      |> Jason.encode!()
+      |> Jason.decode!()
+      |> Imp.load!(registry: registry)
+
+    assert [%{schema: %{"required" => ["api_key", "query"]}}] = Map.values(restored.tools)
+  end
+
+  # An atom that spells a credential is written as the redaction marker, and a
+  # fresh VM that has not loaded `Imp.Redaction` still reads it back.
+  @tag :tmp_dir
+  test "a report and a GRPO checkpoint holding the redacted atom load in a fresh VM",
+       %{tmp_dir: tmp_dir} do
+    shaped_atom = String.to_atom(@shaped)
+    report_path = Path.join(tmp_dir, "report.json")
+    grpo_path = Path.join(tmp_dir, "grpo.json")
+
+    report = Report.new(optimizer: nil, metadata: %{"note" => shaped_atom})
+    File.write!(report_path, report |> Report.dump() |> Jason.encode!())
+    :ok = Imp.Optimizer.GRPO.Checkpoint.save!(grpo_path, :running, %{"note" => shaped_atom})
+
+    expression = """
+    [report_path, grpo_path] = System.argv()
+    report = report_path |> File.read!() |> Jason.decode!() |> Imp.Optimizer.Report.load!()
+    checkpoint = Imp.Optimizer.GRPO.Checkpoint.load!(grpo_path)
+    IO.inspect({report.metadata, checkpoint.data})
+    """
+
+    args =
+      "_build/test/lib/*/ebin"
+      |> Path.wildcard()
+      |> Enum.flat_map(&["-pa", &1])
+      |> Kernel.++(["-e", expression, report_path, grpo_path])
+
+    {output, status} = System.cmd("elixir", args, stderr_to_stdout: true)
+    assert status == 0, output
+    assert output =~ ~s({%{"note" => :"[REDACTED]"}, %{"note" => :"[REDACTED]"}})
+    refute output =~ @shaped
+  end
+
   test "keys that redact to the same term keep one entry" do
     redacted = Imp.Redaction.redact_term(%{{:note, @shaped} => 1, {:note, @shaped <> "x"} => 2})
     assert [{{:note, "[REDACTED]"}, value}] = Map.to_list(redacted)
