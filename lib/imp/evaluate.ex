@@ -41,7 +41,9 @@ defmodule Imp.Evaluate.Result do
   keys (sorted, `score` last; upstream takes the first row's keys and fails
   on ragged rows — the union keeps every column and is deterministic).
   Non-scalar cells are JSON-encoded, mirroring upstream's stringified dicts.
-  Saving an empty result raises: an empty file with no header would be a
+  The file is RFC 4180 CSV with CRLF line endings, and every field holding a
+  comma, a quote or a line break is quoted, so `Imp.Datasets.csv/3` reads it
+  back unchanged. Saving an empty result raises: an empty file with no header would be a
   silent failure.
   """
   def save_as_csv(%__MODULE__{rows: []}, _path) do
@@ -64,10 +66,7 @@ defmodule Imp.Evaluate.Result do
     lines =
       [header | Enum.map(rows, fn row -> Enum.map(header, &csv_cell(Map.get(row, &1))) end)]
 
-    csv =
-      Enum.map_join(lines, "\r\n", fn fields -> Enum.map_join(fields, ",", &csv_escape/1) end)
-
-    File.write!(path, csv <> "\r\n")
+    File.write!(path, Imp.CSV.dump_to_iodata(lines))
     :ok
   end
 
@@ -145,14 +144,6 @@ defmodule Imp.Evaluate.Result do
   defp csv_cell(value) when is_binary(value), do: value
   defp csv_cell(value) when is_number(value) or is_boolean(value), do: to_string(value)
   defp csv_cell(value), do: Jason.encode!(value)
-
-  defp csv_escape(field) do
-    if String.contains?(field, [",", "\"", "\n", "\r"]) do
-      "\"" <> String.replace(field, "\"", "\"\"") <> "\""
-    else
-      field
-    end
-  end
 end
 
 defmodule Imp.EvaluationCancelledError do
