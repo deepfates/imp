@@ -3,6 +3,9 @@ defmodule Imp.Adapter.JSON do
   JSON-oriented adapter.
 
   This adapter accepts map outputs directly and parses provider JSON with Jason.
+  A completion with no JSON object, or an object with none of the output keys,
+  is an `Imp.AdapterParseError`, even when every output is optional or
+  defaulted.
 
   Use this adapter when a field is required, typed, constrained, or consumed by
   application code that should not guess its way through prose.

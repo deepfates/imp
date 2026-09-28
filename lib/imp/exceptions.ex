@@ -73,9 +73,9 @@ defmodule Imp.AdapterParseError do
     * `:malformed` — the completion is not in the adapter's format at all: no
       JSON object for the JSON adapter, XML that does not parse, a one-field
       answer that is not the exact value the field allows.
-    * `:missing_fields` — required output fields are absent, or, for the XML
-      adapter, the reply has none of the requested output tags, which names
-      every output. `:reason` is the list of their names.
+    * `:missing_fields` — required output fields are absent, or the reply
+      answers none of the requested outputs, which names every output.
+      `:reason` is the list of their names.
     * `:invalid_fields` — every field is present but some value does not fit
       its declared type. `:reason` is the fields that were read.
     * `:unsupported_output` — the LM returned something no adapter reads as a
