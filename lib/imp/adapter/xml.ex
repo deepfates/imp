@@ -20,9 +20,11 @@ defmodule Imp.Adapter.XML do
   naming every output, even when every output is optional or has a default, so
   the caller's fallback or retry runs instead of a prediction made only of
   defaults. A signature that names an output in `metadata[:text_field]` is
-  read as `Imp.Adapter.Chat` reads it: a non-blank reply with no requested tag
-  is that field, trimmed, a blank one is a step that said nothing, and the
-  other outputs take their defaults. A reply with some requested tags and not others is read as
+  read as `Imp.Adapter.Chat` reads it: prose is that field, trimmed, a blank
+  reply is a step that said nothing, and the other outputs take their
+  defaults. A reply with an output's tag, a `[[ ## field ## ]]` line, or a
+  JSON object with an output's key is not prose: it is parsed by tags, and
+  with no requested tag it is a parse error that the JSON fallback reads. A reply with some requested tags and not others is read as
   Chat reads a partial reply: absent outputs take their defaults or `nil` when
   optional, and a required one that is still absent is reported missing.
 
@@ -65,7 +67,7 @@ defmodule Imp.Adapter.XML do
 
   @impl true
   def parse(signature, raw, opts) when is_binary(raw) do
-    case text_field_for(signature, raw) do
+    case Imp.Adapter.OutputFields.text_answer(signature, raw) do
       {:ok, name} -> Imp.Adapter.Chat.parse(signature, %{name => String.trim(raw)}, opts)
       :error -> parse_tagged(signature, raw, opts)
     end
@@ -80,30 +82,10 @@ defmodule Imp.Adapter.XML do
     with {:ok, root} <- parse_fragment(raw),
          grouped <- group_children(root),
          {:ok, fields} <- parse_output_fields(signature.outputs, grouped, raw),
-         :ok <- Imp.Adapter.OutputFields.require_any(signature, fields),
+         :ok <- Imp.Adapter.OutputFields.require_any(signature, fields, raw),
          {:ok, prediction} <- Imp.Adapter.Chat.parse(signature, fields, opts) do
       {:ok, prediction}
     end
-  end
-
-  # The output named by `signature.metadata[:text_field]` takes a non-blank
-  # reply in which no requested output tag opens, as `Imp.Adapter.Chat` takes
-  # a marker-free completion. The check is on the text, before XML parsing, so
-  # prose that is not well-formed XML ("R&D", "a < b") is read as prose too.
-  defp text_field_for(signature, raw) do
-    with %{} = field <- Imp.Adapter.OutputFields.text_field(signature),
-         true <- String.trim(raw) != "",
-         false <- opens_output_tag?(signature, raw) do
-      {:ok, field.name}
-    else
-      _not_text -> :error
-    end
-  end
-
-  defp opens_output_tag?(signature, raw) do
-    Enum.any?(signature.outputs, fn field ->
-      Regex.match?(~r/<#{Regex.escape(to_string(field.name))}[\s\/>]/, raw)
-    end)
   end
 
   # ------------------------------------------------------------------

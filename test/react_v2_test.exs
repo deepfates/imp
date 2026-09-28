@@ -562,9 +562,10 @@ defmodule ReActV2Test do
     assert prediction.metadata[:termination_reason] == :incomplete
     assert prediction.metadata[:termination_cause] == :max_iters
 
-    # Four requests, not five: the prose the required-only fallback returns is
-    # read as a thought that called nothing, so no JSON-adapter re-ask fires.
-    for _ <- 1..4 do
+    # Five requests: the required-only fallback answers with a JSON object
+    # carrying the step's keys, which is not prose for `next_thought`, so the
+    # JSON-adapter re-ask reads it (and fails here like the extraction).
+    for _ <- 1..5 do
       assert_received {:required_only_tool_request, _messages, _opts}
     end
 

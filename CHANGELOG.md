@@ -29,7 +29,11 @@ User-visible changes to Imp are recorded here.
   signature that names an output in `metadata[:text_field]` is exempt and
   reads the same in Chat and XML: a reply outside the format is that field
   and a blank one said nothing, so a ReActV2 step's prose under XML is its
-  `next_thought`. `Imp.Predict.ProgramOfThought`, whose outputs are all
+  `next_thought`. A reply that writes the fields in some format (a JSON
+  object with an output's key, a `[[ ## field ## ]]` line, an output's tag)
+  is not prose: Chat and XML parse it in their own format or report it, and
+  the JSON fallback reads it, so a step that spelled out a tool call as JSON
+  runs that tool instead of ending with the JSON text as its answer. `Imp.Predict.ProgramOfThought`, whose outputs are all
   optional, now sends a prose reply to the JSON fallback instead of
   regenerating with a missing-program error.
 - `Imp.inspect_history/2` renders any history. A turn holding a term JSON has

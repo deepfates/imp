@@ -225,4 +225,87 @@ defmodule AdapterOffFormatReplyTest do
     assert_received :lm_call
     assert_received :lm_call
   end
+
+  test "Chat reads the text beside native tool calls by the same rule" do
+    one_optional = Keyword.fetch!(signatures(), :one_optional)
+
+    assert {:error, %Imp.AdapterParseError{kind: :missing_fields, reason: [:answer]}} =
+             Imp.Adapter.Chat.parse(one_optional, %{text: @prose, tool_calls: []}, [])
+
+    assert {:ok, prediction} =
+             Imp.Adapter.Chat.parse(
+               one_optional,
+               %{text: "[[ ## answer ## ]]\nParis", tool_calls: []},
+               []
+             )
+
+    assert Imp.get(prediction, :answer) == "Paris"
+  end
+
+  describe "a ReActV2 step that writes its fields in another format" do
+    # The step reply of #231's capture: a thought and a tool call written as a
+    # JSON object, or as Chat marker sections. It is not prose for
+    # `next_thought`; the adapter's own format reads it, or the JSON fallback
+    # does, and the tool runs.
+    @capture_json ~s({"next_thought": "I should look.", "tool_calls": [{"name": "look", "arguments": {"thing": "France"}}]})
+    @capture_markers """
+    [[ ## next_thought ## ]]
+    I should look.
+
+    [[ ## tool_calls ## ]]
+    [{"name": "look", "arguments": {"thing": "France"}}]
+    """
+
+    defp run_capture(adapter, replies) do
+      owner = self()
+      counter = :counters.new(1, [])
+
+      lm =
+        Imp.LM.Static.new(
+          handler: fn _messages, _opts ->
+            :counters.add(counter, 1, 1)
+            Enum.at(replies, :counters.get(counter, 1) - 1)
+          end
+        )
+
+      look =
+        Imp.tool(:look, "Look at a thing", fn args ->
+          send(owner, {:looked, args})
+          "Its capital is Paris."
+        end)
+
+      agent = Imp.react("question -> answer", [look], lm: lm, adapter: adapter)
+      assert {:ok, prediction} = Imp.call(agent, %{question: "Capital of France?"})
+      {prediction, :counters.get(counter, 1)}
+    end
+
+    for adapter <- [Imp.Adapter.XML, Imp.Adapter.Chat] do
+      test "#{inspect(adapter)}: a JSON object goes to the JSON fallback and its tool runs" do
+        {prediction, calls} =
+          run_capture(unquote(adapter), [@capture_json, @capture_json, "Paris."])
+
+        assert_received {:looked, %{"thing" => "France"}}
+        assert Imp.get(prediction, :answer) == "Paris."
+        assert prediction.metadata.termination_reason == :answered
+        assert calls == 3
+      end
+    end
+
+    test "Imp.Adapter.XML: Chat marker sections go to the JSON fallback and the tool runs" do
+      {prediction, calls} =
+        run_capture(Imp.Adapter.XML, [@capture_markers, @capture_json, "Paris."])
+
+      assert_received {:looked, %{"thing" => "France"}}
+      assert Imp.get(prediction, :answer) == "Paris."
+      assert calls == 3
+    end
+
+    test "Imp.Adapter.Chat: its own marker sections parse, with no fallback" do
+      {prediction, calls} = run_capture(Imp.Adapter.Chat, [@capture_markers, "Paris."])
+
+      assert_received {:looked, %{"thing" => "France"}}
+      assert Imp.get(prediction, :answer) == "Paris."
+      assert calls == 2
+    end
+  end
 end
