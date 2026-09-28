@@ -15,6 +15,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
     Evaluation,
     EvaluationCache,
     EvaluationPolicy,
+    Failure,
     Frontier,
     Merge,
     ModuleSelector,
@@ -644,6 +645,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
         )
     catch
       kind, reason ->
+        reraise_shutdown!(kind, reason, __STACKTRACE__)
         state = record_iteration_failure(state, iteration, kind, reason)
 
         handle_strategy_iteration_failure(
@@ -663,6 +665,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
          state,
          opts
        ) do
+    reraise_shutdown!(kind, reason, stacktrace)
     raise_operational_safety!(reason)
     continue? = not Keyword.get(opts, :raise_on_exception, true)
     exception = if kind == :error, do: reason, else: {kind, reason}
@@ -1824,20 +1827,8 @@ defmodule Imp.Optimizer.GEPA.Engine do
     }
   end
 
-  defp strategy_stage_failure(
-         stage,
-         :error,
-         %{
-           __exception__: true,
-           __struct__: exception_type
-         } = exception
-       ) do
-    {:strategy_stage_error, stage, {:exception, exception_type, Exception.message(exception)}}
-  end
-
-  defp strategy_stage_failure(stage, kind, reason) do
-    {:strategy_stage_error, stage, {kind, inspect(reason)}}
-  end
+  defp strategy_stage_failure(stage, kind, reason),
+    do: {:strategy_stage_error, stage, Failure.record(:worker, kind, reason)}
 
   defp add_strategy_candidate(state, evaluated, valset, opts) do
     proposal = evaluated.proposal
@@ -2517,34 +2508,28 @@ defmodule Imp.Optimizer.GEPA.Engine do
   defp unwrap_parallel_evaluation({:ok, {:evaluation_error, reason}}), do: {:error, reason}
   defp unwrap_parallel_evaluation({:error, reason}), do: {:error, reason}
 
-  defp raise_parallel_worker_error({:exception, exception, stacktrace}),
-    do: :erlang.raise(:error, exception, stacktrace)
+  defp raise_parallel_worker_error({tag, exception, stacktrace})
+       when tag in [
+              :exception,
+              :proposal_exception,
+              :reflection_strategy_exception,
+              :reflection_batch_exception,
+              :evaluation_exception
+            ] and is_exception(exception),
+       do: :erlang.raise(:error, exception, stacktrace)
 
-  defp raise_parallel_worker_error({:exception, message}) when is_binary(message),
-    do: raise(RuntimeError, message)
-
-  defp raise_parallel_worker_error({:proposal_exception, exception, stacktrace}),
-    do: :erlang.raise(:error, exception, stacktrace)
-
-  defp raise_parallel_worker_error({:proposal_exception, message}) when is_binary(message),
-    do: raise(RuntimeError, message)
-
-  defp raise_parallel_worker_error({:reflection_strategy_exception, exception, stacktrace}),
-    do: :erlang.raise(:error, exception, stacktrace)
-
-  defp raise_parallel_worker_error({:reflection_strategy_exception, message})
-       when is_binary(message),
+  # A recorded failure (see `failure_term/3`) keeps the message, not the
+  # exception, so it is raised again as a RuntimeError with that message.
+  defp raise_parallel_worker_error({tag, module, message})
+       when tag in [
+              :exception,
+              :proposal_exception,
+              :reflection_strategy_exception,
+              :reflection_batch_exception,
+              :evaluation_exception,
+              :reflective_dataset_exception
+            ] and is_binary(module) and is_binary(message),
        do: raise(RuntimeError, message)
-
-  defp raise_parallel_worker_error({:reflection_batch_exception, exception, stacktrace}),
-    do: :erlang.raise(:error, exception, stacktrace)
-
-  defp raise_parallel_worker_error({:reflection_batch_exception, message})
-       when is_binary(message),
-       do: raise(RuntimeError, message)
-
-  defp raise_parallel_worker_error({:evaluation_exception, exception, stacktrace}),
-    do: :erlang.raise(:error, exception, stacktrace)
 
   defp raise_parallel_worker_error({:combee_first_level_failed, _index, reason}),
     do: raise_parallel_worker_error(reason)
@@ -2552,26 +2537,34 @@ defmodule Imp.Optimizer.GEPA.Engine do
   defp raise_parallel_worker_error({:combee_final_aggregation_failed, reason}),
     do: raise_parallel_worker_error(reason)
 
-  defp raise_parallel_worker_error({:proposal_throw, kind, reason, stacktrace}),
-    do: :erlang.raise(kind, reason, stacktrace)
+  defp raise_parallel_worker_error({tag, kind, reason, stacktrace})
+       when tag in [
+              :proposal_throw,
+              :reflection_strategy_throw,
+              :reflection_batch_throw,
+              :evaluation_throw
+            ],
+       do: :erlang.raise(kind, reason, stacktrace)
 
-  defp raise_parallel_worker_error({:proposal_throw, kind, reason}),
-    do: :erlang.raise(kind, reason, [])
+  defp raise_parallel_worker_error({tag, reason})
+       when tag in [
+              :proposal_throw,
+              :reflection_strategy_throw,
+              :reflection_batch_throw,
+              :evaluation_throw,
+              :reflective_dataset_throw
+            ],
+       do: throw(reason)
 
-  defp raise_parallel_worker_error({:reflection_strategy_throw, kind, reason, stacktrace}),
-    do: :erlang.raise(kind, reason, stacktrace)
-
-  defp raise_parallel_worker_error({:reflection_strategy_throw, kind, reason}),
-    do: :erlang.raise(kind, reason, [])
-
-  defp raise_parallel_worker_error({:reflection_batch_throw, kind, reason, stacktrace}),
-    do: :erlang.raise(kind, reason, stacktrace)
-
-  defp raise_parallel_worker_error({:reflection_batch_throw, kind, reason}),
-    do: :erlang.raise(kind, reason, [])
-
-  defp raise_parallel_worker_error({:evaluation_throw, kind, reason, stacktrace}),
-    do: :erlang.raise(kind, reason, stacktrace)
+  defp raise_parallel_worker_error({tag, reason})
+       when tag in [
+              :proposal_exit,
+              :reflection_strategy_exit,
+              :reflection_batch_exit,
+              :evaluation_exit,
+              :reflective_dataset_exit
+            ],
+       do: exit(reason)
 
   defp raise_parallel_worker_error({kind, reason}) when kind in [:error, :exit, :throw],
     do: :erlang.raise(kind, reason, [])
@@ -2582,40 +2575,8 @@ defmodule Imp.Optimizer.GEPA.Engine do
 
   defp serializable_failure(reason) do
     raise_operational_safety!(reason)
-    serializable_term(reason)
+    Failure.serializable(reason)
   end
-
-  defp serializable_term({:combee_first_level_failed, index, reason}),
-    do: {:combee_first_level_failed, index, serializable_term(reason)}
-
-  defp serializable_term({:combee_final_aggregation_failed, reason}),
-    do: {:combee_final_aggregation_failed, serializable_term(reason)}
-
-  defp serializable_term({:proposal_exception, exception, _stacktrace}),
-    do: {:proposal_exception, Exception.message(exception)}
-
-  defp serializable_term({:reflection_strategy_exception, exception, _stacktrace}),
-    do: {:reflection_strategy_exception, Exception.message(exception)}
-
-  defp serializable_term({:reflection_batch_exception, exception, _stacktrace}),
-    do: {:reflection_batch_exception, Exception.message(exception)}
-
-  defp serializable_term({:evaluation_exception, exception, _stacktrace}),
-    do: {:evaluation_exception, Exception.message(exception)}
-
-  defp serializable_term({:proposal_throw, kind, reason, _stacktrace}),
-    do: {:proposal_throw, kind, reason}
-
-  defp serializable_term({:reflection_strategy_throw, kind, reason, _stacktrace}),
-    do: {:reflection_strategy_throw, kind, reason}
-
-  defp serializable_term({:reflection_batch_throw, kind, reason, _stacktrace}),
-    do: {:reflection_batch_throw, kind, reason}
-
-  defp serializable_term({:evaluation_throw, kind, reason, _stacktrace}),
-    do: {:evaluation_throw, kind, reason}
-
-  defp serializable_term(reason), do: reason
 
   defp apply_parallel_contexts(state, contexts, adapter, trainset, valset, opts) do
     Enum.reduce(contexts, state, fn context, state ->
@@ -3362,6 +3323,8 @@ defmodule Imp.Optimizer.GEPA.Engine do
          kind \\ :error,
          reason \\ nil
        ) do
+    reraise_shutdown!(kind, reason, stacktrace)
+
     if kind == :error,
       do: raise_operational_safety!(exception),
       else: raise_operational_safety!(reason)
@@ -3390,13 +3353,18 @@ defmodule Imp.Optimizer.GEPA.Engine do
   # failure as its reason, the record a failed proposal in a parallel slot
   # leaves, so the report can name it. A failed strategy validation records
   # one rejection per plan itself.
-  # The reason is the exception itself, or `{kind, reason}` for a throw or
-  # exit; the report renders its text.
-  defp record_iteration_failure(state, iteration, :error, %{__exception__: true} = exception),
-    do: record_proposal_failure(state, iteration, exception)
-
   defp record_iteration_failure(state, iteration, kind, reason),
-    do: record_proposal_failure(state, iteration, {kind, reason})
+    do: record_proposal_failure(state, iteration, Failure.record(:proposal, kind, reason))
+
+  # An exit that asks the process to stop (its owner shutting down, a
+  # supervisor terminating it) is not a failed proposal: it goes on up.
+  defp reraise_shutdown!(:exit, reason, stacktrace) when reason in [:normal, :shutdown, :kill],
+    do: :erlang.raise(:exit, reason, stacktrace)
+
+  defp reraise_shutdown!(:exit, {:shutdown, _detail} = reason, stacktrace),
+    do: :erlang.raise(:exit, reason, stacktrace)
+
+  defp reraise_shutdown!(_kind, _reason, _stacktrace), do: :ok
 
   # An operational safety refusal (a budget, cost, route or transport guard)
   # ends the run whatever `raise_on_exception` says: going on would spend
@@ -4026,7 +3994,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
       notify(opts, :on_merge_rejected, %{
         iteration: iteration,
         parent_ids: proposal.parent_ids,
-        reason: {:evaluation_error, reason}
+        reason: {:evaluation_error, serializable_failure(reason)}
       })
 
       event = %{
@@ -4039,7 +4007,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
         validation_instances: proposal.validation_instances,
         parent_scores: proposal.parent_scores,
         candidate: proposal.candidate,
-        reason: {:evaluation_error, reason}
+        reason: {:evaluation_error, serializable_failure(reason)}
       }
 
       {:ok,
@@ -4511,14 +4479,14 @@ defmodule Imp.Optimizer.GEPA.Engine do
       if Keyword.get(opts, :raise_on_exception, true) do
         reraise error, __STACKTRACE__
       else
-        {:error, {:evaluation_exception, Exception.message(error)}}
+        {:error, Failure.record(:evaluation, :error, error)}
       end
   catch
     kind, reason ->
       if Keyword.get(opts, :raise_on_exception, true) do
         :erlang.raise(kind, reason, __STACKTRACE__)
       else
-        {:error, {:evaluation_throw, kind, inspect(reason)}}
+        {:error, Failure.record(:evaluation, kind, reason)}
       end
   end
 
@@ -4861,11 +4829,11 @@ defmodule Imp.Optimizer.GEPA.Engine do
   rescue
     error ->
       raise_operational_safety!(error)
-      {:error, {:reflective_dataset_exception, Exception.message(error)}}
+      {:error, Failure.record(:reflective_dataset, :error, error)}
   catch
     kind, reason ->
       raise_operational_safety!(reason)
-      {:error, {:reflective_dataset_throw, kind, reason}}
+      {:error, Failure.record(:reflective_dataset, kind, reason)}
   end
 
   defp ensure_combee_policy!(%State{combee_policy: stored} = state, requested) do
@@ -4912,18 +4880,6 @@ defmodule Imp.Optimizer.GEPA.Engine do
   defp indexes(0), do: []
   defp indexes(size), do: Enum.to_list(0..(size - 1))
 
-  # A checkpoint leaves the run, and its rejections, history and pending
-  # proposal slots carry failure reasons that may hold a credential. Only
-  # those fields are redacted: redacting the whole state costs time inside the
-  # iteration's deadlines.
-  @failure_fields ["rejected", "history", "pending_proposal_batch"]
-
-  defp redact_failures(dumped) do
-    Enum.reduce(@failure_fields, dumped, fn field, dumped ->
-      Map.update(dumped, field, nil, &Imp.Redaction.redact/1)
-    end)
-  end
-
   defp checkpoint!(state, opts) do
     emit_progress(state)
     checkpoint_state = snapshot_adapter_state(state, opts)
@@ -4933,7 +4889,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
         :ok
 
       callback when is_function(callback, 1) ->
-        case callback.(checkpoint_state |> dump_state() |> redact_failures()) do
+        case callback.(dump_state(checkpoint_state)) do
           :ok ->
             :ok
 

@@ -31,6 +31,13 @@ User-visible changes to Imp are recorded here.
 
 ### Changed
 
+- Breaking: `Imp.Observability.Status` has a new state,
+  `:succeeded_with_errors`, and `Imp.Observability.status/1` gives it for
+  every optimizer report whose `errors` is not empty, from any optimizer,
+  where it gave `:failed`: an optimizer that returned a report returned a
+  program. Code that matches every `Status` state adds the new one; code that
+  treated `:failed` as "the report has errors" matches
+  `:succeeded_with_errors`.
 - Breaking: `Imp.collect/3` now returns `{:ok, prediction}` or
   `{:error, reason}`, as `Imp.call/2` does, instead of a string. The string
   joined the values of every output field with no separator, so
@@ -395,11 +402,19 @@ Every change here is breaking for code that relied on the old behaviour.
   route or transport guard) whatever `raise_on_exception` says. Before, with
   `raise_on_exception: false`, it recorded the refusal as a failed proposal
   and went on spending.
-- A GEPA checkpoint passed to `:checkpoint_fn` is redacted with
-  `Imp.Redaction`, since its rejections carry failure reasons.
-- `Imp.Observability.status/1` on an optimizer report with errors has state
-  `:succeeded_with_errors`, a new `Imp.Observability.Status` state, where it
-  had `:failed`: the optimizer returned a program.
+- GEPA redacts a failure reason when it records it in a rejection, the
+  history or a pending proposal slot. An exception is recorded as
+  `{:proposal_exception, "Module.Name", message}` (the tag names the stage
+  that failed) and a throw or exit as `{:proposal_throw, term}` or
+  `{:proposal_exit, term}`, so a checkpoint holding it reads back in a VM
+  that has not loaded the module that raised; the parallel and sequential
+  paths record the same shape. A checkpoint otherwise holds the resume state
+  as it is (candidates, the evaluation cache, proposed instructions and
+  reflection data), so a `:checkpoint_fn` consumer treats it as sensitive.
+- GEPA with `raise_on_exception: false` no longer records an exit that asks
+  the process to stop (`:normal`, `:shutdown`, `{:shutdown, _}`, `:kill`) as
+  a failed proposal: the exit goes on up, as it does from a process that
+  traps exits and turns its owner's shutdown into an exit.
 - `examples/deployment/agent_optimization.exs` writes the optimizer's
   rejections and history with `Imp.Optimizer.Report.json_safe/1`. It passed
   them to `Jason.encode!/1`, which raised on a failure reason such as

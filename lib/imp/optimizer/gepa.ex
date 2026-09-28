@@ -103,7 +103,16 @@ defmodule Imp.Optimizer.GEPA do
   them in `metadata.failed_proposals` and sets `status` to `:with_errors`. A
   slot cancelled because a sibling failed first is rejected, not counted as
   failed. An `Imp.OperationalSafetyError` (a budget, cost, route or
-  transport guard) ends the run whatever `raise_on_exception` says.
+  transport guard) ends the run whatever `raise_on_exception` says, and so
+  does an exit that asks the process to stop (`:normal`, `:shutdown`,
+  `{:shutdown, _}`, `:kill`).
+
+  A failure reason is redacted when it is recorded. An exception is recorded
+  as its module's name and its message, and a throw or exit as its term, so a
+  checkpoint reads back without the module that raised. A checkpoint given to
+  `:checkpoint_fn` otherwise holds the resume state as it is: candidates, the
+  evaluation cache, proposed instructions and reflection data. Treat it as
+  sensitive.
 
   The `:callbacks` option accepts callback modules or `{module, context}`
   tuples implementing any subset of the documented GEPA callback contract.
@@ -740,6 +749,31 @@ defmodule Imp.Optimizer.GEPA do
     )
   end
 
+  @exception_tags [
+    :exception,
+    :proposal_exception,
+    :reflection_strategy_exception,
+    :reflection_batch_exception,
+    :evaluation_exception,
+    :reflective_dataset_exception
+  ]
+  @throw_tags [
+    :throw,
+    :proposal_throw,
+    :reflection_strategy_throw,
+    :reflection_batch_throw,
+    :evaluation_throw,
+    :reflective_dataset_throw
+  ]
+  @exit_tags [
+    :exit,
+    :proposal_exit,
+    :reflection_strategy_exit,
+    :reflection_batch_exit,
+    :evaluation_exit,
+    :reflective_dataset_exit
+  ]
+
   defp diagnostic_texts(failures) do
     failures
     |> Enum.map(&diagnostic_text/1)
@@ -762,20 +796,14 @@ defmodule Imp.Optimizer.GEPA do
   defp diagnostic_text({:invalid_metric_result, value}),
     do: truncate_text("invalid metric result: " <> term_text(value), 240)
 
-  defp diagnostic_text({:exception, _type, message}) when is_binary(message),
-    do: message_text(message)
+  # The engine records an exception as `{tag, module_name, message}` and a
+  # throw or exit as `{tag, reason}`, the tag naming the stage that failed.
+  defp diagnostic_text({tag, module, message})
+       when tag in @exception_tags and is_binary(module) and is_binary(message),
+       do: message_text(message)
 
-  # A failure recorded as the exception itself; read back from a checkpoint
-  # it is the exception's fields as a map.
-  defp diagnostic_text(%{__exception__: true} = exception) when is_struct(exception),
-    do: exception |> Exception.message() |> message_text()
-
-  defp diagnostic_text(%{__exception__: true, message: message}) when is_binary(message),
-    do: message_text(message)
-
-  # A throw or exit is shown whole, so its kind is kept.
-  defp diagnostic_text({kind, _reason} = failure) when kind in [:throw, :exit],
-    do: term_text(failure)
+  defp diagnostic_text({tag, reason}) when tag in @throw_tags, do: term_text({:throw, reason})
+  defp diagnostic_text({tag, reason}) when tag in @exit_tags, do: term_text({:exit, reason})
 
   defp diagnostic_text({_kind, message}) when is_binary(message), do: message_text(message)
   defp diagnostic_text(value) when is_atom(value), do: Atom.to_string(value)

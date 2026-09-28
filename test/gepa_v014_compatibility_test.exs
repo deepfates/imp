@@ -695,7 +695,13 @@ defmodule Imp.Optimizer.GEPA.V014CompatibilityTest do
 
     assert reflected.budget.reflection_calls == 1
 
-    assert [%{reason: {:proposal_error, {:reflection_strategy_exception, _message}}}] =
+    assert [
+             %{
+               reason:
+                 {:proposal_error,
+                  {:reflection_strategy_exception, "ArgumentError", "custom reflection failed"}}
+             }
+           ] =
              reflected.rejected
   end
 
@@ -914,7 +920,14 @@ defmodule Imp.Optimizer.GEPA.V014CompatibilityTest do
     assert state.budget.metric_calls == 4
     assert length(state.candidates) == 1
 
-    assert [%{reason: {:proposal_error, {:validation_error, {:evaluation_exception, _}}}}] =
+    assert [
+             %{
+               reason:
+                 {:proposal_error,
+                  {:validation_error,
+                   {:evaluation_exception, "RuntimeError", "validation batch failed"}}}
+             }
+           ] =
              state.rejected
   end
 
@@ -941,7 +954,7 @@ defmodule Imp.Optimizer.GEPA.V014CompatibilityTest do
 
     assert rejection.reason ==
              {:strategy_stage_error, :validation,
-              {:exception, ArgumentError, "strategy validation exploded"}}
+              {:exception, "ArgumentError", "strategy validation exploded"}}
 
     assert List.last(state.history) == rejection
   end
@@ -962,7 +975,7 @@ defmodule Imp.Optimizer.GEPA.V014CompatibilityTest do
                %{
                  iteration: 1,
                  candidate: nil,
-                 reason: {:proposal_error, %ArgumentError{message: ^message}}
+                 reason: {:proposal_error, {:proposal_exception, "ArgumentError", ^message}}
                } = rejection
              ] = state.rejected
 
@@ -1010,7 +1023,8 @@ defmodule Imp.Optimizer.GEPA.V014CompatibilityTest do
                iteration: 1,
                candidate: nil,
                parent_ids: [],
-               reason: {:proposal_error, %RuntimeError{message: "selector exploded"}}
+               reason:
+                 {:proposal_error, {:proposal_exception, "RuntimeError", "selector exploded"}}
              } = rejection
            ] = state.rejected
 
@@ -1040,7 +1054,7 @@ defmodule Imp.Optimizer.GEPA.V014CompatibilityTest do
 
     assert rejection.reason ==
              {:strategy_stage_error, :reflective_dataset,
-              {:exception, ArgumentError, "reflective dataset exploded"}}
+              {:exception, "ArgumentError", "reflective dataset exploded"}}
 
     assert List.last(state.history) == rejection
   end

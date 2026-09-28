@@ -657,6 +657,51 @@ defmodule OptimizerBehavioralCorpusTest do
     refute_receive {:proposal_metric, _pid}, 200
   end
 
+  test "a shutdown exit inside a proposal stops GEPA although raise_on_exception is false" do
+    parent = self()
+
+    # A host that traps exits hands its parent's shutdown to the code it runs
+    # as an exit, as Imp's interruptible sleeps do.
+    selector = fn _state, _trajectories, _scores, _index, _candidate ->
+      send(parent, {:selector, self()})
+      [host_parent | _] = Process.get(:"$ancestors")
+
+      receive do
+        {:EXIT, ^host_parent, reason} -> exit(reason)
+      after
+        300 -> [:main]
+      end
+    end
+
+    {:ok, supervisor} = Task.Supervisor.start_link()
+
+    host =
+      Task.Supervisor.async_nolink(supervisor, fn ->
+        Process.flag(:trap_exit, true)
+
+        {_compiled, report} =
+          Imp.Optimizer.GEPA.new(metric(),
+            execution_profile: :beam_native,
+            generations: 4,
+            raise_on_exception: false,
+            module_selector: selector,
+            reflection_lm: reflection_lm("Answer in one word."),
+            max_metric_calls: 40
+          )
+          |> Imp.Optimizer.GEPA.compile_with_report(france_program(), trainset(), devset())
+
+        send(parent, {:returned, report.errors})
+      end)
+
+    assert_receive {:selector, _pid}, 5_000
+    host_ref = Process.monitor(host.pid)
+    :ok = Task.Supervisor.terminate_child(supervisor, host.pid)
+
+    assert_receive {:DOWN, ^host_ref, :process, _pid, :shutdown}, 5_000
+    refute_received {:returned, _errors}
+    refute_received {:selector, _pid}
+  end
+
   test "GEPA counts a slot cancelled by a sibling's failure as cancelled, not failed" do
     slow_reflection =
       Imp.Test.FunLM.new(fn _messages, _opts ->
@@ -683,20 +728,64 @@ defmodule OptimizerBehavioralCorpusTest do
     assert Enum.all?(report.errors, &(&1.diagnostics == ["timeout"])), inspect(report.errors)
   end
 
-  test "GEPA checkpoints redact failure reasons" do
+  test "GEPA redacts failure reasons when it records them" do
     secret = "sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG"
+    parent = self()
+
+    for opts <- [
+          [
+            module_selector: fn _state, _trajectories, _scores, _index, _candidate ->
+              raise "selector saw #{secret}"
+            end,
+            reflection_lm: reflection_lm("Answer in one word.")
+          ],
+          [reflection_lm: Imp.Test.FunLM.new(fn _m, _o -> {:error, "bad key #{secret}"} end)],
+          [
+            proposal_concurrency: 2,
+            reflection_lm: Imp.Test.FunLM.new(fn _m, _o -> {:error, "bad key #{secret}"} end)
+          ]
+        ] do
+      {_compiled, report} =
+        Imp.Optimizer.GEPA.new(
+          metric(),
+          [
+            execution_profile: :beam_native,
+            generations: 2,
+            raise_on_exception: false,
+            max_metric_calls: 12
+          ] ++ opts
+        )
+        |> Imp.Optimizer.GEPA.compile_with_report(france_program(), trainset(), devset(),
+          checkpoint_fn: fn dumped ->
+            send(parent, {:checkpoint, dumped})
+            :ok
+          end
+        )
+
+      assert report.metadata.failed_proposals == 2
+      checkpoints = collect_checkpoints([])
+      assert Enum.any?(checkpoints, &(Jason.encode!(&1) =~ "proposal_error"))
+      refute Enum.any?(checkpoints, &(Jason.encode!(&1) =~ "abcdefghijklmnop"))
+    end
+  end
+
+  defmodule UnloadedFieldError do
+    defexception [:message, :gepa_fresh_vm_only_field]
+  end
+
+  test "a checkpoint with a custom exception's failure resumes in a fresh VM" do
     parent = self()
 
     {_compiled, report} =
       Imp.Optimizer.GEPA.new(metric(),
         execution_profile: :beam_native,
-        generations: 2,
+        generations: 1,
         raise_on_exception: false,
         module_selector: fn _state, _trajectories, _scores, _index, _candidate ->
-          raise "selector saw #{secret}"
+          raise UnloadedFieldError, message: "custom exploded", gepa_fresh_vm_only_field: 1
         end,
         reflection_lm: reflection_lm("Answer in one word."),
-        max_metric_calls: 12
+        max_metric_calls: 20
       )
       |> Imp.Optimizer.GEPA.compile_with_report(france_program(), trainset(), devset(),
         checkpoint_fn: fn dumped ->
@@ -705,10 +794,67 @@ defmodule OptimizerBehavioralCorpusTest do
         end
       )
 
-    assert report.metadata.failed_proposals == 2
-    checkpoints = collect_checkpoints([])
-    assert Enum.any?(checkpoints, &(Jason.encode!(&1) =~ "proposal_error"))
-    refute Enum.any?(checkpoints, &(Jason.encode!(&1) =~ "abcdefghijklmnop"))
+    assert [%{diagnostics: ["custom exploded"]}] = report.errors
+    checkpoint = collect_checkpoints([]) |> hd()
+
+    path =
+      Path.join(
+        System.tmp_dir!(),
+        "gepa-custom-exception-#{System.unique_integer([:positive])}.json"
+      )
+
+    File.write!(path, Jason.encode!(checkpoint))
+    on_exit(fn -> File.rm(path) end)
+
+    # The fresh VM has neither the test module nor its field atom; it resumes
+    # with a selector that raises an ordinary error. It loads Imp's own
+    # modules first, since a checkpoint also names atoms Imp defines outside
+    # the modules a resume loads.
+    expression = """
+    {:ok, _} = Application.ensure_all_started(:imp)
+    Enum.each(Application.spec(:imp, :modules), &Code.ensure_loaded/1)
+    resume_state = System.argv() |> hd() |> File.read!() |> Jason.decode!()
+
+    program =
+      Imp.predict("question -> answer",
+        lm: Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "unknown"} end)
+      )
+
+    train = [
+      Imp.example(question: "What is the capital of France?", answer: "Paris")
+      |> Imp.Example.with_inputs(:question)
+    ]
+
+    dev = [
+      Imp.example(question: "Capital of France?", answer: "Paris")
+      |> Imp.Example.with_inputs(:question)
+    ]
+
+    {_compiled, report} =
+      Imp.Optimizer.GEPA.new(Imp.Metrics.exact_match(:answer),
+        execution_profile: :beam_native,
+        generations: 2,
+        raise_on_exception: false,
+        module_selector: fn _state, _trajectories, _scores, _index, _candidate ->
+          raise "second exploded"
+        end,
+        reflection_lm: Imp.LM.Static.new(handler: fn _messages, _opts -> %{instruction: "x"} end),
+        max_metric_calls: 20
+      )
+      |> Imp.Optimizer.GEPA.compile_with_report(program, train, dev, resume_state: resume_state)
+
+    IO.puts(inspect(Enum.map(report.errors, & &1.diagnostics)))
+    """
+
+    args =
+      "_build/test/lib/*/ebin"
+      |> Path.wildcard()
+      |> Enum.flat_map(&["-pa", &1])
+      |> Kernel.++(["-e", expression, path])
+
+    {output, status} = System.cmd("elixir", args, stderr_to_stdout: true)
+    assert status == 0, output
+    assert output =~ ~s([["custom exploded"], ["second exploded"]])
   end
 
   test "a GEPA report stopped by a consecutive-outcome stopper loads in a fresh VM" do

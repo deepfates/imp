@@ -290,7 +290,7 @@ defmodule Imp.Optimizer.GEPA.ComBee do
                %{
                  report
                  | status: :error,
-                   failure: serializable_failure(failure),
+                   failure: Imp.Optimizer.GEPA.Failure.serializable(failure),
                    final_calls: final_run.dispatched,
                    reflection_calls: report.reflection_calls + final_run.dispatched
                }}
@@ -299,7 +299,8 @@ defmodule Imp.Optimizer.GEPA.ComBee do
         {index, reason} ->
           failure = {:combee_first_level_failed, index, reason}
 
-          {:error, failure, %{report | status: :error, failure: serializable_failure(failure)}}
+          {:error, failure,
+           %{report | status: :error, failure: Imp.Optimizer.GEPA.Failure.serializable(failure)}}
       end
     end
   end
@@ -573,20 +574,6 @@ defmodule Imp.Optimizer.GEPA.ComBee do
   catch
     kind, reason -> {:error, {:proposal_throw, kind, reason, __STACKTRACE__}}
   end
-
-  defp serializable_failure({:combee_first_level_failed, index, reason}),
-    do: {:combee_first_level_failed, index, serializable_failure(reason)}
-
-  defp serializable_failure({:combee_final_aggregation_failed, reason}),
-    do: {:combee_final_aggregation_failed, serializable_failure(reason)}
-
-  defp serializable_failure({:proposal_exception, exception, _stacktrace}),
-    do: {:proposal_exception, Exception.message(exception)}
-
-  defp serializable_failure({:proposal_throw, kind, reason, _stacktrace}),
-    do: {:proposal_throw, kind, reason}
-
-  defp serializable_failure(reason), do: reason
 
   defp unwrap_coordinator_result({:ok, result}), do: result
   defp unwrap_coordinator_result({:error, reason}), do: {:error, reason}

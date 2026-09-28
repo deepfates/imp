@@ -92,7 +92,8 @@ defmodule Imp.DeploymentAgentOptimizationExampleTest do
         fallback_proposer: fn _candidate, _component, _records, _iteration -> "better" end
       )
 
-    assert [%{reason: {:proposal_error, %RuntimeError{}}} | _] = result.rejected
+    assert [%{reason: {:proposal_error, {:proposal_exception, "RuntimeError", _}}} | _] =
+             result.rejected
 
     result = %{
       result
@@ -105,6 +106,7 @@ defmodule Imp.DeploymentAgentOptimizationExampleTest do
 
     assert record =~ "incomplete_evaluation"
     assert record =~ "proposal_error"
+    assert record =~ "RuntimeError"
     refute record =~ "sk-or-v1-"
   end
 
