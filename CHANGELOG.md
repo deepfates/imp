@@ -6,6 +6,9 @@ User-visible changes to Imp are recorded here.
 
 ### Security
 
+- The lock file takes `mint` 1.11.0 (and `hpax` 1.1.0), which fixes
+  EEF-CVE-2026-91043, EEF-CVE-2026-92103 and EEF-CVE-2026-94194 in the HTTP
+  client Req uses. The example projects' lock files take the same versions.
 - `Imp.Redaction` redacts a string that holds a PEM private key of any type,
   a PGP private key block or a PuTTY key file; a Stripe (`sk_live_`,
   `rk_live_`), GitHub, GitLab (`glpat-`), Hugging Face (`hf_`), Slack
