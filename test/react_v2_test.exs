@@ -457,7 +457,9 @@ defmodule ReActV2Test do
         cache: false
       )
 
-    assert {:ok, prediction} =
+    # The forced submit got no response, so the call fails with the
+    # provider's rejection.
+    assert {:error, %Imp.Predict.ReActV2.StepError{reason: %Imp.LMError{status: 400}}} =
              Imp.react(@submit_signature, [],
                lm: lm,
                max_iters: 1,
@@ -465,8 +467,6 @@ defmodule ReActV2Test do
              )
              |> Imp.call(%{question: "Capital of France?"})
 
-    assert prediction.metadata[:termination_reason] == :incomplete
-    assert prediction.metadata[:termination_cause] == :max_iters
     assert_received {:required_only_tool_request, _initial_messages, _initial_opts}
     assert_received {:required_only_tool_request, _named_messages, _named_opts}
     refute_received {:required_only_tool_request, _fallback_messages, _fallback_opts}
@@ -537,7 +537,7 @@ defmodule ReActV2Test do
     assert extraction_prompt =~ "is not evidence that an action happened"
   end
 
-  test "preserves missing output when typed extraction fails" do
+  test "a typed extraction that gets no response returns its error" do
     {:ok, state} = Agent.start_link(fn -> :initial end)
 
     lm =
@@ -550,17 +550,13 @@ defmodule ReActV2Test do
         cache: false
       )
 
-    assert {:ok, prediction} =
+    assert {:error, %Imp.Predict.ReActV2.StepError{reason: %Imp.LMError{status: 503}}} =
              Imp.react(@submit_signature, [],
                lm: lm,
                max_iters: 1,
                config: [json_retries: 0]
              )
              |> Imp.call(%{question: "Capital of France?"})
-
-    assert prediction.fields == %{}
-    assert prediction.metadata[:termination_reason] == :incomplete
-    assert prediction.metadata[:termination_cause] == :max_iters
 
     # Four requests, not five: the prose the required-only fallback returns is
     # read as a thought that called nothing, so no JSON-adapter re-ask fires.

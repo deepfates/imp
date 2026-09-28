@@ -114,6 +114,7 @@
         "Imp.Predict",
         "Imp.Predict.ChainOfThought",
         "Imp.Predict.ReActV2",
+        "Imp.Predict.ReActV2.StepError",
         "Imp.Retrieve.Memory",
         "Imp.ToolPolicy"
       ],
