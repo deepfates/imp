@@ -11,10 +11,12 @@ User-visible changes to Imp are recorded here.
   `reasoning_effort` option, so they are every effort ReqLLM accepts, on every
   provider; ReqLLM's provider maps or clamps it to what that provider's API
   takes. OpenRouter receives `"max"` in either wire field.
-- A string effort such as `"high"` reaches ReqLLM as its atom. ReqLLM's
-  OpenRouter provider refused the string form, so a string effort on an
-  OpenRouter LM without `openrouter_reasoning_wire: :nested`, including one
-  loaded from a saved program, failed every call.
+- A string effort such as `"high"` reaches ReqLLM as its atom. ReqLLM checks
+  the effort against its atom list before any provider sees it, so in 0.6.0 a
+  string effort, including every effort loaded from a saved program, failed
+  every call on most providers: OpenRouter without
+  `openrouter_reasoning_wire: :nested`, Anthropic, Google and Groq among
+  them. OpenAI and xAI were not affected.
 
 ## 0.6.0 — 2026-09-28
 

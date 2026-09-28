@@ -2385,6 +2385,80 @@ defmodule ReqLLMClientTest do
     refute Map.has_key?(request, "reasoning_effort")
   end
 
+  test "a string reasoning_effort reaches OpenRouter and Anthropic requests" do
+    owner = self()
+
+    adapter = fn request ->
+      send(owner, {:string_effort_transport, request.body})
+
+      body =
+        if String.contains?(to_string(request.url), "anthropic") do
+          %{
+            "id" => "msg_local",
+            "type" => "message",
+            "role" => "assistant",
+            "model" => "claude-sonnet-4-6",
+            "content" => [%{"type" => "text", "text" => "ok"}],
+            "stop_reason" => "end_turn",
+            "usage" => %{"input_tokens" => 1, "output_tokens" => 1}
+          }
+        else
+          %{
+            "id" => "openrouter-string-local",
+            "object" => "chat.completion",
+            "model" => "provider/snapshot",
+            "choices" => [
+              %{
+                "index" => 0,
+                "message" => %{"role" => "assistant", "content" => "ok"},
+                "finish_reason" => "stop"
+              }
+            ],
+            "usage" => %{"prompt_tokens" => 1, "completion_tokens" => 1, "total_tokens" => 2}
+          }
+        end
+
+      {request, Req.Response.new(status: 200, body: body)}
+    end
+
+    transport = [
+      api_key: "provider-disabled",
+      cache: false,
+      max_retries: 0,
+      reasoning_effort: "high",
+      req_http_options: [adapter: adapter, retry: false, max_retries: 0]
+    ]
+
+    messages = [%{role: :user, content: "reason"}]
+
+    openrouter =
+      Imp.req_llm(
+        %{
+          provider: :openrouter,
+          id: "provider/model",
+          model: "provider/model",
+          base_url: "https://openrouter.invalid/v1"
+        },
+        transport
+      )
+
+    assert {:ok, _response} = Imp.Clients.ReqLLM.generate(openrouter, messages, [])
+    assert_received {:string_effort_transport, request_body}
+    request = request_body |> IO.iodata_to_binary() |> Jason.decode!()
+    assert request["reasoning_effort"] == "high"
+
+    anthropic =
+      Imp.req_llm(
+        "anthropic:claude-sonnet-4-6",
+        [base_url: "https://anthropic.invalid"] ++ transport
+      )
+
+    assert {:ok, _response} = Imp.Clients.ReqLLM.generate(anthropic, messages, [])
+    assert_received {:string_effort_transport, request_body}
+    request = request_body |> IO.iodata_to_binary() |> Jason.decode!()
+    assert request["thinking"] == %{"type" => "enabled", "budget_tokens" => 4096}
+  end
+
   test "reasoning_effort rejects unknown values and duplicates early, on any provider" do
     for effort <- [:invented, "invented", %{effort: :high}, 3] do
       assert_raise ArgumentError, ~r/:reasoning_effort/, fn ->

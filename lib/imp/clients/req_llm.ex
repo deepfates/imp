@@ -28,10 +28,11 @@ defmodule Imp.Clients.ReqLLM do
   `:reasoning_effort` is the one reasoning option, on the client or on a call.
   It takes any value of ReqLLM's own `reasoning_effort` option, such as `high`,
   `xhigh`, `max` or `default`, as an atom or a string, on every provider;
-  ReqLLM's provider maps or clamps it to what that provider's API takes. A call naming `nil` spends no reasoning on that call
-  whatever the client is configured with. Native reasoning fields
-  (`Imp.Predict`) set the same option, so a client configured with an effort
-  and a program that asks for one never disagree.
+  ReqLLM's provider maps or clamps it to what that provider's API takes. A
+  call naming `nil` spends no reasoning on that call whatever the client is
+  configured with. Native reasoning fields (`Imp.Predict`) set the same
+  option, so a client configured with an effort and a program that asks for
+  one never disagree.
 
   OpenRouter accepts the effort in two wire fields, and its endpoint catalog
   says which one an endpoint supports: ReqLLM's top-level `reasoning_effort`
@@ -902,9 +903,10 @@ defmodule Imp.Clients.ReqLLM do
           ":reasoning_effort must be one of #{inspect(@reasoning_efforts)}, got: #{inspect(effort)}"
   end
 
-  # ReqLLM validates `:reasoning_effort` against atoms and only some of its
-  # providers (OpenAI, xAI, Meta) accept the string form, so a string effort
-  # sent to OpenRouter fails ReqLLM's option validation. The effort is kept as
+  # ReqLLM checks `:reasoning_effort` against its atom list before most
+  # providers (OpenRouter, Anthropic, Google, Groq) see it; only OpenAI, xAI
+  # and Meta turn the string form into the atom first. A string effort would
+  # fail ReqLLM's option validation on the others. The effort is kept as
   # given in the client's options, where it is part of the cache key, and
   # becomes the atom only on its way into ReqLLM.
   defp atomize_reasoning_effort(opts) do
