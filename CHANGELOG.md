@@ -458,22 +458,31 @@ Every change here is breaking for code that relied on the old behaviour.
   that process: the exit goes on up, as it must from a process that traps
   exits and turns its owner's shutdown into an exit. Before, it was recorded
   and the run went on.
-- A GEPA checkpoint restores a result's trajectories as the run held them:
-  map keys keep their atom or string type, and a trajectory's prediction,
-  example, events, usage, timing, history and adapter values come back as the
-  same structs. It wrote them in the portable `Trajectory.dump/1` form, which
-  writes every map key as a string, so resuming from a checkpoint whose
+- `Imp.Optimizer.Trajectory.dump/1` and `load!/1` round-trip a trajectory:
+  a map with an atom key is written as its entries, each key tagged as an
+  atom, so a prediction's metadata, a trace step (`%{predictor: :main}`) and
+  metric metadata such as Optimize Anything's `objective_scores` load with the
+  keys they had. Every map key was written as a string, so a trajectory whose
+  prediction had metadata failed to load (`Imp.Prediction.new/2: invalid map
+  in :metadata … got: "trace"`). GEPA checkpoints, Playbook checkpoints and
+  `Imp.dump/1` use this codec; resuming GEPA from a checkpoint whose
   pending proposal batch held a result from an `Imp.predict` program raised
-  `Imp.Prediction.new/2: invalid map in :metadata … got: "trace"`, and an
-  Optimize Anything run resumed with its trajectories' metric metadata keyed
-  by strings. A checkpoint written before this change that holds trajectories,
-  such as an Optimize Anything `gepa_state.json`, does not load: the
-  resume raises `invalid GEPA checkpoint trajectory`.
+  that error. A trajectory written by 0.5.0 still loads, with the string keys
+  it was written with, including one whose prediction has metadata. Imp 0.5.0
+  cannot read a trajectory written with atom keys.
 - A GEPA checkpoint resumes in a fresh VM: the loader loads the GEPA modules
   whose atoms a checkpoint holds before decoding it. Before,
   `Imp.Optimizer.GEPA.compile_with_report/5` given a checkpoint in a VM that
   had not yet run GEPA raised `not an already existing atom` on names like
   `:cache_hits` and `:no_strict_improvement`.
+- The checkpoint GEPA writes after a sequential reflection holds the proposed
+  candidate, as the parallel path's does, so a resume from it, or from a
+  checkpoint taken while that candidate was being evaluated, evaluates that
+  candidate on the same minibatch. It held no proposal, so the resume started
+  the iteration over on the next minibatch and asked for a new reflection.
+- Under `:proposal_concurrency` above 1, GEPA evaluates a proposed candidate
+  on its minibatch without capturing traces, as the sequential path and
+  DSPy's GEPA do; its `on_evaluation_end` carries no trajectories.
 - `Imp.Optimizer.GEPA.compile_with_report/5` no longer raises `KeyError` when
   it resumes from a checkpoint taken during a full validation; the
   interrupted validation's rejected candidate is in the report.

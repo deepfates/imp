@@ -6,8 +6,9 @@ defmodule Imp.Optimizer.Trajectory do
   runtime identity and typed events for GEPA, MIPROv2, SIMBA, RLM, ReAct, and
   generic evaluation adapters. `dump/1` is the canonical cross-runtime wire
   representation: it is JSON-safe, deterministic, and redacts secrets in
-  structured fields. Opaque attachment bytes are preserved unchanged. `load/1`
-  validates the complete envelope and fails closed.
+  structured fields. Opaque attachment bytes are preserved unchanged, and map
+  keys load as the atoms or strings they were. `load/1` validates the complete
+  envelope and fails closed.
   """
 
   alias __MODULE__.{Cache, DecodeError, Event, Failure, Parameter, Timing, Usage}
@@ -668,7 +669,7 @@ defmodule Imp.Optimizer.Trajectory do
   defp encode_optional_struct(nil), do: nil
   defp encode_optional_struct(value), do: encode_struct(value)
 
-  defp encode_struct(value) when is_struct(value), do: value |> Map.from_struct() |> encode_term()
+  defp encode_struct(value) when is_struct(value), do: value |> Map.from_struct() |> encode_map()
 
   defp decode_optional_struct(nil, _module), do: nil
   defp decode_optional_struct(value, module), do: decode_struct(value, module)
@@ -713,7 +714,7 @@ defmodule Imp.Optimizer.Trajectory do
 
     %{
       "__trajectory_type__" => "failure",
-      "value" => failure |> Map.from_struct() |> encode_term()
+      "value" => failure |> Map.from_struct() |> encode_map()
     }
   end
 
@@ -737,19 +738,35 @@ defmodule Imp.Optimizer.Trajectory do
             ] do
     %{
       "__trajectory_type__" => module |> Module.split() |> List.last() |> Macro.underscore(),
-      "value" => value |> Map.from_struct() |> encode_term()
+      "value" => value |> Map.from_struct() |> encode_map()
     }
   end
 
   defp encode_term(value) when is_struct(value),
     do: decode_error!("trajectory contains an unsupported struct: #{inspect(value.__struct__)}")
 
+  # A map with an atom key is written as its entries, each key tagged as
+  # every atom is, so it loads with the keys it had. A map whose keys are all
+  # strings stays a JSON object.
   defp encode_term(value) when is_map(value) do
     encoded = encode_map(value)
 
-    if Map.has_key?(encoded, "__trajectory_type__"),
-      do: %{"__trajectory_type__" => "map", "value" => encoded},
-      else: encoded
+    cond do
+      Enum.any?(Map.keys(value), &is_atom/1) ->
+        %{
+          "__trajectory_type__" => "map",
+          "entries" =>
+            value
+            |> Enum.sort_by(fn {key, _nested} -> to_string(key) end)
+            |> Enum.map(fn {key, _nested} -> [encode_term(key), encoded[to_string(key)]] end)
+        }
+
+      Map.has_key?(encoded, "__trajectory_type__") ->
+        %{"__trajectory_type__" => "map", "value" => encoded}
+
+      true ->
+        encoded
+    end
   end
 
   defp encode_term([]), do: []
@@ -827,12 +844,17 @@ defmodule Imp.Optimizer.Trajectory do
          } = value
        ) do
     require_typed_keys!(value, ~w(__trajectory_type__ fields completions score metadata))
+    metadata = decode_term(metadata)
 
-    Imp.Prediction.new(decode_term(fields),
-      completions: decode_term(completions),
-      score: score,
-      metadata: decode_term(metadata)
-    )
+    unless is_map(metadata), do: decode_error!("prediction metadata must be a map")
+
+    # A trajectory written before map keys kept their type holds prediction
+    # metadata with string keys, which `Imp.Prediction.new/2` refuses; it
+    # loads with the keys it was written with.
+    prediction =
+      Imp.Prediction.new(decode_term(fields), completions: decode_term(completions), score: score)
+
+    %{prediction | metadata: metadata}
   end
 
   defp decode_term(%{"__trajectory_type__" => "tuple", "value" => value} = tagged)
@@ -852,6 +874,26 @@ defmodule Imp.Optimizer.Trajectory do
        when is_binary(value) do
     require_typed_keys!(tagged, ~w(__trajectory_type__ value))
     existing_atom(value)
+  end
+
+  defp decode_term(%{"__trajectory_type__" => "map", "entries" => entries} = tagged)
+       when is_list(entries) do
+    require_typed_keys!(tagged, ~w(__trajectory_type__ entries))
+
+    Enum.reduce(entries, %{}, fn
+      [key, nested], decoded ->
+        key = decode_term(key)
+
+        unless is_atom(key) or is_binary(key),
+          do: decode_error!("trajectory map keys must be atoms or strings")
+
+        if Map.has_key?(decoded, key),
+          do: decode_error!("trajectory map contains a repeated key"),
+          else: Map.put(decoded, key, decode_term(nested))
+
+      _entry, _decoded ->
+        decode_error!("malformed trajectory map entry")
+    end)
   end
 
   defp decode_term(%{"__trajectory_type__" => "map", "value" => value} = tagged)

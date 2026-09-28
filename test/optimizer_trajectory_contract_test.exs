@@ -208,8 +208,8 @@ defmodule Imp.Optimizer.TrajectoryContractTest do
 
     assert %Imp.Adapter.Types.Image{
              data: ^payload,
-             metadata: %{"api_key" => "[REDACTED]"}
-           } = restored.example["image"]
+             metadata: %{api_key: "[REDACTED]"}
+           } = restored.example.image
   end
 
   test "serialization rejects atom and string keys that collide in JSON" do
@@ -491,4 +491,80 @@ defmodule Imp.Optimizer.TrajectoryContractTest do
       assert Trajectory.dump(decoded) == wire
     end
   end
+
+  test "a predict program's trajectory loads with the terms it was dumped with" do
+    program =
+      Imp.predict("question -> answer",
+        lm: Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "Paris"} end)
+      )
+
+    {:ok, prediction} = Imp.Module.call(program, %{question: "Capital of France?"})
+    assert %{trace: %{messages: [_ | _]}} = prediction.metadata
+
+    trajectory =
+      Trajectory.project(:gepa, %{
+        index: 0,
+        example: Imp.example(question: "Capital of France?", answer: "Paris"),
+        prediction: prediction,
+        score: 1.0,
+        trace: [
+          %{
+            predictor: :main,
+            inputs: %{question: "Capital of France?"},
+            outputs: %{answer: "Paris"}
+          }
+        ],
+        metric_metadata: %{"source" => "metric", objective_scores: %{accuracy: 1.0}}
+      })
+
+    wire = Trajectory.dump(trajectory)
+    assert Trajectory.load!(wire) == trajectory
+    assert wire |> Jason.encode!() |> Jason.decode!() |> Trajectory.load!() == trajectory
+  end
+
+  test "a trajectory written with every map key as a string still loads" do
+    prediction = %Imp.Prediction{
+      fields: %{answer: "Paris"},
+      metadata: %{trace: %{raw: %{answer: "Paris"}}}
+    }
+
+    trajectory =
+      Trajectory.project(:optimize_anything, %{
+        index: 0,
+        prediction: prediction,
+        score: 1.0,
+        trace: [%{predictor: :main, inputs: %{question: "q"}, outputs: %{answer: "Paris"}}],
+        metric_metadata: %{objective_scores: %{accuracy: 1.0}}
+      })
+
+    # The earlier wire form wrote every map key as a string, with no entries.
+    legacy = trajectory |> Trajectory.dump() |> string_keyed_wire()
+    refute legacy |> Jason.encode!() |> String.contains?("entries")
+
+    restored = Trajectory.load!(legacy)
+    assert restored.prediction.metadata == %{"trace" => %{"raw" => %{"answer" => "Paris"}}}
+
+    assert restored.trace == [
+             %{
+               "predictor" => :main,
+               "inputs" => %{"question" => "q"},
+               "outputs" => %{"answer" => "Paris"}
+             }
+           ]
+
+    assert restored.metric_metadata == %{"objective_scores" => %{"accuracy" => 1.0}}
+  end
+
+  defp string_keyed_wire(%{"__trajectory_type__" => "map", "entries" => entries}) do
+    Map.new(entries, fn [key, value] -> {string_key(key), string_keyed_wire(value)} end)
+  end
+
+  defp string_keyed_wire(map) when is_map(map),
+    do: Map.new(map, fn {key, value} -> {key, string_keyed_wire(value)} end)
+
+  defp string_keyed_wire(list) when is_list(list), do: Enum.map(list, &string_keyed_wire/1)
+  defp string_keyed_wire(value), do: value
+
+  defp string_key(%{"__trajectory_type__" => "atom", "value" => name}), do: name
+  defp string_key(key) when is_binary(key), do: key
 end

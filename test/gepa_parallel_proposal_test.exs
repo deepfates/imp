@@ -11,12 +11,17 @@ defmodule Imp.Optimizer.GEPA.ParallelProposalTest do
     def evaluate(adapter, batch, candidate, opts) do
       capture? = Keyword.get(opts, :capture_traces, false)
       iteration = candidate_iteration(candidate)
-      phase = if(capture? and iteration > 0, do: :child, else: :parent)
-      delay = Map.get(adapter.delays, {phase, batch_id(batch)}, 0)
+      minibatch? = batch_id(batch) != :validation
+      phase = if(iteration > 0, do: :child, else: :parent)
+      delay = if(minibatch?, do: Map.get(adapter.delays, {phase, batch_id(batch)}, 0), else: 0)
 
-      if capture?, do: send(adapter.owner, {:evaluation_started, phase, batch_id(batch), self()})
+      if minibatch?,
+        do: send(adapter.owner, {:evaluation_started, phase, batch_id(batch), self()})
+
       if delay == :infinity, do: Process.sleep(:infinity), else: Process.sleep(delay)
-      if capture?, do: send(adapter.owner, {:evaluation_finished, phase, batch_id(batch), self()})
+
+      if minibatch?,
+        do: send(adapter.owner, {:evaluation_finished, phase, batch_id(batch), self()})
 
       scores = List.duplicate(iteration * 1.0, length(batch))
 
@@ -276,6 +281,12 @@ defmodule Imp.Optimizer.GEPA.ParallelProposalTest do
     end
 
     def on_evaluation_end(_event, _owner), do: :ok
+
+    @impl true
+    def on_evaluation_start(event, owner) do
+      questions = Enum.map(event.inputs, &Imp.Example.get(&1, :question))
+      send(owner, {:evaluation_start, {event.iteration, event.parent_ids, questions}})
+    end
   end
 
   test "a predict program resumes from every checkpoint to the uninterrupted result" do
@@ -287,6 +298,7 @@ defmodule Imp.Optimizer.GEPA.ParallelProposalTest do
       checkpoint_fn = fn dumped -> send(owner, {:checkpoint, dumped}) && :ok end
       expected = compile_predict_program(profile, checkpoint_fn: checkpoint_fn)
       evaluations = receive_evaluations([])
+      starts = receive_starts([])
       checkpoints = receive_checkpoints([])
 
       # The proposed instruction carries a digest of the reflection prompt, so
@@ -327,24 +339,22 @@ defmodule Imp.Optimizer.GEPA.ParallelProposalTest do
             resumed = compile_predict_program(profile, resume_state: resume_state)
             assert resumed.report.metadata.rejected_candidates >= 1, context
 
-          {batch, nil} ->
+          {_prepared_or_none, nil} ->
             resumed = compile_predict_program(profile, resume_state: resume_state)
             assert {resumed.best, resumed.score} == {expected.best, expected.score}, context
 
-            # A parent evaluation the batch holds reaches the callbacks with
-            # the trajectories the uninterrupted run gave them.
-            replayed =
-              for %{"iteration" => iteration, "parent_id" => parent, "parent_result" => %{}} <-
-                    (batch || %{})["contexts"] || [],
-                  do: {iteration, parent}
+            # Every evaluation the resumed run makes, the uninterrupted run
+            # made: the same iteration, parent and examples.
+            for start <- receive_starts([]), do: assert(start in starts, context)
 
-            for {iteration, candidate, _} = evaluation <- receive_evaluations([]),
-                {iteration, candidate} in replayed do
-              assert evaluation in evaluations, context
-            end
+            # Every evaluation with trajectories, a parent's the batch holds
+            # included, reaches the callbacks as it did uninterrupted.
+            for evaluation <- receive_evaluations([]),
+                do: assert(evaluation in evaluations, context)
         end
 
         receive_evaluations([])
+        receive_starts([])
       end
     end
   end
@@ -471,6 +481,14 @@ defmodule Imp.Optimizer.GEPA.ParallelProposalTest do
       score: report.best_score,
       report: report
     }
+  end
+
+  defp receive_starts(acc) do
+    receive do
+      {:evaluation_start, start} -> receive_starts([start | acc])
+    after
+      0 -> Enum.reverse(acc)
+    end
   end
 
   defp receive_evaluations(acc) do
