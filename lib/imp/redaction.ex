@@ -42,6 +42,7 @@ defmodule Imp.Redaction do
     :service_account_key,
     :credential,
     :credentials,
+    :code_verifier,
     :"x-api-key"
   ]
 
@@ -86,6 +87,25 @@ defmodule Imp.Redaction do
     required title type uniqueItems
   ))
 
+  # Structs that hold a connection's headers and URLs. ExMCP's client and HTTP
+  # transport keep an `Authorization` bearer or an API-key header in their
+  # process state, which is printed when the process crashes or is inspected
+  # with `:sys.get_state/1`; ExMCP 1.5 has no `Inspect` implementation for
+  # either, so Imp gives them its own. That entry goes when ExMCP redacts its
+  # own state; if ExMCP adds an implementation, the two conflict.
+  @connection_structs [
+    Imp.Clients.ReqLLM,
+    Imp.Retrievers.HTTP,
+    Imp.Tracking.MLflow,
+    Imp.Tracking.WandB,
+    Imp.Optimize.Anything.Config.Tracking,
+    ExMCP.Client,
+    ExMCP.Transport.HTTP
+  ]
+
+  @doc false
+  def connection_structs, do: @connection_structs
+
   @doc """
   Returns the default key names treated as sensitive.
 
@@ -113,13 +133,6 @@ defmodule Imp.Redaction do
   end
 
   def credential_key?(_key), do: false
-
-  @doc false
-  # What a client, retriever or tracker prints: `redact/1`, then every header
-  # value whatever the header is called, and the query, fragment and user info
-  # of every URL. A header's name says nothing reliable about its value
-  # (`X-Subscription-Token`, `Cookie`), and a URL's query often carries a key.
-  def redact_for_print(value), do: value |> redact() |> hide_headers_and_urls()
 
   @doc false
   # What a saved program may hold: no header at all. A header value is a
@@ -294,6 +307,51 @@ defmodule Imp.Redaction do
         candidates: redact(report.candidates, keys),
         errors: redact(report.errors, keys),
         metadata: redact(report.metadata, keys)
+    }
+  end
+
+  # A connection struct is redacted as it prints: ordinary redaction, then
+  # every header value whatever the header is called, and the query, fragment
+  # and user info of every URL. A header's name says nothing reliable about its
+  # value (`X-Subscription-Token`, `Cookie`), and a URL's query often carries a
+  # key. The struct keeps its type.
+  def redact(%module{} = value, keys) when module in @connection_structs do
+    Map.merge(value, value |> Map.from_struct() |> redact(keys) |> hide_headers_and_urls())
+  end
+
+  # The MCP OAuth structs hold secrets under names that say nothing about them:
+  # a store's derived HMAC key, a flow's PKCE transaction and registered client,
+  # and the `state` that an authorization URL also carries. Each keeps its type
+  # and the fields its `Inspect` implementation shows; the secret fields become
+  # the redaction marker.
+  def redact(%Imp.MCP.OAuth.Store{} = store, keys) do
+    %{store | directory: redact(store.directory, keys), key: "[REDACTED]"}
+  end
+
+  def redact(%Imp.MCP.OAuth.Flow{} = flow, keys) do
+    %{
+      flow
+      | resource_url: redact(flow.resource_url, keys),
+        redirect_uri: redact(flow.redirect_uri, keys),
+        authorization_url: "[REDACTED]",
+        transaction: "[REDACTED]",
+        client: "[REDACTED]",
+        issuer: redact(flow.issuer, keys),
+        token_endpoint: redact(flow.token_endpoint, keys),
+        scopes: redact(flow.scopes, keys)
+    }
+  end
+
+  def redact(%Imp.MCP.OAuth.Pending{} = pending, keys) do
+    %{
+      pending
+      | store: redact(pending.store, keys),
+        credential: redact(pending.credential, keys),
+        server_url: redact(pending.server_url, keys),
+        authorization_url: "[REDACTED]",
+        redirect_uri: redact(pending.redirect_uri, keys),
+        flow: redact(pending.flow, keys),
+        state: if(is_nil(pending.state), do: nil, else: "[REDACTED]")
     }
   end
 
@@ -728,20 +786,12 @@ defmodule Imp.Redaction do
   end
 end
 
-# Structs that can hold a credential print it redacted: an LM client's
-# `api_key` or headers, a retriever's or tracker's headers. A program prints
-# its LM, so a program in IEx, a log line or a crash report would otherwise
-# carry the key.
-defimpl Inspect,
-  for: [
-    Imp.Clients.ReqLLM,
-    Imp.Retrievers.HTTP,
-    Imp.Tracking.MLflow,
-    Imp.Tracking.WandB,
-    Imp.Optimize.Anything.Config.Tracking
-  ] do
-  # `redact_for_print/1` returns a struct's fields as a map; merging them back
-  # keeps the struct, so it prints as one.
-  def inspect(struct, opts),
-    do: Inspect.Any.inspect(Map.merge(struct, Imp.Redaction.redact_for_print(struct)), opts)
+# A connection struct prints as `Imp.Redaction.redact/1` leaves it: an LM
+# client's `api_key` or headers, a retriever's or tracker's headers. A program
+# prints its LM, so a program in IEx, a log line or a crash report would
+# otherwise carry the key.
+for module <- Imp.Redaction.connection_structs() do
+  defimpl Inspect, for: module do
+    def inspect(struct, opts), do: Inspect.Any.inspect(Imp.Redaction.redact(struct), opts)
+  end
 end
