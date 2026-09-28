@@ -16,15 +16,16 @@ User-visible changes to Imp are recorded here.
   or Azure `sig`. It passed these unchanged into run events, traces,
   trajectories and saved programs. As before, the whole string is replaced,
   and every shape it caught before is still caught.
-- `Imp.ExternalCommand` redacts captured output line by line with the same
-  rules, so a credential hides its line and a private key block hides the
-  block. It used two patterns of its own (`sk-` and `Bearer`) as the output
-  was captured and then replaced the whole output if any credential was left
-  in it. A credential no pattern names, on a line of its own beside one that
-  is caught, now stays visible in the output. The optimizer's pricing URL
-  check uses the same rules instead of its own.
-- A string with many near misses for `Bearer` in one letter case (`BEARER x`
-  lines) is redacted in linear time; it took quadratic time.
+- `Imp.ExternalCommand` redacts captured output with the same rules: output
+  that holds a credential is `"[REDACTED]"`, so the credentials printed beside
+  a recognized one (`env | grep AWS`, a credentials file) go with it. It used
+  two patterns of its own (`sk-` and `Bearer`) before the shared rules. The
+  optimizer's pricing URL check uses the same rules instead of its own.
+- A `Bearer` token is found at the end of a line in a multi-line string
+  (`"Authorization: Bearer <token>\nmachine …"`), and mid-line when it holds
+  a digit or symbol (`Bearer <token> https://…`); both were missed.
+- A string of near misses for `Bearer` or `Basic` in one letter case
+  (`BEARER x` lines) is redacted in linear time; it took quadratic time.
 
 ### Changed
 

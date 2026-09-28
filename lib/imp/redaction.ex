@@ -275,8 +275,8 @@ defmodule Imp.Redaction do
   alone, and the text beside a recognized one (the rest of an env dump, a
   cookie header, a `.netrc` entry) often holds others no pattern names. This
   is the one set of credential patterns in Imp; text cleaned anywhere else
-  before it is kept or shown (a command's captured output, an optimizer
-  pricing URL) is cleaned with it. A string is a credential when it holds:
+  before it is kept or shown (a command's captured output, as a whole; an
+  optimizer pricing URL) is cleaned with it. A string is a credential when it holds:
 
     * a private key: a PEM block of any type, a PGP private key block, or a
       PuTTY key file;
@@ -286,7 +286,10 @@ defmodule Imp.Redaction do
       (`AIza`) and OAuth tokens (`ya29.`), Slack (`xox?-`), SendGrid
       (`SG.`), npm (`npm_`), PyPI (`pypi-`), Vault (`hvs.`), or a JSON Web
       Token;
-    * a `Bearer` token, or a `Basic` credential that ends the string;
+    * a `Bearer` token that ends the string or its line or is closed by
+      punctuation, or one with a digit or symbol in it followed by anything
+      (a token of letters alone there reads as prose, `Bearer authentication
+      is ...`); or a `Basic` credential that ends the string;
     * a `session=` value, or a long hex value assigned to a credential name
       (`token=<hex>`, `api_key: <hex>`);
     * a URL with a password in its user info, or a signed URL's signature or
@@ -443,18 +446,6 @@ defmodule Imp.Redaction do
     do: if(secret_value?(value), do: "[REDACTED]", else: value)
 
   def redact(value, _keys), do: value
-
-  @doc false
-  # Redacts text line by line with the rule `redact/2` applies to a string, so
-  # one credential hides its line rather than all of the text: a command's
-  # captured output. A private key block spans lines and goes as one.
-  @spec redact_lines(String.t()) :: String.t()
-  def redact_lines(text) when is_binary(text) do
-    key_blocks()
-    |> Enum.reduce(text, &Regex.replace(&1, &2, "[REDACTED]"))
-    |> String.split("\n")
-    |> Enum.map_join("\n", &redact/1)
-  end
 
   @doc """
   Recursively removes credential-bearing entries while preserving semantic data.
@@ -788,12 +779,13 @@ defmodule Imp.Redaction do
   # replaced whole. Every token pattern has a boundary on each side, so a
   # longer word that contains the prefix is not taken for a token.
   #
-  # `Bearer`, `Basic` and `session` are matched in any case, and those three
-  # patterns turn off PCRE's start-of-match optimization with
-  # `(*NO_START_OPT)`. With it, PCRE looks for a leading letter that may be
-  # either case by searching for each case separately; when one case never
-  # occurs again, each failed attempt searches to the end of the string, so a
-  # string with many near misses (`BEARER x` lines) took quadratic time.
+  # `Bearer` and `Basic` are matched in any case, and both patterns turn off
+  # PCRE's start-of-match optimization with `(*NO_START_OPT)`. With it, PCRE
+  # looks for a leading letter that may be either case by searching for each
+  # case separately; when one case never occurs again, each failed attempt
+  # searches to the end of the string, so a string of near misses in one case
+  # (`BEARER x` lines) took quadratic time. `session` does not show this and
+  # keeps the optimization.
   defp compile_secret_patterns do
     [
       # Private keys: a PEM block of any type (PKCS#8, RSA, EC, OpenSSH,
@@ -831,9 +823,9 @@ defmodule Imp.Redaction do
       # JSON Web Tokens: header.payload.signature, each base64url; the first
       # two are JSON objects, so they start `eyJ`.
       ~r/(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\./,
-      ~r/(*NO_START_OPT)(?:\A|[\s:;,"'=({\[])Bearer[ \t]+[A-Za-z0-9._~+\/-]{12,}={0,2}(?=\z|["'`}\]),;])/i,
+      ~r/(*NO_START_OPT)(?:\A|[\s:;,"'=({\[])Bearer[ \t]+(?:[A-Za-z0-9._~+\/-]{12,}={0,2}(?=\z|[\r\n"'`}\]),;])|(?=[A-Za-z]*[0-9._~+\/-])[A-Za-z0-9._~+\/-]{12,}={0,2}(?![A-Za-z0-9._~+\/=-]))/i,
       {:basic, ~r/(*NO_START_OPT)(?:\A|[\s:;,])Basic[ \t]+([A-Za-z0-9+\/]+={0,2})\z/i},
-      ~r/(*NO_START_OPT)(?:\A|[?&;,\s])session\s*=\s*[A-Za-z0-9._~+\/-]{8,}={0,2}(?=\z|[?&;,\s])/i,
+      ~r/(?:\A|[?&;,\s])session\s*=\s*[A-Za-z0-9._~+\/-]{8,}={0,2}(?=\z|[?&;,\s])/i,
       # Long hex strings alone are not credentials: Imp passes SHA-1 and
       # SHA-256 digests around as cache keys and git identities. One is a
       # credential in an explicit assignment (`token=<hex>`, `secret: <hex>`),
@@ -845,27 +837,6 @@ defmodule Imp.Redaction do
       # to be one.
       ~r/[?&](?:X-Amz-Signature|X-Amz-Security-Token|X-Goog-Signature|sig)=[^&#\s]{16,}/
     ]
-  end
-
-  # Private key blocks span lines; `redact_lines/1` removes each block whole
-  # before it looks at single lines. A block cut off before its end runs to
-  # the end of the text.
-  @key_blocks_key {__MODULE__, :key_blocks, System.unique_integer([:positive])}
-
-  defp key_blocks do
-    case :persistent_term.get(@key_blocks_key, nil) do
-      nil ->
-        patterns = [
-          ~r/-----BEGIN [A-Z0-9 ]{0,40}PRIVATE KEY(?: BLOCK)?-----.*?(?:-----END [A-Z0-9 ]{0,40}PRIVATE KEY(?: BLOCK)?-----|\z)/s,
-          ~r/PuTTY-User-Key-File-[0-9]+:.*?(?:Private-MAC:[^\n]*|\z)/s
-        ]
-
-        :persistent_term.put(@key_blocks_key, patterns)
-        patterns
-
-      patterns ->
-        patterns
-    end
   end
 
   # `Basic` is followed by base64 in prose too ("Basic authentication"); it is

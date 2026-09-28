@@ -18,18 +18,23 @@ defmodule Imp.ExternalCommandTest do
     assert redacted.output == "[REDACTED]"
     refute redacted.output =~ secret
 
-    # Output is redacted line by line as it is captured, before the capture
-    # leaves the process that owns the command: a credential hides its line,
-    # a private key block hides the block. Fake values only.
-    github = "gh" <> "p_" <> String.duplicate("F4ke", 9)
-    pem = "-----BEGIN PRIVATE KEY-----\nMIIFAKEFAKE\n-----END PRIVATE KEY-----"
-    printed = "step 1\npush #{github}\nAuthorization: Bearer F4keF4keF4keF4ke\n#{pem}\ndone"
-    cleaned = "step 1\n[REDACTED]\n[REDACTED]\n[REDACTED]\ndone"
+    # Output holding a credential is replaced whole as it is captured, so the
+    # credentials beside a recognized one, which no pattern names, go with it.
+    # Fake values only.
+    for printed <- [
+          "AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\nAWS_SECRET_ACCESS_KEY=F4keSecretAccessKey\nAWS_SESSION_TOKEN=F4keSessionToken\n",
+          "[default]\naws_access_key_id = AKIAIOSFODNN7EXAMPLE\naws_secret_access_key = F4keIniSecret\n",
+          "Cookie: session=F4keSessionCookie; csrftoken=F4keCsrf\nX-Vault-Token: F4keVaultToken\n",
+          "step 1\n-----BEGIN PRIVATE KEY-----\nMIIFAKEFAKE\n-----END PRIVATE KEY-----\nDB_PASSWORD=F4kePw\n"
+        ] do
+      assert {:ok, capture, 0} = Imp.ExternalCommand.Lifecycle.run("printf", ["%s", printed])
+      assert capture.text == "[REDACTED]"
+      assert {:ok, shaped} = Imp.ExternalCommand.run("printf", ["%s", printed])
+      assert shaped.output == "[REDACTED]"
+    end
 
-    assert {:ok, capture, 0} = Imp.ExternalCommand.Lifecycle.run("printf", ["%s", printed])
-    assert capture.text == cleaned
-    assert {:ok, shaped} = Imp.ExternalCommand.run("printf", ["%s", printed])
-    assert shaped.output == cleaned
+    assert {:ok, plain} = Imp.ExternalCommand.run("printf", ["%s", "step 1\nstep 2\n"])
+    assert plain.output == "step 1\nstep 2\n"
 
     assert {:ok, bounded} =
              Imp.ExternalCommand.run("python3", ["-c", "print('x ' * 500, end='')"],

@@ -84,6 +84,12 @@ defmodule Imp.RedactionTest do
       {"Authorization: Bearer F4keF4keF4keF4ke",
        "Bearer authentication is an authorization mechanism."},
     bearer_any_case: {"BeArEr F4keF4keF4keF4ke", "bearer bonds are bearer instruments"},
+    bearer_mid_line:
+      {"curl -H Authorization: Bearer F4ke1234F4ke1234 https://api.test",
+       "Bearer authentication tokens are described below"},
+    bearer_line_end:
+      {"Authorization: Bearer F4keF4keF4keF4ke\nmachine api.test login F4ke",
+       "Bearer authentication is described below.\nnext"},
     basic: {"Authorization: #{@basic}", "Basic authentication is enabled."},
     basic_any_case: {"BASIC " <> Base.encode64("fake-user:fake-pass"), "basic setup is enabled."},
     session: {"a=1&session=F4keSessionF4ke&b=2", "sessions=12 ran"},
@@ -112,6 +118,28 @@ defmodule Imp.RedactionTest do
     end
   end
 
+  # A string of near misses for `Bearer` or `Basic`, all in one letter case,
+  # took time quadratic in its length before the patterns turned off PCRE's
+  # start-of-match optimization (see `compile_secret_patterns/0`). Linear time
+  # grows about 4x from the small input to the large one; quadratic about 16x.
+  # The large input takes a few hundred milliseconds linear, seconds quadratic.
+  test "strings of near misses in one letter case are redacted in linear time" do
+    time = fn text ->
+      Enum.min(
+        for _ <- 1..3 do
+          {microseconds, ^text} = :timer.tc(fn -> Imp.Redaction.redact(text) end)
+          microseconds
+        end
+      )
+    end
+
+    for line <- ["BEARER aaaa\n", "BASIC Zm9vYmFy x\n"] do
+      small = time.(String.duplicate(line, 50_000))
+      large = time.(String.duplicate(line, 200_000))
+      assert large < 8 * small + 50_000, "#{inspect(line)}: #{small}us then #{large}us"
+    end
+  end
+
   test "the optimizer's pricing URL check refuses the shapes Imp.Redaction catches" do
     for token <- ["gh" <> "p_" <> @f4, "h" <> "f_" <> @f4] do
       assert_raise ArgumentError, fn ->
@@ -127,17 +155,6 @@ defmodule Imp.RedactionTest do
 
     url = "https://pricing.example/models/gpt/rates"
     assert Imp.Optimizer.Budget.validate_pricing_source_url!(url) == url
-  end
-
-  test "text redacted line by line hides each credential's line and each private key block" do
-    text =
-      "step 1 ok\nexport OPENAI_API_KEY=sk-F4keF4keF4keF4ke\nstep 2 ok\n" <>
-        "-----BEGIN PRIVATE KEY-----\nMIIFAKEFAKE\nFAKEFAKE==\n-----END PRIVATE KEY-----\n" <>
-        "PuTTY-User-Key-File-3: ssh-ed25519\nPrivate-Lines: 1\nAAAAFAKE\nPrivate-MAC: F4ke\n" <>
-        "done\n-----BEGIN RSA PRIVATE KEY-----\ncut off FAKE"
-
-    assert Imp.Redaction.redact_lines(text) ==
-             "step 1 ok\n[REDACTED]\nstep 2 ok\n[REDACTED]\n[REDACTED]\ndone\n[REDACTED]"
   end
 
   defmodule OrdinaryStruct do

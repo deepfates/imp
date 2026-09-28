@@ -22,11 +22,9 @@ defmodule Imp.RedactionDifferentialTest do
     basic_val = b64.("alice:FAKEbasicpw")
     b64basic = basic_val
 
-    b64 = fn s -> Base.encode64(s) end
-    basic_val = b64.("alice:FAKEbasicpw")
-    b64basic = basic_val
-
     cases = [
+      # Token shapes on their own, one per line, with nothing else to hide them.
+      {"tokens alone", "#{skp}\n#{hf}\n#{aiza}\n#{jwt}\n#{b64basic}", []},
       # env dumps
       {"env: phoenix",
        """
@@ -309,6 +307,64 @@ defmodule Imp.RedactionDifferentialTest do
     end
   end
 
+  # The capture pipeline Imp.ExternalCommand had before this rule set: its own
+  # `sk-` and `Bearer` replacements as output was captured, then the previous
+  # whole-string rule over the result.
+  defp main_capture(text) do
+    text
+    |> String.replace(~r/\bsk-[A-Za-z0-9_-]{8,}\b/, "[REDACTED]")
+    |> String.replace(~r/\bBearer\s+[A-Za-z0-9._~+\/=\-]{12,}\b/i, "Bearer [REDACTED]")
+    |> MainRedaction.redact()
+  end
+
+  defp command_outputs do
+    sk = "sk-FAKEopenai" <> String.duplicate("a1", 12)
+
+    [
+      {"printenv",
+       "HOME=/root\nOPENAI_API_KEY=#{sk}\nSECRET_KEY_BASE=FAKEskbQQQQQQQQQQQQ\nPGPASSWORD=FAKEpgpass99\nRELEASE_COOKIE=FAKEcookie\nSTRIPE_KEY=FAKEstripeplain\n"},
+      {"curl -v",
+       "> GET / HTTP/2\n> authorization: Bearer #{sk}\n> x-api-key: FAKExapikey123\n> Cookie: sessionid=FAKEdjangosess\n< set-cookie: sid=FAKEsidcookie\n"},
+      {"kubectl secret yaml",
+       "apiVersion: v1\ndata:\n  password: RkFLRWs4c3B3\n  token: #{sk}\nkind: Secret\n"},
+      {"docker inspect env",
+       "\"Env\": [\n  \"OPENAI_API_KEY=#{sk}\",\n  \"DB_PASSWORD=FAKEdockerpw\"\n]"},
+      {"git remote -v",
+       "origin https://x-access-token:FAKEghinstall@github.com/o/r (fetch)\nbackup https://FAKEonlytoken@github.com/o/r (push)\n"},
+      {"netrc cat",
+       "machine api.openai.com login x password #{sk}\nmachine github.com login alice password FAKEnetrcpw\n"},
+      {"json pretty", "{\n  \"api_key\": \"#{sk}\",\n  \"password\": \"FAKEjsonpw\"\n}"},
+      {"pem then env",
+       "-----BEGIN PRIVATE KEY-----\nFAKEpembody\n-----END PRIVATE KEY-----\nDB_PASSWORD=FAKEafterpem\n"},
+      {"aws env",
+       "AWS_ACCESS_KEY_ID=AKIAFAKEAKIA1234567Z\nAWS_SECRET_ACCESS_KEY=FAKEawssecret/abc+def\nAWS_SESSION_TOKEN=FAKEawssess\n"},
+      {"aws credentials file",
+       "access_key     ****************FAKE shared-credentials-file\n[default]\naws_access_key_id = AKIAFAKEAKIA1234567Z\naws_secret_access_key = FAKEinisecret\n"},
+      {"hex token env",
+       "GITHUB_TOKEN=0badcafe0badcafe0badcafe0badcafe12345678\nNPM_PASS=FAKEnpmpass\n"},
+      {"cookie session vault",
+       "Cookie: session=FAKEsesscookie012; csrftoken=FAKEcsrf\nX-Vault-Token: FAKEvault\n"},
+      {"basic end", "Authorization: Basic YWxpY2U6RkFLRWJhc2ljcHc=\nx-api-key: FAKExapi2"},
+      {"only a password", "DB_PASSWORD=FAKEalonepw\nready\n"},
+      {"bearer then netrc",
+       "Authorization: Bearer abcdefghijklmnopqrstu\nmachine github.com\n  login alice\n  password FAKEnetrcpw2\n"}
+    ]
+  end
+
+  test "command output: nothing the previous capture pipeline hid is shown" do
+    hidden_by_main =
+      for {name, text} <- command_outputs() ++ corpus(), main_capture(text) != text do
+        {name, text}
+      end
+
+    assert length(hidden_by_main) > 60
+
+    for {name, text} <- hidden_by_main do
+      assert {:ok, result} = Imp.ExternalCommand.run("printf", ["%s", text])
+      assert result.output == "[REDACTED]", "#{name} showed what the previous pipeline hid"
+    end
+  end
+
   # Model answers, prompts and code that name credentials without holding
   # one. Neither rule set may change them.
   @ordinary [
@@ -373,7 +429,7 @@ defmodule Imp.RedactionDifferentialTest do
   # fake credential. A line the previous rules changed too is already
   # accounted for; a line only the current rules change must carry one of
   # the fake markers below.
-  @fixture_markers ~w(CANARY canary FAKE F4ke fake EXAMPLE password@ secret test-)
+  @fixture_markers ~w(CANARY canary FAKE F4ke EXAMPLE user:password@)
 
   test "in this repository's docs, livebooks, lib and tests, only fake credential lines change" do
     files =
