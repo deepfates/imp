@@ -20,6 +20,23 @@ User-visible changes to Imp are recorded here.
 - A streamed call to a client built from an inline model spec
   (`Imp.req_llm(%{provider: ..., id: ...})`) no longer fails with
   `{:lm_stream_failed, "protocol String.Chars not implemented for Map ..."}`.
+- Breaking: `Imp.Core.LMResponse.cost`, and the `:cost` on a
+  `:model_response` event, is what the provider reported charging, as its
+  docs said, and `nil` when the provider reported no charge. It was ReqLLM's
+  catalog estimate for every model in ReqLLM's catalog, so every spend total
+  built on it counted an estimate as money spent, and OpenRouter's own charge,
+  which OpenRouter responses carry unasked, was overridden by it. OpenRouter
+  calls now report OpenRouter's charge; one made with the caller's own
+  provider key reports OpenRouter's fee plus the upstream charge, or `nil`
+  when the upstream charge is missing. A call to any catalog-priced provider
+  that reports no charge (Anthropic, OpenAI, Google, Groq, xAI and others)
+  now has a `nil` cost where it had the estimate. The estimate is the new `estimated_cost` field on
+  `Imp.Core.LMResponse` and `:estimated_cost` on the `:model_response` event;
+  `billing` is the breakdown behind that estimate, as it always was, and its
+  docs now say so. Migration: a host that sums `cost` treats `nil` as an
+  unknown charge, not a free one; a host that wants the old number for calls
+  with no reported charge reads `estimated_cost` for them, knowing it is an
+  estimate.
 
 ## 0.6.0 — 2026-09-28
 
