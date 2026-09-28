@@ -62,6 +62,10 @@ defmodule PackageContractTest do
   ]
 
   @excluded_files [
+    # The demo MCP servers are the only Plug code in lib/; Plug is not
+    # something a package consumer needs.
+    "lib/imp/acp/demo_mcp_http_plug.ex",
+    "lib/imp/acp/demo_mcp_oauth_plug.ex",
     "lib/imp/benchmarks.ex",
     "lib/mix/tasks/imp.public_api.ex",
     "lib/mix/tasks/imp.package.clean_room.ex",

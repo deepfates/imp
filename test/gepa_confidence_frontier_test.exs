@@ -130,6 +130,17 @@ defmodule Imp.Optimizer.GEPA.ConfidenceFrontierTest do
     end
   end
 
+  test "confidence adapter rejects a ReqLLM model from another provider" do
+    lm = Imp.Clients.ReqLLM.new(%{provider: :anthropic, id: "claude-fixture"})
+    program = Imp.predict("input -> category", lm: lm)
+
+    assert_raise ArgumentError,
+                 ~r/requires an OpenAI Chat ReqLLM model, got provider: :anthropic/,
+                 fn ->
+                   ConfidenceAdapter.new(program, field: :category, enum: ["Food", "Drinks"])
+                 end
+  end
+
   test "confidence adapter rejects unsupported LM transports before evaluation" do
     program = Imp.predict("input -> category", lm: Imp.LM.Static)
 
