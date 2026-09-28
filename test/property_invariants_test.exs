@@ -43,6 +43,22 @@ defmodule PropertyInvariantsTest do
     end
   end
 
+  test "fields named nil, true and false keep their names through dump and load" do
+    signature = Imp.signature("nil: string, true: string -> false: string")
+    loaded = signature |> Imp.Signature.dump() |> Jason.encode!() |> Jason.decode!()
+    loaded = Imp.Signature.load!(loaded)
+
+    assert Imp.Signature.input_names(signature) == ["nil", "true"]
+    assert Imp.Signature.input_names(loaded) == ["nil", "true"]
+    assert Imp.Signature.output_names(loaded) == ["false"]
+  end
+
+  test "a field name given as the atom nil is refused" do
+    assert_raise ArgumentError, ~r/expects a field name, got: nil/, fn ->
+      Imp.Signature.Field.new(nil, :input)
+    end
+  end
+
   property "signature dump/load round-trips the serialized contract" do
     check all(spec <- signature_spec(), max_runs: 100) do
       signature = Imp.signature(spec)

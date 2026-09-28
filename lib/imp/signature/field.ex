@@ -69,6 +69,7 @@ defmodule Imp.Signature.Field do
   end
 
   def new(name, kind) when is_atom(name) do
+    name = normalize_name(name)
     %__MODULE__{name: name, kind: normalize_kind(kind), prefix: infer_prefix(name)}
   end
 
@@ -172,10 +173,22 @@ defmodule Imp.Signature.Field do
     end
   end
 
+  # `nil`, `true` and `false` are atoms but not names: a field given one of
+  # them as an atom is refused, and one written as text keeps its text, so
+  # `"nil: string -> a"` has a field named "nil" that saves and loads as "nil".
+  defp normalize_name(name) when name in [nil, true, false] do
+    raise ArgumentError,
+          "Imp.Signature.Field.new/2 expects a field name, got: #{inspect(name)}"
+  end
+
   defp normalize_name(name) when is_atom(name), do: name
 
-  defp normalize_name(name) when is_binary(name),
-    do: name |> String.trim() |> existing_atom_or_string()
+  defp normalize_name(name) when is_binary(name) do
+    case String.trim(name) do
+      literal when literal in ["nil", "true", "false"] -> literal
+      trimmed -> existing_atom_or_string(trimmed)
+    end
+  end
 
   defp normalize_name(name) do
     raise ArgumentError,

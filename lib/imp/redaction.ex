@@ -917,8 +917,9 @@ defmodule Imp.Redaction do
       # encrypted), a PGP private key block, a PuTTY key file.
       ~r/-----BEGIN [A-Z0-9 ]{0,40}PRIVATE KEY(?: BLOCK)?-----/,
       ~r/PuTTY-User-Key-File-[0-9]+:/,
-      # OpenAI (`sk-`, `sk-proj-`), Anthropic (`sk-ant-`), OpenRouter (`sk-or-`).
-      ~r/(?:\A|[^A-Za-z0-9_-])sk-[A-Za-z0-9_-]{8,}(?=\z|[^A-Za-z0-9_-])/,
+      # OpenAI (`sk-`, `sk-proj-`), Anthropic (`sk-ant-`), OpenRouter (`sk-or-`),
+      # also right after a hyphen (`x-sk-...`), as a word boundary allows.
+      ~r/(?:\A|[^A-Za-z0-9_])sk-[A-Za-z0-9_-]{8,}(?=\z|[^A-Za-z0-9_-])/,
       # Stripe secret and restricted live keys.
       ~r/(?<![A-Za-z0-9_])[sr]k_live_[A-Za-z0-9]{16,}(?![A-Za-z0-9_])/,
       # GitHub classic, OAuth, user-to-server, server and refresh tokens, and
