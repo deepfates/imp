@@ -78,7 +78,10 @@ defmodule SilentFailureRegressionsTest do
   end
 
   test "P03: a ReqLLM-pinned Predict round-trips with dynamic_lm?: false and the same LM" do
-    lm = %Imp.Clients.ReqLLM{model: "openai:gpt-test", opts: []}
+    # Built by the constructor, as a loaded client is: it reads the model's
+    # tool calling from the registry (`:tool_calling`), which a bare struct
+    # leaves to be looked up when asked.
+    lm = Imp.req_llm("openai:gpt-test")
     program = Imp.predict("question -> answer", lm: lm)
 
     loaded = program |> Imp.dump() |> Imp.load!()
