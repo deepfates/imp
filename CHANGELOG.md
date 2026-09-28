@@ -10,16 +10,27 @@ User-visible changes to Imp are recorded here.
   and the cost the provider reported at the end of the stream. ReqLLM's
   stream is a `Stream.resource`, which reports its end as halted rather than
   done, and Imp ended such a stream without its terminal event, so every
-  streamed call was recorded with no usage and no cost. The stream now ends with exactly one
-  terminal event, `done: true` with the provider's usage (including its
-  `"cost"`), model and finish reason.
-- A stream that carries a provider error, or finishes with reason `:error`
-  or `:cancelled`, ends in `{:error, %Imp.LMError{}}`, not in a completion
-  of whatever text arrived first. An error that ends a stream carries, in
-  its metadata, the usage and other metadata that arrived before it.
-- A streamed call to a client built from an inline model spec
-  (`Imp.req_llm(%{provider: ..., id: ...})`) no longer fails with
-  `{:lm_stream_failed, "protocol String.Chars not implemented for Map ..."}`.
+  streamed call was recorded with no usage and no cost. The stream now ends
+  with exactly one terminal event, `done: true` with the provider's usage
+  (including its `"cost"`), model and finish reason, taking the finish
+  reason, and usage no chunk reported, from ReqLLM's metadata handle.
+- A stream that did not complete ends in `{:error, %Imp.LMError{}}`, not in
+  a completion of whatever text arrived first: one that carries a provider
+  error, finishes with reason `:error` or `:cancelled`, or is incomplete,
+  its body ending with no finish and no `[DONE]` (reason
+  `{:stream_finished, :incomplete}`). The error event carries the usage and
+  other metadata that arrived before it.
+- A streamed call that fails after the provider reported usage records that
+  usage and cost on its failed `:model_response` event and in
+  `Imp.Usage`, since the provider may have charged for it. The caller still
+  receives `{:error, reason}`.
+- A streamed call to a client built from an inline spec map, with atom or
+  string keys, or a `{provider, model}` tuple no longer fails with
+  `{:lm_stream_failed, "protocol String.Chars not implemented ..."}`. A
+  streamed call records the model the provider reported, as a non-streamed
+  call does, and otherwise the configured model id (`gpt-test`, where it
+  recorded the whole `openai:gpt-test`), so its `Imp.Usage` key changes the
+  same way.
 - Breaking: `Imp.Core.LMResponse.cost`, and the `:cost` on a
   `:model_response` event, is what the provider reported charging, as its
   docs said, and `nil` when the provider reported no charge. It was ReqLLM's

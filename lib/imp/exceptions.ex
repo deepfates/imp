@@ -42,6 +42,11 @@ defmodule Imp.LMError do
       request because its input is longer than the model accepts. Sending it
       again unchanged will fail again; a shorter input may not.
 
+  An error the provider sends inside a stream arrives without its code,
+  because ReqLLM's stream decoder keeps only its message, so it has `:status`
+  `nil` and is retryable as a failed stream, where the same error in a
+  non-streamed response may carry a status that says otherwise.
+
   `:reason` keeps the provider library's error unchanged for diagnostics.
   `Imp.Errors.retryable?/1` and `Imp.Errors.context_window_exceeded?/1` read
   these fields through the wrappers Imp puts around an LM error.

@@ -51,16 +51,26 @@ defmodule Imp.Streaming.Execution do
       |> Imp.LM.record(request, fn request ->
         {messages, opts} = Imp.Core.request_parts(request)
 
-        with {:ok, raw} <-
-               lm
-               |> module.stream(messages, opts)
-               |> consume_stream(context, name, lm) do
-          Imp.Core.response(raw)
+        case lm |> module.stream(messages, opts) |> consume_stream(context, name, lm) do
+          {:ok, raw} -> Imp.Core.response(raw)
+          {:error, reason, raw} -> partial_failure(reason, raw)
+          {:error, _reason} = error -> error
         end
       end)
       |> Imp.LM.legacy_result()
     else
       Imp.LM.generate(lm, messages, opts)
+    end
+  end
+
+  # A stream that failed after the provider reported usage or cost may still
+  # have been billed, so the failure carries what arrived as a partial
+  # response for `Imp.LM.record/3` to record; the caller still gets only the
+  # reason.
+  defp partial_failure(reason, raw) do
+    case Imp.Core.response(raw) do
+      {:ok, partial} -> {:error, reason, partial}
+      {:error, _invalid} -> {:error, reason}
     end
   end
 
@@ -72,8 +82,8 @@ defmodule Imp.Streaming.Execution do
 
     result =
       Enum.reduce_while(stream, {:ok, [], %{}}, fn
-        %StreamResponse{chunk: {:error, reason}}, _acc ->
-          {:halt, {:error, reason}}
+        %StreamResponse{chunk: {:error, reason}} = event, {:ok, chunks, metadata} ->
+          {:halt, {:error, reason, chunks, collect_metadata(event, metadata)}}
 
         %StreamResponse{} = event, {:ok, chunks, metadata} ->
           maybe_emit_raw(context, name, event)
@@ -92,8 +102,11 @@ defmodule Imp.Streaming.Execution do
         |> envelope(normalize_metadata(lm, metadata))
         |> then(&{:ok, &1})
 
-      {:error, _reason} = error ->
-        error
+      {:error, reason, _chunks, metadata} when map_size(metadata) == 0 ->
+        {:error, reason}
+
+      {:error, reason, chunks, metadata} ->
+        {:error, reason, envelope(materialize_chunks(chunks), normalize_metadata(lm, metadata))}
     end
   rescue
     error -> {:error, {:lm_stream_failed, Exception.message(error)}}
@@ -203,12 +216,14 @@ defmodule Imp.Streaming.Execution do
   defp envelope(output, metadata),
     do: %{__imp_lm_output__: output, __imp_lm_metadata__: metadata}
 
-  # The model is a `"provider:model"` string or an inline spec map, as
-  # `Imp.req_llm/2` accepts either.
+  # The model is the one the provider reported, as a non-streamed response
+  # records it, and otherwise the id the client was configured with.
   defp normalize_metadata(%Imp.Clients.ReqLLM{model: model}, metadata) do
+    {provider, model_id} = Imp.Clients.ReqLLM.model_identity(model)
+
     req_llm = %{
-      provider: model_provider(model),
-      model: model_name(model),
+      provider: provider,
+      model: metadata[:model] || metadata["model"] || model_id,
       usage: metadata[:usage] || metadata["usage"],
       finish_reason: metadata[:finish_reason] || metadata["finish_reason"]
     }
@@ -219,20 +234,6 @@ defmodule Imp.Streaming.Execution do
   end
 
   defp normalize_metadata(_lm, metadata), do: metadata
-
-  defp model_provider(%{provider: provider}), do: to_string(provider)
-
-  defp model_provider(model) when is_binary(model) do
-    case String.split(model, ":", parts: 2) do
-      [provider, _model] -> provider
-      _other -> nil
-    end
-  end
-
-  defp model_provider(_model), do: nil
-
-  defp model_name(%{} = model), do: to_string(Map.get(model, :model) || Map.get(model, :id))
-  defp model_name(model), do: to_string(model)
 
   defp normalize_name(name), do: to_string(name)
 end

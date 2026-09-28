@@ -78,18 +78,39 @@ defmodule Imp.ReqLLMStreamEndTest do
     refute Enum.any?(events, &match?(%StreamResponse{done: true, chunk: nil}, &1))
   end
 
+  test "a stream whose body stops with no finish and no [DONE] is not a completion" do
+    events = stream(lm(sse([@content], false)))
+
+    assert [
+             %StreamResponse{chunk: "pong"},
+             %StreamResponse{
+               chunk: {:error, %Imp.LMError{reason: {:stream_finished, :incomplete}}},
+               done: true,
+               metadata: %{finish_reason: :incomplete}
+             }
+           ] = events
+  end
+
+  # A ReqLLM stream built from chunks, with a real metadata handle answering
+  # what ReqLLM concluded about the stream.
   defmodule FinishStub do
     def stream_text(model, messages, opts) do
-      finish_reason = Keyword.fetch!(opts, :finish_reason)
+      chunks =
+        Keyword.get_lazy(opts, :chunks, fn ->
+          [
+            ReqLLM.StreamChunk.text("partial"),
+            ReqLLM.StreamChunk.meta(%{finish_reason: Keyword.fetch!(opts, :finish_reason)})
+          ]
+        end)
+
+      handle_metadata = Keyword.get(opts, :handle_metadata, %{})
+
+      {:ok, handle} =
+        ReqLLM.StreamResponse.MetadataHandle.start_link(fn -> handle_metadata end)
 
       stream =
         Stream.resource(
-          fn ->
-            [
-              ReqLLM.StreamChunk.text("partial"),
-              ReqLLM.StreamChunk.meta(%{finish_reason: finish_reason})
-            ]
-          end,
+          fn -> chunks end,
           fn
             [] -> {:halt, []}
             [chunk | rest] -> {[chunk], rest}
@@ -100,7 +121,7 @@ defmodule Imp.ReqLLMStreamEndTest do
       {:ok,
        %ReqLLM.StreamResponse{
          stream: stream,
-         metadata_handle: self(),
+         metadata_handle: handle,
          cancel: fn -> :ok end,
          model: model,
          context: ReqLLM.Context.new(messages)
@@ -123,6 +144,37 @@ defmodule Imp.ReqLLMStreamEndTest do
                  metadata: %{finish_reason: ^finish_reason}
                }
              ] = events
+    end
+  end
+
+  test "usage only ReqLLM's metadata handle reported is on the done event" do
+    usage = %{input_tokens: 4, output_tokens: 2, total_tokens: 6}
+
+    events =
+      %{provider: :openai, id: "local-model", model: "local-model"}
+      |> Imp.req_llm(
+        req_module: FinishStub,
+        chunks: [ReqLLM.StreamChunk.text("pong")],
+        handle_metadata: %{usage: usage, finish_reason: :stop},
+        cache: false
+      )
+      |> stream()
+
+    assert [
+             %StreamResponse{chunk: "pong"},
+             %StreamResponse{done: true, metadata: %{usage: ^usage, finish_reason: :stop}}
+           ] = events
+  end
+
+  test "the client names the provider and model id of every model shape it accepts" do
+    for model <- [
+          "openai:gpt-x",
+          {:openai, "gpt-x"},
+          {:openai, "gpt-x", []},
+          %{provider: :openai, id: "gpt-x"},
+          %{"provider" => "openai", "id" => "gpt-x"}
+        ] do
+      assert Imp.Clients.ReqLLM.model_identity(model) == {"openai", "gpt-x"}, inspect(model)
     end
   end
 
@@ -149,5 +201,76 @@ defmodule Imp.ReqLLMStreamEndTest do
     assert [response] = Enum.filter(events, &(&1.kind == :model_response))
     assert %{input_tokens: 7, output_tokens: 1, total_tokens: 8} = response.metadata.usage
     assert response.metadata.usage["cost"] == 0.00042
+    assert response.metadata.cost == 0.00042
+  end
+
+  defp run(program) do
+    {:ok, run} = Imp.Run.start(%Collecting{program: program}, %{question: "Capital of France?"})
+
+    {result, usage} = Imp.Usage.track(fn -> Task.await(run.task) end)
+    events = Imp.Run.events(run)
+    Imp.Run.stop(run)
+    {result, usage, events}
+  end
+
+  test "a stream that fails after the provider reported usage records that spend" do
+    error = %{"error" => %{"message" => "upstream died"}}
+    program = Imp.predict("question -> answer", lm: lm(sse([@content, @usage, error], false)))
+
+    assert {{:error, %Imp.LMError{message: message}}, _usage, events} = run(program)
+    assert message =~ "upstream died"
+
+    assert [response] = Enum.filter(events, &(&1.kind == :model_response))
+    assert %Imp.LMError{} = response.error
+    assert %{input_tokens: 7, output_tokens: 1, total_tokens: 8} = response.metadata.usage
+    assert response.metadata.cost == 0.00042
+  end
+
+  test "a failure that carries a partial response counts its usage and returns the reason" do
+    lm = Imp.req_llm(%{provider: :openrouter, id: "m", model: "m"}, cache: false)
+    request = Imp.LM.new_request(lm, [%{role: :user, content: "ping"}], [], "test")
+
+    {:ok, partial} =
+      Imp.Core.response(%{
+        __imp_lm_output__: "po",
+        __imp_lm_metadata__: %{
+          req_llm: %{
+            provider: "openrouter",
+            model: "m",
+            usage: %{input_tokens: 7, output_tokens: 1}
+          }
+        }
+      })
+
+    assert {{:error, :broken}, usage} =
+             Imp.Usage.track(fn ->
+               Imp.LM.record(lm, request, fn _request -> {:error, :broken, partial} end)
+             end)
+
+    assert usage == %{"openrouter/m" => %{input_tokens: 7, output_tokens: 1}}
+  end
+
+  # Tuple and string-keyed map specs are model shapes `Imp.req_llm/2`
+  # accepts; a streamed call through either records its provider and model.
+  test "a streamed call records provider and model for tuple and string-keyed specs" do
+    for model <- [{:openai, "local-model"}, %{"provider" => "openai", "id" => "local-model"}] do
+      lm =
+        Imp.req_llm(model,
+          req_module: FinishStub,
+          chunks: [
+            ReqLLM.StreamChunk.text("[[ ## answer ## ]]\nParis\n\n[[ ## completed ## ]]"),
+            ReqLLM.StreamChunk.meta(%{usage: %{input_tokens: 1}, finish_reason: :stop})
+          ],
+          cache: false
+        )
+
+      program = Imp.predict("question -> answer", lm: lm)
+      assert {{:ok, _prediction}, _usage, events} = run(program)
+      assert [response] = Enum.filter(events, &(&1.kind == :model_response))
+
+      assert %{provider: "openai", model: "local-model"} =
+               response.metadata.response.req_llm,
+             inspect(model)
+    end
   end
 end
