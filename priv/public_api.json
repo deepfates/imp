@@ -2460,7 +2460,8 @@
       "struct_fields": [
         "model",
         "opts",
-        "req_module"
+        "req_module",
+        "tool_calling"
       ],
       "types": [
         {

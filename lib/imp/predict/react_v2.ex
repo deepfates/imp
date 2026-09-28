@@ -1011,8 +1011,6 @@ defmodule Imp.Predict.ReActV2 do
   defp schema_value(schema, key) when is_map(schema),
     do: Map.get(schema, key) || Map.get(schema, safe_atom(key))
 
-  defp schema_value(_schema, _key), do: nil
-
   defp safe_atom(key) do
     String.to_existing_atom(key)
   rescue
