@@ -42,6 +42,7 @@ defmodule Imp.Redaction do
     :service_account_key,
     :credential,
     :credentials,
+    :code_verifier,
     :"x-api-key"
   ]
 
@@ -86,6 +87,25 @@ defmodule Imp.Redaction do
     required title type uniqueItems
   ))
 
+  # Structs that hold a connection's headers and URLs. ExMCP's client and HTTP
+  # transport keep an `Authorization` bearer or an API-key header in their
+  # process state, which is printed when the process crashes or is inspected
+  # with `:sys.get_state/1`; ExMCP 1.5 has no `Inspect` implementation for
+  # either, so Imp gives them its own. That entry goes when ExMCP redacts its
+  # own state; if ExMCP adds an implementation, the two conflict.
+  @connection_structs [
+    Imp.Clients.ReqLLM,
+    Imp.Retrievers.HTTP,
+    Imp.Tracking.MLflow,
+    Imp.Tracking.WandB,
+    Imp.Optimize.Anything.Config.Tracking,
+    ExMCP.Client,
+    ExMCP.Transport.HTTP
+  ]
+
+  @doc false
+  def connection_structs, do: @connection_structs
+
   @doc """
   Returns the default key names treated as sensitive.
 
@@ -113,13 +133,6 @@ defmodule Imp.Redaction do
   end
 
   def credential_key?(_key), do: false
-
-  @doc false
-  # What a client, retriever or tracker prints: `redact/1`, then every header
-  # value whatever the header is called, and the query, fragment and user info
-  # of every URL. A header's name says nothing reliable about its value
-  # (`X-Subscription-Token`, `Cookie`), and a URL's query often carries a key.
-  def redact_for_print(value), do: value |> redact() |> hide_headers_and_urls()
 
   @doc false
   # What a saved program may hold: no header at all. A header value is a
@@ -264,9 +277,12 @@ defmodule Imp.Redaction do
   pricing URL) is cleaned by calling `redact/1` on it. The shapes are PEM
   private key blocks, OpenAI and Anthropic `sk-` keys, GitHub and Hugging Face
   tokens, AWS access key ids, Google API keys, Slack tokens, JSON Web Tokens,
-  Bearer and Basic credentials, `session=` values, and long hex values assigned
-  to a credential name. A label that names the credential (`Bearer`, `Basic`,
-  `session=`, `token=`) is kept and the value after it replaced.
+  Bearer and Basic credentials, a value assigned to a credential name
+  (`DB_PASSWORD=…`, `x-api-key: …`, `"password": "…"`), the password in a
+  URL's user info, and the `key` and `sig` query parameters. A label that
+  names the credential (`Bearer`, `Basic`, `password=`) is kept and the value
+  after it replaced. A credential's quoted value with no closing quote on its
+  line replaces the whole string.
 
       iex> Imp.Redaction.redact(%{api_key: "sk-test-secret-1234567890", model: "demo"})
       %{api_key: "[REDACTED]", model: "demo"}
@@ -310,6 +326,51 @@ defmodule Imp.Redaction do
         candidates: redact(report.candidates, keys),
         errors: redact(report.errors, keys),
         metadata: redact(report.metadata, keys)
+    }
+  end
+
+  # A connection struct is redacted as it prints: ordinary redaction, then
+  # every header value whatever the header is called, and the query, fragment
+  # and user info of every URL. A header's name says nothing reliable about its
+  # value (`X-Subscription-Token`, `Cookie`), and a URL's query often carries a
+  # key. The struct keeps its type.
+  def redact(%module{} = value, keys) when module in @connection_structs do
+    Map.merge(value, value |> Map.from_struct() |> redact(keys) |> hide_headers_and_urls())
+  end
+
+  # The MCP OAuth structs hold secrets under names that say nothing about them:
+  # a store's derived HMAC key, a flow's PKCE transaction and registered client,
+  # and the `state` that an authorization URL also carries. Each keeps its type
+  # and the fields its `Inspect` implementation shows; the secret fields become
+  # the redaction marker.
+  def redact(%Imp.MCP.OAuth.Store{} = store, keys) do
+    %{store | directory: redact(store.directory, keys), key: "[REDACTED]"}
+  end
+
+  def redact(%Imp.MCP.OAuth.Flow{} = flow, keys) do
+    %{
+      flow
+      | resource_url: redact(flow.resource_url, keys),
+        redirect_uri: redact(flow.redirect_uri, keys),
+        authorization_url: "[REDACTED]",
+        transaction: "[REDACTED]",
+        client: "[REDACTED]",
+        issuer: redact(flow.issuer, keys),
+        token_endpoint: redact(flow.token_endpoint, keys),
+        scopes: redact(flow.scopes, keys)
+    }
+  end
+
+  def redact(%Imp.MCP.OAuth.Pending{} = pending, keys) do
+    %{
+      pending
+      | store: redact(pending.store, keys),
+        credential: redact(pending.credential, keys),
+        server_url: redact(pending.server_url, keys),
+        authorization_url: "[REDACTED]",
+        redirect_uri: redact(pending.redirect_uri, keys),
+        flow: redact(pending.flow, keys),
+        state: if(is_nil(pending.state), do: nil, else: "[REDACTED]")
     }
   end
 
@@ -377,6 +438,8 @@ defmodule Imp.Redaction do
     Enum.reduce(secret_patterns(), text, fn {pattern, replacement}, redacted ->
       Regex.replace(pattern, redacted, replacement)
     end)
+  catch
+    :unterminated_credential -> "[REDACTED]"
   end
 
   @doc """
@@ -681,21 +744,48 @@ defmodule Imp.Redaction do
     end)
   end
 
+  # The patterns are compiled once per loaded module and kept in
+  # `:persistent_term`: a regex literal is rebuilt on every evaluation, and
+  # `redact/2` runs every pattern over every string it walks.
+  @secret_patterns_key {__MODULE__, :secret_patterns, System.unique_integer([:positive])}
+
+  defp secret_patterns do
+    case :persistent_term.get(@secret_patterns_key, nil) do
+      nil ->
+        patterns = compile_secret_patterns()
+        :persistent_term.put(@secret_patterns_key, patterns)
+        patterns
+
+      patterns ->
+        patterns
+    end
+  end
+
   # Each pattern matches one credential shape. A pattern that captures a label
   # (`\1`) keeps it and replaces what follows. The PEM block runs first
   # because it can hold anything, including the other shapes.
-  defp secret_patterns do
-    [
+  #
+  # No pattern begins with, or requires, a letter matched in either case. PCRE
+  # looks for such a letter by searching for each case separately; when one
+  # case never occurs again, a string with many matches is searched to its end
+  # once per match, which is quadratic. So `Bearer` and `Basic` get a pattern
+  # per spelling instead of one caseless pattern.
+  defp compile_secret_patterns do
+    List.flatten([
       # A PEM private key block (PKCS#8, RSA, EC, OpenSSH, encrypted). Output
       # cut off mid-key has no END line; everything after BEGIN goes.
       {~r/-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----(?:.*?-----END [A-Z0-9 ]*PRIVATE KEY-----|.*\z)/s,
        "[REDACTED]"},
       # A token after `Bearer` ends the line or is closed by punctuation, so
       # prose ("Bearer authentication is ...") is not taken for one.
-      {~r/(?<![^\s:;,"'=({\[])(Bearer[ \t]+)[A-Za-z0-9._~+\/-]{12,}={0,2}(?=[ \t]*(?:\z|[\r\n])|["'`}\]),;])/i,
-       "\\1[REDACTED]"},
-      {~r/(?<![^\s:;,])(Basic[ \t]+)([A-Za-z0-9+\/]+={0,2})(?=[ \t]*(?:\z|[\r\n]))/i,
-       &basic_credential/3},
+      for scheme <- ["Bearer", "bearer", "BEARER"] do
+        {~r/(?<![^\s:;,"'=({\[])(#{scheme}[ \t]+)[A-Za-z0-9._~+\/-]{12,}={0,2}(?=[ \t]*(?:\z|[\r\n])|["'`}\]),;])/,
+         "\\1[REDACTED]"}
+      end,
+      for scheme <- ["Basic", "basic", "BASIC"] do
+        {~r/(?<![^\s:;,])(#{scheme}[ \t]+)([A-Za-z0-9+\/]+={0,2})(?=[ \t]*(?:\z|[\r\n]))/,
+         &basic_credential/3}
+      end,
       # JSON Web Tokens: header.payload.signature, each base64url, the first
       # two JSON objects (so `eyJ`).
       {~r/(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]*(?![A-Za-z0-9_.-])/,
@@ -715,15 +805,55 @@ defmodule Imp.Redaction do
       {~r/(?<![A-Z0-9])(?:AKIA|ASIA)[0-9A-Z]{16,}(?![A-Z0-9])/, "[REDACTED]"},
       # Google API keys: AIza and 35 url-safe base64 characters.
       {~r/(?<![A-Za-z0-9_-])AIza[0-9A-Za-z_-]{35}(?![A-Za-z0-9_-])/, "[REDACTED]"},
-      {~r/(?<![^?&;,\s])(session\s*=\s*)[A-Za-z0-9._~+\/-]{8,}={0,2}(?=\z|[?&;,\s])/i,
-       "\\1[REDACTED]"},
-      # Long hex strings alone are not secrets: Imp passes SHA-1 and SHA-256
-      # digests around as cache keys and git identities. One is redacted only
-      # in an explicit credential assignment (`token=<hex>`, `secret: <hex>`),
-      # where the key name says what it is.
-      {~r/((?:secret|token|password|api[_-]?key|credential)s?\s*[=:]\s*"?)[0-9a-fA-F]{32,}(?![0-9a-fA-F])/i,
-       "\\1[REDACTED]"}
-    ]
+      # The password in a URL's user info: `postgres://admin:<password>@host`.
+      {~r/(:\/\/[^\s\/?#@:]*:)[^\s\/?#@]+(?=@)/, "\\1[REDACTED]"},
+      # `key` and `sig` are credentials as query parameters (`?key=`, `&sig=`,
+      # as Google and Azure SAS URLs carry them), not as names elsewhere.
+      {~r/([?&](?:key|sig)=)[^&#\s"'`<>]+/, "\\1[REDACTED]"},
+      # A value assigned to a credential name, in the spellings logs and
+      # dumps use: `NAME=value`, `name: value`, `"name": "value"`,
+      # `"name" => "value"`, and query parameters. The pattern finds names
+      # whose last letter can end a credential name, and
+      # `credential_assignment/9` decides. A credential's quoted value with no
+      # closing quote on its line cannot be told apart from what follows it,
+      # so the whole string is replaced.
+      {~r/(?<![A-Za-z0-9_.-])(["']?)([A-Za-z][A-Za-z0-9_.-]*+)(?<=[yYdDnNtTlLsShHrReE])\1([ \t]*(?:=>|[:=](?![=~>]))[ \t]*)(?:(["'])((?:\\.|(?!\4)[^\\\r\n])*)(\4|(?=[\r\n]|\z))|((?:(?i:bearer|basic|token|digest)[ \t]+)?)(?!(?i:bearer|basic|token|digest)[ \t]|:)([^\s&;,"'`<>{}\[\]()]++)(?![({\[]))/,
+       &credential_assignment/9}
+    ])
+  end
+
+  defp credential_assignment(match, quote, name, separator, open, quoted, close, scheme, bare) do
+    value = if open == "", do: bare, else: quoted
+
+    cond do
+      value in ["", "null", "true", "false"] or String.contains?(value, "[REDACTED]") -> match
+      not credential_name?(name) -> match
+      open == "" -> quote <> name <> quote <> separator <> scheme <> "[REDACTED]"
+      close == "" -> throw(:unterminated_credential)
+      true -> quote <> name <> quote <> separator <> open <> "[REDACTED]" <> close
+    end
+  end
+
+  # A name is a credential name when `credential_key?/1` says so; when it is
+  # an environment-variable name ending in `_KEY`, `_SECRET` or `_TOKEN`
+  # (`STRIPE_KEY`); or when it is a vendor signature parameter
+  # (`X-Amz-Signature`). Lower-case `sort_key` or `eos_token` are not, and
+  # neither is a program's `signature`. A value already redacted, JSON's
+  # `null`, `true` and `false`, a bare atom (`token: :string`), and a bare
+  # value followed by `(`, `{` or `[` (a call or a literal in code,
+  # `api_key: fetch_key()`) are left alone.
+  # The pattern finds most `name: value` pairs, so a name that cannot end a
+  # credential name is turned away before its tokens are computed.
+  @credential_name_endings ~w(key keyid token secret password credential credentials auth
+                              authorization bearer session verifier signature)
+
+  defp credential_name?(name) do
+    lowered = name |> String.downcase() |> String.replace(["_", "-", "."], "")
+
+    String.ends_with?(lowered, @credential_name_endings) and
+      (credential_key?(name) or String.match?(name, ~r/\Ax-[a-z]+-signature\z/i) or
+         (String.match?(name, ~r/\A[A-Z0-9]+(?:_[A-Z0-9]+)+\z/) and
+            List.last(key_tokens(name)) in ["key", "secret", "token"]))
   end
 
   # `Basic` is followed by base64 in prose too ("Basic authentication"); it is
@@ -736,20 +866,12 @@ defmodule Imp.Redaction do
   end
 end
 
-# Structs that can hold a credential print it redacted: an LM client's
-# `api_key` or headers, a retriever's or tracker's headers. A program prints
-# its LM, so a program in IEx, a log line or a crash report would otherwise
-# carry the key.
-defimpl Inspect,
-  for: [
-    Imp.Clients.ReqLLM,
-    Imp.Retrievers.HTTP,
-    Imp.Tracking.MLflow,
-    Imp.Tracking.WandB,
-    Imp.Optimize.Anything.Config.Tracking
-  ] do
-  # `redact_for_print/1` returns a struct's fields as a map; merging them back
-  # keeps the struct, so it prints as one.
-  def inspect(struct, opts),
-    do: Inspect.Any.inspect(Map.merge(struct, Imp.Redaction.redact_for_print(struct)), opts)
+# A connection struct prints as `Imp.Redaction.redact/1` leaves it: an LM
+# client's `api_key` or headers, a retriever's or tracker's headers. A program
+# prints its LM, so a program in IEx, a log line or a crash report would
+# otherwise carry the key.
+for module <- Imp.Redaction.connection_structs() do
+  defimpl Inspect, for: module do
+    def inspect(struct, opts), do: Inspect.Any.inspect(Imp.Redaction.redact(struct), opts)
+  end
 end

@@ -125,7 +125,8 @@ defmodule Imp.AssertionsTest do
       )
       |> Imp.assert(one_word)
 
-    assert Imp.Streaming.collect(program, %{question: "Capital of France?"}) == "Paris"
+    assert {:ok, prediction} = Imp.Streaming.collect(program, %{question: "Capital of France?"})
+    assert Imp.get(prediction, :answer) == "Paris"
   end
 
   test "constructor validation is explicit" do

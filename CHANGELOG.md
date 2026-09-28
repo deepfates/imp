@@ -10,18 +10,162 @@ User-visible changes to Imp are recorded here.
   `gho_`, `ghu_`, `ghs_`, `ghr_`, `github_pat_`), Hugging Face `hf_` tokens,
   Slack `xox?-` tokens, JSON Web Tokens and AWS access key ids longer than 20
   characters, which it passed through unchanged into run events, traces,
-  trajectories and saved programs. It replaces only the credential in a
-  string and keeps the text around it (`"key [REDACTED] was used"`, `"Bearer
-  [REDACTED]"`, `"session=[REDACTED]"`), where it replaced the whole string.
+  trajectories and saved programs. It also catches a value assigned to a
+  credential name (`DB_PASSWORD=…`, `x-api-key: …`, `"password": "…"`,
+  `"token" => "…"`, `X-Amz-Security-Token=…`, `X-Amz-Signature=…`), the
+  password in a URL's user info, and the `key` and `sig` query parameters.
+  It replaces only the credential and keeps the text around it
+  (`"key [REDACTED] was used"`, `"Bearer [REDACTED]"`,
+  `"DB_PASSWORD=[REDACTED]"`), where it replaced the whole string once any
+  credential shape appeared in it; a credential's quoted value with no
+  closing quote on its line still replaces the whole string.
   `Imp.ExternalCommand` and the optimizer's pricing URL check use the same
   patterns instead of their own.
 
+### Changed
+
+- Breaking: `Imp.collect/3` now returns `{:ok, prediction}` or
+  `{:error, reason}`, as `Imp.call/2` does, instead of a string. The string
+  joined the values of every output field with no separator, so
+  `question -> reasoning, answer` collected as `"Because.Paris"`. Code that
+  matched a string reads the field from the prediction instead:
+  `{:ok, prediction} = Imp.collect(program, inputs)`, then
+  `Imp.get(prediction, :answer)`.
+
 ### Fixed
 
-- `Imp.inspect_history/2` renders a history holding terms JSON has no encoding
-  for, such as the `{:error, {:unknown_tool, name}}` a ReActV2 turn records
-  when the model calls a tool that does not exist, a pid or a map with tuple
-  keys. It raised `Protocol.UndefinedError`.
+- `Imp.inspect_history/2` renders any history. A turn holding a term JSON has
+  no encoding for, such as the `{:error, {:unknown_tool, name}}` result a
+  ReActV2 history keeps for a call to a tool that does not exist, raised
+  `Protocol.UndefinedError`. Turns now render through the same conversion
+  `Imp.Observability.render_inspection/2` uses: tuples become lists, structs
+  become maps, and pids, references and functions become their `inspect/1`
+  text. Redaction runs first, as before.
+- A binary that is not valid UTF-8 renders as
+  `%{"__imp_type__" => "binary", "bytes" => size}`, never as its content or a
+  digest of it; a map key that is not valid UTF-8 takes the same form inside
+  the map's `entries`. This applies to `Imp.inspect_history/2` and
+  `Imp.Observability.render_inspection/2`, which raised `Jason.EncodeError` on
+  such a binary, and to `Imp.Run.Event.to_map/1` and
+  `Imp.Trajectory.to_atif/2`, which returned the raw bytes, so encoding their
+  result raised. Output for values without such binaries is unchanged, and a
+  request's `tools_hash` is identical.
+- `Imp.Redaction.redact/2` redacts the secrets in `Imp.MCP.OAuth.Store` (the
+  derived key), `Imp.MCP.OAuth.Pending` (the authorization URL and `state`)
+  and `Imp.MCP.OAuth.Flow` (the authorization URL, PKCE transaction and
+  registered client), keeping each struct and its other fields. They were
+  walked as plain maps, whose field names are not credential names, so the
+  store's key reached any redacted output that held a store. `code_verifier`
+  is a credential name, so a PKCE transaction map is redacted on its own too.
+- `Imp.Redaction.redact/2` hides a connection struct's header values and the
+  query, fragment and user info of its URLs, as `inspect/1` already did:
+  `Imp.Clients.ReqLLM`, `Imp.Retrievers.HTTP`, `Imp.Tracking.MLflow`,
+  `Imp.Tracking.WandB`, `Imp.Optimize.Anything.Config.Tracking`,
+  `ExMCP.Client` and `ExMCP.Transport.HTTP`. A retriever in a tool result kept
+  an `X-Subscription-Token` header, a cookie and a `?key=` URL in
+  `render_inspection/2`, run-event JSON and ATIF.
+- A call streamed with `Imp.stream(program, inputs, provider_stream: true)`
+  is recorded in its run like any other model call: a `:model_request` event
+  with the request's `:purpose`, and a `:model_response` event with the usage
+  and cost the provider reported. It recorded neither, so a streamed turn left
+  no model record, no cost and no ATIF model step.
+- A model turn that says something and calls tools keeps what it said. Through
+  `Imp.req_llm/2` the text was dropped whenever the reply had tool calls, so a
+  ReActV2 step's `next_thought` was empty; streamed with `provider_stream:
+  true`, the text was kept but the tool calls were lost, all of them when text
+  arrived and all but the last otherwise. Both now return the text and every
+  tool call, and the adapter reads the text as it reads a text reply, into
+  `next_thought` for ReActV2, as DSPy does. So when a ReActV2 run reaches
+  `max_iters` and its last reply has text beside tool calls it did not run,
+  that text is now the answer, where the answer was `nil`; the calls are still
+  listed as unexecuted. The text also appears in history turns and in the ATIF
+  model step.
+- An Avatar tool ends with its caller. Its task kept running after the
+  caller was killed, after `Imp.Run.cancel/3` and after the run's owner died;
+  it now ends when the caller does. It still runs unlinked, so a crash is an
+  observation, and takes no place in the task pool. It sees the caller's
+  `Imp.context/2` settings, run context and deadline, which it did not, and
+  parallel work it starts runs on the caller's place in the pool when the
+  caller has one. A tool that timed out, or whose task exited, reads as
+  `:unknown` in `Imp.Tool.outcome/1` rather than `:result`, since it may have
+  acted.
+  Inside a run, Avatar records each tool call as `:tool_call` and
+  `:tool_result` events with `metadata.outcome`, and arguments that fail the
+  tool's schema are refused before the tool starts.
+- An RLM call made outside a run no longer leaves its model or tool call
+  running, holding a place in the task pool, when the calling process is
+  killed. An RLM call no longer leaves the pool place of one of its own tasks
+  recorded in the calling process, which made parallel work that process
+  started afterwards (`Imp.Predict.Parallel.map/3`, `Imp.Evaluate.run/2`) run
+  one item at a time.
+- An instruction an optimizer sets on `Imp.Predict.ProgramOfThought` or
+  `Imp.Predict.CodeAct` reaches the extraction step, which kept the old
+  instructions when GEPA, MIPROv2, COPRO, SIMBA or InferRules set it.
+  `Imp.Optimizer.InstructionSearch` sets instructions the same way.
+- A ProgramOfThought or CodeAct whose instruction an optimizer set saves and
+  loads. `Imp.Saving.load!/1` raised "saved ProgramOfThought planner
+  instructions must match task instructions" for it.
+
+### Examples and datasets
+
+Every change here is breaking for code that relied on the old behaviour.
+
+- `Imp.Example.inputs/1` and `labels/1` raise `ArgumentError` when the example
+  never declared its inputs, as DSPy raises `ValueError`. They returned every
+  field as inputs, labels included, so a program was given the answer and
+  scored on it. `Imp.evaluate/4`, `Imp.Evaluate.run/2`,
+  `Imp.Experiment.Data.new/1` and every optimizer that runs a program on
+  examples check each dataset before any model call, and the error names the
+  function, the dataset and the row. Migration: call `Imp.with_inputs/2` on
+  every example you evaluate or optimize on.
+- `Imp.Evaluate` and `Imp.Experiment.Data` refuse a row that is a plain map or
+  a field pair list, which cannot declare its inputs; Evaluate turned it into
+  an example whose labels reached the program. Migration: build the row with
+  `Imp.example/1 |> Imp.with_inputs(...)`.
+- `Imp.Example.new/1` and `Imp.Prediction.new/2` raise when a field is given
+  twice, as an atom and a string or as a repeated key; one value was silently
+  dropped. Migration: give each field once, under one spelling.
+- `Imp.Signature.new/2` (and `Imp.signature/2`) applies new instructions to an
+  existing signature; it returned the signature unchanged. Migration: to keep
+  a signature's instructions, pass it without instructions.
+
+### Documentation
+
+- The install instructions ask for a C and a C++ compiler: jaxon builds native
+  code from C and erlexec from C++. They asked for a C++ compiler only. They
+  also say the first compile needs network access, for erlexec's rebar3
+  plugins.
+- The package's Changelog link opens the changelog on HexDocs, and the 0.4.0
+  entry links the benchmark pages as they were at v0.4.0, not on `main`.
+- Each Livebook's setup cell only installs Imp: from Hex, or from the
+  checkout `IMP_PATH` names. It no longer searches for a source checkout.
+- The MCP example on the Tools and agents page defines its server and its
+  imported tools, where it used an undefined `imported`, and closes the
+  server when the call fails.
+
+### Fixed
+
+- The package ships the TRL worker that `Imp.Clients.TRLTrainer` starts by
+  default: `priv/trl_worker/worker.py`, its `pyproject.toml` and `uv.lock`, and
+  the default contract. In 0.5.0 the defaults named files the package did not
+  contain, so GRPO training from Hex needed a source checkout. The default
+  contract now pins transformers 5.10.1, the version the lockfile installs; it
+  named 5.5.0, which the worker refused at startup.
+
+### GEPA
+
+- A GEPA report names real failures only: a row whose program call or metric
+  failed, a row whose metric returned a value `Imp.Metrics` cannot read, and
+  a proposal error. Before, it treated the metric's feedback as a failure, so
+  a run whose metric returned feedback reported `errors`,
+  `status: :with_errors` and candidates named "Program call failed: …" when
+  nothing had failed.
+- A GEPA report no longer crashes when a metric throws or exits: the
+  failure is shown as `{:throw, reason}` or `{:exit, reason}`. Before,
+  building the report raised `Protocol.UndefinedError`. Every diagnostic in
+  the report has its credential values redacted.
+- A GEPA candidate rejected because its proposal failed is named "Proposal
+  failed: …", not "Program call failed: …".
 
 ## 0.5.0 — 2026-09-26
 
@@ -939,8 +1083,8 @@ Every change here is breaking for code that matches on the old shape.
 - Removed the evidence-certification bookkeeping from the source checkout. It
   never shipped in the package, so a consumer sees no change; the benchmark
   harness it wrapped is unchanged.
-- Added [Benchmarks](https://github.com/deepfates/imp/blob/main/research/BENCHMARKS.md)
-  and its [results table](https://github.com/deepfates/imp/blob/main/research/RESULTS.md).
+- Added [Benchmarks](https://github.com/deepfates/imp/blob/v0.4.0/docs/BENCHMARKS.md)
+  and its [results table](https://github.com/deepfates/imp/blob/v0.4.0/benchmarks/RESULTS.md).
   Every number this repository publishes is one row in that table, carrying
   the dataset and its license, the model, the provider, the date, the commit,
   and the command that produced it; prose elsewhere cites a row rather than

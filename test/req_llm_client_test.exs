@@ -1549,7 +1549,10 @@ defmodule ReqLLMClientTest do
     assert Enum.any?(stream_events, & &1.done)
     assert Imp.get(List.last(chunks), :answer) == "pong"
 
-    assert Imp.Streaming.collect(program, %{question: "pong"}, provider_stream: true) == "pong"
+    assert {:ok, prediction} =
+             Imp.Streaming.collect(program, %{question: "pong"}, provider_stream: true)
+
+    assert Imp.get(prediction, :answer) == "pong"
 
     assert_received {:req_llm_stream, "openai:gpt-test",
                      [%ReqLLM.Message{role: :system}, %ReqLLM.Message{role: :user}], first_opts}
@@ -1569,7 +1572,10 @@ defmodule ReqLLMClientTest do
     lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: TextStub, cache: false)
     program = Imp.predict("question -> answer", lm: lm, config: [purpose: :voice])
 
-    assert Imp.Streaming.collect(program, %{question: "pong"}, provider_stream: true) == "pong"
+    assert {:ok, prediction} =
+             Imp.Streaming.collect(program, %{question: "pong"}, provider_stream: true)
+
+    assert Imp.get(prediction, :answer) == "pong"
     assert_received {:req_llm_stream, "openai:gpt-test", _messages, opts}
     refute Keyword.has_key?(opts, :purpose)
   end

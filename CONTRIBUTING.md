@@ -25,7 +25,9 @@ checks every page `mix docs` renders: Elixir blocks parse, blocks that need no
 provider run and match the results they show (`#=>`), links resolve, and
 modules named are documented; its moduledoc gives the rules a page's code
 follows. `mix livebook.execute.check` executes every shipped notebook end to
-end. Research material (results, comparisons with DSPy, and the experiments
+end against this checkout. A notebook you open in Livebook installs Imp from
+Hex unless `IMP_PATH` names your checkout in the environment Livebook starts
+in. Research material (results, comparisons with DSPy, and the experiments
 behind them) lives in `research/`, outside the package and hexdocs; its
 README says how to check it.
 

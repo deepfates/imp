@@ -113,8 +113,10 @@ defmodule Imp.HistoryTest do
     program = Imp.predict("question, history -> answer", lm: lm)
     history = Imp.history([%{question: "Capital of France?", answer: "Paris"}])
 
-    assert Imp.Streaming.collect(program, %{question: "Capital of Italy?", history: history}) ==
-             "Rome"
+    assert {:ok, prediction} =
+             Imp.Streaming.collect(program, %{question: "Capital of Italy?", history: history})
+
+    assert Imp.get(prediction, :answer) == "Rome"
   end
 
   test "provider chat history remains explicit adapter-type history" do

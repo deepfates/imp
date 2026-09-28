@@ -280,6 +280,12 @@ defmodule Imp.Optimizer.BootstrapFinetune do
   @doc false
   def compile(%__MODULE__{} = optimizer, program, trainset) do
     with {:ok, trainset} <- materialize_trainset(trainset),
+         :ok <-
+           Imp.Example.require_inputs!(
+             trainset,
+             "Imp.Optimizer.BootstrapFinetune.compile",
+             "trainset"
+           ),
          {:ok, predictors} <- validate_student(program, optimizer.trainer),
          {:ok, teachers} <- prepare_teachers(program, optimizer.teacher),
          {:ok, trace_data} <-

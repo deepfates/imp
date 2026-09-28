@@ -47,14 +47,21 @@ defmodule Imp.Observability.Inspection do
   @doc """
   Returns `value` as a term `Jason` can encode, deterministically.
 
-  Structs and maps with atom or string keys become maps with string keys; a map
-  with other keys becomes `%{"__imp_type__" => "map", "entries" => [[key,
+  Structs and maps with atom or UTF-8 string keys become maps with string keys;
+  a map with other keys becomes `%{"__imp_type__" => "map", "entries" => [[key,
   value], ...]}` in a stable order. Tuples become lists, an improper list
   becomes `%{"__imp_type__" => "improper_list", "head" => ..., "tail" => ...}`,
-  atoms other than `nil`, `true` and `false` become strings, and anything else
-  that is not a number or a binary becomes its `inspect/1` text. Nothing is
-  redacted here; pass a value through `Imp.Redaction.redact/1` first when it
-  may carry secrets.
+  and atoms other than `nil`, `true` and `false` become strings.
+
+  A binary that is not valid UTF-8, as a value or as a map key, becomes
+  `%{"__imp_type__" => "binary", "bytes" => size}`. Neither its content nor a
+  digest of it is rendered: such bytes are most often key material, ciphertext
+  or random values, and a digest of a short one gives it back by trying every
+  candidate. Anything else that is not a number or a UTF-8 binary, such as a
+  pid, a reference or a function, becomes its `inspect/1` text.
+
+  Nothing is redacted here; pass a value through `Imp.Redaction.redact/1`
+  first when it may carry secrets.
 
       iex> Imp.Observability.Inspection.json_safe(%{kind: :tool, args: {1, :a}})
       %{"args" => [1, "a"], "kind" => "tool"}
@@ -65,7 +72,7 @@ defmodule Imp.Observability.Inspection do
   def json_safe(value) when is_struct(value), do: value |> Map.from_struct() |> json_safe()
 
   def json_safe(value) when is_map(value) do
-    if Enum.all?(Map.keys(value), &(is_atom(&1) or is_binary(&1))) do
+    if Enum.all?(Map.keys(value), &(is_atom(&1) or utf8?(&1))) do
       value
       |> Enum.sort_by(fn {key, _value} -> to_string(key) end)
       |> Map.new(fn {key, nested} -> {to_string(key), json_safe(nested)} end)
@@ -94,8 +101,17 @@ defmodule Imp.Observability.Inspection do
 
   def json_safe(value) when is_nil(value) or is_boolean(value), do: value
   def json_safe(value) when is_atom(value), do: Atom.to_string(value)
-  def json_safe(value) when is_binary(value) or is_number(value), do: value
+  def json_safe(value) when is_number(value), do: value
+
+  def json_safe(value) when is_binary(value) do
+    if String.valid?(value),
+      do: value,
+      else: %{"__imp_type__" => "binary", "bytes" => byte_size(value)}
+  end
+
   def json_safe(value), do: Kernel.inspect(value)
+
+  defp utf8?(value), do: is_binary(value) and String.valid?(value)
 
   defp proper_list?([]), do: true
   defp proper_list?([_head | tail]), do: proper_list?(tail)

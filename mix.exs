@@ -193,7 +193,7 @@ defmodule Imp.MixProject do
       licenses: ["MIT"],
       links: %{
         "Source" => "https://github.com/deepfates/imp",
-        "Changelog" => "https://github.com/deepfates/imp/blob/main/CHANGELOG.md"
+        "Changelog" => "https://hexdocs.pm/imp/changelog.html"
       }
     ]
   end
@@ -219,6 +219,13 @@ defmodule Imp.MixProject do
          "RELEASE_NOTES.md",
          "assets/imp-with-cards.jpg",
          "priv/public_api.json",
+         # What `Imp.Clients.TRLTrainer` reads by default: the worker, its
+         # locked Python environment and the default contract. The other
+         # contracts in priv/trl_worker belong to research runs.
+         "priv/trl_worker/pyproject.toml",
+         "priv/trl_worker/qwen-one-update-contract.json",
+         "priv/trl_worker/uv.lock",
+         "priv/trl_worker/worker.py",
          "priv/tutorial/support_tickets.json",
          "README.md",
          "mix.exs"
@@ -463,7 +470,7 @@ defmodule Imp.MixProject do
         "test.livebooks --path livebooks"
       ],
       "livebook.execute.check": [
-        &warm_livebook_install/1,
+        &prepare_livebook_install/1,
         "test.livebooks --path livebooks --execute"
       ],
       # Static type gate. Runs in dev (PLTs are built per-env; dev
@@ -601,13 +608,16 @@ defmodule Imp.MixProject do
 
   defp clean_docs(_args), do: File.rm_rf!("doc")
 
-  # Each notebook's first cell runs `Mix.install([{:imp, path: repo}],
-  # lockfile: ...)` on this checkout, and `test.livebooks --execute` gives a
-  # notebook 30 seconds. On a cold install cache the first notebook spends
-  # that compiling Imp and its dependencies and times out, so the same install
-  # runs here first, with no time limit, and the notebooks find it cached.
-  defp warm_livebook_install(_args) do
+  # Each notebook's first cell installs Imp from `IMP_PATH` when it is set and
+  # from Hex otherwise. The check sets `IMP_PATH` to this checkout, so the
+  # notebooks run against the working tree; `test.livebooks --execute` runs
+  # each one in a child process, which inherits it. That task gives a notebook
+  # 30 seconds, and on a cold install cache the first notebook spends that
+  # compiling Imp and its dependencies, so the same install runs here first,
+  # with no time limit, and the notebooks find it cached.
+  defp prepare_livebook_install(_args) do
     repo = File.cwd!()
+    System.put_env("IMP_PATH", repo)
 
     install =
       "Mix.install([{:imp, path: #{inspect(repo)}}], " <>

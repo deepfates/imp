@@ -356,6 +356,8 @@ defmodule Imp.Optimizer.GEPA do
     ensure_proposal_source!(optimizer)
     trainset = Enum.to_list(trainset)
     devset = Enum.to_list(devset)
+    Imp.Example.require_inputs!(trainset, "Imp.Optimizer.GEPA.compile", "trainset")
+    Imp.Example.require_inputs!(devset, "Imp.Optimizer.GEPA.compile", "valset")
     {feedback, feedback_errors} = feedback(optimizer, trainset)
 
     reflection_feedback =
@@ -620,7 +622,8 @@ defmodule Imp.Optimizer.GEPA do
       state.rejected
       |> Enum.filter(&is_map(&1.candidate))
       |> Enum.map(fn event ->
-        diagnostics = rejection_diagnostics(event)
+        {failed_calls, proposal_errors} = rejection_diagnostics(event)
+        diagnostics = Enum.uniq(failed_calls ++ proposal_errors)
 
         %{
           score: event.minibatch_candidate_score || 0.0,
@@ -628,11 +631,7 @@ defmodule Imp.Optimizer.GEPA do
           parameters: event.candidate,
           id: "gepa-#{event.iteration}",
           parent_id: event.parent_ids |> List.first() |> candidate_id(),
-          mutation:
-            if(diagnostics == [],
-              do: "Reflection #{event.iteration}",
-              else: "Program call failed: #{Enum.join(diagnostics, "; ")}"
-            ),
+          mutation: rejection_mutation(event.iteration, failed_calls, proposal_errors),
           diagnostics: diagnostics
         }
       end)
@@ -650,30 +649,58 @@ defmodule Imp.Optimizer.GEPA do
     end)
   end
 
+  # Diagnostics name real failures only: rows whose program call or metric
+  # failed, which the adapter records as diagnostic entries, rows whose metric
+  # returned a value `Imp.Metrics` could not read, and proposal errors. The
+  # metric's feedback on the other rows is not a failure.
   defp result_diagnostics(result) do
-    result.side_information
-    |> Map.values()
-    |> List.flatten()
-    |> Enum.map(&diagnostic_text/1)
-    |> Enum.reject(&(&1 in [nil, "successful", "improve"]))
-    |> Enum.uniq()
+    [result.side_information]
+    |> failed_rows()
+    |> diagnostic_texts()
   end
 
+  # A rejection's failures, kept apart by what failed: program or metric
+  # calls on the parent's or the proposal's rows, and the proposal itself.
   defp rejection_diagnostics(event) do
-    reason =
+    failed_calls =
+      [
+        Map.get(event, :parent_side_information, %{}),
+        Map.get(event, :candidate_side_information, %{})
+      ]
+      |> failed_rows()
+      |> diagnostic_texts()
+
+    proposal_errors =
       case event.reason do
-        {:proposal_error, reason} -> [reason]
+        {:proposal_error, reason} -> diagnostic_texts([reason])
         _reason -> []
       end
 
-    [
-      Map.get(event, :parent_side_information, %{}),
-      Map.get(event, :candidate_side_information, %{})
-    ]
+    {failed_calls, proposal_errors}
+  end
+
+  defp rejection_mutation(iteration, [], []), do: "Reflection #{iteration}"
+
+  defp rejection_mutation(_iteration, failed_calls, proposal_errors) do
+    [{"Program call failed", failed_calls}, {"Proposal failed", proposal_errors}]
+    |> Enum.reject(fn {_label, diagnostics} -> diagnostics == [] end)
+    |> Enum.map_join("; ", fn {label, diagnostics} ->
+      "#{label}: #{Enum.join(diagnostics, "; ")}"
+    end)
+  end
+
+  defp failed_rows(side_informations) do
+    side_informations
     |> Enum.flat_map(&(&1 |> Map.values() |> List.flatten()))
-    |> Kernel.++(reason)
+    |> Enum.filter(
+      &(ProgramAdapter.diagnostic_failure?(&1) or Imp.Metrics.invalid_result_feedback?(&1))
+    )
+  end
+
+  defp diagnostic_texts(failures) do
+    failures
     |> Enum.map(&diagnostic_text/1)
-    |> Enum.reject(&(&1 in [nil, "successful", "improve"]))
+    |> Enum.reject(&is_nil/1)
     |> Enum.uniq()
   end
 
@@ -682,11 +709,24 @@ defmodule Imp.Optimizer.GEPA do
   defp diagnostic_text(%{"diagnostic_only" => true, "error" => error}),
     do: diagnostic_text(error)
 
-  defp diagnostic_text({:metric_error, message}), do: truncate_text(to_string(message), 240)
-  defp diagnostic_text({_kind, message}) when is_binary(message), do: truncate_text(message, 240)
+  # A metric that raised carries its message; one that threw or exited
+  # carries `{kind, reason}`, shown whole so the kind is kept.
+  defp diagnostic_text({:metric_error, message}) when is_binary(message),
+    do: message_text(message)
+
+  defp diagnostic_text({:metric_error, reason}), do: term_text(reason)
+
+  defp diagnostic_text({:invalid_metric_result, value}),
+    do: truncate_text("invalid metric result: " <> term_text(value), 240)
+
+  defp diagnostic_text({_kind, message}) when is_binary(message), do: message_text(message)
   defp diagnostic_text(value) when is_atom(value), do: Atom.to_string(value)
   defp diagnostic_text(nil), do: nil
-  defp diagnostic_text(value), do: truncate_text(inspect(value), 240)
+  defp diagnostic_text(value), do: term_text(value)
+
+  defp message_text(message), do: message |> Imp.Redaction.redact() |> truncate_text(240)
+
+  defp term_text(value), do: value |> Imp.Redaction.redact() |> inspect() |> truncate_text(240)
 
   defp primary_instruction(candidate) do
     Map.get(candidate, :main) || Map.get(candidate, "main") || candidate |> Map.values() |> hd()

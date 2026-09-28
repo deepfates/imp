@@ -105,7 +105,9 @@ defmodule LocalServiceE2ETest do
       Imp.predict("question, context -> answer, citation", lm: lm)
       |> Imp.rag(retriever, k: 1)
 
-    assert Imp.Streaming.collect(program, %{question: "streaming capital"}) == "Lisbonlocal"
+    assert {:ok, prediction} = Imp.Streaming.collect(program, %{question: "streaming capital"})
+    assert Imp.get(prediction, :answer) == "Lisbon"
+    assert Imp.get(prediction, :citation) == "local"
 
     assert Enum.take(Imp.Streaming.stream(program, %{question: "streaming capital"}), 6) ==
              ~w(L i s b o n)

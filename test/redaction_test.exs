@@ -64,7 +64,7 @@ defmodule Imp.RedactionTest do
       {"pat github_pat_11F4KE#{String.duplicate("F4ke", 6)}_#{String.duplicate("F4ke", 10)}.",
        "pat [REDACTED].", "github_pat_ is the prefix"},
     hugging_face:
-      {"HF_TOKEN=hf_#{String.duplicate("F4ke", 9)} ok", "HF_TOKEN=[REDACTED] ok",
+      {"cloned with hf_#{String.duplicate("F4ke", 9)} ok", "cloned with [REDACTED] ok",
        "hf_hub_download"},
     aws_access_key:
       {"creds AKIAIOSFODNN7EXAMPLE in prose", "creds [REDACTED] in prose",
@@ -76,17 +76,67 @@ defmodule Imp.RedactionTest do
       {"xoxb-#{String.duplicate("0", 10)}-#{String.duplicate("F4ke", 4)} posted",
        "[REDACTED] posted", "xoxo-hugs"},
     bearer:
-      {"Authorization: Bearer F4keF4keF4keF4ke\nnext", "Authorization: Bearer [REDACTED]\nnext",
+      {"sent Bearer F4keF4keF4keF4ke\nnext", "sent Bearer [REDACTED]\nnext",
        "Bearer authentication is an authorization mechanism."},
+    bearer_lower_case:
+      {"sent bearer F4keF4keF4keF4ke", "sent bearer [REDACTED]",
+       "bearer authentication is an authorization mechanism."},
     jwt: {"id_token #{@jwt} end", "id_token [REDACTED] end", "eyJhbGciOiJub25lIn0 alone"},
     google: {"key=AIza#{String.duplicate("Xy-_9", 7)}.", "key=[REDACTED].", "AIzaShort"},
     basic:
-      {"Authorization: Basic #{Base.encode64("fake-user:fake-pass")}",
-       "Authorization: Basic [REDACTED]", "Basic authentication is enabled."},
-    session: {"a=1&session=F4keSessionF4ke&b=2", "a=1&session=[REDACTED]&b=2", "session=short"},
+      {"sent Basic #{Base.encode64("fake-user:fake-pass")}", "sent Basic [REDACTED]",
+       "Basic authentication is enabled."},
+    basic_lower_case:
+      {"sent basic #{Base.encode64("fake-user:fake-pass")}", "sent basic [REDACTED]",
+       "basic setup is enabled."},
+    session: {"a=1&session=F4keSessionF4ke&b=2", "a=1&session=[REDACTED]&b=2", "sessions=12 ran"},
     hex_assignment:
       {"token=#{String.duplicate("0badcafe", 5)} rest", "token=[REDACTED] rest",
-       "cache hit #{String.duplicate("0badcafe", 5)}"}
+       "cache hit #{String.duplicate("0badcafe", 5)}"},
+    # A credential beside another: each is found by its own shape, not by
+    # sharing a string with one.
+    env_dump:
+      {"OPENAI_API_KEY=sk-F4keF4keF4keF4ke\nDB_PASSWORD=F4ke_pw_1\nAWS_SECRET_ACCESS_KEY=F4ke/F4ke+F4ke\nSTRIPE_KEY=F4ke\n",
+       "OPENAI_API_KEY=[REDACTED]\nDB_PASSWORD=[REDACTED]\nAWS_SECRET_ACCESS_KEY=[REDACTED]\nSTRIPE_KEY=[REDACTED]\n",
+       "eos_token=EOS sort_key=name max_tokens=128 tokens: 12 password_hint=none"},
+    curl_headers:
+      {~s(curl -H "Authorization: Bearer F4keF4keF4keF4ke" -H "x-api-key: F4keApiKey" https://api.test),
+       ~s(curl -H "Authorization: Bearer [REDACTED]" -H "x-api-key: [REDACTED]" https://api.test),
+       ~s(curl -H "Accept: application/json" https://api.test)},
+    presigned_url:
+      {"https://b.s3.test/o?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAIOSFODNN7EXAMPLE%2F20260927&X-Amz-Security-Token=F4keSessionToken&X-Amz-Signature=0f0f0f0f",
+       "https://b.s3.test/o?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=[REDACTED]%2F20260927&X-Amz-Security-Token=[REDACTED]&X-Amz-Signature=[REDACTED]",
+       "https://example.test/images/public-diagram.png?version=12&size=large"},
+    query_signature:
+      {"https://acct.blob.test/c?sv=2024&sig=F4keSig%3D&se=2026",
+       "https://acct.blob.test/c?sv=2024&sig=[REDACTED]&se=2026",
+       "https://x.test/?key_id=3&signed=yes"},
+    query_key:
+      {~s|HTTP.new("https://r.test/s?key=F4keKey", opts)|,
+       ~s|HTTP.new("https://r.test/s?key=[REDACTED]", opts)|, ~s(%{key: "name", sort_key: "id"})},
+    url_password:
+      {"postgres://admin:F4ke_pw_1@db.test/app?sslmode=require",
+       "postgres://admin:[REDACTED]@db.test/app?sslmode=require",
+       "https://example.test:8443/path@v2"},
+    json_fields:
+      {~s(request failed {"api_key":"F4keKey","password":"F4ke \\"pw\\"","user":"ada"}),
+       ~s(request failed {"api_key":"[REDACTED]","password":"[REDACTED]","user":"ada"}),
+       ~s({"tokens": 12, "max_tokens": "128", "api_key": null})},
+    # Code that names a credential without holding one keeps its text.
+    code_naming_credentials:
+      {~s(api_key = "F4ke_pw_1"\nsignature: "question -> answer"),
+       ~s(api_key = "[REDACTED]"\nsignature: "question -> answer"),
+       ~s|assert lm.api_key == "x" and api_key =~ "y"; api_key: fetch_key(opts), schema: %{token: :string}, doc: `token:`|},
+    elixir_inspect:
+      {~s(%{"password" => "F4ke_pw_1", "user" => "ada", token: "F4ke"}),
+       ~s(%{"password" => "[REDACTED]", "user" => "ada", token: "[REDACTED]"}),
+       ~s(%{"title" => "tokens and keys", sessions: 3})},
+    unterminated_value:
+      {~s(config password: "F4ke_pw_1 and whatever follows\nnext line), "[REDACTED]",
+       ~s(title: "an unterminated quote)},
+    credential_after_unterminated_quote:
+      {~s(title: "open\npassword: "F4ke_pw_1" end), ~s(title: "open\npassword: "[REDACTED]" end),
+       ~s(title: "open\nsubtitle: "closed" end)}
   ]
 
   for {name, {text, redacted, near_miss}} <- @secret_shapes do
@@ -480,5 +530,80 @@ defmodule Imp.RedactionTest do
 
     assert Imp.Redaction.redact(%{log: "cache hit #{fake_hex}"}).log ==
              "cache hit #{fake_hex}"
+  end
+
+  test "MCP OAuth structs keep their type and public fields and lose their secrets" do
+    store = %Imp.MCP.OAuth.Store{directory: "/var/imp/oauth", key: <<151, 87, 0, 255>>}
+
+    flow = %Imp.MCP.OAuth.Flow{
+      resource_url: "https://mcp.example/mcp",
+      redirect_uri: "http://127.0.0.1:4000/callback",
+      authorization_url: "https://auth.example/authorize?state=state-value&code_challenge=c",
+      transaction: %{code_verifier: "verifier-value", state: "state-value"},
+      client: %{client_id: "client-id", client_secret: "client-secret-value"},
+      issuer: "https://auth.example",
+      token_endpoint: "https://auth.example/token",
+      token_auth_method: :client_secret_post,
+      scopes: ["read"]
+    }
+
+    pending = %Imp.MCP.OAuth.Pending{
+      store: store,
+      credential: "readwise",
+      server_url: "https://mcp.example/mcp",
+      authorization_url: flow.authorization_url,
+      redirect_uri: flow.redirect_uri,
+      flow: flow,
+      state: "state-value"
+    }
+
+    redacted = Imp.Redaction.redact(pending)
+
+    assert %Imp.MCP.OAuth.Pending{
+             credential: "readwise",
+             server_url: "https://mcp.example/mcp",
+             authorization_url: "[REDACTED]",
+             state: "[REDACTED]",
+             store: %Imp.MCP.OAuth.Store{directory: "/var/imp/oauth", key: "[REDACTED]"},
+             flow: %Imp.MCP.OAuth.Flow{
+               resource_url: "https://mcp.example/mcp",
+               authorization_url: "[REDACTED]",
+               transaction: "[REDACTED]",
+               client: "[REDACTED]",
+               token_auth_method: :client_secret_post,
+               scopes: ["read"]
+             }
+           } = redacted
+
+    printed = Kernel.inspect(redacted, structs: false)
+
+    for secret <- ["state-value", "verifier-value", "client-secret-value", "client-id"] do
+      refute printed =~ secret
+    end
+
+    refute printed =~ Kernel.inspect(store.key)
+    assert Imp.Redaction.redact(%{pending | state: nil}).state == nil
+  end
+
+  test "a bare PKCE transaction map loses its verifier" do
+    transaction = %{"code_verifier" => "v2", code_verifier: "verifier-value", state: "s"}
+    redacted = Imp.Redaction.redact(transaction)
+
+    assert redacted.code_verifier == "[REDACTED]"
+    assert redacted["code_verifier"] == "[REDACTED]"
+  end
+
+  test "a connection struct redacts as it prints" do
+    retriever =
+      Imp.Retrievers.HTTP.new("https://retriever.example/search?key=query-key-value",
+        headers: [{"x-subscription-token", "subscription-token-value"}]
+      )
+
+    redacted = Imp.Redaction.redact(retriever)
+
+    assert %Imp.Retrievers.HTTP{} = redacted
+    assert redacted.headers == [{"x-subscription-token", "[REDACTED]"}]
+    refute redacted.url =~ "query-key-value"
+    assert Kernel.inspect(retriever) == Kernel.inspect(redacted)
   end
 end
