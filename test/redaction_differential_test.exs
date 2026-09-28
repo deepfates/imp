@@ -321,6 +321,7 @@ defmodule Imp.RedactionDifferentialTest do
     sk = "sk-FAKEopenai" <> String.duplicate("a1", 12)
 
     [
+      {"key after a hyphen", "flag x-#{sk} set\n"},
       {"printenv",
        "HOME=/root\nOPENAI_API_KEY=#{sk}\nSECRET_KEY_BASE=FAKEskbQQQQQQQQQQQQ\nPGPASSWORD=FAKEpgpass99\nRELEASE_COOKIE=FAKEcookie\nSTRIPE_KEY=FAKEstripeplain\n"},
       {"curl -v",
