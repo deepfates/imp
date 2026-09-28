@@ -643,7 +643,7 @@ defmodule Imp.Optimizer.GEPA.Engine do
         })
 
         if continue? do
-          state = %{state | iteration: iteration}
+          state = record_iteration_failure(state, iteration, :error, exception)
           notify_iteration_end(opts, iteration, state, candidate_count)
           checkpoint!(state, opts)
           {:ok, state}
@@ -791,14 +791,10 @@ defmodule Imp.Optimizer.GEPA.Engine do
                capture_traces: true,
                deadline: Coordinator.deadline(Keyword.get(opts, :proposal_timeout, :infinity))
              ],
-             fn _kind, _reason ->
-               consume_ambiguous_evaluation(
-                 state,
-                 reservation,
-                 :minibatch,
-                 hd(tasks).iteration,
-                 opts
-               )
+             fn kind, reason ->
+               state
+               |> consume_ambiguous_evaluation(reservation, :minibatch, hd(tasks).iteration, opts)
+               |> record_iteration_failure(hd(tasks).iteration, kind, reason)
              end
            ) do
         {:ok, results} ->
@@ -1380,14 +1376,15 @@ defmodule Imp.Optimizer.GEPA.Engine do
                capture_traces: true,
                deadline: Coordinator.deadline(Keyword.get(opts, :proposal_timeout, :infinity))
              ],
-             fn _kind, _reason ->
-               consume_ambiguous_evaluation(
-                 state,
+             fn kind, reason ->
+               state
+               |> consume_ambiguous_evaluation(
                  reservation,
                  :minibatch,
                  hd(reflected).iteration,
                  opts
                )
+               |> record_iteration_failure(hd(reflected).iteration, kind, reason)
              end
            ) do
         {:ok, results} ->
@@ -3358,12 +3355,52 @@ defmodule Imp.Optimizer.GEPA.Engine do
     })
 
     if continue? do
-      {:ok, %{state | iteration: iteration, last_iteration_found_candidate: false}}
+      failure = if kind == :error, do: exception, else: reason
+      state = record_iteration_failure(state, iteration, kind, failure)
+      {:ok, %{state | last_iteration_found_candidate: false}}
     else
       if kind == :error,
         do: reraise(exception, stacktrace),
         else: :erlang.raise(kind, reason, stacktrace)
     end
+  end
+
+  # A proposal failure that ends its iteration, when the run continues under
+  # `raise_on_exception: false`, is recorded as a rejected proposal with the
+  # failure as its reason, the record a failed proposal in a parallel slot
+  # leaves, so the report can name it. A failed strategy validation records
+  # one rejection per plan itself.
+  defp record_iteration_failure(state, iteration, :error, %{__exception__: true} = exception),
+    do:
+      record_proposal_failure(
+        state,
+        iteration,
+        {:proposal_exception, Exception.message(exception)}
+      )
+
+  defp record_iteration_failure(state, iteration, kind, reason),
+    do: record_proposal_failure(state, iteration, {:proposal_throw, kind, reason})
+
+  defp record_proposal_failure(state, iteration, failure) do
+    event = %{
+      iteration: iteration,
+      status: :rejected,
+      parent_ids: [],
+      components: [],
+      candidate: nil,
+      reason: {:proposal_error, failure},
+      minibatch_parent_score: nil,
+      minibatch_candidate_score: nil,
+      parent_side_information: %{},
+      candidate_side_information: %{}
+    }
+
+    %{
+      state
+      | iteration: iteration,
+        rejected: state.rejected ++ [event],
+        history: state.history ++ [event]
+    }
   end
 
   @spec best(State.t()) :: Entry.t()

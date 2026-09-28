@@ -74,10 +74,10 @@
   # defensive fallback paired with the clauses above
   {"lib/imp/optimizer/better_together.ex", :pattern_match_cov, {1302, 8}},
   # raise-only helper: every raise_parallel_worker_error/1 clause raises
-  # (engine.ex:2469-2530); the catch-all covers these shapes at runtime
-  {"lib/imp/optimizer/gepa/engine.ex", :call, {3962, 35}},
+  # (engine.ex:2513-2574); the catch-all covers these shapes at runtime
+  {"lib/imp/optimizer/gepa/engine.ex", :call, {3999, 35}},
   # defensive clause for already-handled pending-validation states
-  {"lib/imp/optimizer/gepa/engine.ex", :pattern_match_cov, {3041, 7}},
+  {"lib/imp/optimizer/gepa/engine.ex", :pattern_match_cov, {3038, 7}},
   # defensive clause dialyzer pins to the module head (line 1)
   {"lib/imp/optimizer/gepa/evaluation.ex", :pattern_match, 1},
   # MapSet opacity: MapSet.equal? against a literal-typed key set
@@ -216,7 +216,7 @@
   {"lib/imp/optimizer/artifact.ex", :call_without_opaque, {745, 52}},
   {"lib/imp/optimizer/artifact.ex", :call_without_opaque, {909, 53}},
   {"lib/imp/optimizer/playbook.ex", :pattern_match_cov, {1014, 8}},
-  {"lib/imp/optimizer/report.ex", :call_without_opaque, {766, 55}},
+  {"lib/imp/optimizer/report.ex", :call_without_opaque, {767, 55}},
   {"lib/imp/schema.ex", :pattern_match_cov, {440, 8}},
   {"bench/imp/benchmark_truth/failure_campaign.ex", :pattern_match_cov, {168, 13}}
 ]

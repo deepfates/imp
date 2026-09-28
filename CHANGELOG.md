@@ -338,6 +338,17 @@ Every change here is breaking for code that relied on the old behaviour.
   the report has its credential values redacted.
 - A GEPA candidate rejected because its proposal failed is named "Proposal
   failed: …", not "Program call failed: …".
+- A GEPA run with `raise_on_exception: false` that continued past failed
+  proposals reports them. Each failure (a reflection call, reflection
+  strategy, evaluation or validation that raised, or an iteration that raised)
+  is an entry in `report.errors` with its `iteration`, its `candidate_id` when
+  a candidate was proposed, and its `diagnostics`; `metadata.failed_proposals`
+  counts them, and `status` is `:with_errors`. The program returned is still
+  the best candidate found, the baseline when every proposal failed, as
+  DSPy's GEPA returns it. Before, such a run reported `status: :ok` and no
+  errors: a proposal failure was listed only on a rejected candidate, a
+  failure before a candidate existed was not listed at all, and under
+  `execution_profile: :beam_native` an iteration that raised left no record.
 
 ## 0.5.0 — 2026-09-26
 

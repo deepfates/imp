@@ -360,6 +360,138 @@ defmodule OptimizerBehavioralCorpusTest do
              "Proposal failed: GEPA objective scores must be maps with numeric values"
   end
 
+  # A program whose rows carry objective scores GEPA cannot accept once its
+  # instruction is "Answer in one word.", so evaluating that proposal raises.
+  defp one_word_program do
+    Imp.predict("question -> answer",
+      lm:
+        Imp.LM.Static.new(
+          handler: fn messages, _opts ->
+            prompt = Enum.map_join(messages, "\n", & &1.content)
+            if prompt =~ "Answer in one word", do: %{answer: "one"}, else: %{answer: "unknown"}
+          end
+        )
+    )
+  end
+
+  defp unscorable_proposal_metric do
+    fn _example, prediction ->
+      if Imp.Prediction.get(prediction, :answer) == "one",
+        do: %{score: 0.0, metadata: %{objective_scores: %{accuracy: "not a number"}}},
+        else: 0.0
+    end
+  end
+
+  defp run_gepa(metric, program, opts) do
+    {:ok, compiled} =
+      Imp.Optimizer.GEPA.new(metric, opts)
+      |> Imp.Optimizer.run(program, trainset: trainset(), validation: devset())
+
+    {compiled, Imp.Optimizer.Report.fetch(compiled)}
+  end
+
+  test "GEPA reports every failed proposal when it continues past all of them" do
+    down_lm = Imp.Test.FunLM.new(fn _messages, _opts -> {:error, :reflection_down} end)
+    evaluation_failure = "GEPA objective scores must be maps with numeric values"
+    reflection_failure = "{:reflection_lm_failed, :reflection_down}"
+
+    cases =
+      for profile <- [
+            [execution_profile: :gepa_v0_1_4_merge],
+            [execution_profile: :beam_native, generations: 3],
+            [execution_profile: :beam_native, generations: 3, proposal_concurrency: 2]
+          ],
+          {metric, reflection, failure} <- [
+            {unscorable_proposal_metric(), reflection_lm("Answer in one word."),
+             evaluation_failure},
+            {metric(), down_lm, reflection_failure}
+          ],
+          do: {profile, metric, reflection, failure}
+
+    for {profile, metric, reflection, failure} <- cases do
+      {compiled, report} =
+        run_gepa(
+          metric,
+          one_word_program(),
+          profile ++
+            [raise_on_exception: false, reflection_lm: reflection, max_metric_calls: 12]
+        )
+
+      label = inspect({profile, failure})
+
+      # The run returns the baseline program; its report cannot be read as a
+      # clean run that found nothing better.
+      assert Imp.Optimizer.GEPA.Candidate.from_program(compiled) ==
+               Imp.Optimizer.GEPA.Candidate.from_program(one_word_program()),
+             label
+
+      assert report.metadata.status == :with_errors, label
+      assert report.metadata.failed_proposals > 0, label
+      assert report.metadata.failed_proposals == report.metadata.rejected_candidates, label
+      assert length(report.errors) == report.metadata.failed_proposals, label
+
+      for error <- report.errors do
+        assert %{iteration: iteration, diagnostics: [^failure]} = error, label
+        assert is_integer(iteration) and iteration > 0, label
+      end
+    end
+  end
+
+  test "GEPA with raise_on_exception left on still raises when a proposal fails" do
+    for profile <- [:gepa_v0_1_4_merge, :beam_native] do
+      assert {:error,
+              {:optimizer_failed, Imp.Optimizer.GEPA,
+               %ArgumentError{message: "GEPA objective scores must be maps with numeric values"}}} =
+               Imp.Optimizer.GEPA.new(unscorable_proposal_metric(),
+                 execution_profile: profile,
+                 generations: 3,
+                 reflection_lm: reflection_lm("Answer in one word."),
+                 max_metric_calls: 12
+               )
+               |> Imp.Optimizer.run(one_word_program(),
+                 trainset: trainset(),
+                 validation: devset()
+               )
+    end
+  end
+
+  test "GEPA returns the improved program and reports the failures when only some proposals fail" do
+    for profile <- [:gepa_v0_1_4_merge, :beam_native] do
+      calls = :counters.new(1, [])
+
+      # The first two reflection calls fail, the rest propose the instruction
+      # that solves the task.
+      flaky_lm =
+        Imp.Test.FunLM.new(fn _messages, _opts ->
+          :counters.add(calls, 1, 1)
+
+          if :counters.get(calls, 1) <= 2,
+            do: {:error, :reflection_down},
+            else: {:ok, %{instruction: "Always answer Paris when asked about France."}}
+        end)
+
+      {compiled, report} =
+        run_gepa(metric(), france_program(),
+          execution_profile: profile,
+          generations: 4,
+          raise_on_exception: false,
+          reflection_lm: flaky_lm,
+          max_metric_calls: 20
+        )
+
+      assert report.best_score == 1.0, inspect(profile)
+      assert evaluator(compiled).score == 1.0, inspect(profile)
+      assert report.metadata.status == :with_errors, inspect(profile)
+      assert report.metadata.failed_proposals > 0, inspect(profile)
+
+      assert Enum.all?(
+               report.errors,
+               &(&1.diagnostics == ["{:reflection_lm_failed, :reflection_down}"])
+             ),
+             inspect(profile)
+    end
+  end
+
   test "GEPA keeps truncated multibyte diagnostics valid UTF-8" do
     reason = String.duplicate("é", 241)
 

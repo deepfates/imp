@@ -87,6 +87,7 @@ defmodule Imp.Optimizer.Report do
     "equal_or_better" => :equal_or_better,
     "evaluation_policy" => :evaluation_policy,
     "feedback" => :feedback,
+    "failed_proposals" => :failed_proposals,
     "failures" => :failures,
     "frontier_size" => :frontier_size,
     "frontier_type" => :frontier_type,

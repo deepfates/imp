@@ -316,6 +316,19 @@ defmodule Imp.Optimizer.GEPA.V014CompatibilityTest do
       Enum.map(items, fn {candidate, batch} -> evaluate(adapter, batch, candidate, opts) end)
     end
 
+    def batch_evaluate(%__MODULE__{stage: stage} = adapter, items, opts)
+        when stage in [:parent_evaluation, :child_evaluation] do
+      parent = if stage == :parent_evaluation, do: "0", else: "1"
+
+      if Enum.any?(items, fn {candidate, batch} ->
+           candidate.main == parent and Enum.all?(batch, &(&1.id < 10))
+         end) do
+        raise ArgumentError, "strategy #{stage} exploded"
+      end
+
+      Enum.map(items, fn {candidate, batch} -> evaluate(adapter, batch, candidate, opts) end)
+    end
+
     def batch_evaluate(adapter, items, opts) do
       Enum.map(items, fn {candidate, batch} -> evaluate(adapter, batch, candidate, opts) end)
     end
@@ -919,6 +932,64 @@ defmodule Imp.Optimizer.GEPA.V014CompatibilityTest do
     assert rejection.reason ==
              {:strategy_stage_error, :validation,
               {:exception, ArgumentError, "strategy validation exploded"}}
+
+    assert List.last(state.history) == rejection
+  end
+
+  test "strategy minibatch evaluation exceptions record the failed proposal" do
+    for stage <- [:parent_evaluation, :child_evaluation] do
+      message = "strategy #{stage} exploded"
+
+      assert_raise ArgumentError, message, fn ->
+        run_strategy_stage_failure(stage, true)
+      end
+
+      state = run_strategy_stage_failure(stage, false)
+
+      assert length(state.candidates) == 1
+
+      assert [
+               %{
+                 iteration: 1,
+                 candidate: nil,
+                 reason: {:proposal_error, {:proposal_exception, ^message}}
+               } = rejection
+             ] = state.rejected
+
+      assert List.last(state.history) == rejection
+    end
+  end
+
+  test "strategy iteration exceptions record the failed proposal" do
+    state =
+      Engine.run(
+        %StrategyStageFailureAdapter{stage: :none},
+        %{main: "0"},
+        [%{id: 1}],
+        [%{id: 10}],
+        fn _candidate, _component, _records, _iteration -> "1" end,
+        module_selector: fn _state, _trajectories, _scores, _idx, _candidate ->
+          raise "selector exploded"
+        end,
+        max_iterations: 1,
+        minibatch_size: 1,
+        proposal_concurrency: 2,
+        sampling_strategy: {:same_parent, 1},
+        selection_strategy: :all_improvements,
+        candidate_selection_strategy: :current_best,
+        max_metric_calls: 20,
+        raise_on_exception: false,
+        seed: 5
+      )
+
+    assert [
+             %{
+               iteration: 1,
+               candidate: nil,
+               parent_ids: [],
+               reason: {:proposal_error, {:proposal_exception, "selector exploded"}}
+             } = rejection
+           ] = state.rejected
 
     assert List.last(state.history) == rejection
   end

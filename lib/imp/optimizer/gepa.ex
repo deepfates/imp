@@ -89,6 +89,14 @@ defmodule Imp.Optimizer.GEPA do
   built-ins, or a validated custom `Imp.Optimizer.GEPA.CandidateSelector`
   module/struct.
 
+  `raise_on_exception: false` keeps the run going when a proposal fails (its
+  reflection call, reflection strategy, evaluation or validation raises) and
+  returns the best candidate found, the baseline when every proposal failed.
+  The report lists each failure in `errors` with its `iteration`, its
+  `candidate_id` when a candidate was proposed, and its `diagnostics`,
+  counts them in `metadata.failed_proposals`, and sets `status` to
+  `:with_errors`. With the default, `true`, the first failure raises.
+
   The `:callbacks` option accepts callback modules or `{module, context}`
   tuples implementing any subset of the documented GEPA callback contract.
   Hooks are synchronous and observational; failures are isolated from
@@ -453,7 +461,8 @@ defmodule Imp.Optimizer.GEPA do
     best = Engine.best(state)
     compiled = Candidate.apply_to_program(program, best.candidate)
     candidates = report_candidates(state)
-    errors = feedback_errors ++ evaluation_errors(state)
+    proposal_errors = proposal_errors(state)
+    errors = feedback_errors ++ evaluation_errors(state) ++ proposal_errors
 
     report =
       Report.new(%{
@@ -497,6 +506,7 @@ defmodule Imp.Optimizer.GEPA do
           full_evaluations: state.budget.full_evaluations,
           max_full_evaluations: state.budget.max_full_evaluations,
           rejected_candidates: length(state.rejected),
+          failed_proposals: length(proposal_errors),
           stop_reason: state.stop_reason,
           status: if(errors == [], do: :ok, else: :with_errors),
           combee:
@@ -672,14 +682,37 @@ defmodule Imp.Optimizer.GEPA do
       |> failed_rows()
       |> diagnostic_texts()
 
-    proposal_errors =
-      case event.reason do
-        {:proposal_error, reason} -> diagnostic_texts([reason])
-        _reason -> []
-      end
-
-    {failed_calls, proposal_errors}
+    {failed_calls, event.reason |> proposal_failures() |> diagnostic_texts()}
   end
+
+  # Every proposal that failed (its reflection call, reflection strategy,
+  # evaluation or validation raised, or the whole iteration did) and that the
+  # run continued past under `raise_on_exception: false`. A failure recorded
+  # before a candidate existed has no candidate id.
+  defp proposal_errors(state) do
+    Enum.flat_map(state.rejected, fn event ->
+      case event.reason |> proposal_failures() |> diagnostic_texts() do
+        [] ->
+          []
+
+        diagnostics ->
+          [
+            %{
+              candidate_id: if(is_map(event.candidate), do: "gepa-#{event.iteration}"),
+              iteration: event.iteration,
+              diagnostics: diagnostics
+            }
+          ]
+      end
+    end)
+  end
+
+  # The rejection reasons the engine records for a failure, as opposed to a
+  # proposal that ran and was not good enough.
+  defp proposal_failures({:proposal_error, reason}), do: [reason]
+  defp proposal_failures({:strategy_stage_error, _stage, reason}), do: [reason]
+  defp proposal_failures({:evaluation_error, reason}), do: [reason]
+  defp proposal_failures(_reason), do: []
 
   defp rejection_mutation(iteration, [], []), do: "Reflection #{iteration}"
 
@@ -720,6 +753,9 @@ defmodule Imp.Optimizer.GEPA do
 
   defp diagnostic_text({:invalid_metric_result, value}),
     do: truncate_text("invalid metric result: " <> term_text(value), 240)
+
+  defp diagnostic_text({:exception, _type, message}) when is_binary(message),
+    do: message_text(message)
 
   defp diagnostic_text({_kind, message}) when is_binary(message), do: message_text(message)
   defp diagnostic_text(value) when is_atom(value), do: Atom.to_string(value)
