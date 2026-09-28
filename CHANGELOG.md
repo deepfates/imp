@@ -23,6 +23,17 @@ User-visible changes to Imp are recorded here.
   unknown charge, not a free one; a host that wants the old number for calls
   with no reported charge reads `estimated_cost` for them, knowing it is an
   estimate.
+- `:reasoning_effort` accepts `max`, when an LM is built, on a call and in a
+  saved program. Imp's accepted efforts are read from ReqLLM's own
+  `reasoning_effort` option, so they are every effort ReqLLM accepts, on every
+  provider; ReqLLM's provider maps or clamps it to what that provider's API
+  takes. OpenRouter receives `"max"` in either wire field.
+- A string effort such as `"high"` reaches ReqLLM as its atom. ReqLLM checks
+  the effort against its atom list before any provider sees it, so in 0.6.0 a
+  string effort, including every effort loaded from a saved program, failed
+  every call on most providers: OpenRouter without
+  `openrouter_reasoning_wire: :nested`, Anthropic, Google and Groq among
+  them. OpenAI and xAI were not affected.
 
 ## 0.6.0 — 2026-09-28
 

@@ -1586,13 +1586,13 @@ defmodule Imp.Saving do
           "saved ReqLLM input_envelope must be a list, got: #{inspect(value)}"
   end
 
-  defp require_reasoning_effort!(effort)
-       when effort in ~w(none minimal low medium high xhigh default),
-       do: effort
-
   defp require_reasoning_effort!(effort) do
-    raise ArgumentError,
-          "saved ReqLLM reasoning_effort is unsupported: #{inspect(effort)}"
+    if is_binary(effort) and effort in Imp.Clients.ReqLLM.reasoning_efforts() do
+      effort
+    else
+      raise ArgumentError,
+            "saved ReqLLM reasoning_effort is unsupported: #{inspect(effort)}"
+    end
   end
 
   defp decode_req_http_options!(options) when is_list(options) do

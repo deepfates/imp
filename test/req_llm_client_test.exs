@@ -1381,7 +1381,7 @@ defmodule ReqLLMClientTest do
 
     assert_received {:req_llm_generate, "anthropic:claude-sonnet-4-6", messages, opts}
     refute inspect(messages) =~ "reasoning"
-    assert Keyword.fetch!(opts, :reasoning_effort) == "low"
+    assert Keyword.fetch!(opts, :reasoning_effort) == :low
   end
 
   test "manual reasoning fields still work without provider-native thinking" do
@@ -2313,6 +2313,150 @@ defmodule ReqLLMClientTest do
     top_level = Imp.req_llm("openrouter:provider/model", reasoning_effort: :low)
     refute Keyword.has_key?(top_level.opts, :openrouter_reasoning_wire)
     assert top_level.opts[:reasoning_effort] == :low
+  end
+
+  test "reasoning_effort max reaches OpenRouter as \"max\" on either wire" do
+    owner = self()
+
+    adapter = fn request ->
+      send(owner, {:openrouter_max_transport, request.body})
+
+      body = %{
+        "id" => "openrouter-max-local",
+        "object" => "chat.completion",
+        "model" => "provider/snapshot",
+        "choices" => [
+          %{
+            "index" => 0,
+            "message" => %{"role" => "assistant", "content" => "ok"},
+            "finish_reason" => "stop"
+          }
+        ],
+        "usage" => %{"prompt_tokens" => 1, "completion_tokens" => 1, "total_tokens" => 2}
+      }
+
+      {request, Req.Response.new(status: 200, body: body)}
+    end
+
+    model = %{
+      provider: :openrouter,
+      id: "provider/model",
+      model: "provider/model",
+      base_url: "https://provider-disabled.invalid/v1"
+    }
+
+    transport = [
+      api_key: "provider-disabled",
+      cache: false,
+      max_retries: 0,
+      req_http_options: [adapter: adapter, retry: false, max_retries: 0]
+    ]
+
+    messages = [%{role: :user, content: "reason"}]
+
+    # Configured on the client, as a string: ReqLLM's top-level field.
+    configured = Imp.req_llm(model, [reasoning_effort: "max"] ++ transport)
+    assert {:ok, _response} = Imp.Clients.ReqLLM.generate(configured, messages, [])
+    assert_received {:openrouter_max_transport, request_body}
+    request = request_body |> IO.iodata_to_binary() |> Jason.decode!()
+    assert request["reasoning_effort"] == "max"
+
+    # Named on a call, as an atom, over a client with no effort.
+    plain = Imp.req_llm(model, transport)
+
+    assert {:ok, _response} =
+             Imp.Clients.ReqLLM.generate(plain, messages, reasoning_effort: :max)
+
+    assert_received {:openrouter_max_transport, request_body}
+    request = request_body |> IO.iodata_to_binary() |> Jason.decode!()
+    assert request["reasoning_effort"] == "max"
+
+    # The nested wire carries the same value.
+    nested =
+      Imp.req_llm(
+        model,
+        [reasoning_effort: :max, openrouter_reasoning_wire: :nested] ++ transport
+      )
+
+    assert {:ok, _response} = Imp.Clients.ReqLLM.generate(nested, messages, [])
+    assert_received {:openrouter_max_transport, request_body}
+    request = request_body |> IO.iodata_to_binary() |> Jason.decode!()
+    assert request["reasoning"] == %{"effort" => "max"}
+    refute Map.has_key?(request, "reasoning_effort")
+  end
+
+  test "a string reasoning_effort reaches OpenRouter and Anthropic requests" do
+    owner = self()
+
+    adapter = fn request ->
+      send(owner, {:string_effort_transport, request.body})
+
+      body =
+        if String.contains?(to_string(request.url), "anthropic") do
+          %{
+            "id" => "msg_local",
+            "type" => "message",
+            "role" => "assistant",
+            "model" => "claude-sonnet-4-6",
+            "content" => [%{"type" => "text", "text" => "ok"}],
+            "stop_reason" => "end_turn",
+            "usage" => %{"input_tokens" => 1, "output_tokens" => 1}
+          }
+        else
+          %{
+            "id" => "openrouter-string-local",
+            "object" => "chat.completion",
+            "model" => "provider/snapshot",
+            "choices" => [
+              %{
+                "index" => 0,
+                "message" => %{"role" => "assistant", "content" => "ok"},
+                "finish_reason" => "stop"
+              }
+            ],
+            "usage" => %{"prompt_tokens" => 1, "completion_tokens" => 1, "total_tokens" => 2}
+          }
+        end
+
+      {request, Req.Response.new(status: 200, body: body)}
+    end
+
+    transport = [
+      api_key: "provider-disabled",
+      cache: false,
+      max_retries: 0,
+      reasoning_effort: "high",
+      req_http_options: [adapter: adapter, retry: false, max_retries: 0]
+    ]
+
+    messages = [%{role: :user, content: "reason"}]
+
+    openrouter =
+      Imp.req_llm(
+        %{
+          provider: :openrouter,
+          id: "provider/model",
+          model: "provider/model",
+          base_url: "https://openrouter.invalid/v1"
+        },
+        transport
+      )
+
+    assert {:ok, _response} = Imp.Clients.ReqLLM.generate(openrouter, messages, [])
+    assert_received {:string_effort_transport, request_body}
+    request = request_body |> IO.iodata_to_binary() |> Jason.decode!()
+    assert request["reasoning_effort"] == "high"
+
+    anthropic =
+      Imp.req_llm(
+        "anthropic:claude-sonnet-4-6",
+        [base_url: "https://anthropic.invalid"] ++ transport
+      )
+
+    assert {:ok, _response} = Imp.Clients.ReqLLM.generate(anthropic, messages, [])
+    assert_received {:string_effort_transport, request_body}
+    request = request_body |> IO.iodata_to_binary() |> Jason.decode!()
+    assert request["thinking"] == %{"type" => "enabled", "budget_tokens" => 4096}
   end
 
   test "reasoning_effort rejects unknown values and duplicates early, on any provider" do
