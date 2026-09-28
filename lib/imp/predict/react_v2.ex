@@ -123,7 +123,8 @@ defmodule Imp.Predict.ReActV2 do
   So a step asks for one thing, whichever adapter formats it. The step has a
   `tools` input, the roster as text in DSPy's shape ("name, whose description
   is <desc>...</desc>. It takes arguments {...}.", the arguments being the
-  schema's properties, `required` and `$defs` as JSON), and a `tool_calls`
+  schema's properties, `required` and `$defs` as JSON, the properties in the
+  schema's order when it keeps one and by name otherwise), and a `tool_calls`
   output whose description shows how to write a call.
   When the LM calls tools natively (every LM unless its client says
   otherwise; `Imp.Clients.ReqLLM` asks the model registry), the tools are sent
@@ -267,7 +268,7 @@ defmodule Imp.Predict.ReActV2 do
       raise ArgumentError, "submit is reserved by Imp.Predict.ReActV2"
     end
 
-    reject_reserved_tools!(signature)
+    reject_reserved_tools!(signature, "Imp.Predict.ReActV2.new/3")
 
     tools = put_submit(tools, signature)
 
@@ -391,7 +392,7 @@ defmodule Imp.Predict.ReActV2 do
   # agent it was saved from asked. A host's own `:adapter_opts` (renderers are
   # functions) are not saved; the host passes them again.
   def restore_loop(%__MODULE__{react: react} = agent) do
-    reject_reserved_tools!(agent.signature)
+    reject_reserved_tools!(agent.signature, "loading a ReActV2 program")
 
     metadata =
       react.signature.metadata
@@ -945,12 +946,11 @@ defmodule Imp.Predict.ReActV2 do
   # `Adapter._call_preprocess` does.
   # `tools` is the step's tool list, so a task field of that name would be
   # taken for it. A program saved before the name was reserved is refused on
-  # load with the same message.
-  defp reject_reserved_tools!(signature) do
+  # load with the same words, naming what the caller did.
+  defp reject_reserved_tools!(signature, context) do
     if Enum.any?(signature.inputs ++ signature.outputs, &Imp.FieldMap.same_name?(&1.name, :tools)) do
       raise ArgumentError,
-            "Imp.Predict.ReActV2.new/3: `tools` is reserved for the step's tool list; " <>
-              "rename that field"
+            "#{context}: `tools` is reserved for the step's tool list; rename that field"
     end
   end
 
@@ -976,9 +976,10 @@ defmodule Imp.Predict.ReActV2 do
   # The roster as the `tools` input: one line per tool in DSPy's `Tool.__str__`
   # shape, "name, whose description is <desc>...</desc>. It takes arguments
   # {...}.", with the arguments as JSON: the `properties` of the schema the
-  # provider would get (`submit`'s included), in the order the schema gives
-  # them, then its `required` list and its `$defs`, so an optional argument
-  # reads as one and a `$ref` resolves.
+  # provider would get (`submit`'s included), then its `required` list and its
+  # `$defs`, so an optional argument reads as one and a `$ref` resolves. The
+  # properties keep their order only when the schema keeps one (a
+  # `Jason.OrderedObject`); a map's are listed by name.
   defp tool_lines(react) do
     react.tools
     |> ordered_tools(react.tool_order)

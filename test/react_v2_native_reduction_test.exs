@@ -118,14 +118,14 @@ defmodule ReActV2NativeReductionTest do
     end
   end
 
-  @reserved "Imp.Predict.ReActV2.new/3: `tools` is reserved for the step's tool list; rename that field"
+  @reserved "`tools` is reserved for the step's tool list; rename that field"
 
   test "a task field named tools is refused, on construction and on load" do
-    assert_raise ArgumentError, @reserved, fn ->
+    assert_raise ArgumentError, "Imp.Predict.ReActV2.new/3: " <> @reserved, fn ->
       Imp.react("question, tools: array[str] -> answer", [look()])
     end
 
-    assert_raise ArgumentError, @reserved, fn ->
+    assert_raise ArgumentError, "Imp.Predict.ReActV2.new/3: " <> @reserved, fn ->
       Imp.react("question -> answer, tools", [look()])
     end
 
@@ -148,6 +148,6 @@ defmodule ReActV2NativeReductionTest do
       |> update_in(["react", "signature", "inputs"], &(&1 ++ [field]))
 
     error = assert_raise ArgumentError, fn -> Imp.load!(state, registry: registry) end
-    assert Exception.message(error) =~ @reserved
+    assert Exception.message(error) =~ "loading a ReActV2 program: " <> @reserved
   end
 end

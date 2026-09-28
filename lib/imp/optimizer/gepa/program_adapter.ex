@@ -400,7 +400,7 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
     # called `tools` is kept.
     cond do
       tools == [] -> fields
-      roster_input -> fields |> Map.delete(roster_input) |> Map.put("tools", text(tools))
+      roster_input -> Map.put(fields, "tools", text(tools))
       Map.has_key?(fields, "tools") -> fields
       true -> Map.put(fields, "tools", text(tools))
     end

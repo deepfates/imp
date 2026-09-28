@@ -68,13 +68,16 @@ User-visible changes to Imp are recorded here.
   write its calls in `tool_calls`, whose description shows the shape of a
   call with an example. A `tools` input lists every tool, `submit` included,
   in DSPy's words: its name, its description, and its arguments as JSON (the
-  schema's properties in their declared order, its `required` list and its
-  `$defs`). Its earlier steps are replayed as text rather than as tool blocks
+  schema's properties, its `required` list and its `$defs`; the properties in
+  the schema's order when it keeps one, a `Jason.OrderedObject`, and by name
+  for an ordinary map). Its earlier steps are replayed as text rather than as tool blocks
   a provider without declared tools may refuse. A task signature can no
   longer have a field named `tools`, and loading a program saved with one is
   refused with the same error. `Imp.Clients.ReqLLM` reads whether the model
-  calls tools from the registry once, when the client is built
-  (`:tool_calling`). The guidance says where a text answer
+  calls tools from the registry once, when the client is built, and keeps it
+  with the model it was read for (`:tool_calling`); a client whose model is
+  swapped looks the new model up. So a client built by `Imp.req_llm/2`, or
+  loaded, no longer equals a bare `%Imp.Clients.ReqLLM{}` for the same model. The guidance says where a text answer
   goes, the same in every format: in `next_thought`, with `tool_calls` left
   empty when the model writes its calls. It no longer asks for plain text
   beside a structure that asks for fields; a plain-text reply to a Chat step
