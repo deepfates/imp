@@ -1109,22 +1109,20 @@ defmodule Imp.Saving do
     end)
   end
 
-  # A two-element list is a pair only inside a list of pairs, as JSON writes
-  # config, options and headers (`Imp.Redaction.pair_list?/1`).
+  # A two-element list with a name first is a pair inside a list, as JSON
+  # writes config, options and headers (`Imp.Redaction.list_pair?/1`).
   defp redact_dump(value) when is_list(value) do
-    if Imp.Redaction.pair_list?(value) do
-      Enum.map(value, fn
-        [key, nested] ->
-          if Imp.Redaction.credential_entry?(key, nested),
-            do: [key, "[REDACTED]"],
-            else: [key, redact_dump(nested)]
+    Enum.map(value, fn
+      [key, nested] = pair ->
+        cond do
+          not Imp.Redaction.list_pair?(pair) -> redact_dump(pair)
+          Imp.Redaction.credential_entry?(key, nested) -> [key, "[REDACTED]"]
+          true -> [key, redact_dump(nested)]
+        end
 
-        pair ->
-          redact_dump(pair)
-      end)
-    else
-      Enum.map(value, &redact_dump/1)
-    end
+      item ->
+        redact_dump(item)
+    end)
   end
 
   defp redact_dump({key, value}) when is_atom(key) or is_binary(key) do
@@ -1179,14 +1177,16 @@ defmodule Imp.Saving do
     |> require_portable_json!(context)
   end
 
+  # An Avatar's tool schemas are redacted as they are, before they are encoded,
+  # so that a client, retriever or OAuth struct in one is still a struct when
+  # redacted.
   defp dump_avatar_tools(tools) do
     tools
-    |> dump_tools("Avatar")
-    |> Enum.map(fn tool ->
-      tool
-      |> Map.update!("description", &Imp.Redaction.redact(&1, []))
-      |> Map.update!("schema", &Imp.Redaction.redact_term/1)
+    |> Map.new(fn {name, tool} ->
+      {name, %{tool | schema: Imp.Redaction.redact_term(tool.schema)}}
     end)
+    |> dump_tools("Avatar")
+    |> Enum.map(&Map.update!(&1, "description", fn text -> Imp.Redaction.redact(text, []) end))
   end
 
   defp require_portable_json!(value, context) do

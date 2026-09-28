@@ -62,8 +62,8 @@ defmodule Imp.RedactionWritersTest do
     assert Enum.any?(Map.keys(redacted.keyed), &match?(%Imp.Retrievers.HTTP{}, &1))
   end
 
-  # JSON writes a pair as a two-element list inside a list of pairs: decoded
-  # tool results, config and ReqLLM options arrive that way.
+  # JSON writes a pair as a two-element list inside a list: decoded tool
+  # results, config and ReqLLM options arrive that way.
   @list_pairs [
     {[["api_key", "PROBE-LIST-PAIR-VALUE-7F3A"]], "PROBE-LIST-PAIR-VALUE-7F3A"},
     {%{headers: [["X-Api-Key", "PROBE-LIST-HEADER-VALUE-7F3A"]]}, "PROBE-LIST-HEADER-VALUE-7F3A"},
@@ -166,6 +166,61 @@ defmodule Imp.RedactionWritersTest do
     assert status == 0, output
     assert output =~ ~s({%{"note" => :"[REDACTED]"}, %{"note" => :"[REDACTED]"}})
     refute output =~ @shaped
+  end
+
+  # Saving's final pass is the only redaction a ReAct tool schema gets, so a
+  # pair written as a list in it is redacted there.
+  test "a ReAct tool schema's list-written pair is redacted when saved" do
+    runner = fn args -> args end
+    registry = Imp.Saving.Registry.new(lookup_runner: runner)
+
+    schema = %{
+      "type" => "object",
+      "properties" => %{"q" => %{"type" => "string"}},
+      "examples" => [["api_key", "PROBE-SCHEMA-PAIR-7F3A"]]
+    }
+
+    program =
+      Imp.Predict.ReAct.new("question -> answer", [
+        Imp.tool(:lookup, "lookup", runner, schema: schema)
+      ])
+
+    written = program |> Imp.Saving.dump(registry: registry) |> Jason.encode!()
+    refute written =~ "PROBE-SCHEMA-PAIR-7F3A"
+    assert written =~ ~s(["api_key","[REDACTED]"])
+  end
+
+  # A Predict's config is written as `[name, value]` pairs; its headers go.
+  test "a Predict's config headers are not saved" do
+    program =
+      Imp.predict("question -> answer",
+        config: [headers: [{"x-custom", "PROBE-CONFIG-HEADER-7F3A"}], temperature: 0.1]
+      )
+
+    assert Imp.Saving.dump(program)["config"] == [["temperature", 0.1]]
+  end
+
+  # An Avatar's tool schemas are redacted before they are encoded, where a
+  # retriever in one is still a struct; its actor's demos keep their type.
+  test "an Avatar's tool schemas and actor demos are redacted as they are", %{probe: probe} do
+    runner = fn args -> args end
+    registry = Imp.Saving.Registry.new(lookup_runner: runner)
+    schema = %{"type" => "object", "x-source" => probe.retriever}
+    demo = Imp.example(question: "q", answer: "a") |> Imp.with_inputs(:question)
+
+    avatar =
+      Imp.avatar("question -> answer", [Imp.tool(:lookup, "lookup", runner, schema: schema)])
+
+    avatar = %{avatar | actor: Imp.Predict.with_demos(avatar.actor, [demo])}
+    written = Imp.dump(avatar, registry: registry)
+    encoded = Jason.encode!(written)
+
+    refute encoded =~ "PROBE-SUBSCRIPTION-VALUE-7F3A"
+    refute encoded =~ "PROBE-URL-KEY-VALUE-7F3A"
+    assert encoded =~ "X-Subscription-Token"
+
+    loaded = written |> Jason.encode!() |> Jason.decode!() |> Imp.load!(registry: registry)
+    assert loaded.actor.demos == [demo]
   end
 
   test "keys that redact to the same term keep one entry" do

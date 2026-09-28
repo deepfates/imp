@@ -111,12 +111,16 @@ User-visible changes to Imp are recorded here.
   (`with_inputs([:api_key, :question])`), or whose metadata holds such a list,
   loads back as it was. Saving and `Imp.Redaction.drop_credentials/1` read
   every two-element list whose first item was a name as a key and its value,
-  and replaced or dropped the second item. A two-element list is now a pair
-  only inside a list whose every element is a pair with a name first, as JSON
-  writes config and headers (`[["api_key", key], ["model", "gpt"]]`); a flat
-  list of names is data. This also stops `Imp.Redaction.redact/1` from
-  rewriting an Avatar tool schema's `"required" => ["api_key", "query"]` and
-  `Imp.Optimizer.Parameter` from refusing input keys `["api_key", "question"]`.
+  and replaced or dropped the second item. A two-element list with a name
+  first is now a pair when it is an element of a list, as JSON writes config,
+  headers and tool results (`[["api_key", key], ["model", "gpt"]]`); held
+  directly as a field or map value, it is data. This also stops
+  `Imp.Redaction.redact/1` from rewriting an Avatar tool schema's
+  `"required" => ["api_key", "query"]` and `Imp.Optimizer.Parameter` from
+  refusing input keys `["api_key", "question"]`. One divergence from 0.5.0
+  follows: a flat `["api_key", key]` held directly as a value, under a key
+  that is not itself a credential name, is not redacted, since it has the
+  shape of a list of two names.
 - A map key that is a string shaped like a credential is redacted.
   `Imp.Optimizer.Trajectory` names a key it refuses (one that is not an atom
   or a string) by its type; it printed the key, credential included.
