@@ -2,81 +2,272 @@
 
 User-visible changes to Imp are recorded here.
 
-## Unreleased
+## 0.6.0 — 2026-09-28
 
 ### Security
 
-- The lock file takes `mint` 1.11.0 (and `hpax` 1.1.0), which fixes
-  EEF-CVE-2026-91043, EEF-CVE-2026-92103 and EEF-CVE-2026-94194 in the HTTP
-  client Req uses. The example projects' lock files take the same versions.
+- Imp's lock file and the example projects' keep `mint` 1.10.1, which has
+  three advisories that `mint` 1.11.0 fixes: EEF-CVE-2026-91043 and
+  EEF-CVE-2026-92103 are in Mint's HTTP/2 client, and EEF-CVE-2026-94194 is
+  in HTTP/1 chunked framing and needs an intermediary between the client and
+  a malicious server. `mint` 1.11.0 leaves an HTTP/1 connection open after a
+  receive timeout, and Finch 0.23.0 reuses it, so requests after a timeout
+  fail (see Known limits in the release notes). `.audit_ignore` lists the
+  three advisories with the reason and the condition that removes them: a
+  Finch release that includes https://github.com/sneako/finch/pull/397,
+  which is open and unreleased.
 - `Imp.Redaction` redacts a string that holds a PEM private key of any type,
   a PGP private key block or a PuTTY key file; a Stripe (`sk_live_`,
   `rk_live_`), GitHub, GitLab (`glpat-`), Hugging Face (`hf_`), Slack
-  (`xox?-`), SendGrid (`SG.`), npm (`npm_`), PyPI (`pypi-`), Google OAuth
+  (`xox?-`), SendGrid (`SG.`), npm (`npm_`), PyPI (`pypi-AgE`), Google OAuth
   (`ya29.`) or Vault (`hvs.`) token, or a JSON Web Token; an AWS access key id
   longer than 20 characters; a URL with a password in its user info; or a
   signed URL's `X-Amz-Signature`, `X-Amz-Security-Token`, `X-Goog-Signature`
   or Azure `sig`. It passed these unchanged into run events, traces,
   trajectories and saved programs. As before, the whole string is replaced,
-  and every shape it caught before is still caught.
-- `Imp.ExternalCommand` redacts captured output with the same rules: output
-  that holds a credential is `"[REDACTED]"`, so the credentials printed beside
-  a recognized one (`env | grep AWS`, a credentials file) go with it. It used
-  two patterns of its own (`sk-` and `Bearer`) before the shared rules. The
-  optimizer's pricing URL check uses the same rules instead of its own.
+  and every shape it caught before is still caught. It tries 22 patterns
+  where 0.5.0 tried 7, so it is slower on text that holds no credential.
 - A `Bearer` token of 16 or more characters with a digit in it is found
   wherever it ends: mid-line (`Bearer <token> https://…`) or before a newline
-  in a multi-line string (`"Authorization: Bearer <token>\nmachine …"`).
-  Both were missed. A word without a digit after `Bearer`, followed by more
-  text, is still read as prose and left alone.
-- A string of near misses for `Bearer` or `Basic` in one letter case
-  (`BEARER x` lines) is redacted in linear time; it took quadratic time.
+  (`"Authorization: Bearer <token>\nmachine …"`). Both were missed. A word
+  without a digit after `Bearer`, followed by more text, is still read as
+  prose and left alone.
+- Near misses for `Bearer` or `Basic` in one letter case (`BEARER x` lines)
+  are redacted in linear time; they took quadratic time.
+- `Imp.ExternalCommand` redacts captured output with the same rules, in
+  place of its own `sk-` and `Bearer` patterns: output that holds a
+  credential is `"[REDACTED]"` whole, so the credentials printed beside a
+  recognized one (`env | grep AWS`, a credentials file) go with it. A
+  `Bearer` token of 12 to 15 characters, or one with no digit, followed by
+  more text or a newline is shown, where 0.5.0's own `Bearer` pattern hid any
+  such token of 12 or more characters. The optimizer's pricing URL check uses
+  the same rules instead of its own.
+- Writers redact a term before converting it: optimizer reports
+  (`Imp.Optimizer.Report.dump/1`, `json_safe/1`, `json_projection/1`),
+  experiment results, `Imp.Evaluate.Result.save_as_json/2` and
+  `save_as_csv/2`, BetterTogether's bootstrap diagnostics, optimizer artifact
+  candidates, GRPO session checkpoints, Optimize Anything results, ACP session
+  records and saved programs (a Predict's demos and metadata, KNN examples,
+  memory retriever documents). They converted first, so a client, retriever
+  or MCP OAuth store in them was written with its header values, URL query
+  secrets or store key, and a secret in a map key that is a tuple, a list or
+  a struct was written as it was. `Imp.Redaction.drop_credentials/1` redacts
+  such structs too. The SIMBA, MIPROv2, InferRules and random-search
+  checkpoints redact their failure reasons; the instructions, demos and scores
+  a resumed run continues from are kept as they are. Output that holds no
+  secret is unchanged.
+- `Imp.Redaction.redact/2` hides a connection struct's header values and the
+  query, fragment and user info of its URLs, as `inspect/1` already did:
+  `Imp.Clients.ReqLLM`, `Imp.Retrievers.HTTP`, `Imp.Tracking.MLflow`,
+  `Imp.Tracking.WandB`, `Imp.Optimize.Anything.Config.Tracking`,
+  `ExMCP.Client` and `ExMCP.Transport.HTTP`. A retriever in a tool result kept
+  an `X-Subscription-Token` header, a cookie and a `?key=` URL in
+  `render_inspection/2`, run-event JSON and ATIF.
+- `Imp.Redaction.redact/2` redacts the secrets in `Imp.MCP.OAuth.Store` (the
+  derived key), `Imp.MCP.OAuth.Pending` (the authorization URL and `state`)
+  and `Imp.MCP.OAuth.Flow` (the authorization URL, PKCE transaction and
+  registered client), keeping each struct and its other fields. They were
+  walked as plain maps, so the store's key reached any redacted output that
+  held a store. `code_verifier` is a credential name, so a PKCE transaction
+  map is redacted on its own too.
+- An error about a devset, evaluation row, field entry or demo that is not
+  an example names its type and key names, never its values.
+- A map key that is a string shaped like a credential is redacted.
+  `Imp.Optimizer.Trajectory` names a key it refuses (one that is not an atom
+  or a string) by its type; it printed the key, credential included.
+- The `ReqLLM.Error.API.Request` inside an `Imp.LMError` from
+  `Imp.Clients.ReqLLM` carries at most one response header, `retry-after`.
+  Any other header ReqLLM left on the error is removed, so cookies, account
+  identifiers and request ids no longer reach logs, checkpoints or run events
+  through `inspect/1` of the error.
+- An ACP session store redacts the history and transcript it writes, except
+  the provider's `reasoning_content` and `reasoning_details`. A resumed
+  session therefore replays a user message or tool result that held a
+  credential as `"[REDACTED]"`, both to the client and in the model's
+  history. The session's `_meta` is stored as sent; Imp never reads it.
+- A two-element list with a name first is a key and its value only when it is
+  an element of a list, as JSON writes config, headers and tool results
+  (`[["api_key", key], ["model", "gpt"]]`); held directly as a field or map
+  value, it is data. Saving and `Imp.Redaction.drop_credentials/1` read every
+  such list as a pair, so a saved program whose example had an input named
+  like a credential (`with_inputs([:api_key, :question])`), or whose metadata
+  held such a list, did not load back as it was; `Imp.Redaction.redact/1`
+  rewrote an Avatar tool schema's `"required" => ["api_key", "query"]`; and
+  `Imp.Optimizer.Parameter` refused input keys `["api_key", "question"]`. One
+  divergence from 0.5.0 follows: a flat two-element name-first list that is
+  not itself an element of a list (at the top level, in a tuple, or under a
+  key that is not a credential name), such as `["password", "hunter2"]`, is
+  not redacted, since it has the shape of a list of two names.
 
 ### Changed
 
 - Breaking: `Imp.Observability.Status` has a new state,
-  `:succeeded_with_errors`, and `Imp.Observability.status/1` gives it for
-  every optimizer report whose `errors` is not empty, from any optimizer,
-  where it gave `:failed`: an optimizer that returned a report returned a
-  program. Code that matches every `Status` state adds the new one; code that
-  treated `:failed` as "the report has errors" matches
-  `:succeeded_with_errors`.
-- Breaking: `Imp.collect/3` now returns `{:ok, prediction}` or
-  `{:error, reason}`, as `Imp.call/2` does, instead of a string. The string
-  joined the values of every output field with no separator, so
-  `question -> reasoning, answer` collected as `"Because.Paris"`. Code that
-  matched a string reads the field from the prediction instead:
+  `:succeeded_with_errors`, and `Imp.Observability.status/1` gives it, where
+  it gave `:failed`, for every optimizer report whose `errors` is not empty:
+  an optimizer that returned a report returned a program. Migration: code that
+  matches every `Status` state adds the new one; code that treated `:failed`
+  as "the report has errors" matches `:succeeded_with_errors`.
+- Breaking: `Imp.collect/3` returns `{:ok, prediction}` or
+  `{:error, reason}`, as `Imp.call/2` does, instead of a string that joined
+  every output field's value with no separator (`question -> reasoning,
+  answer` collected as `"Because.Paris"`). Migration:
   `{:ok, prediction} = Imp.collect(program, inputs)`, then
   `Imp.get(prediction, :answer)`.
-- Breaking: an `Imp.Predict.ReActV2` turn that could not get a model response
-  returns `{:error, %Imp.Predict.ReActV2.StepError{}}`, where it returned
+- Breaking: an `Imp.Predict.ReActV2` turn whose last request (made after a
+  step failed or the turn was interrupted) also fails returns
+  `{:error, %Imp.Predict.ReActV2.StepError{}}`, where it returned
   `{:ok, prediction}` with no outputs and `termination_reason: :incomplete`.
-  That is a turn whose last request, after a step failed or the turn was
-  interrupted, failed too: the LM returned an `Imp.LMError`, its client raised
-  (`{:lm_failed, client, exception}`), or a renderer raised
-  (`{:adapter_format_failed, adapter, exception}`). The error's `:reason` is
-  that request's error unchanged, which `Imp.Errors.retryable?/1` and
-  `Imp.Errors.context_window_exceeded?/1` read through the struct, and its
-  `:history` is the turn's `Imp.History` as far as it got, the value the
-  incomplete prediction carried in its `:history` metadata, with every tool
-  call that ran and its result. A step that fails and whose last request is
-  answered still ends `:last_text`, `:forced_submit` or `:extracted`, and
-  `:incomplete` is kept for a turn whose last request was answered without a
-  valid answer, or that ran out of time or context window. `Imp.ACP` saves the
-  history of such a turn to its session before failing the turn. Migration:
-  match `{:error, %Imp.Predict.ReActV2.StepError{reason: reason, history:
-  history}}` where you checked `Imp.Prediction.complete?/1` after a model
-  failure, and store `history` as you store a finished turn's.
-  `Imp.Errors.retryable?/1` on it says whether the last model request may be
-  sent again, not the turn: its tools have run. Inspecting it shows the reason
-  and the history's size, not the history.
+  `:reason` is that request's error unchanged: an `Imp.LMError`,
+  `{:lm_failed, client, exception}` or
+  `{:adapter_format_failed, adapter, exception}`, which
+  `Imp.Errors.retryable?/1` and `context_window_exceeded?/1` read through the
+  struct. `retryable?/1` says whether the last model request may be sent
+  again, not the turn: its tools have run. `:history` is the turn's
+  `Imp.History` as far as it got, with every tool call that ran and its
+  result; inspecting the error shows the history's size, not the history.
+  A turn whose last request is answered still ends `:last_text`,
+  `:forced_submit` or `:extracted`, and `:incomplete` is kept for one answered
+  without a valid answer or out of time or context window. `Imp.ACP` saves
+  the history to its session before failing the turn. Migration: where you
+  checked `Imp.Prediction.complete?/1` after a model failure, match
+  `{:error, %Imp.Predict.ReActV2.StepError{reason: reason, history:
+  history}}` and store `history` as you store a finished turn's.
 - Breaking: an `Imp.Predict.ReActV2` step refused by an
-  `Imp.OperationalSafetyError` (a route, cost, transport or budget guard) ends
-  the turn at once with that error as the `StepError`'s `:reason`. It made the
-  turn's last request instead, and an answer to that request ended the turn
-  `:last_text` or `:forced_submit`, passing the guard by. Migration: none for
-  a caller that already treats safety errors as fatal; `Imp.Evaluate` and the
-  optimizers find the guard inside the `StepError` and raise it.
+  `Imp.OperationalSafetyError` (a route, cost, transport, budget or
+  cancellation guard) ends the turn at once with a `StepError` whose `:reason`
+  is that error. The turn made its last request instead, and an answer to it
+  passed the guard by. `Imp.Evaluate` and the optimizers find the guard inside
+  the `StepError` and raise it. Migration: where you call the program
+  yourself, match `{:error, %Imp.Predict.ReActV2.StepError{reason:
+  %Imp.OperationalSafetyError{}}}`.
+- Breaking: an `Imp.react` task signature cannot have a field named `tools`,
+  which is now the step's tool list, and loading a program saved with one
+  raises the same `ArgumentError`. Migration: rebuild the program with the
+  field renamed and save it; to keep a saved program's optimized instructions
+  and demos, rename the field in the saved file, or optimize again.
+- Breaking: `Imp.Clients.ReqLLM` has a `:tool_calling` field: whether the
+  model calls tools natively, read from the registry once when the client is
+  built or loaded, and kept with the model it was read for. A client whose
+  model is swapped looks the new model up. A client built by `Imp.req_llm/2`,
+  or loaded, therefore no longer equals a bare `%Imp.Clients.ReqLLM{}` for the
+  same model. Likewise `%Imp.Predict.ReActV2{}` has a `:tool_order` field,
+  the tools' declared order. Migration: compare clients by `model`, not by
+  the whole struct.
+- Breaking: in `Imp.Adapter.Chat`, `Imp.Adapter.JSON` and `Imp.Adapter.XML`,
+  a reply that answers none of the requested outputs (no
+  `[[ ## field ## ]]` section, no output key, no output tag) is an
+  `Imp.AdapterParseError` of kind `:missing_fields` naming every output, so
+  the JSON fallback or a retry runs. When every output was optional or
+  defaulted, as a ReActV2 step's are, such a reply parsed as defaults and
+  `nil`s, so an XML agent given prose finished with `answer: nil`. DSPy 3.3.1
+  fills defaults there; Imp does not. For a signature that names an output in
+  `metadata[:text_field]`, Chat and XML read prose as that field (so a
+  ReActV2 step's prose under XML is its `next_thought`), and a blank
+  completion, the one exemption, as a step that said nothing. A reply that
+  writes fields in some format (a JSON object with an output's key, a
+  `[[ ## field ## ]]` line, an output's tag) is not prose: Chat and XML parse
+  it or report it, so a step that spelled out a tool call as JSON runs that
+  tool instead of answering with the JSON text. So a step whose prose quotes
+  its own field names goes to the JSON fallback, which usually costs one more
+  call; beside native tool calls such a thought becomes `nil`, and the calls
+  still run. A JSON `{}` for a ReActV2
+  step is `:missing_fields`, where it was a step with `nil` fields.
+  `Imp.Predict.ProgramOfThought`, whose outputs are all optional, sends prose
+  to the JSON fallback instead of regenerating with a missing-program error.
+  Migration: match `%Imp.AdapterParseError{kind: :missing_fields}` where you
+  relied on a prediction of defaults, or on ProgramOfThought's
+  `:missing_program`, for a reply that answered nothing.
+- Breaking: `Imp.Clients.ReqLLMBatch` never sends a request again when it may
+  already have run. A dispatch that timed out, crashed, threw or exited was
+  retried as transient, so one request could run and be billed several times;
+  it is now `:ambiguous` and final, and a dispatcher may return
+  `{:ambiguous, reason}` itself. `req_llm_dispatcher/2` makes every call with
+  `max_retries: 0` (ReqLLM's own retry step could send a request four times in
+  one batch attempt); retries only a request that never reached the provider
+  (connection refused, or no pooled connection free, as Req reports it) or
+  that the provider answered with 408, 425, 429, 503 or 529; treats any other
+  4xx as terminal; and treats any other 5xx, and a timeout or closed
+  connection with no response, as `:ambiguous`, where a 5xx was retried. On
+  resume, a checkpoint written by 0.5.0 is rewritten at schema version 2 and
+  its `:transient_failure` requests become `:ambiguous`, since 0.5.0 recorded
+  timeouts and dispatcher crashes that way, and a `schema_migration` event
+  records each. Migration: check an `:ambiguous`
+  request with the provider before sending it again.
+- Breaking: an MCP call the server answers with HTTP 503 or 529 is
+  `:refused`, like a 429, where it was `:unknown`: RFC 9110 defines 503 as the
+  server being unable to handle the request, and providers answer overload
+  with 503 or 529. MCP calls and `Imp.Clients.ReqLLMBatch` read a status the
+  same way. Migration: code that treated a 503 or 529 as possibly run
+  matches `:refused` for them.
+- Breaking: `Imp.Datasets.csv/3` parses RFC 4180 CSV with NimbleCSV, a new
+  dependency (`nimble_csv ~> 1.3`); it raised `FunctionClauseError` on any
+  quoted field and could not read a quoted line break. A line break may be
+  CRLF, LF or a bare CR, and a leading byte order mark is dropped, where it was
+  read into the first column's name. A blank line is skipped, but a `""` line
+  is a row with one empty value, so a file with more than one column refuses
+  it (`invalid CSV row at <path>:<line>: expected N fields, got 1`). A
+  malformed file raises `Imp.Datasets.Error` naming the line its record starts
+  on, with that record's first 200 characters as `record`. Some files 0.5.0
+  loaded are refused:
+  - a quote inside an unquoted field, such as an inch mark (`12" pipe,1`):
+    `invalid CSV at <path>:<line>: a quote opened on this line is never
+    closed`, or, when the line holds two (`12" by 3" board,1`),
+    `invalid CSV at <path>:<line>: unexpected escape character " in "..."`.
+  - a space between a comma and a quoted field (`x, "y"`):
+    `invalid CSV at <path>:<line>: unexpected escape character " in "..."`.
+  Migration: quote the whole field and double the quotes inside it
+  (`"12"" pipe",1`), or remove the space.
+- Breaking: `Imp.Example.inputs/1` and `labels/1` raise `ArgumentError` when
+  the example never declared its inputs, as DSPy raises `ValueError`. They
+  returned every field as inputs, labels included, so a program was given the
+  answer and scored on it. `Imp.evaluate/4`, `Imp.Evaluate.run/2`,
+  `Imp.Experiment.Data.new/1` and every optimizer that runs a program on
+  examples check each dataset before any model call, and the error names the
+  function, the dataset and the row. To check it, `Imp.Evaluate`, MIPROv2,
+  `Imp.Optimizer.InstructionSearch` and `Imp.Optimizer.SignatureOptimizer`
+  read a lazy dataset once and hold it in memory, so a one-shot stream is no
+  longer found empty on a second pass (every InstructionSearch candidate
+  scored 0.0 on one). Migration: call `Imp.with_inputs/2` on every example
+  you evaluate or optimize on.
+- Breaking: `Imp.Evaluate` and `Imp.Experiment.Data` refuse a row that is a
+  plain map or a field pair list, which cannot declare its inputs; Evaluate
+  turned it into an example whose labels reached the program. Migration:
+  build the row with `Imp.example/1 |> Imp.with_inputs(...)`.
+- Breaking: `Imp.Example.new/1` and `Imp.Prediction.new/2` raise when a field
+  is given twice, as an atom and a string or as a repeated key; one value was
+  silently dropped. Migration: give each field once, under one spelling.
+- Breaking: `Imp.Signature.new/2` (and `Imp.signature/2`) applies new
+  instructions to an existing signature; it returned the signature unchanged.
+  Migration: to keep a signature's instructions, pass it without
+  instructions.
+- Breaking: a GEPA run that continued past failed proposals reports them, so
+  it reports `status: :with_errors` where it reported `:ok` with no errors.
+  Each failure is an entry in `report.errors` with its `iteration`, its
+  `diagnostics` and its `candidate_id` (the rejected candidate in
+  `candidates`, or `nil` when the failure left none there);
+  `metadata.failed_proposals` counts them. With `raise_on_exception: false`
+  that is any failure: a reflection call, reflection strategy, evaluation or
+  validation that raised, threw or exited, or an iteration that did. With the
+  default, `true`, it is the failures GEPA already recorded and went on from:
+  a reflection that returned no usable instruction, a failed reflective
+  dataset in a parallel slot, and a reflection interrupted before a resume.
+  The program returned is still the best candidate found, the baseline when
+  every proposal failed, as DSPy's GEPA returns it. A slot cancelled because
+  a sibling failed first is rejected, not counted as failed. Migration: code
+  that checked `status == :ok` reads `report.errors`.
+- Breaking: under GEPA's `execution_profile: :beam_native` with
+  `raise_on_exception: false`, an iteration that raised is recorded as a
+  rejection with a `{:proposal_error, reason}` reason, so
+  `Stopper.consecutive_outcome/2` counts it as `:proposal_error`, as the
+  default profile already did, where it counted `:none`. When evaluating the
+  first two proposals raises and the third solves the task,
+  `consecutive_outcome(:proposal_error, 2)` now stops after two iterations
+  with the baseline, where the run went on and returned the solving
+  candidate, and `consecutive_outcome(:none, 2)` no longer stops it after the
+  first. An iteration that threw or exited, which crashed the run, is recorded
+  the same way.
+  Migration: review stoppers built on `consecutive_outcome(:none, _)` or
+  `(:proposal_error, _)` for `:beam_native` runs.
 - `Imp.Clients.ReqLLM` marks `context_window_exceeded` on more providers'
   length refusals, streamed or not: Anthropic's "prompt is too long: N tokens
   > M maximum" and "input length and `max_tokens` exceed context limit",
@@ -89,89 +280,33 @@ User-visible changes to Imp are recorded here.
   non-streamed `context_length_exceeded` was marked, so the others failed the
   call instead of letting `Imp.Predict.ReActV2` leave out older episodes or
   end the turn `:incomplete`.
+- Imp 0.5.0 cannot read some files this release writes:
+  - a trajectory with a map that has an atom key, which GEPA checkpoints,
+    Playbook checkpoints and `Imp.dump/1` write through
+    `Imp.Optimizer.Trajectory`;
+  - an optimizer report (`Imp.Optimizer.Report.encode_term/1`, `dump/1`)
+    that holds an `Imp.History`, now written under a `"history"` tag where it
+    was a plain map;
+  - an `Imp.Clients.ReqLLMBatch` checkpoint, now at schema version 2.
 - Imp declares the dependencies whose modules it names, which reached it only
   through its other dependencies: `finch` `~> 0.21` (`Imp.Clients.ReqLLM`
   matches its error structs) and `decimal` `~> 2.0 or ~> 3.0` as an optional
   dependency (`Imp.Core` reads a reported cost given as a `Decimal`). It
   declares `plug` and `plug_cowboy` with `runtime: false` for the demo MCP
   servers, which the package leaves out: Imp starts neither, and no Imp code
-  that ships uses them. It declares `mint` `~> 1.11` (see Security). Of these,
-  only `mint` moves an existing lock: an application that locked `mint` below
-  1.11.0 moves to 1.11.0 on `mix deps.get`. The other requirements are ones
-  Req and ExMCP already set (ExMCP requires `decimal` `~> 3.0`), so an
-  application resolves no new package and keeps the versions it has.
+  that ships uses them. It declares `mint` `~> 1.8`, since it matches Mint's
+  error structs to tell a request that was never sent from one that may have
+  run. Every one of these requirements is one Finch, Req or ExMCP already set
+  (ExMCP requires `decimal` `~> 3.0`), so none moves an application's lock.
 - Imp no longer depends on `jsv`, which nothing in Imp uses. ReqLLM still
   requires it.
 
 ### Fixed
 
-- Optimizer reports (`Imp.Optimizer.Report.dump/1`, `json_safe/1`,
-  `json_projection/1`), experiment results, `Imp.Evaluate.Result.save_as_json/2`
-  and `save_as_csv/2`, BetterTogether's bootstrap diagnostics, optimizer
-  artifact candidates, GRPO session checkpoints, Optimize Anything results,
-  ACP session records and saved programs (a Predict's demos and metadata, KNN
-  examples, memory retriever documents) redact a term before converting it.
-  They converted first, so a client, retriever or MCP OAuth store in them was
-  written with its header values, URL query secrets or store key, and a
-  secret in a map key that is a tuple, a list or a struct was written as it
-  was. The SIMBA, MIPROv2, InferRules and random-search checkpoints redact
-  their failure reasons the same way; the instructions, demos and scores a
-  resumed run continues from are kept. `Imp.Redaction.drop_credentials/1`
-  redacts such structs too. Output that holds no secret is unchanged.
-- An ACP session store redacts the history and transcript it writes, except
-  the provider's `reasoning_content` and `reasoning_details`. A resumed session
-  therefore replays a user message or tool result that held a credential as
-  `"[REDACTED]"`, both to the client and in the model's history. The session's
-  `_meta` is stored as sent; Imp never reads it.
-- A saved program whose example has an input named like a credential
-  (`with_inputs([:api_key, :question])`), or whose metadata holds such a list,
-  loads back as it was. Saving and `Imp.Redaction.drop_credentials/1` read
-  every two-element list whose first item was a name as a key and its value,
-  and replaced or dropped the second item. A two-element list with a name
-  first is now a pair when it is an element of a list, as JSON writes config,
-  headers and tool results (`[["api_key", key], ["model", "gpt"]]`); held
-  directly as a field or map value, it is data. This also stops
-  `Imp.Redaction.redact/1` from rewriting an Avatar tool schema's
-  `"required" => ["api_key", "query"]` and `Imp.Optimizer.Parameter` from
-  refusing input keys `["api_key", "question"]`. One divergence from 0.5.0
-  follows: a flat `["api_key", key]` held directly as a value, under a key
-  that is not itself a credential name, is not redacted, since it has the
-  shape of a list of two names.
-- A map key that is a string shaped like a credential is redacted.
-  `Imp.Optimizer.Trajectory` names a key it refuses (one that is not an atom
-  or a string) by its type; it printed the key, credential included.
-- `Imp.Optimizer.Report.load!/1` and `Imp.Optimizer.GRPO.Checkpoint.load!/1`
-  read the `"[REDACTED]"` atom marker in a VM that has not loaded
-  `Imp.Redaction`, and a MIPROv2 checkpoint resumes in a fresh VM: its loader
-  loads the modules whose atoms it decodes. It failed with "not an already
-  existing atom".
-- A reply that answers none of the requested outputs is a parse error in
-  `Imp.Adapter.Chat`, `Imp.Adapter.JSON` and `Imp.Adapter.XML`: an
-  `Imp.AdapterParseError` of kind `:missing_fields` naming every output, so
-  the JSON fallback or a retry runs. For Chat that is a completion with no
-  `[[ ## field ## ]]` section for any output, for JSON an object with none of
-  the output keys, and for XML a reply with none of the output tags (prose, a
-  JSON object, the other adapters' markers). Such a reply parsed as a
-  prediction of defaults and `nil`s when every output was optional or
-  defaulted, as a ReActV2 step's are, so an XML agent given prose finished
-  with `answer: nil`. DSPy 3.3.1 fills defaults there; Imp does not.
-  For a signature that names an output in `metadata[:text_field]`, Chat and
-  XML read prose as that field and a blank completion as a step that said
-  nothing; the blank completion is the only reply exempt from the rule. So a
-  ReActV2 step's prose under XML is its `next_thought`. A reply that writes
-  the fields in some format (a JSON object with an output's key, a
-  `[[ ## field ## ]]` line, an output's tag) is not prose: Chat and XML parse
-  it in their own format or report it, and the JSON fallback reads it, so a
-  step that spelled out a tool call as JSON runs that tool instead of ending
-  with the JSON text as its answer. A JSON `{}` for a ReActV2 step, under
-  `Imp.Adapter.JSON` or in the fallback, is now `:missing_fields` where it was
-  a step with `nil` fields. `Imp.Predict.ProgramOfThought`, whose outputs are
-  all optional, now sends a prose reply to the JSON fallback instead of
-  regenerating with a missing-program error.
 - `Imp.inspect_history/2` renders any history. A turn holding a term JSON has
   no encoding for, such as the `{:error, {:unknown_tool, name}}` result a
   ReActV2 history keeps for a call to a tool that does not exist, raised
-  `Protocol.UndefinedError`. Turns now render through the same conversion
+  `Protocol.UndefinedError`. Turns render through the conversion
   `Imp.Observability.render_inspection/2` uses: tuples become lists, structs
   become maps, and pids, references and functions become their `inspect/1`
   text. Redaction runs first, as before.
@@ -184,109 +319,69 @@ User-visible changes to Imp are recorded here.
   `Imp.Trajectory.to_atif/2`, which returned the raw bytes, so encoding their
   result raised. Output for values without such binaries is unchanged, and a
   request's `tools_hash` is identical.
-- `Imp.Redaction.redact/2` redacts the secrets in `Imp.MCP.OAuth.Store` (the
-  derived key), `Imp.MCP.OAuth.Pending` (the authorization URL and `state`)
-  and `Imp.MCP.OAuth.Flow` (the authorization URL, PKCE transaction and
-  registered client), keeping each struct and its other fields. They were
-  walked as plain maps, whose field names are not credential names, so the
-  store's key reached any redacted output that held a store. `code_verifier`
-  is a credential name, so a PKCE transaction map is redacted on its own too.
-- `Imp.Redaction.redact/2` hides a connection struct's header values and the
-  query, fragment and user info of its URLs, as `inspect/1` already did:
-  `Imp.Clients.ReqLLM`, `Imp.Retrievers.HTTP`, `Imp.Tracking.MLflow`,
-  `Imp.Tracking.WandB`, `Imp.Optimize.Anything.Config.Tracking`,
-  `ExMCP.Client` and `ExMCP.Transport.HTTP`. A retriever in a tool result kept
-  an `X-Subscription-Token` header, a cookie and a `?key=` URL in
-  `render_inspection/2`, run-event JSON and ATIF.
 - A call streamed with `Imp.stream(program, inputs, provider_stream: true)`
   is recorded in its run like any other model call: a `:model_request` event
   with the request's `:purpose`, and a `:model_response` event with the usage
   and cost the provider reported. It recorded neither, so a streamed turn left
-  no model record, no cost and no ATIF model step.
-- A model turn that says something and calls tools keeps what it said. Through
+  no model record, no cost and no ATIF model step. A `stream/3` that raises
+  before returning a stream is recorded too and returns
+  `{:error, {:lm_failed, lm, error}}`, as a raising `generate/3` does.
+- A model turn that says something and calls tools keeps both. Through
   `Imp.req_llm/2` the text was dropped whenever the reply had tool calls, so a
   ReActV2 step's `next_thought` was empty; streamed with `provider_stream:
   true`, the text was kept but the tool calls were lost, all of them when text
-  arrived and all but the last otherwise. Both now return the text and every
-  tool call, and the adapter reads the text as it reads a text reply, into
-  `next_thought` for ReActV2, as DSPy does. So when a ReActV2 run reaches
-  `max_iters` and its last reply has text beside tool calls it did not run,
-  that text is now the answer, where the answer was `nil`; the calls are still
-  listed as unexecuted. The text also appears in history turns and in the ATIF
-  model step.
-- An Avatar tool ends with its caller. Its task kept running after the
-  caller was killed, after `Imp.Run.cancel/3` and after the run's owner died;
-  it now ends when the caller does. It still runs unlinked, so a crash is an
-  observation, and takes no place in the task pool. It sees the caller's
-  `Imp.context/2` settings, run context and deadline, which it did not, and
-  parallel work it starts runs on the caller's place in the pool when the
-  caller has one. A tool that timed out, or whose task exited, reads as
-  `:unknown` in `Imp.Tool.outcome/1` rather than `:result`, since it may have
-  acted.
-  Inside a run, Avatar records each tool call as `:tool_call` and
-  `:tool_result` events with `metadata.outcome`, and arguments that fail the
-  tool's schema are refused before the tool starts.
-- An RLM call made outside a run no longer leaves its model or tool call
-  running, holding a place in the task pool, when the calling process is
-  killed. An RLM call no longer leaves the pool place of one of its own tasks
-  recorded in the calling process, which made parallel work that process
-  started afterwards (`Imp.Predict.Parallel.map/3`, `Imp.Evaluate.run/2`) run
-  one item at a time.
-- The package ships the TRL worker that `Imp.Clients.TRLTrainer` starts by
-  default: `priv/trl_worker/worker.py`, its `pyproject.toml` and `uv.lock`, and
-  the default contract. In 0.5.0 the defaults named files the package did not
-  contain, so GRPO training from Hex needed a source checkout. The default
-  contract now pins transformers 5.10.1, the version the lockfile installs; it
-  named 5.5.0, which the worker refused at startup.
-- An `Imp.react` step asks for one thing, whichever adapter formats it. With
-  an LM that calls tools natively, the tools are sent natively and the step's
-  prompt no longer also describes `tool_calls` as a field to write, in the
-  Chat, JSON and XML adapters, their demos and the JSON fallback: the step
-  output that native calls fill is left out before any adapter formats, as
-  DSPy does. A model that followed that description wrote a JSON object, and
-  for a signature with one text output the object became the answer. An LM
-  whose client says it cannot call tools (a ReqLLM model the registry lists
-  without tool calling, `Imp.Clients.TRLLM`) is sent no tools and asked to
-  write its calls in `tool_calls`, whose description shows the shape of a
-  call with an example. A `tools` input lists every tool, `submit` included,
-  in DSPy's words: its name, its description, and its arguments as JSON (the
-  schema's properties, its `required` list and its `$defs`; the properties in
-  the schema's order when it keeps one, a `Jason.OrderedObject`, and by name
-  for an ordinary map). Its earlier steps are replayed as text rather than as tool blocks
-  a provider without declared tools may refuse. A task signature can no
-  longer have a field named `tools`, and loading a program saved with one is
-  refused with the same error. `Imp.Clients.ReqLLM` reads whether the model
-  calls tools from the registry once, when the client is built, and keeps it
-  with the model it was read for (`:tool_calling`); a client whose model is
-  swapped looks the new model up. So a client built by `Imp.req_llm/2`, or
-  loaded, no longer equals a bare `%Imp.Clients.ReqLLM{}` for the same model. The guidance says where a text answer
-  goes, the same in every format: in `next_thought`, with `tool_calls` left
-  empty when the model writes its calls. It no longer asks for plain text
-  beside a structure that asks for fields; a plain-text reply to a Chat step
-  is still read as the answer. A stored turn that carries only
-  the task's answer is replayed as that answer, not as step fields marked
-  "Not supplied"; it is replayed by the adapter itself, so a host
-  `:output_renderer` is not consulted for it. `Imp.LM.Budgeted` and BootstrapFewShot's rollout LM answer
-  for the LM they wrap, for this and for reasoning and response-format
-  support.
-- `Imp.react` sends its tool roster in the order the tools were declared, then
-  `submit`, and a saved agent keeps that order. It was the order of the tool
-  names' atoms, which can differ between processes and changed the prompt a
-  provider caches.
+  arrived and all but the last otherwise. The raw LM output for such a reply
+  is `%{text: text, tool_calls: calls}` (`:text` only when it is not blank),
+  unstreamed and streamed. Keeping the text is what DSPy does; the adapter
+  then reads it as it reads a text reply, into `next_thought` for ReActV2,
+  where DSPy's Chat adapter leaves the field empty. So when a
+  ReActV2 run reaches `max_iters` and its last reply has text beside tool
+  calls it did not run, that text is now the answer, where the answer was
+  `nil`; the calls are still listed as unexecuted. The text also appears in
+  history turns and in the ATIF model step.
+- An `Imp.react` step asks for one thing, whichever adapter formats it, as
+  DSPy's does. With an LM that calls tools natively, the tools are sent
+  natively and the prompt (Chat, JSON or XML, their demos and the JSON
+  fallback) no longer also describes `tool_calls` as a field to write; a model
+  that followed that description wrote a JSON object, which for a signature
+  with one text output became the answer. An LM whose client says it cannot
+  call tools (a ReqLLM model the registry lists without tool calling,
+  `Imp.Clients.TRLLM`) is sent no tools. Its step has a `tools` input listing
+  every tool, `submit` included, in DSPy's words: name, description, and
+  arguments as JSON (the schema's properties, in its order when it is a
+  `Jason.OrderedObject` and by name otherwise, its `required` list and its
+  `$defs`). It writes its calls in `tool_calls`, whose description shows a
+  call's shape with an example, and its earlier steps are replayed as text,
+  not as tool blocks a provider without declared tools may refuse. The
+  guidance says the same in every format: a text answer goes in
+  `next_thought`, with `tool_calls` left empty when the model writes its
+  calls. It no longer asks for plain text beside a structure that asks for
+  fields; a plain-text reply to a Chat step is still read as the answer. A
+  stored turn that carries only the task's answer is replayed as that answer,
+  not as step fields marked "Not supplied", by the adapter itself, so a host
+  `:output_renderer` is not consulted for it. `Imp.LM.Budgeted` and
+  BootstrapFewShot's rollout LM answer for the LM they wrap, for tool calling
+  as for reasoning and response-format support.
+- `Imp.react` sends its tool roster in declared order, then `submit`, and a
+  saved agent keeps that order. It was the order of the tool names' atoms,
+  which can differ between runs of the VM and changed the prompt a provider
+  caches.
 - The JSON fallback after an unparseable Chat or XML reply sends the same
   request in JSON: the program's `adapter_opts` renderers (`:system_renderer`,
-  `:output_renderer`), an agent loop's guidance and the demos go with it.
-  Before, it sent the stock JSON prompt, so a host that shapes its prompt with
-  renderers got a different prompt on every fallback, and an `Imp.react` step
-  lost its tool guidance. `Imp.Adapter.JSON` and `Imp.Adapter.XML` now honor
+  `:output_renderer`), an agent loop's guidance and the demos go with it. It
+  sent the stock JSON prompt, so a host that shapes its prompt with renderers
+  got a different prompt on every fallback, and an `Imp.react` step lost its
+  tool guidance. `Imp.Adapter.JSON` and `Imp.Adapter.XML` honor
   `:system_renderer`, `:output_renderer` and `:guidance` whenever they are
   used, and end a request whose inputs are all in the history with the output
-  requirements as a user message of their own instead of appending them to the
-  last tool result. A renderer receives the formatting adapter's own
+  requirements as a user message of their own instead of appending them to
+  the last tool result. A renderer receives the formatting adapter's own
   rendering in its options, as `:default_system` and, for an
   `:output_renderer` that takes the options as a fourth argument,
   `:default_outputs`, so one that builds on the default builds on the format
-  of the request and a fallback never asks for two formats.
+  of the request. A renderer now shapes the JSON fallback and every JSON or
+  XML request; one that ignores its options sends a Chat-shaped prompt in the
+  fallback.
 - The `[:imp, :adapter, :parse, :json_fallback]` event names the adapter whose
   reply failed as `:adapter` (it always said `Imp.Adapter.Chat`, also for
   XML) and the adapter that retried as `:fallback_adapter`.
@@ -300,162 +395,84 @@ User-visible changes to Imp are recorded here.
   an Elixir string cannot hold, makes the parse an `Imp.AdapterParseError`.
   This reaches the Chat, JSON and XML adapters and GEPA's instruction
   proposal.
-- `Imp.Clients.ReqLLMBatch` no longer sends a request again when it may
-  already have run. A dispatch that timed out, crashed, threw or exited was
-  retried as transient, so one request could run and be billed several
-  times; it is now `:ambiguous` and final, as an uncommitted dispatch already
-  was on resume. A dispatcher may return `{:ambiguous, reason}` itself.
-  `req_llm_dispatcher/2`:
-  - makes every call with `max_retries: 0`. ReqLLM's own retry step resent a
-    timed-out or refused request up to three more times inside one batch
-    attempt, so a single attempt could send a request four times.
-  - retries only a request that never reached the provider (connection
-    refused, or no pooled connection free, as Req reports it) or that the
-    provider answered with 408, 425, 429, 503 or 529.
-  - treats any other 4xx as terminal.
-  - treats a 500, 502, 504 or any other 5xx but 503 and 529, and a timeout
-    or closed connection with no response, as `:ambiguous`. A 5xx was
-    retried.
-  Before a retry the batch waits: for the provider's `retry-after` (seconds
-  or an HTTP date) when it sent one, otherwise with exponential backoff and
-  jitter, capped by the new `:max_retry_wait` option (default 60 s). A
+- Before a retry, `Imp.Clients.ReqLLMBatch` waits for the provider's
+  `retry-after` (seconds, or an IMF-fixdate, RFC 850 or asctime date) when it
+  sent one, otherwise with exponential backoff and jitter capped by the new
+  `:max_retry_wait` option (default 60 s). `Imp.Clients.ReqLLM` keeps
+  `retry-after` on its errors for this; ReqLLM's own decoding dropped it. A
   waiting request takes no dispatch slot from the others. When the provider
   asks for longer than `:max_retry_wait`, or the wait would pass the
   `Imp.Deadline` in force, the request is not retried in that run: it stays
   `:transient_failure`, the summary is not `complete?`, and `resume/3`
   retries it. The checkpoint keeps the time each such request may be sent
-  again (`not_before`, UTC), and `resume/3` waits for it under the same
-  rules or stops the retry again without sending. `retry-after` may be an
-  IMF-fixdate, an RFC 850 date or an asctime date. A process that traps
-  exits and is stopped by its parent during the wait exits at once with the
-  parent's reason; a dispatch wave in progress is still waited for, up to
-  `:timeout`, and a process started with bare `spawn` has no parent to
-  listen for and sleeps uninterrupted.
-- The `ReqLLM.Error.API.Request` inside an `Imp.LMError` from
-  `Imp.Clients.ReqLLM` carries at most one response header, `retry-after`,
-  so the caller can wait before retrying (ReqLLM's own decoding dropped it).
-  Any other header ReqLLM left on the error is removed, so cookies, account
-  identifiers and request ids no longer reach logs, checkpoints or run
-  events through `inspect/1` of the error.
-  A checkpoint written by 0.5.0 is rewritten at schema version 2 on resume,
-  and its `:transient_failure` requests become `:ambiguous`, since 0.5.0
-  recorded timeouts and dispatcher crashes that way.
-- An MCP call the server answers with HTTP 503 or 529 is `:refused`, like a
-  429, where it was `:unknown`: RFC 9110 defines 503 as the server being
-  unable to handle the request, and providers answer overload with 503 or
-  529. MCP and language-model calls read a status the
-  same way.
-- `Imp.Datasets.csv/3` reads quoted fields. It raised `FunctionClauseError`
-  on any quoted field and could not read a quoted line break. It now parses
-  RFC 4180 CSV with NimbleCSV, a new dependency (`nimble_csv ~> 1.3`). A
-  line break may be CRLF, LF or a bare CR (as Excel for Mac writes), and a
-  leading byte order mark is dropped; it was read into the first column's
-  name. A blank line is skipped; a record holding only `""` is a row with
-  an empty value, so in a file with more than one column a `""` line is now
-  refused as `invalid CSV row at <path>:<line>: expected N fields, got 1`,
-  where 0.5.0 raised `FunctionClauseError` on it as on any quoted field. A malformed file raises `Imp.Datasets.Error` naming the line its
-  record starts on, with the start of that record (at most 200 characters)
-  as `record`. Some files 0.5.0 loaded are now refused:
-  - a quote inside an unquoted field, such as an inch mark (`12" pipe,1`):
-    `invalid CSV at <path>:<line>: a quote opened on this line is never
-    closed`, or, when the line holds two (`12" by 3" board,1`),
-    `invalid CSV at <path>:<line>: unexpected escape character " in "..."`.
-  - a space between a comma and a quoted field (`x, "y"`):
-    `invalid CSV at <path>:<line>: unexpected escape character " in "..."`.
-  Quote the whole field and double the quotes inside it (`"12"" pipe",1`),
-  or remove the space.
+  again (`not_before`, UTC) and records a `retry_stopped` event, and
+  `resume/3` waits for it under the same rules or stops the retry again
+  without sending. A process that traps exits and is
+  stopped by its parent during the wait exits at once with the parent's
+  reason; a dispatch wave in progress is still waited for, up to `:timeout`,
+  and a process started with bare `spawn` has no parent to listen for and
+  sleeps uninterrupted.
+- An Avatar tool ends with its caller. Its task kept running after the caller
+  was killed, after `Imp.Run.cancel/3` and after the run's owner died. It
+  still runs unlinked, so a crash is an observation, and takes no place in the
+  task pool. It sees the caller's `Imp.context/2` settings, run context and
+  deadline, which it did not, and parallel work it starts runs on the
+  caller's place in the pool when the caller has one. A tool that timed out,
+  or whose task exited, reads as `:unknown` in `Imp.Tool.outcome/1` rather
+  than `:result`, since it may have acted. Inside a run, Avatar records each
+  tool call as `:tool_call` and `:tool_result` events with
+  `metadata.outcome`, and arguments that fail the tool's schema are refused
+  before the tool starts.
+- An RLM call made outside a run no longer leaves its model or tool call
+  running, holding a place in the task pool, when the calling process is
+  killed. An RLM call no longer leaves the pool place of one of its own tasks
+  recorded in the calling process, which made parallel work that process
+  started afterwards (`Imp.Predict.Parallel.map/3`, `Imp.Evaluate.run/2`) run
+  one item at a time.
+- The package ships the TRL worker that `Imp.Clients.TRLTrainer` starts by
+  default: `priv/trl_worker/worker.py`, its `pyproject.toml` and `uv.lock`, and
+  the default contract. In 0.5.0 the defaults named files the package did not
+  contain, so GRPO training from Hex needed a source checkout. The default
+  contract pins transformers 5.10.1, the version the lockfile installs; it
+  named 5.5.0, which the worker refused at startup.
+- `Imp.Optimizer.Report.load!/1` and `Imp.Optimizer.GRPO.Checkpoint.load!/1`
+  read the `"[REDACTED]"` atom marker in a VM that has not loaded
+  `Imp.Redaction`, and a MIPROv2 checkpoint resumes in a fresh VM: its loader
+  loads the modules whose atoms it decodes. They failed with "not an already
+  existing atom".
 - `Imp.Evaluate.Result.save_as_csv/2` writes with the same CSV module that
   `Imp.Datasets.csv/3` reads with, so what it writes reads back unchanged.
   The bytes it writes are the same as before.
+- A signature field written as `nil`, `true` or `false` keeps that name as
+  text, so `"nil: string -> a"` saves and loads with a field named `"nil"`.
+  The name became the atom `nil`, which saved as `""`. A field given the atom
+  `nil`, `true` or `false` as its name raises `ArgumentError`.
 - An instruction an optimizer sets on `Imp.Predict.ProgramOfThought` or
   `Imp.Predict.CodeAct` reaches the extraction step, which kept the old
-  instructions when GEPA, MIPROv2, COPRO, SIMBA or InferRules set it.
+  instructions when GEPA, MIPROv2, COPRO, SIMBA or InferRules set it, and such
+  a program saves and loads: `Imp.Saving.load!/1` raised "saved
+  ProgramOfThought planner instructions must match task instructions".
   `Imp.Optimizer.InstructionSearch` sets instructions the same way.
-- A ProgramOfThought or CodeAct whose instruction an optimizer set saves and
-  loads. `Imp.Saving.load!/1` raised "saved ProgramOfThought planner
-  instructions must match task instructions" for it.
-
-### Examples and datasets
-
-Every change here is breaking for code that relied on the old behaviour.
-
-- `Imp.Example.inputs/1` and `labels/1` raise `ArgumentError` when the example
-  never declared its inputs, as DSPy raises `ValueError`. They returned every
-  field as inputs, labels included, so a program was given the answer and
-  scored on it. `Imp.evaluate/4`, `Imp.Evaluate.run/2`,
-  `Imp.Experiment.Data.new/1` and every optimizer that runs a program on
-  examples check each dataset before any model call, and the error names the
-  function, the dataset and the row. Migration: call `Imp.with_inputs/2` on
-  every example you evaluate or optimize on.
-- `Imp.Evaluate` and `Imp.Experiment.Data` refuse a row that is a plain map or
-  a field pair list, which cannot declare its inputs; Evaluate turned it into
-  an example whose labels reached the program. Migration: build the row with
-  `Imp.example/1 |> Imp.with_inputs(...)`.
-- `Imp.Example.new/1` and `Imp.Prediction.new/2` raise when a field is given
-  twice, as an atom and a string or as a repeated key; one value was silently
-  dropped. Migration: give each field once, under one spelling.
-- `Imp.Signature.new/2` (and `Imp.signature/2`) applies new instructions to an
-  existing signature; it returned the signature unchanged. Migration: to keep
-  a signature's instructions, pass it without instructions.
-
-### Documentation
-
-- The install instructions ask for a C and a C++ compiler: jaxon builds native
-  code from C and erlexec from C++. They asked for a C++ compiler only. They
-  also say the first compile needs network access, for erlexec's rebar3
-  plugins.
-- The package's Changelog link opens the changelog on HexDocs, and the 0.4.0
-  entry links the benchmark pages as they were at v0.4.0, not on `main`.
-- Each Livebook's setup cell only installs Imp: from Hex, or from the
-  checkout `IMP_PATH` names. It no longer searches for a source checkout.
-- The MCP example on the Tools and agents page defines its server and its
-  imported tools, where it used an undefined `imported`, and closes the
-  server when the call fails.
+- `examples/deployment/agent_optimization.exs` writes the optimizer's
+  rejections and history with `Imp.Optimizer.Report.json_safe/1`. It passed
+  them to `Jason.encode!/1`, which raised on a failure reason such as
+  `{:incomplete_evaluation, 1}`, so a finished run lost its record.
 
 ### GEPA
 
 - A GEPA report names real failures only: a row whose program call or metric
   failed, a row whose metric returned a value `Imp.Metrics` cannot read, and
-  a proposal error. Before, it treated the metric's feedback as a failure, so
-  a run whose metric returned feedback reported `errors`,
-  `status: :with_errors` and candidates named "Program call failed: …" when
-  nothing had failed.
-- A GEPA report no longer crashes when a metric throws or exits: the
-  failure is shown as `{:throw, reason}` or `{:exit, reason}`. Before,
-  building the report raised `Protocol.UndefinedError`. Every diagnostic in
-  the report has its credential values redacted.
-- A GEPA candidate rejected because its proposal failed is named "Proposal
-  failed: …", not "Program call failed: …".
-- A GEPA run that continued past failed proposals reports them. Each
-  failure is an entry in `report.errors` with its `iteration`, its
-  `diagnostics` and its `candidate_id` (the rejected candidate in
-  `candidates`, or `nil` when the failure left none there);
-  `metadata.failed_proposals` counts them, and `status` is `:with_errors`.
-  With `raise_on_exception: false` that is any failure: a reflection call,
-  reflection strategy, evaluation or validation that raised, threw or
-  exited, or an iteration that did. With the default, `true`, it is the
-  failures GEPA already recorded and went on from: a reflection that returned
-  no usable instruction, a failed reflective dataset in a parallel slot, and
-  a reflection interrupted before a resume, so such a run now reports
-  `:with_errors` where it reported `:ok`. The program returned is still the
-  best candidate found, the baseline when every proposal failed, as DSPy's
-  GEPA returns it. A slot cancelled because a sibling failed first is
-  rejected, not counted as failed. Before, such a run reported `status: :ok`
-  and no errors.
-- Under `execution_profile: :beam_native` with `raise_on_exception: false`,
-  an iteration that raised is recorded as a rejection with a
-  `{:proposal_error, reason}` reason, so `Stopper.consecutive_outcome/2`
-  counts it as a `:proposal_error` outcome, as the default profile already
-  did; before, its outcome was `:none`. For example, when evaluating the
-  first two proposals raises and the third proposal solves the task,
-  `consecutive_outcome(:proposal_error, 2)` now stops the run after those two
-  iterations with the baseline, where before the run went on to
-  `:max_iterations` and returned the solving candidate; and
-  `consecutive_outcome(:none, 2)`, which stopped that run after its first
-  iteration, no longer does. An iteration that threw or exited is recorded the
-  same way; before, it crashed the run.
+  a proposal error. It treated the metric's feedback as a failure, so a run
+  whose metric returned feedback reported `errors`, `status: :with_errors`
+  and candidates named "Program call failed: …" when nothing had failed. A
+  candidate rejected because its proposal failed is named "Proposal failed:
+  …".
+- A GEPA report no longer crashes when a metric throws or exits: the failure
+  is shown as `{:throw, reason}` or `{:exit, reason}`, where building the
+  report raised `Protocol.UndefinedError`. Every diagnostic in the report has
+  its credential values redacted.
 - GEPA ends the run on an `Imp.OperationalSafetyError` (a budget, cost,
-  route or transport guard) whatever `raise_on_exception` says. Before, with
+  route or transport guard) whatever `raise_on_exception` says. With
   `raise_on_exception: false`, it recorded the refusal as a failed proposal
   and went on spending.
 - GEPA redacts a failure reason when it records it in a rejection, the
@@ -472,38 +489,33 @@ Every change here is breaking for code that relied on the old behaviour.
   `:kill`) as a failed proposal when a module selector, a reflection
   strategy, or the adapter's evaluation or reflective dataset raises it in
   that process: the exit goes on up, as it must from a process that traps
-  exits and turns its owner's shutdown into an exit. Before, it was recorded
-  and the run went on.
+  exits and turns its owner's shutdown into an exit.
 - `Imp.Optimizer.Trajectory.dump/1` and `load!/1` round-trip a trajectory:
   a map with an atom key is written as its entries, each key tagged as an
   atom, so a prediction's metadata, a trace step (`%{predictor: :main}`) and
   metric metadata such as Optimize Anything's `objective_scores` load with the
   keys they had. Every map key was written as a string, so a trajectory whose
   prediction had metadata failed to load (`Imp.Prediction.new/2: invalid map
-  in :metadata … got: "trace"`). GEPA checkpoints, Playbook checkpoints and
-  `Imp.dump/1` use this codec; resuming GEPA from a checkpoint whose pending
-  proposal batch held a result from an `Imp.predict` program raised that
-  error. Loading never creates an atom: a key written as an atom the loading
-  VM does not have (a dynamic metric-metadata key, say) loads as its name, a
-  string. A prediction's string metadata keys become their atoms when those
-  exist, so `Imp.Prediction.get_lm_usage/1`, `complete?/1` and readers of
-  `:trace` find them. A map that holds a key as both an atom and a string is
-  refused on load, as on dump. A trajectory written by 0.5.0 still loads, including one
+  in :metadata … got: "trace"`), and resuming GEPA from a checkpoint whose
+  pending proposal batch held a result from an `Imp.predict` program raised
+  that error. Loading never creates an atom: a key written as an atom the
+  loading VM does not have loads as its name, a string. A prediction's string
+  metadata keys become their atoms when those exist, so
+  `Imp.Prediction.get_lm_usage/1`, `complete?/1` and readers of `:trace` find
+  them. A map that holds a key as both an atom and a string is refused on
+  load, as on dump. A trajectory written by 0.5.0 still loads, including one
   whose prediction has metadata; its other map keys load as the strings they
-  were written as. Imp 0.5.0 cannot read a trajectory written with atom keys.
+  were written as.
 - GEPA checkpoints an agent. A trajectory, and the report codec GEPA uses for
   a pending batch's reflective dataset and a result's outputs, write an
   `Imp.History` with `Imp.History.dump/1` and read it with
   `Imp.History.load!/1`; the trajectory codec also carries
-  `Imp.Adapter.Types.ToolCalls` and `ToolCallResults`. Before, the first
-  checkpoint that held an `Imp.react` program's trajectories raised
+  `Imp.Adapter.Types.ToolCalls` and `ToolCallResults`. The first checkpoint
+  that held an `Imp.react` program's trajectories raised
   `Trajectory.DecodeError: trajectory contains an unsupported struct:
   Imp.History`, under either profile.
-  An optimizer report (`Imp.Optimizer.Report.encode_term/1`, `dump/1`) that
-  holds an `Imp.History` now writes it under a `"history"` tag, where it wrote
-  a plain map; Imp 0.5.0 and earlier builds cannot read such a report.
 - A GEPA checkpoint resumes in a fresh VM: the loader loads the GEPA modules
-  whose atoms a checkpoint holds before decoding it. Before,
+  whose atoms a checkpoint holds before decoding it.
   `Imp.Optimizer.GEPA.compile_with_report/5` given a checkpoint in a VM that
   had not yet run GEPA raised `not an already existing atom` on names like
   `:cache_hits` and `:no_strict_improvement`.
@@ -520,10 +532,20 @@ Every change here is breaking for code that relied on the old behaviour.
 - `Imp.Optimizer.GEPA.compile_with_report/5` no longer raises `KeyError` when
   it resumes from a checkpoint taken during a full validation; the
   interrupted validation's rejected candidate is in the report.
-- `examples/deployment/agent_optimization.exs` writes the optimizer's
-  rejections and history with `Imp.Optimizer.Report.json_safe/1`. It passed
-  them to `Jason.encode!/1`, which raised on a failure reason such as
-  `{:incomplete_evaluation, 1}`, so a finished run lost its record.
+
+### Documentation
+
+- The install instructions ask for a C and a C++ compiler: jaxon builds native
+  code from C and erlexec from C++. They asked for a C++ compiler only. They
+  also say the first compile needs network access, for erlexec's rebar3
+  plugins.
+- The package's Changelog link opens the changelog on HexDocs, and the 0.4.0
+  entry links the benchmark pages as they were at v0.4.0, not on `main`.
+- Each Livebook's setup cell only installs Imp: from Hex, or from the
+  checkout `IMP_PATH` names. It no longer searches for a source checkout.
+- The MCP example on the Tools and agents page defines its server and its
+  imported tools, where it used an undefined `imported`, and closes the
+  server when the call fails.
 
 ## 0.5.0 — 2026-09-26
 

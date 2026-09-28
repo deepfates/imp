@@ -455,7 +455,8 @@ defmodule DeploymentReferenceTest do
     readme = File.read!(Path.join(@example_root, "README.md"))
 
     assert mix_file =~ ~s(elixir: "~> 1.19")
-    assert mix_file =~ ~s({:imp, "~> 0.5"})
+    [major, minor | _patch] = String.split(Mix.Project.config()[:version], ".")
+    assert mix_file =~ ~s({:imp, "~> #{major}.#{minor}"})
     assert mix_file =~ "IMP_PATH"
     assert readme =~ "bounded supervised task"
     assert readme =~ "IMP_MODEL"

@@ -1,7 +1,7 @@
 defmodule Imp.MixProject do
   use Mix.Project
 
-  @version "0.5.0"
+  @version "0.6.0"
 
   def project do
     [
@@ -139,9 +139,13 @@ defmodule Imp.MixProject do
       # Imp matches Mint's error structs (Mint.TransportError, Mint.HTTPError)
       # to tell a request that was never sent from one that may have run
       # (Imp.Clients.ReqLLM, Imp.MCP.CallFailure), so it depends on Mint
-      # directly. 1.11.0 is the first release without EEF-CVE-2026-91043,
-      # EEF-CVE-2026-92103 and EEF-CVE-2026-94194.
-      {:mint, "~> 1.11"},
+      # directly. The requirement is Finch's own, so declaring it moves no
+      # application's lock. It is not 1.11: mint 1.11.0 leaves an HTTP/1
+      # connection open after a receive timeout and Finch 0.23.0 reuses it, so
+      # mix.lock holds 1.10.1 (test/timed_out_connection_test.exs,
+      # .audit_ignore) until a Finch release includes
+      # https://github.com/sneako/finch/pull/397.
+      {:mint, "~> 1.8"},
       {:nimble_csv, "~> 1.3"},
       {:nimble_options, "~> 1.1"},
       # The demo MCP servers (Imp.ACP.DemoMCPHTTPPlug, DemoMCPOAuthPlug, the
