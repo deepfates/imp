@@ -6,12 +6,16 @@ User-visible changes to Imp are recorded here.
 
 ### Security
 
-- Imp depends on `mint` `~> 1.11` directly, which fixes EEF-CVE-2026-91043,
-  EEF-CVE-2026-92103 and EEF-CVE-2026-94194 in the HTTP client Req uses. Imp
-  matches Mint's error structs to tell a request that was never sent from one
-  that may have run, and did not declare the dependency. `mix deps.get` in an
-  application that locked `mint` 1.10.1 moves it to 1.11.0. Imp's lock file
-  and the example projects' take `mint` 1.11.0 and `hpax` 1.1.0.
+- Imp's lock file and the example projects' keep `mint` 1.10.1, which has
+  three advisories that `mint` 1.11.0 fixes: EEF-CVE-2026-91043 and
+  EEF-CVE-2026-92103 are in Mint's HTTP/2 client, and EEF-CVE-2026-94194 is
+  in HTTP/1 chunked framing and needs an intermediary between the client and
+  a malicious server. `mint` 1.11.0 leaves an HTTP/1 connection open after a
+  receive timeout, and Finch 0.23.0 reuses it, so requests after a timeout
+  fail (see Known limits in the release notes). `.audit_ignore` lists the
+  three advisories with the reason and the condition that removes them: a
+  Finch release that includes https://github.com/sneako/finch/pull/397,
+  which is open and unreleased.
 - `Imp.Redaction` redacts a string that holds a PEM private key of any type,
   a PGP private key block or a PuTTY key file; a Stripe (`sk_live_`,
   `rk_live_`), GitHub, GitLab (`glpat-`), Hugging Face (`hf_`), Slack
@@ -290,11 +294,13 @@ User-visible changes to Imp are recorded here.
   dependency (`Imp.Core` reads a reported cost given as a `Decimal`). It
   declares `plug` and `plug_cowboy` with `runtime: false` for the demo MCP
   servers, which the package leaves out: Imp starts neither, and no Imp code
-  that ships uses them. It declares `mint` `~> 1.11` (see Security). Of these,
-  only `mint` moves an existing lock: an application that locked `mint` below
-  1.11.0 moves to 1.11.0 on `mix deps.get`. The other requirements are ones
-  Req and ExMCP already set (ExMCP requires `decimal` `~> 3.0`), so an
-  application resolves no new package and keeps the versions it has.
+  that ships uses them. It declares `mint` `~> 1.10`, since it matches Mint's
+  error structs to tell a request that was never sent from one that may have
+  run. The other requirements are ones Req and ExMCP already set (ExMCP
+  requires `decimal` `~> 3.0`), so they move no lock. The `mint` requirement
+  moves only a lock below 1.10: `mix deps.get` then takes the newest release,
+  1.11.0, unless the application asks for `{:mint, "~> 1.10.1"}` (see
+  Security).
 - Imp no longer depends on `jsv`, which nothing in Imp uses. ReqLLM still
   requires it.
 
