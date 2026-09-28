@@ -307,7 +307,8 @@ defmodule OptimizerBehavioralCorpusTest do
           {fn _example, _prediction -> throw("judge down") end, ~s({:throw, "judge down"})},
           {fn _example, _prediction -> throw(%{api_key: "sk-judge-secret"}) end,
            ~s({:throw, %{api_key: "[REDACTED]"}})},
-          {fn _example, _prediction -> raise "judge rejected sk-judge-secret0" end, "[REDACTED]"}
+          {fn _example, _prediction -> raise "judge rejected sk-judge-secret0" end,
+           "judge rejected [REDACTED]"}
         ] do
       report =
         Imp.Optimizer.GEPA.new(metric, execution_profile: :beam_native, generations: 0)
