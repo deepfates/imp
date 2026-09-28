@@ -21,9 +21,11 @@ User-visible changes to Imp are recorded here.
   a recognized one (`env | grep AWS`, a credentials file) go with it. It used
   two patterns of its own (`sk-` and `Bearer`) before the shared rules. The
   optimizer's pricing URL check uses the same rules instead of its own.
-- A `Bearer` token is found at the end of a line in a multi-line string
-  (`"Authorization: Bearer <token>\nmachine …"`), and mid-line when it holds
-  a digit or symbol (`Bearer <token> https://…`); both were missed.
+- A `Bearer` token of 16 or more characters with a digit in it is found
+  wherever it ends: mid-line (`Bearer <token> https://…`) or before a newline
+  in a multi-line string (`"Authorization: Bearer <token>\nmachine …"`).
+  Both were missed. A word without a digit after `Bearer`, followed by more
+  text, is still read as prose and left alone.
 - A string of near misses for `Bearer` or `Basic` in one letter case
   (`BEARER x` lines) is redacted in linear time; it took quadratic time.
 

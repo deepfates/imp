@@ -70,7 +70,7 @@ defmodule Imp.RedactionDifferentialTest do
        "machine api.openai.com login x password #{sk}\nmachine github.com login alice password FAKEnetrcpw\n",
        []},
       {"netrc + bearer",
-       "Authorization: Bearer abcdefghijklmnopqrstu\nmachine github.com\n  login alice\n  password FAKEnetrcpw2\n",
+       "Authorization: Bearer abcdefghij0123456789\nmachine github.com\n  login alice\n  password FAKEnetrcpw2\n",
        []},
       # curl -v
       {"curl -v",
@@ -270,26 +270,26 @@ defmodule Imp.RedactionDifferentialTest do
       "Session = FAKEsess12345",
       "SESSION=FAKEsess12345",
       "x session=FAKEsess12345;",
-      "Authorization: Bearer FAKEtok12345678 trailing",
-      "bearer FAKEtok12345678",
-      "BeArEr FAKEtok12345678",
+      "Authorization: Bearer FAKEtok1234567890 trailing",
+      "bearer FAKEtok1234567890",
+      "BeArEr FAKEtok1234567890",
       "Basic YWxpY2U6RkFLRXB3",
       "bAsIc YWxpY2U6RkFLRXB3",
       "AKIAFAKEFAKEFAKEFAKE",
       "prefix sk-FAKEaaaaaaaa suffix",
       "AIza" <> String.duplicate("F", 35),
-      "Authorization: Bearer FAKEtok12345678\r\n",
+      "Authorization: Bearer FAKEtok1234567890\r\n",
       "token:#{hex}",
-      "Authorization:Bearer FAKEtok12345678",
-      "{\"Authorization\":\"Bearer FAKEtok12345678\"}",
-      "Bearer FAKEtok12345678==",
+      "Authorization:Bearer FAKEtok1234567890",
+      "{\"Authorization\":\"Bearer FAKEtok1234567890\"}",
+      "Bearer FAKEtok1234567890==",
       "Bearer FAKEtok1234567+/=\n",
-      "Bearer\tFAKEtok12345678",
-      "'Bearer FAKEtok12345678'",
-      "(Bearer FAKEtok12345678)",
-      "[Bearer FAKEtok12345678]",
-      "Bearer FAKEtok12345678.",
-      "Bearer FAKEtok12345678!"
+      "Bearer\tFAKEtok1234567890",
+      "'Bearer FAKEtok1234567890'",
+      "(Bearer FAKEtok1234567890)",
+      "[Bearer FAKEtok1234567890]",
+      "Bearer FAKEtok1234567890.",
+      "Bearer FAKEtok1234567890!"
     ]
 
     Enum.map(cases, fn {name, text, _extra} -> {name, text} end) ++
@@ -347,7 +347,7 @@ defmodule Imp.RedactionDifferentialTest do
       {"basic end", "Authorization: Basic YWxpY2U6RkFLRWJhc2ljcHc=\nx-api-key: FAKExapi2"},
       {"only a password", "DB_PASSWORD=FAKEalonepw\nready\n"},
       {"bearer then netrc",
-       "Authorization: Bearer abcdefghijklmnopqrstu\nmachine github.com\n  login alice\n  password FAKEnetrcpw2\n"}
+       "Authorization: Bearer abcdefghij0123456789\nmachine github.com\n  login alice\n  password FAKEnetrcpw2\n"}
     ]
   end
 
@@ -418,6 +418,47 @@ defmodule Imp.RedactionDifferentialTest do
     end
   end
 
+  # Prose, docs and code that put a word after `Bearer`. A token is found
+  # when it ends the string or is closed by punctuation, or when it has a
+  # digit and 16 or more characters; none of these is one.
+  @bearer_prose [
+    "Send it as a Bearer self-contained token in the Authorization header.",
+    "Use Bearer token-based-auth here",
+    "The Bearer JWT-formatted header",
+    "a Bearer token/API-key pair",
+    "BEARER THE-QUICK-BROWN fox",
+    "| Authorization | Bearer YOUR_API_KEY |",
+    "Bearer 2FA tokens are common",
+    "Bearer token-based authentication is used",
+    "Send a bearer self-contained token",
+    "bearer short-lived tokens",
+    ~s(`"Bearer " <> token`),
+    ~s|put_req_header(conn, "authorization", "Bearer " <> token)|,
+    "| Header | Value |\n|---|---|\n| Authorization | Bearer <token> |",
+    "curl -H 'Authorization: Bearer $OPENAI_API_KEY' https://x",
+    "Authorization: Bearer ${TOKEN}",
+    "Authorization: Bearer YOUR_API_KEY here",
+    "Bearer bonds are bearer instruments",
+    "The bearer of bad news.\nNext line",
+    "Clients authenticate with bearer credentials.\nThen",
+    "OAuth 2.0 Bearer Token Usage (RFC 6750) defines it",
+    "Bearer v1.2.3-beta release notes",
+    "bearer 2024-01-01T00:00:00Z",
+    "Bearer lookahead-and-lookbehind rules",
+    "answer: Bearer instruments-of-debt are transferable",
+    "The Bearer scheme (RFC-6750-section-2) says",
+    "ex: Bearer abc.def.ghi more",
+    "Bearer\tfoo-bar-baz-qux text",
+    "reasoning: The bearer 12345678901 is a number",
+    "bearer id=1234567890123 next"
+  ]
+
+  test "prose, docs and code with a word after Bearer are left alone" do
+    for text <- @bearer_prose do
+      assert Imp.Redaction.redact(text) == text
+    end
+  end
+
   test "a URL with a password in its user info is redacted, which the previous rules missed" do
     for text <- ["ftp://user:pass@host", "see http://a:b@c"] do
       assert MainRedaction.redact(text) == text
@@ -462,12 +503,19 @@ defmodule Imp.RedactionDifferentialTest do
         "For each word, emit token: the word itself and session: the talk it came from. Auth: none required."
       )
 
-    demo = Imp.example(text: "the talk", token_label: ~s({"token": "the", "session": "keynote"}))
-    program = %{Imp.Predict.new(signature) | demos: [demo]}
+    demos = [
+      Imp.example(text: "the talk", token_label: ~s({"token": "the", "session": "keynote"})),
+      Imp.example(
+        text: "how do I send the key?",
+        token_label: "Send it as a Bearer self-contained token in the Authorization header."
+      )
+    ]
+
+    program = %{Imp.Predict.new(signature) | demos: demos}
 
     loaded = program |> Imp.Saving.dump() |> Imp.Saving.load!()
 
     assert loaded.signature.instructions == signature.instructions
-    assert loaded.demos == [demo]
+    assert loaded.demos == demos
   end
 end

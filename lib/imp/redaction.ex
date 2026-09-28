@@ -286,10 +286,10 @@ defmodule Imp.Redaction do
       (`AIza`) and OAuth tokens (`ya29.`), Slack (`xox?-`), SendGrid
       (`SG.`), npm (`npm_`), PyPI (`pypi-`), Vault (`hvs.`), or a JSON Web
       Token;
-    * a `Bearer` token that ends the string or its line or is closed by
-      punctuation, or one with a digit or symbol in it followed by anything
-      (a token of letters alone there reads as prose, `Bearer authentication
-      is ...`); or a `Basic` credential that ends the string;
+    * a `Bearer` token that ends the string or is closed by punctuation, or
+      one of 16 or more characters with a digit in it wherever it ends (a
+      token without a digit, followed by more text, reads as prose: `Bearer
+      token-based-auth`, `Bearer authentication is ...`); or a `Basic` credential that ends the string;
     * a `session=` value, or a long hex value assigned to a credential name
       (`token=<hex>`, `api_key: <hex>`);
     * a URL with a password in its user info, or a signed URL's signature or
@@ -823,7 +823,7 @@ defmodule Imp.Redaction do
       # JSON Web Tokens: header.payload.signature, each base64url; the first
       # two are JSON objects, so they start `eyJ`.
       ~r/(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\./,
-      ~r/(*NO_START_OPT)(?:\A|[\s:;,"'=({\[])Bearer[ \t]+(?:[A-Za-z0-9._~+\/-]{12,}={0,2}(?=\z|[\r\n"'`}\]),;])|(?=[A-Za-z]*[0-9._~+\/-])[A-Za-z0-9._~+\/-]{12,}={0,2}(?![A-Za-z0-9._~+\/=-]))/i,
+      ~r/(*NO_START_OPT)(?:\A|[\s:;,"'=({\[])Bearer[ \t]+(?:[A-Za-z0-9._~+\/-]{12,}={0,2}(?=\z|["'`}\]),;])|(?=[A-Za-z._~+\/-]*[0-9])[A-Za-z0-9._~+\/-]{16,}={0,2}(?![A-Za-z0-9._~+\/=-]))/i,
       {:basic, ~r/(*NO_START_OPT)(?:\A|[\s:;,])Basic[ \t]+([A-Za-z0-9+\/]+={0,2})\z/i},
       ~r/(?:\A|[?&;,\s])session\s*=\s*[A-Za-z0-9._~+\/-]{8,}={0,2}(?=\z|[?&;,\s])/i,
       # Long hex strings alone are not credentials: Imp passes SHA-1 and

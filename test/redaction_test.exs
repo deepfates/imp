@@ -120,23 +120,31 @@ defmodule Imp.RedactionTest do
 
   # A string of near misses for `Bearer` or `Basic`, all in one letter case,
   # took time quadratic in its length before the patterns turned off PCRE's
-  # start-of-match optimization (see `compile_secret_patterns/0`). Linear time
-  # grows about 4x from the small input to the large one; quadratic about 16x.
-  # The large input takes a few hundred milliseconds linear, seconds quadratic.
+  # start-of-match optimization (see `compile_secret_patterns/0`). Each input
+  # is timed against ordinary text of the same byte size, alternately, so a
+  # loaded machine slows both: linear time stays within about 2x of the
+  # reference, quadratic time is 25x to 50x at this size.
   test "strings of near misses in one letter case are redacted in linear time" do
     time = fn text ->
-      Enum.min(
-        for _ <- 1..3 do
-          {microseconds, ^text} = :timer.tc(fn -> Imp.Redaction.redact(text) end)
-          microseconds
-        end
-      )
+      {microseconds, ^text} = :timer.tc(fn -> Imp.Redaction.redact(text) end)
+      microseconds
     end
 
     for line <- ["BEARER aaaa\n", "BASIC Zm9vYmFy x\n"] do
-      small = time.(String.duplicate(line, 50_000))
-      large = time.(String.duplicate(line, 200_000))
-      assert large < 8 * small + 50_000, "#{inspect(line)}: #{small}us then #{large}us"
+      near_misses = String.duplicate(line, 200_000)
+
+      reference =
+        "plain words here\n"
+        |> String.duplicate(200_000)
+        |> binary_part(0, byte_size(near_misses))
+
+      {adversarial, ordinary} =
+        1..5
+        |> Enum.map(fn _ -> {time.(near_misses), time.(reference)} end)
+        |> Enum.unzip()
+
+      assert Enum.min(adversarial) < 6 * Enum.min(ordinary),
+             "#{inspect(line)}: #{Enum.min(adversarial)}us against #{Enum.min(ordinary)}us"
     end
   end
 
