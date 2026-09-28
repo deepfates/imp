@@ -345,7 +345,7 @@ defmodule ReActV2StepContractTest do
         req_http_options: [adapter: adapter, retry: false, max_retries: 0]
       )
 
-    lm = %{lm | tool_calling: false}
+    lm = %{lm | tool_calling: {model, false}}
 
     assert {:ok, prediction} =
              Imp.call(Imp.react("intent -> answer", [look()], lm: lm), %{intent: "hi"})

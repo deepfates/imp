@@ -96,7 +96,7 @@ defmodule ReActV2ToolRosterTest do
   test "a ReqLLM client's tool calling is read once, when it is built" do
     spec = "openai:imp-uncatalogued-#{System.unique_integer([:positive])}"
     lm = ExUnit.CaptureIO.with_io(:stderr, fn -> Imp.req_llm(spec, api_key: "k") end) |> elem(0)
-    assert lm.tool_calling == true
+    assert lm.tool_calling == {spec, true}
 
     warnings =
       ExUnit.CaptureIO.capture_io(:stderr, fn ->
@@ -107,12 +107,23 @@ defmodule ReActV2ToolRosterTest do
 
     # The answer is the struct's: the registry says this model calls tools.
     tools = %{provider: :openai, id: "m", capabilities: %{tools: %{enabled: true}}}
-    assert Imp.req_llm(tools, api_key: "k").tool_calling == true
+    lm = Imp.req_llm(tools, api_key: "k")
+    assert lm.tool_calling == {tools, true}
+    refute Imp.LM.tool_calling_capability(%{lm | tool_calling: {tools, false}})
+  end
 
-    refute Imp.LM.tool_calling_capability(%{
-             Imp.req_llm(tools, api_key: "k")
-             | tool_calling: false
-           })
+  # A trainer rebinds a client to a new model (`%{lm | model: artifact}`); the
+  # answer read for the old model no longer applies.
+  test "a ReqLLM client's tool calling follows a swapped model" do
+    off = %{provider: :openai, id: "m-off", capabilities: %{tools: %{enabled: false}}}
+    on = %{provider: :openai, id: "m-on", capabilities: %{tools: %{enabled: true}}}
+
+    lm = Imp.req_llm(off, api_key: "k")
+    refute Imp.LM.tool_calling_capability(lm)
+    assert Imp.LM.tool_calling_capability(%{lm | model: on})
+
+    lm = Imp.req_llm(on, api_key: "k")
+    refute Imp.LM.tool_calling_capability(%{lm | model: off})
   end
 
   test "a wrapped LM answers for the LM it wraps" do
