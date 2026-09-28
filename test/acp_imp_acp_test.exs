@@ -1579,6 +1579,46 @@ defmodule Imp.ACPTest do
     assert inspect(second_messages) =~ "content: \"ok\""
   end
 
+  # A turn whose model failed after a tool ran keeps that call in the session:
+  # the next turn's prompt holds it, so the tool is not called again blind.
+  test "a ReActV2 turn that got no model response keeps its history in the session" do
+    test_pid = self()
+    counter = :counters.new(1, [])
+
+    noted = Imp.tool(:note, "Write a note", fn _arguments -> "note written" end)
+
+    lm =
+      Imp.Test.FunLM.new(fn messages, _opts ->
+        :counters.add(counter, 1, 1)
+
+        case :counters.get(counter, 1) do
+          1 ->
+            {:ok, %{tool_calls: [%{id: "first-note", name: "note", arguments: %{}}]}}
+
+          n when n in [2, 3] ->
+            {:error, %Imp.LMError{message: "provider unavailable", status: 503, retryable: true}}
+
+          _later ->
+            send(test_pid, {:after_failure_messages, messages})
+            {:ok, "ok"}
+        end
+      end)
+
+    {client, _agent} =
+      start_pair(fn _session -> Imp.react("question -> answer", [noted], lm: lm) end,
+        permission_policy: :unrestricted
+      )
+
+    {:ok, %{"sessionId" => session_id}} = Client.new_session(client, "/tmp/project")
+
+    assert {:ok, %{"stopReason" => "refusal"}} = Client.prompt(client, session_id, "first")
+
+    assert {:ok, %{"stopReason" => "end_turn"}} = Client.prompt(client, session_id, "second")
+    assert_receive {:after_failure_messages, messages}
+    assert inspect(messages) =~ "first-note"
+    assert inspect(messages) =~ "note written"
+  end
+
   test "durable ReAct sessions list, load, replay, continue, and delete across agent restart" do
     test_pid = self()
 

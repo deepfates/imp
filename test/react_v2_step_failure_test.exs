@@ -1,8 +1,10 @@
 defmodule ReActV2StepFailureTest do
-  # A turn that could not get a model response returns the failed request's
-  # error, never a prediction. A tool call whose outcome is unknown is an
-  # observation, not such a failure.
+  # A turn that could not get a model response returns a StepError carrying
+  # the failed request's error and the history so far, never a prediction. A
+  # tool call whose outcome is unknown is an observation, not such a failure.
   use ExUnit.Case, async: false
+
+  alias Imp.Predict.ReActV2.StepError
 
   @submit_signature "question -> answer, confidence: float"
   @look_call %{tool_calls: [%{id: "first", name: "look", arguments: %{"where" => "shelf"}}]}
@@ -63,10 +65,11 @@ defmodule ReActV2StepFailureTest do
     test "a text answer returns the LM error" do
       program = Imp.react("intent -> answer", [look(self())], lm: failing_after([]))
 
-      assert {:error, %Imp.LMError{status: 503} = error} =
+      assert {:error, %StepError{reason: %Imp.LMError{status: 503}} = error} =
                Imp.call(program, %{intent: "hello"})
 
       assert Imp.Errors.retryable?(error)
+      assert Exception.message(error) =~ "provider unavailable"
       # The step and its last request.
       assert request_count() == 2
     end
@@ -74,7 +77,7 @@ defmodule ReActV2StepFailureTest do
     test "a signature with submit returns the LM error" do
       program = Imp.react(@submit_signature, [look(self())], lm: failing_after([]))
 
-      assert {:error, %Imp.LMError{status: 503}} =
+      assert {:error, %StepError{reason: %Imp.LMError{status: 503}}} =
                Imp.call(program, %{question: "Capital of France?"})
 
       # The step and its forced submit.
@@ -92,7 +95,7 @@ defmodule ReActV2StepFailureTest do
                  event_sink: fn event -> send(owner, {:run_event, event}) end
                )
 
-      assert {:error, %Imp.LMError{status: 503}} = Task.await(run.task)
+      assert {:error, %StepError{reason: %Imp.LMError{status: 503}}} = Task.await(run.task)
       :ok = Imp.Run.stop(run)
 
       assert_received :looked
@@ -105,10 +108,49 @@ defmodule ReActV2StepFailureTest do
     test "a signature with submit returns the LM error" do
       program = Imp.react(@submit_signature, [look(self())], lm: failing_after([@look_call]))
 
-      assert {:error, %Imp.LMError{status: 503}} =
+      assert {:error, %StepError{reason: %Imp.LMError{status: 503}, history: history}} =
                Imp.call(program, %{question: "Capital of France?"})
 
       assert_received :looked
+      assert [%{tool_calls: %{tool_calls: [%{id: "first"}]}}] = history.messages
+    end
+
+    # The tool ran, so the history the error carries holds its call and
+    # result exactly as the turn's history held them when the model failed:
+    # the history of the same turn whose last request answered with nothing,
+    # which adds no step.
+    test "the error's history holds the tool call and its observation" do
+      owner = self()
+
+      assert {:error, %StepError{history: failed}} =
+               Imp.react("intent -> answer", [look(owner)], lm: failing_after([@look_call]))
+               |> Imp.call(%{intent: "hello"})
+
+      step_two = :counters.new(1, [])
+
+      answered_nothing =
+        Imp.Test.FunLM.new(fn _messages, _opts ->
+          :counters.add(step_two, 1, 1)
+
+          case :counters.get(step_two, 1) do
+            1 -> {:ok, @look_call}
+            2 -> {:error, unavailable()}
+            _last -> {:ok, ""}
+          end
+        end)
+
+      assert {:ok, prediction} =
+               Imp.react("intent -> answer", [look(owner)], lm: answered_nothing)
+               |> Imp.call(%{intent: "hello"})
+
+      assert prediction.metadata[:termination_reason] == :last_text
+      assert failed == prediction.metadata[:history]
+
+      assert [%{intent: "hello", tool_calls: calls, tool_call_results: [result]}] =
+               failed.messages
+
+      assert [%{id: "first", name: "look", arguments: %{"where" => "shelf"}}] = calls.tool_calls
+      assert %{id: "first", name: "look", result: %{"seen" => true}, error: false} = result
     end
   end
 
@@ -122,8 +164,13 @@ defmodule ReActV2StepFailureTest do
       )
 
     assert {:error,
-            {:adapter_format_failed, Imp.Adapter.Chat, %ArgumentError{message: "renderer broke"}}} =
-             Imp.call(program, %{intent: "hello"})
+            %StepError{
+              reason:
+                {:adapter_format_failed, Imp.Adapter.Chat,
+                 %ArgumentError{message: "renderer broke"}}
+            } = error} = Imp.call(program, %{intent: "hello"})
+
+    assert Exception.message(error) =~ "renderer broke"
 
     # The request is never formatted, so the LM is never called.
     assert request_count() == 0
@@ -141,7 +188,9 @@ defmodule ReActV2StepFailureTest do
 
     program = Imp.react("intent -> answer", [look(self())], lm: lm)
 
-    assert {:error, %Imp.LMError{status: 500}} = Imp.call(program, %{intent: "hello"})
+    assert {:error, %StepError{reason: %Imp.LMError{status: 500}}} =
+             Imp.call(program, %{intent: "hello"})
+
     assert_received :http_request
   end
 
@@ -164,6 +213,96 @@ defmodule ReActV2StepFailureTest do
     assert Imp.get(prediction, :answer) == "From memory: it is there."
     assert prediction.metadata[:termination_reason] == :last_text
     assert prediction.metadata[:termination_cause] == :prediction_error
+  end
+
+  describe "a step that an operational safety guard refuses" do
+    # The guard fires on step 2, after a tool ran; the LM would answer a last
+    # request, which must not be made.
+    defp guarded(safety) do
+      owner = self()
+      counter = :counters.new(1, [])
+
+      Imp.Test.FunLM.new(fn _messages, _opts ->
+        :counters.add(counter, 1, 1)
+        n = :counters.get(counter, 1)
+        send(owner, {:request, n})
+
+        case n do
+          1 -> {:ok, @look_call}
+          2 -> {:error, safety}
+          _last -> {:ok, "Answered after the guard."}
+        end
+      end)
+    end
+
+    for {kind, signature, inputs} <- [
+          {:route, "intent -> answer", %{intent: "hello"}},
+          {:budget, "question -> answer, confidence: float", %{question: "Capital of France?"}}
+        ] do
+      test "#{kind}: ends the turn at once with the guard's error" do
+        safety =
+          Imp.OperationalSafetyError.exception(
+            kind: unquote(kind),
+            reason: :refused_by_fixture
+          )
+
+        program = Imp.react(unquote(signature), [look(self())], lm: guarded(safety))
+
+        assert {:error, %StepError{reason: ^safety, history: history} = error} =
+                 Imp.call(program, unquote(Macro.escape(inputs)))
+
+        # The step that ran and the refused one; no last request.
+        assert request_count() == 2
+        assert Imp.OperationalSafetyError.find(error) == safety
+
+        assert_raise Imp.OperationalSafetyError, fn ->
+          Imp.OperationalSafetyError.raise_if_present!({:error, error})
+        end
+
+        assert [%{tool_calls: %{tool_calls: [%{id: "first"}]}}] = history.messages
+      end
+    end
+
+    test "a guard raised inside the LM client is fatal too" do
+      safety = Imp.OperationalSafetyError.exception(kind: :budget, reason: :spent)
+      counter = :counters.new(1, [])
+
+      lm =
+        Imp.LM.Static.new(
+          handler: fn _messages, _opts ->
+            :counters.add(counter, 1, 1)
+            if :counters.get(counter, 1) == 1, do: raise(safety), else: "Answered anyway."
+          end
+        )
+
+      assert {:error, %StepError{reason: ^safety}} =
+               Imp.react("intent -> answer", [look(self())], lm: lm)
+               |> Imp.call(%{intent: "hello"})
+
+      assert :counters.get(counter, 1) == 1
+    end
+  end
+
+  # A last request refused because the context window is full ends the turn
+  # incomplete, not as an error: the caller shortens the input.
+  test "a last request refused for length is incomplete, not an error" do
+    counter = :counters.new(1, [])
+
+    lm =
+      Imp.Test.FunLM.new(fn _messages, _opts ->
+        :counters.add(counter, 1, 1)
+
+        if :counters.get(counter, 1) == 1,
+          do: {:error, unavailable()},
+          else: {:error, %Imp.LMError{status: 400, context_window_exceeded: true}}
+      end)
+
+    assert {:ok, prediction} =
+             Imp.react("intent -> answer", [look(self())], lm: lm)
+             |> Imp.call(%{intent: "hello"})
+
+    assert prediction.metadata[:termination_reason] == :incomplete
+    assert prediction.metadata[:termination_cause] == :context_window_exceeded
   end
 
   test "a tool call whose outcome is unknown is an observation, and the turn answers" do

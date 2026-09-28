@@ -280,8 +280,11 @@ defmodule Imp.ReActV2ContextTest do
 
     prior = Imp.history([%{intent: "prior", answer: "old"}])
 
-    assert {:error, :unrelated_provider_failure} =
+    assert {:error,
+            %Imp.Predict.ReActV2.StepError{reason: :unrelated_provider_failure, history: history}} =
              Imp.call(Imp.react("intent -> answer", [], lm: lm), %{intent: "now", history: prior})
+
+    assert history == prior
 
     # The step and its last request, and no history retries.
     assert Agent.get(calls, & &1) == 2

@@ -66,14 +66,18 @@ defmodule Imp.Predict.ReActV2 do
       request was answered with no valid answer in it, or the turn ran out of
       time or context window.
 
-  A turn that could not get a model response returns `{:error, reason}`
-  rather than a prediction: its last request failed with an `Imp.LMError`,
-  its LM client raised (`{:lm_failed, client, exception}`), or a renderer
-  raised (`{:adapter_format_failed, adapter, exception}`). `reason` is that
-  request's error as `Imp.Predict` returns it, so `Imp.Errors` classifies it.
-  The steps the turn took before it are in its `Imp.Run` events
-  (`:reasoning`, `:tool_call`, `:tool_result`). A tool call whose outcome is
-  unknown is not such a failure: it is an observation, and the turn goes on.
+  A turn that could not get a model response returns
+  `{:error, %Imp.Predict.ReActV2.StepError{}}` rather than a prediction: its
+  last request failed with an `Imp.LMError`, its LM client raised
+  (`{:lm_failed, client, exception}`), or a renderer raised
+  (`{:adapter_format_failed, adapter, exception}`). The error's `:reason` is
+  that request's error as `Imp.Predict` returns it, which `Imp.Errors`
+  classifies through the struct, and its `:history` is the turn's history as
+  far as it got, with every tool call that ran and its result. A step that
+  fails with an `Imp.OperationalSafetyError` (a route, cost, transport or
+  budget guard) ends the turn the same way at once, with no last request. A
+  tool call whose outcome is unknown is not such a failure: it is an
+  observation, and the turn goes on.
 
   ## When a turn is interrupted
 
@@ -171,6 +175,7 @@ defmodule Imp.Predict.ReActV2 do
   @behaviour Imp.Module
 
   alias Imp.Adapter.Types.{ToolCall, ToolCalls, ToolResult}
+  alias Imp.Predict.ReActV2.StepError
 
   @malformed_tool_call "__imp_malformed_tool_call__"
 
@@ -575,20 +580,28 @@ defmodule Imp.Predict.ReActV2 do
       # is also one more try at a model response after a transient failure,
       # which a host that answers every turn relies on. The call fails only
       # when that request gets no response either (`last_request_failed/4`).
+      # An operational safety guard (route, cost, transport, budget) is
+      # fatal, as `Imp.OperationalSafetyError` requires: a further request
+      # would pass the guard by, so the turn stops here.
       {:error, reason, history} ->
-        if Imp.Errors.context_window_exceeded?(reason) do
-          incomplete_prediction(history, :context_window_exceeded, reason)
-        else
-          interrupted(
-            react,
-            history,
-            inputs,
-            pending,
-            interruption(reason),
-            turn,
-            reason,
-            execution
-          )
+        cond do
+          safety_error?(reason) ->
+            step_error(history, reason)
+
+          Imp.Errors.context_window_exceeded?(reason) ->
+            incomplete_prediction(history, :context_window_exceeded, reason)
+
+          true ->
+            interrupted(
+              react,
+              history,
+              inputs,
+              pending,
+              interruption(reason),
+              turn,
+              reason,
+              execution
+            )
         end
     end
   end
@@ -703,10 +716,14 @@ defmodule Imp.Predict.ReActV2 do
   # does not parse leaves the turn incomplete too, under the interruption that
   # led to it: the model responded and gave no answer. Any other failure means
   # the turn could not get a model response at all (the LM failed, its client
-  # raised, a renderer raised), so the call fails with that request's error,
-  # unchanged, as `Imp.Predict` returns it, and `Imp.Errors` classifies it.
+  # raised, a renderer raised, a safety guard refused it), so the call fails
+  # with that request's error and the history so far (`StepError`). A safety
+  # guard is named first: it is fatal whatever else is true of the turn.
   defp last_request_failed(history, interruption, error, termination_error) do
     cond do
+      safety_error?(error) ->
+        step_error(history, error)
+
       deadline_passed?() ->
         incomplete_prediction(history, :deadline_exceeded, termination_error)
 
@@ -717,9 +734,16 @@ defmodule Imp.Predict.ReActV2 do
         incomplete_prediction(history, interruption, termination_error)
 
       true ->
-        {:error, error}
+        step_error(history, error)
     end
   end
+
+  # The history is the one a finished turn returns: every step that ran, with
+  # the tools it called, which have happened and must not be forgotten.
+  defp step_error(history, reason),
+    do: {:error, StepError.exception(reason: reason, history: history.full)}
+
+  defp safety_error?(reason), do: Imp.OperationalSafetyError.find(reason) != nil
 
   defp put_unexecuted(metadata, %ToolCalls{tool_calls: []}), do: metadata
 
@@ -771,9 +795,10 @@ defmodule Imp.Predict.ReActV2 do
               {:ok, prediction, history}
 
             {:error, fallback_error, history} ->
-              if Imp.Errors.context_window_exceeded?(fallback_error),
-                do: {:error, fallback_error, history},
-                else: {:extract, fallback_error, history}
+              if Imp.Errors.context_window_exceeded?(fallback_error) or
+                   safety_error?(fallback_error),
+                 do: {:error, fallback_error, history},
+                 else: {:extract, fallback_error, history}
           end
         else
           error

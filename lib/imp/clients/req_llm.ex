@@ -485,23 +485,80 @@ defmodule Imp.Clients.ReqLLM do
 
   defp transport_reason(_reason), do: nil
 
-  # OpenAI-compatible providers name this refusal in the structured error code.
-  # General HTTP 400s and prose mentioning context are not that signal.
-  defp context_length_exceeded?(%ReqLLM.Error.API.Request{status: 400, response_body: body}) do
-    body =
-      if is_binary(body) do
-        case Jason.decode(body) do
-          {:ok, decoded} -> decoded
-          _ -> nil
-        end
-      else
-        body
-      end
+  # A provider refuses a request whose input is longer than the model accepts
+  # with an HTTP 400 whose body says so in a shape of its own. Only those
+  # documented shapes are read; a 400 of another kind, or prose that merely
+  # mentions context, is not this refusal.
+  #
+  # A streamed request's HTTP error arrives as an `API.Stream` error whose
+  # `cause` is the `API.Request` error, and ReqLLM keeps only the body's inner
+  # `error` object as its `response_body` there
+  # (`ReqLLM.Streaming.Failure.api_error/4`); a non-streamed one keeps the
+  # whole body. Both are read.
+  defp context_length_exceeded?(%ReqLLM.Error.API.Stream{cause: cause}),
+    do: context_length_exceeded?(cause)
 
-    match?(%{"error" => %{"code" => "context_length_exceeded"}}, body)
+  defp context_length_exceeded?(%ReqLLM.Error.API.Request{status: 400, response_body: body}) do
+    case error_object(decode_error_body(body)) do
+      %{} = error -> overflow_error?(error)
+      _other -> false
+    end
   end
 
   defp context_length_exceeded?(_reason), do: false
+
+  defp decode_error_body(body) when is_binary(body) do
+    case Jason.decode(body) do
+      {:ok, decoded} -> decoded
+      _error -> nil
+    end
+  end
+
+  defp decode_error_body(body), do: body
+
+  defp error_object(%{"error" => %{} = error}), do: error
+  defp error_object(%{} = error), do: error
+  defp error_object(_body), do: nil
+
+  # OpenAI: `{"error": {"code": "context_length_exceeded", "type":
+  # "invalid_request_error", ...}}`. OpenAI's error-code guide does not list
+  # it; the body is the API's own, as the openai Python SDK reports it
+  # (https://github.com/langchain-ai/langchain/issues/16781), and
+  # OpenAI-compatible servers copy the code (vLLM:
+  # https://github.com/vllm-project/vllm/pull/37011).
+  defp overflow_error?(%{"code" => "context_length_exceeded"}), do: true
+
+  # OpenRouter: the typed `error_type` `context_length_exceeded`, "The combined
+  # input and output tokens exceed the model's context window", at
+  # `error.metadata.error_type` on Chat Completions and `error.error_type` on
+  # its Anthropic Messages surface
+  # (https://openrouter.ai/docs/api-reference/errors).
+  defp overflow_error?(%{"metadata" => %{"error_type" => "context_length_exceeded"}}), do: true
+  defp overflow_error?(%{"error_type" => "context_length_exceeded"}), do: true
+
+  # Anthropic: a 400 `invalid_request_error` whose message is "prompt is too
+  # long", returned when the input alone exceeds the context window
+  # (https://platform.claude.com/docs/en/build-with-claude/context-windows).
+  # The error type is shared by every malformed request, so the message is
+  # what names this one.
+  defp overflow_error?(%{"type" => "invalid_request_error", "message" => message})
+       when is_binary(message),
+       do: String.starts_with?(message, "prompt is too long")
+
+  # Google Gemini: a 400 `INVALID_ARGUMENT` whose message is "The input token
+  # count (N) exceeds the maximum number of tokens allowed (M)." The status is
+  # shared by every invalid argument, so the message names this one. Google's
+  # error reference does not list it; the text is the API's own, as Google's
+  # Gemini CLI reports it (https://github.com/google-gemini/gemini-cli/issues/11248).
+  defp overflow_error?(%{"status" => "INVALID_ARGUMENT", "message" => message})
+       when is_binary(message),
+       do:
+         Regex.match?(
+           ~r/^The input token count \(\d*\) exceeds the maximum number of tokens allowed/,
+           message
+         )
+
+  defp overflow_error?(_error), do: false
 
   defp lm_error_message(reason) when is_exception(reason), do: Exception.message(reason)
   defp lm_error_message(reason), do: inspect(reason, limit: 20, printable_limit: 500)

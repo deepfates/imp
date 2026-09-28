@@ -459,7 +459,7 @@ defmodule ReActV2Test do
 
     # The forced submit got no response, so the call fails with the
     # provider's rejection.
-    assert {:error, %Imp.LMError{status: 400}} =
+    assert {:error, %Imp.Predict.ReActV2.StepError{reason: %Imp.LMError{status: 400}}} =
              Imp.react(@submit_signature, [],
                lm: lm,
                max_iters: 1,
@@ -550,7 +550,7 @@ defmodule ReActV2Test do
         cache: false
       )
 
-    assert {:error, %Imp.LMError{status: 503}} =
+    assert {:error, %Imp.Predict.ReActV2.StepError{reason: %Imp.LMError{status: 503}}} =
              Imp.react(@submit_signature, [],
                lm: lm,
                max_iters: 1,

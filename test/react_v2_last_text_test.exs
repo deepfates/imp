@@ -203,8 +203,10 @@ defmodule ReActV2LastTextTest do
 
     program = Imp.react("intent -> answer", [look()], lm: lm)
 
-    assert {:error, {:lm_failed, Imp.LM.Static, %RuntimeError{message: message}}} =
-             Imp.call(program, %{intent: "hello"})
+    assert {:error,
+            %Imp.Predict.ReActV2.StepError{
+              reason: {:lm_failed, Imp.LM.Static, %RuntimeError{message: message}}
+            }} = Imp.call(program, %{intent: "hello"})
 
     assert message == "provider unavailable 2"
   end
@@ -407,8 +409,13 @@ defmodule ReActV2LastTextTest do
       # The LM that fails every request that does not say "none" leaves the
       # turn with no response, which is an error, not "none was sent".
       case Imp.call(program, %{intent: "hello"}) do
-        {:ok, prediction} -> refute Imp.get(prediction, :answer) == "none was sent"
-        {:error, reason} -> assert {:lm_failed, Imp.LM.Static, %RuntimeError{}} = reason
+        {:ok, prediction} ->
+          refute Imp.get(prediction, :answer) == "none was sent"
+
+        {:error, error} ->
+          assert %Imp.Predict.ReActV2.StepError{
+                   reason: {:lm_failed, Imp.LM.Static, %RuntimeError{}}
+                 } = error
       end
     end
 

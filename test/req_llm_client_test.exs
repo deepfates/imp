@@ -2450,4 +2450,125 @@ defmodule ReqLLMClientTest do
     refute_received {^ref, [:req_llm, :request, :start], _, _}
     refute_received {^ref, [:imp, :lm, :transport, :attempt], _, _}
   end
+
+  describe "a request refused for its length" do
+    # Each provider's refusal body, as its API sends it (sources in
+    # `Imp.Clients.ReqLLM`'s `overflow_error?/1`).
+    @overflow_bodies [
+      openai:
+        {"/v1",
+         %{
+           "error" => %{
+             "message" => "This model's maximum context length is 128000 tokens.",
+             "type" => "invalid_request_error",
+             "param" => "messages",
+             "code" => "context_length_exceeded"
+           }
+         }},
+      anthropic:
+        {"/v1",
+         %{
+           "type" => "error",
+           "error" => %{
+             "type" => "invalid_request_error",
+             "message" => "prompt is too long: 210000 tokens > 200000 maximum"
+           }
+         }},
+      google:
+        {"",
+         %{
+           "error" => %{
+             "code" => 400,
+             "message" =>
+               "The input token count (2551556) exceeds the maximum number of tokens allowed (1048576).",
+             "status" => "INVALID_ARGUMENT"
+           }
+         }},
+      openrouter:
+        {"/v1",
+         %{
+           "error" => %{
+             "code" => 400,
+             "message" => "This endpoint's maximum context length is 128000 tokens.",
+             "metadata" => %{"error_type" => "context_length_exceeded"}
+           }
+         }}
+    ]
+
+    # The same statuses and error types for another fault.
+    @other_bodies [
+      anthropic:
+        {"/v1",
+         %{
+           "type" => "error",
+           "error" => %{
+             "type" => "invalid_request_error",
+             "message" => "messages: roles must alternate; the prompt is too long to tell"
+           }
+         }},
+      google:
+        {"",
+         %{
+           "error" => %{
+             "code" => 400,
+             "message" => "Invalid value at 'contents[0]': input token count unknown.",
+             "status" => "INVALID_ARGUMENT"
+           }
+         }},
+      openrouter:
+        {"/v1",
+         %{
+           "error" => %{
+             "code" => 400,
+             "message" => "maximum context length is mentioned in prose",
+             "metadata" => %{"error_type" => "invalid_request"}
+           }
+         }}
+    ]
+
+    defp overflow_lm(provider, {path, body}) do
+      url = Imp.Test.LocalHTTP.start(fn _request -> {400, body} end)
+
+      Imp.req_llm(
+        %{provider: provider, id: "fixture", model: "fixture", base_url: url <> path},
+        api_key: "fixture",
+        cache: false,
+        req_http_options: [retry: false, max_retries: 0]
+      )
+    end
+
+    defp refusal(lm, :generate),
+      do: Imp.Clients.ReqLLM.generate(lm, [%{role: :user, content: "long"}], [])
+
+    defp refusal(lm, :stream) do
+      lm
+      |> Imp.Clients.ReqLLM.stream([%{role: :user, content: "long"}], [])
+      |> Enum.find_value(fn
+        %Imp.Streaming.Messages.StreamResponse{chunk: {:error, error}} -> {:error, error}
+        _chunk -> nil
+      end)
+    end
+
+    for {provider, response} <- @overflow_bodies, mode <- [:generate, :stream] do
+      @response response
+      test "#{provider}'s refusal is marked, #{if mode == :stream, do: "streamed", else: "not streamed"}" do
+        lm = overflow_lm(unquote(provider), @response)
+
+        assert {:error, %Imp.LMError{context_window_exceeded: true} = error} =
+                 refusal(lm, unquote(mode))
+
+        assert Imp.Errors.context_window_exceeded?(error)
+      end
+    end
+
+    for {provider, response} <- @other_bodies, mode <- [:generate, :stream] do
+      @response response
+      test "#{provider}'s other 400 is not marked, #{if mode == :stream, do: "streamed", else: "not streamed"}" do
+        lm = overflow_lm(unquote(provider), @response)
+
+        assert {:error, %Imp.LMError{context_window_exceeded: false}} =
+                 refusal(lm, unquote(mode))
+      end
+    end
+  end
 end

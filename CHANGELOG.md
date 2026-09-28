@@ -14,19 +14,39 @@ User-visible changes to Imp are recorded here.
   `{:ok, prediction} = Imp.collect(program, inputs)`, then
   `Imp.get(prediction, :answer)`.
 - Breaking: an `Imp.Predict.ReActV2` turn that could not get a model response
-  returns `{:error, reason}`, where it returned `{:ok, prediction}` with no
-  outputs and `termination_reason: :incomplete`. That is a turn whose last
-  request, after a step failed or the turn was interrupted, failed too: the LM
-  returned an `Imp.LMError`, its client raised (`{:lm_failed, client,
-  exception}`), or a renderer raised (`{:adapter_format_failed, adapter,
-  exception}`). `reason` is that request's error unchanged, so
-  `Imp.Errors.retryable?/1` reads it. A step that fails and whose last request
-  is answered still ends `:last_text`, `:forced_submit` or `:extracted`, and
+  returns `{:error, %Imp.Predict.ReActV2.StepError{}}`, where it returned
+  `{:ok, prediction}` with no outputs and `termination_reason: :incomplete`.
+  That is a turn whose last request, after a step failed or the turn was
+  interrupted, failed too: the LM returned an `Imp.LMError`, its client raised
+  (`{:lm_failed, client, exception}`), or a renderer raised
+  (`{:adapter_format_failed, adapter, exception}`). The error's `:reason` is
+  that request's error unchanged, which `Imp.Errors.retryable?/1` and
+  `Imp.Errors.context_window_exceeded?/1` read through the struct, and its
+  `:history` is the turn's `Imp.History` as far as it got, the value the
+  incomplete prediction carried in its `:history` metadata, with every tool
+  call that ran and its result. A step that fails and whose last request is
+  answered still ends `:last_text`, `:forced_submit` or `:extracted`, and
   `:incomplete` is kept for a turn whose last request was answered without a
-  valid answer, or that ran out of time or context window. Migration: handle
-  `{:error, reason}` from `Imp.call/2` where you checked
-  `Imp.Prediction.complete?/1` for a model failure; the steps taken before it
-  are in the run's `:tool_call` and `:tool_result` events.
+  valid answer, or that ran out of time or context window. `Imp.ACP` saves the
+  history of such a turn to its session before failing the turn. Migration:
+  match `{:error, %Imp.Predict.ReActV2.StepError{reason: reason, history:
+  history}}` where you checked `Imp.Prediction.complete?/1` after a model
+  failure, and store `history` as you store a finished turn's.
+- Breaking: an `Imp.Predict.ReActV2` step refused by an
+  `Imp.OperationalSafetyError` (a route, cost, transport or budget guard) ends
+  the turn at once with that error as the `StepError`'s `:reason`. It made the
+  turn's last request instead, and an answer to that request ended the turn
+  `:last_text` or `:forced_submit`, passing the guard by. Migration: none for
+  a caller that already treats safety errors as fatal; `Imp.Evaluate` and the
+  optimizers find the guard inside the `StepError` and raise it.
+- `Imp.Clients.ReqLLM` marks `context_window_exceeded` on the length refusals
+  of Anthropic ("prompt is too long"), Google Gemini ("The input token count
+  ... exceeds the maximum number of tokens allowed") and OpenRouter
+  (`error_type: "context_length_exceeded"`), and on OpenAI's
+  `context_length_exceeded` when the request was streamed. Only OpenAI's
+  non-streamed refusal was marked, so the others failed the call instead of
+  letting `Imp.Predict.ReActV2` leave out older episodes or end the turn
+  `:incomplete`.
 
 ### Fixed
 
