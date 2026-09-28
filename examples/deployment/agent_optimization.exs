@@ -134,16 +134,7 @@ defmodule ImpDeployment.AgentOptimization.Runner do
       "git_sha" => git_sha(),
       "models" => %{"task" => @task_model, "optimizer" => @optimizer_model},
       "data" => %{"train" => ids(train()), "selection" => ids(selection()), "test" => ids(test())},
-      "optimizer" => %{
-        "candidates" => result.candidates,
-        "validation_scores" => result.validation_scores,
-        "best_candidate" => Anything.best_candidate(result),
-        "stop_reason" => inspect(result.stop_reason),
-        "metric_calls" => result.total_metric_calls,
-        "reflection_calls" => result.reflection_calls,
-        "rejected" => result.rejected,
-        "history" => result.history
-      },
+      "optimizer" => optimizer_record(result),
       "held_out" => %{"baseline" => baseline_test, "selected" => selected_test},
       "fresh_process" => fresh,
       "budgets" => %{
@@ -179,6 +170,22 @@ defmodule ImpDeployment.AgentOptimization.Runner do
              selected_test["mean_score"] >= 0.8 and fresh["score"] >= 0.8 do
       raise "live agent treatment did not clear its bounded usefulness criteria"
     end
+  end
+
+  # Rejections and history hold failure reasons as terms (tuples, exception
+  # structs), which JSON cannot hold as they are; they are written in Imp's
+  # tagged encoding, redacted.
+  def optimizer_record(result) do
+    %{
+      "candidates" => result.candidates,
+      "validation_scores" => result.validation_scores,
+      "best_candidate" => Anything.best_candidate(result),
+      "stop_reason" => inspect(result.stop_reason),
+      "metric_calls" => result.total_metric_calls,
+      "reflection_calls" => result.reflection_calls,
+      "rejected" => Imp.Optimizer.Report.json_safe(result.rejected),
+      "history" => Imp.Optimizer.Report.json_safe(result.history)
+    }
   end
 
   def fresh do

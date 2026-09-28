@@ -560,6 +560,11 @@
     },
     {
       "category": "internal",
+      "module": "Imp.Optimizer.GEPA.Failure",
+      "source": "lib/imp/optimizer/gepa/failure.ex"
+    },
+    {
+      "category": "internal",
       "module": "Imp.Optimizer.GEPA.Frontier",
       "source": "lib/imp/optimizer/gepa/frontier.ex"
     },

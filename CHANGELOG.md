@@ -31,6 +31,13 @@ User-visible changes to Imp are recorded here.
 
 ### Changed
 
+- Breaking: `Imp.Observability.Status` has a new state,
+  `:succeeded_with_errors`, and `Imp.Observability.status/1` gives it for
+  every optimizer report whose `errors` is not empty, from any optimizer,
+  where it gave `:failed`: an optimizer that returned a report returned a
+  program. Code that matches every `Status` state adds the new one; code that
+  treated `:failed` as "the report has errors" matches
+  `:succeeded_with_errors`.
 - Breaking: `Imp.collect/3` now returns `{:ok, prediction}` or
   `{:error, reason}`, as `Imp.call/2` does, instead of a string. The string
   joined the values of every output field with no separator, so
@@ -363,6 +370,58 @@ Every change here is breaking for code that relied on the old behaviour.
   the report has its credential values redacted.
 - A GEPA candidate rejected because its proposal failed is named "Proposal
   failed: …", not "Program call failed: …".
+- A GEPA run that continued past failed proposals reports them. Each
+  failure is an entry in `report.errors` with its `iteration`, its
+  `diagnostics` and its `candidate_id` (the rejected candidate in
+  `candidates`, or `nil` when the failure left none there);
+  `metadata.failed_proposals` counts them, and `status` is `:with_errors`.
+  With `raise_on_exception: false` that is any failure: a reflection call,
+  reflection strategy, evaluation or validation that raised, threw or
+  exited, or an iteration that did. With the default, `true`, it is the
+  failures GEPA already recorded and went on from: a reflection that returned
+  no usable instruction, a failed reflective dataset in a parallel slot, and
+  a reflection interrupted before a resume, so such a run now reports
+  `:with_errors` where it reported `:ok`. The program returned is still the
+  best candidate found, the baseline when every proposal failed, as DSPy's
+  GEPA returns it. A slot cancelled because a sibling failed first is
+  rejected, not counted as failed. Before, such a run reported `status: :ok`
+  and no errors.
+- Under `execution_profile: :beam_native` with `raise_on_exception: false`,
+  an iteration that raised is recorded as a rejection with a
+  `{:proposal_error, reason}` reason, so `Stopper.consecutive_outcome/2`
+  counts it as a `:proposal_error` outcome, as the default profile already
+  did; before, its outcome was `:none`. For example, when evaluating the
+  first two proposals raises and the third proposal solves the task,
+  `consecutive_outcome(:proposal_error, 2)` now stops the run after those two
+  iterations with the baseline, where before the run went on to
+  `:max_iterations` and returned the solving candidate; and
+  `consecutive_outcome(:none, 2)`, which stopped that run after its first
+  iteration, no longer does. An iteration that threw or exited is recorded the
+  same way; before, it crashed the run.
+- GEPA ends the run on an `Imp.OperationalSafetyError` (a budget, cost,
+  route or transport guard) whatever `raise_on_exception` says. Before, with
+  `raise_on_exception: false`, it recorded the refusal as a failed proposal
+  and went on spending.
+- GEPA redacts a failure reason when it records it in a rejection, the
+  history or a pending proposal slot. An exception is recorded as
+  `{:proposal_exception, "Module.Name", message}` (the tag names the stage
+  that failed) and a throw or exit as `{:proposal_throw, term}` or
+  `{:proposal_exit, term}`, so a checkpoint holding it reads back in a VM
+  that has not loaded the module that raised; the parallel and sequential
+  paths record the same shape. A checkpoint otherwise holds the resume state
+  as it is (candidates, the evaluation cache, proposed instructions and
+  reflection data), so a `:checkpoint_fn` consumer treats it as sensitive.
+- GEPA with `raise_on_exception: false` no longer records an exit that asks
+  the process running it to stop (`:normal`, `:shutdown`, `{:shutdown, _}`,
+  `:kill`) as a failed proposal when a module selector, a reflection
+  strategy, or the adapter's evaluation or reflective dataset raises it in
+  that process: the exit goes on up, as it must from a process that traps
+  exits and turns its owner's shutdown into an exit. Before, it was recorded
+  and the run went on.
+- `examples/deployment/agent_optimization.exs` writes the optimizer's
+  rejections and history with `Imp.Optimizer.Report.json_safe/1`. It passed
+  them to `Jason.encode!/1`, which raised on a failure reason such as
+  `{:incomplete_evaluation, 1}`, so a finished run lost its record.
 
 ## 0.5.0 — 2026-09-26
 
