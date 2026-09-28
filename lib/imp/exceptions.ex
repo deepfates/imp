@@ -73,8 +73,9 @@ defmodule Imp.AdapterParseError do
     * `:malformed` — the completion is not in the adapter's format at all: no
       JSON object for the JSON adapter, XML that does not parse, a one-field
       answer that is not the exact value the field allows.
-    * `:missing_fields` — required output fields are absent. `:reason` is the
-      list of their names.
+    * `:missing_fields` — required output fields are absent, or the reply
+      answers none of the requested outputs, which names every output.
+      `:reason` is the list of their names.
     * `:invalid_fields` — every field is present but some value does not fit
       its declared type. `:reason` is the fields that were read.
     * `:unsupported_output` — the LM returned something no adapter reads as a
@@ -139,9 +140,10 @@ defmodule Imp.Errors do
   Reads the failure classes callers act on, through the wrappers Imp puts
   around an error.
 
-  An LM error reaches a caller directly (`{:error, %Imp.LMError{}}`), or from
-  a client that raised (`{:lm_failed, client, exception}`). These functions
-  accept either, with or without the `{:error, _}` around it.
+  An LM error reaches a caller directly (`{:error, %Imp.LMError{}}`), from
+  a client that raised (`{:lm_failed, client, exception}`), or inside the
+  `Imp.Predict.ReActV2.StepError` of a turn that got no model response. These
+  functions accept any of them, with or without the `{:error, _}` around it.
   """
 
   @doc """
@@ -200,6 +202,7 @@ defmodule Imp.Errors do
 
   defp lm_error({:error, reason}), do: lm_error(reason)
   defp lm_error({:lm_failed, _client, reason}), do: lm_error(reason)
+  defp lm_error(%Imp.Predict.ReActV2.StepError{reason: reason}), do: lm_error(reason)
   defp lm_error(%Imp.LMError{} = error), do: error
   defp lm_error(_other), do: nil
 end

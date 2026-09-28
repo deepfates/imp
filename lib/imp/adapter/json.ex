@@ -3,6 +3,9 @@ defmodule Imp.Adapter.JSON do
   JSON-oriented adapter.
 
   This adapter accepts map outputs directly and parses provider JSON with Jason.
+  A completion with no JSON object, or an object with none of the output keys,
+  is an `Imp.AdapterParseError`, even when every output is optional or
+  defaulted.
 
   Use this adapter when a field is required, typed, constrained, or consumed by
   application code that should not guess its way through prose.
@@ -387,9 +390,14 @@ defmodule Imp.Adapter.JSON do
   def parse(signature, raw, opts) when is_binary(raw) do
     validate_opts!(opts, "#{inspect(__MODULE__)}.parse/3")
 
+    # An object with none of the requested keys is missing every output even
+    # when all of them are optional or defaulted, where DSPy fills the
+    # defaults; see `Imp.Adapter.OutputFields.require_any/2` for why Imp
+    # departs from it.
     case Imp.Adapter.JSONRepair.decode_object(extract_json(raw)) do
       {:ok, decoded} ->
-        with {:ok, prediction} <- Imp.Adapter.Chat.parse(signature, decoded, opts),
+        with :ok <- Imp.Adapter.OutputFields.require_any(signature, decoded),
+             {:ok, prediction} <- Imp.Adapter.Chat.parse(signature, decoded, opts),
              :ok <-
                Imp.Schema.validate_fields(
                  signature.outputs,

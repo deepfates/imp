@@ -104,8 +104,8 @@ defmodule ReActV2Test do
             error =
               ReqLLM.Error.API.Request.exception(
                 status: 503,
-                reason: "extraction unavailable",
-                response_body: %{"error" => "extraction unavailable"}
+                reason: "corrective unavailable",
+                response_body: %{"error" => "corrective unavailable"}
               )
 
             {{:error, error}, :done}
@@ -457,7 +457,9 @@ defmodule ReActV2Test do
         cache: false
       )
 
-    assert {:ok, prediction} =
+    # The forced submit got no response, so the call fails with the
+    # provider's rejection.
+    assert {:error, %Imp.Predict.ReActV2.StepError{reason: %Imp.LMError{status: 400}}} =
              Imp.react(@submit_signature, [],
                lm: lm,
                max_iters: 1,
@@ -465,8 +467,6 @@ defmodule ReActV2Test do
              )
              |> Imp.call(%{question: "Capital of France?"})
 
-    assert prediction.metadata[:termination_reason] == :incomplete
-    assert prediction.metadata[:termination_cause] == :max_iters
     assert_received {:required_only_tool_request, _initial_messages, _initial_opts}
     assert_received {:required_only_tool_request, _named_messages, _named_opts}
     refute_received {:required_only_tool_request, _fallback_messages, _fallback_opts}
@@ -537,7 +537,7 @@ defmodule ReActV2Test do
     assert extraction_prompt =~ "is not evidence that an action happened"
   end
 
-  test "preserves missing output when typed extraction fails" do
+  test "a step fallback and then a typed extraction that get no response return the extraction's error" do
     {:ok, state} = Agent.start_link(fn -> :initial end)
 
     lm =
@@ -550,7 +550,10 @@ defmodule ReActV2Test do
         cache: false
       )
 
-    assert {:ok, prediction} =
+    assert {:error,
+            %Imp.Predict.ReActV2.StepError{
+              reason: %Imp.LMError{status: 503, message: message}
+            }} =
              Imp.react(@submit_signature, [],
                lm: lm,
                max_iters: 1,
@@ -558,15 +561,21 @@ defmodule ReActV2Test do
              )
              |> Imp.call(%{question: "Capital of France?"})
 
-    assert prediction.fields == %{}
-    assert prediction.metadata[:termination_reason] == :incomplete
-    assert prediction.metadata[:termination_cause] == :max_iters
+    # The extraction's 503, not the step fallback's.
+    assert message =~ "extraction unavailable"
 
-    # Four requests, not five: the prose the required-only fallback returns is
-    # read as a thought that called nothing, so no JSON-adapter re-ask fires.
-    for _ <- 1..4 do
-      assert_received {:required_only_tool_request, _messages, _opts}
-    end
+    # Five requests: the first step, the named and required retries, the JSON
+    # fallback of the step, and the extraction. The required-only retry
+    # answers with a JSON object carrying the step's keys, which is not prose
+    # for `next_thought`, so the JSON fallback reads it; its request gets a
+    # 503 too, the step ends, and the extraction runs.
+    requests =
+      for _ <- 1..5 do
+        assert_received {:required_only_tool_request, messages, _opts}
+        messages |> List.last() |> Map.get(:content) |> inspect()
+      end
+
+    assert Enum.at(requests, 3) =~ "Respond with a JSON object"
 
     refute_received {:required_only_tool_request, _messages, _opts}
   end
