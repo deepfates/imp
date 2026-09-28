@@ -25,8 +25,11 @@ defmodule Imp.Clients.ReqLLMBatch do
   only when every remaining request is waiting. A process that traps exits
   and is stopped by its parent during that sleep exits at once with the
   parent's reason; a dispatch wave that is running is still waited for, for
-  up to `:timeout`. Backoff is capped at
-  `:max_retry_wait`. When the provider asks for longer than `:max_retry_wait`,
+  up to `:timeout`. The parent is the first of the process's `$ancestors`,
+  which a process started by `Task`, `GenServer` or another OTP behaviour
+  has; a process started with bare `spawn/1` or `spawn_link/1` has none, and
+  its sleep cannot be interrupted. Backoff is capped at `:max_retry_wait`.
+  When the provider asks for longer than `:max_retry_wait`,
   or the wait would end after the `Imp.Deadline` bound to the calling
   process, the request is not retried in this run: it stays
   `:transient_failure` with the attempts it has used, the summary is not

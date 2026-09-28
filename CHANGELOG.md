@@ -109,7 +109,8 @@ User-visible changes to Imp are recorded here.
   IMF-fixdate, an RFC 850 date or an asctime date. A process that traps
   exits and is stopped by its parent during the wait exits at once with the
   parent's reason; a dispatch wave in progress is still waited for, up to
-  `:timeout`.
+  `:timeout`, and a process started with bare `spawn` has no parent to
+  listen for and sleeps uninterrupted.
 - The `ReqLLM.Error.API.Request` inside an `Imp.LMError` from
   `Imp.Clients.ReqLLM` carries at most one response header, `retry-after`,
   so the caller can wait before retrying (ReqLLM's own decoding dropped it).
@@ -130,7 +131,9 @@ User-visible changes to Imp are recorded here.
   line break may be CRLF, LF or a bare CR (as Excel for Mac writes), and a
   leading byte order mark is dropped; it was read into the first column's
   name. A blank line is skipped; a record holding only `""` is a row with
-  an empty value. A malformed file raises `Imp.Datasets.Error` naming the line its
+  an empty value, so in a file with more than one column a `""` line is now
+  refused as `invalid CSV row at <path>:<line>: expected N fields, got 1`,
+  where 0.5.0 raised `FunctionClauseError` on it as on any quoted field. A malformed file raises `Imp.Datasets.Error` naming the line its
   record starts on, with the start of that record (at most 200 characters)
   as `record`. Some files 0.5.0 loaded are now refused:
   - a quote inside an unquoted field, such as an inch mark (`12" pipe,1`):

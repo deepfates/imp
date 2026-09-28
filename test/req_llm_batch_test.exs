@@ -204,6 +204,42 @@ defmodule ReqLLMBatchTest do
     refute inspect(error, limit: :infinity) =~ "cookie-secret-value"
   end
 
+  test "a streaming HTTP error keeps only retry-after of the response's headers" do
+    base_url =
+      Imp.Test.LocalHTTP.start(fn _request ->
+        {429,
+         [
+           {"retry-after", "3"},
+           {"set-cookie", "session=cookie-secret-value"},
+           {"openai-organization", "org-secret-value"}
+         ], %{error: %{message: "rate limited"}}}
+      end)
+
+    client =
+      Imp.req_llm(%{provider: :openai, id: "stream-leak-model", base_url: base_url},
+        api_key: "local-test-key",
+        max_retries: 0
+      )
+
+    result =
+      try do
+        client |> ReqLLMClient.stream([%{role: :user, content: "hi"}]) |> Enum.to_list()
+      rescue
+        error -> error
+      catch
+        kind, reason -> {kind, reason}
+      end
+
+    text = inspect(result, limit: :infinity, printable_limit: :infinity)
+
+    assert [%{chunk: {:error, %Imp.LMError{reason: %ReqLLM.Error.API.Stream{} = error}}}] =
+             result
+
+    assert error.cause.headers == %{"retry-after" => ["3"]}
+    refute text =~ "cookie-secret-value"
+    refute text =~ "org-secret-value"
+  end
+
   test "an error keeps only retry-after of the response's headers" do
     secret_headers = [
       {"set-cookie", "session=cookie-secret-value"},
@@ -391,7 +427,10 @@ defmodule ReqLLMBatchTest do
 
       assert summary.counts == %{succeeded: 2}
       # Both failed at 0; the batch slept until each could be sent again.
-      assert sent.() == [{"seconds", 0}, {"date", 0}, {"seconds", 2_000}, {"date", 7_000}]
+      # The first sends run concurrently, so their order is not fixed.
+      assert MapSet.new(sent.()) ==
+               MapSet.new([{"seconds", 0}, {"date", 0}, {"seconds", 2_000}, {"date", 7_000}])
+
       assert sleeps(clock) == [2_000, 5_000]
     end
 
@@ -584,7 +623,9 @@ defmodule ReqLLMBatchTest do
                )
 
       assert summary.counts == %{succeeded: 2}
-      assert sent.() == [{"rfc850", 0}, {"asctime", 0}, {"rfc850", 3_000}, {"asctime", 5_000}]
+
+      assert MapSet.new(sent.()) ==
+               MapSet.new([{"rfc850", 0}, {"asctime", 0}, {"rfc850", 3_000}, {"asctime", 5_000}])
     end
 
     test "a trapping process stopped by its parent during the wait exits at once" do

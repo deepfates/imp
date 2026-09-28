@@ -201,20 +201,48 @@ defmodule Imp.Datasets do
   # holding a 400,000-row dataset, the walk over a 200,000-row file took
   # 190 s in that process and 1 s in its own. Its error is raised again in
   # the caller.
+  #
+  # The walk is monitored, not linked, so a caller that traps exits finds no
+  # exit message from it afterwards. A guard process kills the walk if the
+  # caller dies first.
   defp walk_csv(text, path) do
-    task =
-      Task.async(fn ->
-        try do
-          {:ok, csv_records!(text, path)}
-        rescue
-          error -> {:raise, error, __STACKTRACE__}
-        end
+    caller = self()
+    tag = make_ref()
+
+    {walk, monitor} =
+      spawn_monitor(fn ->
+        result =
+          try do
+            {:ok, csv_records!(text, path)}
+          rescue
+            error -> {:raise, error, __STACKTRACE__}
+          end
+
+        send(caller, {tag, result})
       end)
 
-    case Task.await(task, :infinity) do
-      {:ok, {nil, _rows}} -> raise_no_csv_header!(path)
-      {:ok, table} -> table
-      {:raise, error, stacktrace} -> reraise error, stacktrace
+    spawn(fn ->
+      caller_down = Process.monitor(caller)
+      walk_down = Process.monitor(walk)
+
+      receive do
+        {:DOWN, ^caller_down, :process, _pid, _reason} -> Process.exit(walk, :kill)
+        {:DOWN, ^walk_down, :process, _pid, _reason} -> :ok
+      end
+    end)
+
+    receive do
+      {^tag, result} ->
+        Process.demonitor(monitor, [:flush])
+
+        case result do
+          {:ok, {nil, _rows}} -> raise_no_csv_header!(path)
+          {:ok, table} -> table
+          {:raise, error, stacktrace} -> reraise error, stacktrace
+        end
+
+      {:DOWN, ^monitor, :process, ^walk, reason} ->
+        exit(reason)
     end
   end
 

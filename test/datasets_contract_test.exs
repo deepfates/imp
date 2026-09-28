@@ -177,6 +177,44 @@ defmodule DatasetsContractTest do
     cleanup_tmp("long-ragged.csv")
   end
 
+  test "a caller that traps exits has no stray message after a CSV load" do
+    good = tmp_path("trap-good.csv")
+    bad = tmp_path("trap-bad.csv")
+    # A quoted empty value and a ragged row both take the record-by-record walk.
+    File.write!(good, ~s(q\nx\n""\ny\n))
+    File.write!(bad, "q,a\n1,2\n3,4,5\n")
+    test_pid = self()
+
+    spawn(fn ->
+      Process.flag(:trap_exit, true)
+      loaded = Datasets.csv(good, [])
+      raised = assert_raise(Datasets.Error, fn -> Datasets.csv(bad, [:q]) end)
+      Process.sleep(50)
+      {:messages, messages} = Process.info(self(), :messages)
+      send(test_pid, {:done, length(loaded), raised.line, messages})
+    end)
+
+    assert_receive {:done, 3, 3, []}, 5_000
+  after
+    cleanup_tmp("trap-good.csv")
+    cleanup_tmp("trap-bad.csv")
+  end
+
+  test "a CSV walk ends when its caller is killed" do
+    path = tmp_path("killed-caller.csv")
+    rows = Enum.map(1..200_000, &~s("q #{&1}, with comma",#{&1}\n))
+    File.write!(path, ["q,a\n" | rows] ++ ["bad,row,extra\n"])
+
+    caller = spawn(fn -> Datasets.csv(path, [:q]) end)
+    walk = wait_for_monitored(caller)
+    ref = Process.monitor(walk)
+    Process.exit(caller, :kill)
+
+    assert_receive {:DOWN, ^ref, :process, ^walk, :killed}, 1_000
+  after
+    cleanup_tmp("killed-caller.csv")
+  end
+
   test "CSV loader bounds the record an error carries" do
     path = tmp_path("long-unclosed.csv")
     File.write!(path, "q,a\n\"" <> String.duplicate("x", 10_000) <> ",1\n")
@@ -394,6 +432,18 @@ defmodule DatasetsContractTest do
     cleanup_tmp("typed-gsm8k.jsonl")
     cleanup_tmp("typed-hotpot.jsonl")
     cleanup_tmp("typed-math.jsonl")
+  end
+
+  # The process `pid` monitors, once it monitors one.
+  defp wait_for_monitored(pid, tries \\ 500) do
+    case Process.info(pid, :monitors) do
+      {:monitors, [{:process, monitored} | _rest]} ->
+        monitored
+
+      _none when tries > 0 ->
+        Process.sleep(5)
+        wait_for_monitored(pid, tries - 1)
+    end
   end
 
   defp tmp_path(name),

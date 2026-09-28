@@ -387,10 +387,12 @@ defmodule Imp.Clients.ReqLLM do
   defp lm_error(reason), do: lm_error(reason, retryable?(reason))
 
   defp lm_error(reason, retryable) do
+    stripped = only_retry_after_header(reason)
+
     %Imp.LMError{
-      message: lm_error_message(reason),
+      message: lm_error_message(stripped),
       status: status(reason),
-      reason: only_retry_after_header(reason),
+      reason: stripped,
       retryable: retryable,
       context_window_exceeded: context_length_exceeded?(reason)
     }
@@ -1415,7 +1417,7 @@ defmodule Imp.Clients.ReqLLM do
 
   # Every error this client returns passes here, streaming ones included, so
   # no response header but `retry-after` reaches a caller whichever path
-  # built the error.
+  # built the error, and the error's message is made from what is left.
   defp only_retry_after_header(%ReqLLM.Error.API.Request{} = error) do
     values = retry_after_values(error.headers)
 
@@ -1424,6 +1426,16 @@ defmodule Imp.Clients.ReqLLM do
       | headers: if(values == [], do: nil, else: %{"retry-after" => values}),
         cause: only_retry_after_header(error.cause)
     }
+  end
+
+  # A failed stream wraps the HTTP error and writes it, headers included,
+  # into its own text (`ReqLLM.Streaming`); that text is written again from
+  # the stripped error, in the same words.
+  defp only_retry_after_header(
+         %ReqLLM.Error.API.Stream{cause: %ReqLLM.Error.API.Request{}} = error
+       ) do
+    cause = only_retry_after_header(error.cause)
+    %{error | cause: cause, reason: "Stream failed: #{inspect(cause)}"}
   end
 
   defp only_retry_after_header(reason), do: reason
