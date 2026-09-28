@@ -3230,6 +3230,7 @@
       "struct_fields": [
         "billing",
         "cost",
+        "estimated_cost",
         "metadata",
         "outputs",
         "raw",
