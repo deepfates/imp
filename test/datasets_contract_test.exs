@@ -36,6 +36,203 @@ defmodule DatasetsContractTest do
     cleanup_tmp("ragged.csv")
   end
 
+  test "CSV loader reads quoted commas, escaped quotes, empty quoted fields and quoted newlines" do
+    path = tmp_path("quoted.csv")
+
+    File.write!(
+      path,
+      ~s(question,answer\r\n"a, b",x\r\ny,"a, b"\r\n"",z\r\n"say ""hi""",q\r\n"two\nlines",w\r\n\r\nlast,row)
+    )
+
+    rows = path |> Datasets.csv([:question]) |> Enum.map(& &1.fields)
+
+    assert rows == [
+             %{"question" => "a, b", "answer" => "x"},
+             %{"question" => "y", "answer" => "a, b"},
+             %{"question" => "", "answer" => "z"},
+             %{"question" => ~s(say "hi"), "answer" => "q"},
+             %{"question" => "two\nlines", "answer" => "w"},
+             %{"question" => "last", "answer" => "row"}
+           ]
+  after
+    cleanup_tmp("quoted.csv")
+  end
+
+  test "CSV loader names the line of a row after a quoted newline" do
+    path = tmp_path("ragged-after-newline.csv")
+    File.write!(path, ~s(question,answer\n"two\nlines",w\n2+2?,4,extra\n))
+
+    assert_raise Datasets.Error, ~r/invalid CSV row .*:4: expected 2 fields, got 3/, fn ->
+      Datasets.csv(path, [:question])
+    end
+  after
+    cleanup_tmp("ragged-after-newline.csv")
+  end
+
+  test "CSV loader rejects malformed quoting with the line it starts on" do
+    path = tmp_path("malformed.csv")
+    File.write!(path, ~s(question,answer\nok,1\nbad,x"y"\n))
+
+    error = assert_raise Datasets.Error, fn -> Datasets.csv(path, [:question]) end
+    assert error.line == 3
+    assert error.message =~ ~r/invalid CSV at .*:3: /
+
+    File.write!(path, ~s(question,answer\nok,1\n"unclosed,1\nnext,2\n))
+
+    error = assert_raise Datasets.Error, fn -> Datasets.csv(path, [:question]) end
+    assert error.line == 3
+    assert error.message =~ ~r/invalid CSV at .*:3: a quote opened on this line is never closed/
+  after
+    cleanup_tmp("malformed.csv")
+  end
+
+  test "rows written by Evaluate.Result.save_as_csv read back equal through Datasets.csv" do
+    path = tmp_path("round-trip.csv")
+
+    questions = [
+      "a, b",
+      ~s(say "hi"),
+      "two\nlines",
+      "carriage\rreturn",
+      "naïve café 漢字 ✓",
+      "plain"
+    ]
+
+    rows =
+      Enum.map(questions, fn question ->
+        %{
+          example: Imp.example(question: question, answer: question <> "!"),
+          prediction: Imp.prediction(reasoning: "r: " <> question),
+          score: 1.0
+        }
+      end)
+
+    result = %Imp.Evaluate.Result{score: 1.0, rows: rows}
+    assert :ok = Imp.Evaluate.Result.save_as_csv(result, path)
+
+    read_back = path |> Datasets.csv([:question]) |> Enum.map(& &1.fields)
+
+    assert read_back ==
+             Enum.map(questions, fn question ->
+               %{
+                 "question" => question,
+                 "answer" => question <> "!",
+                 "reasoning" => "r: " <> question,
+                 "score" => "1.0"
+               }
+             end)
+  after
+    cleanup_tmp("round-trip.csv")
+  end
+
+  test "CSV loader reads bare-CR line endings and drops a byte order mark" do
+    path = tmp_path("line-endings.csv")
+
+    File.write!(path, "q,a\r1,2\r3,4\r")
+    rows = path |> Datasets.csv([:q]) |> Enum.map(& &1.fields)
+    assert rows == [%{"q" => "1", "a" => "2"}, %{"q" => "3", "a" => "4"}]
+
+    File.write!(path, "\uFEFFq,a\r\n1,2\n3,4\r5,6")
+    rows = path |> Datasets.csv([:q]) |> Enum.map(& &1.fields)
+
+    assert rows == [
+             %{"q" => "1", "a" => "2"},
+             %{"q" => "3", "a" => "4"},
+             %{"q" => "5", "a" => "6"}
+           ]
+  after
+    cleanup_tmp("line-endings.csv")
+  end
+
+  test "CSV loader names the line of a bad row in a bare-CR file after a quoted line break" do
+    path = tmp_path("bare-cr-error.csv")
+    File.write!(path, ~s(q,a\r"x\ry",2\r3,4,5\r))
+
+    error = assert_raise Datasets.Error, fn -> Datasets.csv(path, [:q]) end
+    assert error.line == 4
+    assert error.message =~ ~r/invalid CSV row .*:4: expected 2 fields, got 3/
+  after
+    cleanup_tmp("bare-cr-error.csv")
+  end
+
+  test "CSV loader keeps a quoted empty value and skips blank lines" do
+    path = tmp_path("quoted-empty.csv")
+    File.write!(path, ~s(q\nx\n""\n\ny\n))
+
+    values = path |> Datasets.csv([]) |> Enum.map(& &1.fields["q"])
+    assert values == ["x", "", "y"]
+  after
+    cleanup_tmp("quoted-empty.csv")
+  end
+
+  test "CSV loader bounds the fields of a ragged row it reports" do
+    path = tmp_path("long-ragged.csv")
+    File.write!(path, "q,a\n" <> String.duplicate("z", 10_000) <> ",1,extra\n")
+
+    error = assert_raise Datasets.Error, fn -> Datasets.csv(path, [:q]) end
+    assert error.line == 2
+    assert [long, "1", "extra"] = error.record
+    assert byte_size(long) <= 210
+  after
+    cleanup_tmp("long-ragged.csv")
+  end
+
+  test "a caller that traps exits has no stray message after a CSV load" do
+    good = tmp_path("trap-good.csv")
+    bad = tmp_path("trap-bad.csv")
+    # A quoted empty value and a ragged row both take the record-by-record walk.
+    File.write!(good, ~s(q\nx\n""\ny\n))
+    File.write!(bad, "q,a\n1,2\n3,4,5\n")
+    test_pid = self()
+
+    spawn(fn ->
+      Process.flag(:trap_exit, true)
+      loaded = Datasets.csv(good, [])
+      raised = assert_raise(Datasets.Error, fn -> Datasets.csv(bad, [:q]) end)
+      Process.sleep(50)
+      {:messages, messages} = Process.info(self(), :messages)
+      send(test_pid, {:done, length(loaded), raised.line, messages})
+    end)
+
+    assert_receive {:done, 3, 3, []}, 5_000
+  after
+    cleanup_tmp("trap-good.csv")
+    cleanup_tmp("trap-bad.csv")
+  end
+
+  test "a CSV walk ends when its caller is killed" do
+    path = tmp_path("killed-caller.csv")
+    rows = Enum.map(1..200_000, &~s("q #{&1}, with comma",#{&1}\n))
+    File.write!(path, ["q,a\n" | rows] ++ ["bad,row,extra\n"])
+
+    caller = spawn(fn -> Datasets.csv(path, [:q]) end)
+    walk = wait_for_monitored(caller)
+    ref = Process.monitor(walk)
+    Process.exit(caller, :kill)
+
+    assert_receive {:DOWN, ^ref, :process, ^walk, :killed}, 1_000
+  after
+    cleanup_tmp("killed-caller.csv")
+  end
+
+  test "CSV loader bounds the record an error carries" do
+    path = tmp_path("long-unclosed.csv")
+    File.write!(path, "q,a\n\"" <> String.duplicate("x", 10_000) <> ",1\n")
+
+    error = assert_raise Datasets.Error, fn -> Datasets.csv(path, [:q]) end
+    assert error.line == 2
+    assert byte_size(error.record) <= 210
+
+    File.write!(path, "q,a\n" <> String.duplicate("y", 10_000) <> ~s(" by 3",1\n))
+
+    error = assert_raise Datasets.Error, fn -> Datasets.csv(path, [:q]) end
+    assert error.line == 2
+    assert byte_size(error.record) <= 210
+    assert byte_size(error.message) <= 210 + byte_size(path) + 40
+  after
+    cleanup_tmp("long-unclosed.csv")
+  end
+
   test "CSV loader rejects empty files with dataset context" do
     path = tmp_path("empty.csv")
     File.write!(path, "")
@@ -235,6 +432,18 @@ defmodule DatasetsContractTest do
     cleanup_tmp("typed-gsm8k.jsonl")
     cleanup_tmp("typed-hotpot.jsonl")
     cleanup_tmp("typed-math.jsonl")
+  end
+
+  # The process `pid` monitors, once it monitors one.
+  defp wait_for_monitored(pid, tries \\ 500) do
+    case Process.info(pid, :monitors) do
+      {:monitors, [{:process, monitored} | _rest]} ->
+        monitored
+
+      _none when tries > 0 ->
+        Process.sleep(5)
+        wait_for_monitored(pid, tries - 1)
+    end
   end
 
   defp tmp_path(name),

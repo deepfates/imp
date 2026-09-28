@@ -67,24 +67,25 @@ defmodule Imp.Datasets do
     |> from_records(input_keys, Keyword.put_new(opts, :source, path))
   end
 
+  @doc """
+  Loads examples from a CSV file whose first record is the header.
+
+  The file is read as RFC 4180 CSV: a quoted field may contain commas,
+  doubled quotes and line breaks. A line break is CRLF, LF or a bare CR, a
+  leading byte order mark is dropped, and blank lines are skipped. Each record becomes
+  a map from the header's strings to the record's fields. A file that is not
+  valid CSV, or a record whose field count differs from the header's, raises
+  `Imp.Datasets.Error` naming the line the record starts on, with the start
+  of the record that could not be read.
+  """
   def csv(path, input_keys, opts \\ []) do
     opts = Imp.Options.validate!(opts, @file_records_option_schema, "Imp.Datasets.csv/3")
     path = validate_path!(path, "Imp.Datasets.csv/3")
 
-    rows =
-      path
-      |> File.read!()
-      |> String.split(~r/\R/, trim: true)
-      |> Enum.map(&parse_csv_line/1)
-
-    [header | rows] = require_csv_header!(rows, path)
+    {header, rows} = path |> File.read!() |> csv_table(path)
 
     rows
-    |> Enum.with_index(2)
-    |> Enum.map(fn {row, line_number} ->
-      validate_csv_row!(row, header, path, line_number)
-      header |> Enum.zip(row) |> Map.new()
-    end)
+    |> Enum.map(&(header |> Enum.zip(&1) |> Map.new()))
     |> from_records(input_keys, Keyword.put_new(opts, :source, path))
   end
 
@@ -150,7 +151,10 @@ defmodule Imp.Datasets do
     end
   end
 
-  defp require_csv_header!([], path) do
+  defp require_csv_header!([], path), do: raise_no_csv_header!(path)
+  defp require_csv_header!(rows, _path), do: rows
+
+  defp raise_no_csv_header!(path) do
     raise Error,
       message: "invalid CSV dataset at #{path}: expected header row",
       path: path,
@@ -158,15 +162,168 @@ defmodule Imp.Datasets do
       record: nil
   end
 
-  defp require_csv_header!(rows, _path), do: rows
+  # The whole file is parsed at once. `Imp.CSV` takes CRLF, LF and a bare CR
+  # as line breaks, so a file with rows after its header yields them whatever
+  # line endings it uses. A blank line parses as `[""]` and is skipped. So
+  # does a record holding only a quoted empty value, `""`, which is a row: a
+  # file with one is read record by record instead, as is a file that fails
+  # to parse or has a row of the wrong width, where that walk names the line.
+  # The rows parsed so far are garbage by the time the walk starts.
+  defp csv_table(text, path) do
+    case parse_csv(text) do
+      {:ok, rows} ->
+        if quoted_empty_record?(text) do
+          walk_csv(text, path)
+        else
+          [header | rows] = rows |> Enum.reject(&(&1 == [""])) |> require_csv_header!(path)
+          width = length(header)
 
-  defp parse_csv_line(line) do
-    Regex.scan(~r/(?:^|,)(?:"([^"]*(?:""[^"]*)*)"|([^,]*))/, line)
-    |> Enum.map(fn
-      [_all, quoted, ""] -> String.replace(quoted, "\"\"", "\"")
-      [_all, "", bare] -> bare
-    end)
+          if Enum.all?(rows, &(length(&1) == width)),
+            do: {header, rows},
+            else: walk_csv(text, path)
+        end
+
+      :error ->
+        walk_csv(text, path)
+    end
   end
+
+  defp parse_csv(text) do
+    {:ok, Imp.CSV.parse_string(text, skip_headers: false)}
+  rescue
+    NimbleCSV.ParseError -> :error
+  end
+
+  defp quoted_empty_record?(text), do: Regex.match?(~r/(?:\A|[\r\n])""(?:[\r\n]|\z)/, text)
+
+  # The walk runs in a process of its own: a garbage collection in the
+  # caller also goes over whatever else the caller holds. From a process
+  # holding a 400,000-row dataset, the walk over a 200,000-row file took
+  # 190 s in that process and 1 s in its own. Its error is raised again in
+  # the caller.
+  #
+  # The walk is monitored, not linked, so a caller that traps exits finds no
+  # exit message from it afterwards. A guard process kills the walk if the
+  # caller dies first.
+  defp walk_csv(text, path) do
+    caller = self()
+    tag = make_ref()
+
+    {walk, monitor} =
+      spawn_monitor(fn ->
+        result =
+          try do
+            {:ok, csv_records!(text, path)}
+          rescue
+            error -> {:raise, error, __STACKTRACE__}
+          end
+
+        send(caller, {tag, result})
+      end)
+
+    spawn(fn ->
+      caller_down = Process.monitor(caller)
+      walk_down = Process.monitor(walk)
+
+      receive do
+        {:DOWN, ^caller_down, :process, _pid, _reason} -> Process.exit(walk, :kill)
+        {:DOWN, ^walk_down, :process, _pid, _reason} -> :ok
+      end
+    end)
+
+    receive do
+      {^tag, result} ->
+        Process.demonitor(monitor, [:flush])
+
+        case result do
+          {:ok, {nil, _rows}} -> raise_no_csv_header!(path)
+          {:ok, table} -> table
+          {:raise, error, stacktrace} -> reraise error, stacktrace
+        end
+
+      {:DOWN, ^monitor, :process, ^walk, reason} ->
+        exit(reason)
+    end
+  end
+
+  # Splits the file into records, each with the line it starts on, and reads
+  # them one at a time: raises for the first record that cannot be parsed or
+  # whose field count differs from the header's. A record ends at a line
+  # break outside quotes; a record with no text is a blank line.
+  defp csv_records!(text, path) do
+    {records, from, start_line, _line, quoted?} =
+      text
+      |> :binary.matches(["\r\n", "\n", "\r", "\""])
+      |> Enum.reduce({[], 0, 1, 1, false}, fn {at, length},
+                                              {records, from, start, line, quoted?} ->
+        cond do
+          binary_part(text, at, length) == "\"" ->
+            {records, from, start, line, not quoted?}
+
+          quoted? ->
+            {records, from, start, line + 1, quoted?}
+
+          true ->
+            record = binary_part(text, from, at - from)
+            {[{record, start} | records], at + length, line + 1, line + 1, quoted?}
+        end
+      end)
+
+    rest = binary_part(text, from, byte_size(text) - from)
+
+    if quoted? do
+      raise Error,
+        message:
+          "invalid CSV at #{path}:#{start_line}: a quote opened on this line is never closed",
+        path: path,
+        line: start_line,
+        record: truncate(rest)
+    end
+
+    # Each field is copied out of the file's binary. Kept as parts of it, the
+    # rows made every garbage collection in this process slower as they
+    # accumulated: 12.6 s for 400,000 rows against 0.6 s copied.
+    {header, rows} =
+      [{rest, start_line} | records]
+      |> Enum.reverse()
+      |> Enum.reject(fn {record, _line} -> record == "" end)
+      |> Enum.reduce({nil, []}, fn {record, line}, acc ->
+        record
+        |> parse_csv_record!(path, line)
+        |> Enum.map(fn row -> Enum.map(row, &:binary.copy/1) end)
+        |> Enum.reduce(acc, fn
+          row, {nil, []} ->
+            {row, []}
+
+          row, {header, rows} ->
+            validate_csv_row!(row, header, path, line)
+            {header, [row | rows]}
+        end)
+      end)
+
+    {header, Enum.reverse(rows)}
+  end
+
+  defp parse_csv_record!(text, path, line_number) do
+    Imp.CSV.parse_string(text, skip_headers: false)
+  rescue
+    error in NimbleCSV.ParseError ->
+      reraise Error,
+              [
+                message:
+                  "invalid CSV at #{path}:#{line_number}: " <>
+                    truncate(Exception.message(error)),
+                path: path,
+                line: line_number,
+                record: truncate(text)
+              ],
+              __STACKTRACE__
+  end
+
+  @record_limit 200
+
+  defp truncate(text) when byte_size(text) <= @record_limit, do: text
+  defp truncate(text), do: String.slice(text, 0, @record_limit) <> "..."
 
   defp decode_jsonl_line!(line, path, line_number) do
     case Jason.decode(line) do
@@ -240,7 +397,7 @@ defmodule Imp.Datasets do
           "invalid CSV row at #{path}:#{line_number}: expected #{length(header)} fields, got #{length(row)}",
         path: path,
         line: line_number,
-        record: row
+        record: Enum.map(row, &truncate/1)
     end
 
     :ok

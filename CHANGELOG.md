@@ -98,6 +98,73 @@ User-visible changes to Imp are recorded here.
   recorded in the calling process, which made parallel work that process
   started afterwards (`Imp.Predict.Parallel.map/3`, `Imp.Evaluate.run/2`) run
   one item at a time.
+- `Imp.Clients.ReqLLMBatch` no longer sends a request again when it may
+  already have run. A dispatch that timed out, crashed, threw or exited was
+  retried as transient, so one request could run and be billed several
+  times; it is now `:ambiguous` and final, as an uncommitted dispatch already
+  was on resume. A dispatcher may return `{:ambiguous, reason}` itself.
+  `req_llm_dispatcher/2`:
+  - makes every call with `max_retries: 0`. ReqLLM's own retry step resent a
+    timed-out or refused request up to three more times inside one batch
+    attempt, so a single attempt could send a request four times.
+  - retries only a request that never reached the provider (connection
+    refused, or no pooled connection free, as Req reports it) or that the
+    provider answered with 408, 425, 429, 503 or 529.
+  - treats any other 4xx as terminal.
+  - treats a 500, 502, 504 or any other 5xx but 503 and 529, and a timeout
+    or closed connection with no response, as `:ambiguous`. A 5xx was
+    retried.
+  Before a retry the batch waits: for the provider's `retry-after` (seconds
+  or an HTTP date) when it sent one, otherwise with exponential backoff and
+  jitter, capped by the new `:max_retry_wait` option (default 60 s). A
+  waiting request takes no dispatch slot from the others. When the provider
+  asks for longer than `:max_retry_wait`, or the wait would pass the
+  `Imp.Deadline` in force, the request is not retried in that run: it stays
+  `:transient_failure`, the summary is not `complete?`, and `resume/3`
+  retries it. The checkpoint keeps the time each such request may be sent
+  again (`not_before`, UTC), and `resume/3` waits for it under the same
+  rules or stops the retry again without sending. `retry-after` may be an
+  IMF-fixdate, an RFC 850 date or an asctime date. A process that traps
+  exits and is stopped by its parent during the wait exits at once with the
+  parent's reason; a dispatch wave in progress is still waited for, up to
+  `:timeout`, and a process started with bare `spawn` has no parent to
+  listen for and sleeps uninterrupted.
+- The `ReqLLM.Error.API.Request` inside an `Imp.LMError` from
+  `Imp.Clients.ReqLLM` carries at most one response header, `retry-after`,
+  so the caller can wait before retrying (ReqLLM's own decoding dropped it).
+  Any other header ReqLLM left on the error is removed, so cookies, account
+  identifiers and request ids no longer reach logs, checkpoints or run
+  events through `inspect/1` of the error.
+  A checkpoint written by 0.5.0 is rewritten at schema version 2 on resume,
+  and its `:transient_failure` requests become `:ambiguous`, since 0.5.0
+  recorded timeouts and dispatcher crashes that way.
+- An MCP call the server answers with HTTP 503 or 529 is `:refused`, like a
+  429, where it was `:unknown`: RFC 9110 defines 503 as the server being
+  unable to handle the request, and providers answer overload with 503 or
+  529. MCP and language-model calls read a status the
+  same way.
+- `Imp.Datasets.csv/3` reads quoted fields. It raised `FunctionClauseError`
+  on any quoted field and could not read a quoted line break. It now parses
+  RFC 4180 CSV with NimbleCSV, a new dependency (`nimble_csv ~> 1.3`). A
+  line break may be CRLF, LF or a bare CR (as Excel for Mac writes), and a
+  leading byte order mark is dropped; it was read into the first column's
+  name. A blank line is skipped; a record holding only `""` is a row with
+  an empty value, so in a file with more than one column a `""` line is now
+  refused as `invalid CSV row at <path>:<line>: expected N fields, got 1`,
+  where 0.5.0 raised `FunctionClauseError` on it as on any quoted field. A malformed file raises `Imp.Datasets.Error` naming the line its
+  record starts on, with the start of that record (at most 200 characters)
+  as `record`. Some files 0.5.0 loaded are now refused:
+  - a quote inside an unquoted field, such as an inch mark (`12" pipe,1`):
+    `invalid CSV at <path>:<line>: a quote opened on this line is never
+    closed`, or, when the line holds two (`12" by 3" board,1`),
+    `invalid CSV at <path>:<line>: unexpected escape character " in "..."`.
+  - a space between a comma and a quoted field (`x, "y"`):
+    `invalid CSV at <path>:<line>: unexpected escape character " in "..."`.
+  Quote the whole field and double the quotes inside it (`"12"" pipe",1`),
+  or remove the space.
+- `Imp.Evaluate.Result.save_as_csv/2` writes with the same CSV module that
+  `Imp.Datasets.csv/3` reads with, so what it writes reads back unchanged.
+  The bytes it writes are the same as before.
 - An instruction an optimizer sets on `Imp.Predict.ProgramOfThought` or
   `Imp.Predict.CodeAct` reaches the extraction step, which kept the old
   instructions when GEPA, MIPROv2, COPRO, SIMBA or InferRules set it.
