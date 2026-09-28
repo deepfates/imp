@@ -23,7 +23,16 @@ defmodule Imp.Predict.ReActV2.StepError do
       run, so a host that keeps a conversation stores it as it stores a
       finished turn's.
 
+  `Imp.Errors.retryable?/1` on this error answers whether the last model
+  request may be sent again, not whether the turn may: the tools in
+  `:history` have already run, and running the turn again from its inputs
+  runs them again. A host that continues continues from `:history`.
+
   No partial prediction exists: a turn that stopped here has no outputs.
+
+  Inspecting the error shows the reason and how many messages the history
+  holds, not the history: a host that logs or records an inspected error does
+  not write the trajectory, with its provider reasoning continuation, there.
   """
 
   defexception [:message, :reason, :history]
@@ -53,4 +62,22 @@ defmodule Imp.Predict.ReActV2.StepError do
 
   defp describe(exception) when is_exception(exception), do: Exception.message(exception)
   defp describe(reason), do: inspect(reason, limit: 20, printable_limit: 500)
+end
+
+defimpl Inspect, for: Imp.Predict.ReActV2.StepError do
+  import Inspect.Algebra
+
+  def inspect(%{reason: reason, history: history}, opts) do
+    count =
+      case history do
+        %Imp.History{messages: messages} -> length(messages)
+        _none -> 0
+      end
+
+    concat([
+      "#Imp.Predict.ReActV2.StepError<reason: ",
+      to_doc(reason, opts),
+      ", history: #{count} #{if count == 1, do: "message", else: "messages"}>"
+    ])
+  end
 end

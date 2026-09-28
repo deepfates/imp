@@ -360,23 +360,25 @@ defmodule Imp.Clients.ReqLLM do
   end
 
   defp send_generate(lm, messages, opts) do
+    provider = model_provider(lm.model)
+
     case lm.req_module.generate_text(lm.model, to_req_messages(messages), opts) do
       {:ok, response} ->
         case relayed_error(response) do
           nil -> {:ok, from_response(response, lm.model)}
-          error -> {:error, lm_error(error)}
+          error -> {:error, lm_error(error, provider)}
         end
 
       {:error, reason} ->
-        {:error, lm_error(reason)}
+        {:error, lm_error(reason, provider)}
 
       other ->
-        {:error, lm_error({:invalid_req_llm_response, other}, false)}
+        {:error, lm_error({:invalid_req_llm_response, other}, false, provider)}
     end
   rescue
-    error -> {:error, lm_error(error)}
+    error -> {:error, lm_error(error, model_provider(lm.model))}
   catch
-    kind, reason -> {:error, lm_error({kind, reason})}
+    kind, reason -> {:error, lm_error({kind, reason}, model_provider(lm.model))}
   end
 
   # OpenRouter relays an upstream provider's refusal as a successful HTTP
@@ -409,11 +411,13 @@ defmodule Imp.Clients.ReqLLM do
 
   # Every failed request becomes one `Imp.LMError`, classified here, where the
   # provider library's error shapes are known, so no caller has to know them.
-  defp lm_error(%Imp.LMError{} = error), do: error
+  # `provider` is the model's provider, when known, for the error shapes only
+  # one provider sends.
+  defp lm_error(%Imp.LMError{} = error, _provider), do: error
 
-  defp lm_error(reason), do: lm_error(reason, retryable?(reason))
+  defp lm_error(reason, provider), do: lm_error(reason, retryable?(reason), provider)
 
-  defp lm_error(reason, retryable) do
+  defp lm_error(reason, retryable, provider) do
     stripped = only_retry_after_header(reason)
 
     %Imp.LMError{
@@ -421,7 +425,7 @@ defmodule Imp.Clients.ReqLLM do
       status: status(reason),
       reason: stripped,
       retryable: retryable,
-      context_window_exceeded: context_length_exceeded?(reason)
+      context_window_exceeded: context_length_exceeded?(reason, provider)
     }
   end
 
@@ -487,25 +491,29 @@ defmodule Imp.Clients.ReqLLM do
 
   # A provider refuses a request whose input is longer than the model accepts
   # with an HTTP 400 whose body says so in a shape of its own. Only those
-  # documented shapes are read; a 400 of another kind, or prose that merely
-  # mentions context, is not this refusal.
+  # shapes are read, each from the source cited beside it; a 400 of another
+  # kind, or prose that merely mentions context, is not this refusal.
   #
   # A streamed request's HTTP error arrives as an `API.Stream` error whose
   # `cause` is the `API.Request` error, and ReqLLM keeps only the body's inner
   # `error` object as its `response_body` there
   # (`ReqLLM.Streaming.Failure.api_error/4`); a non-streamed one keeps the
-  # whole body. Both are read.
-  defp context_length_exceeded?(%ReqLLM.Error.API.Stream{cause: cause}),
-    do: context_length_exceeded?(cause)
+  # whole body. Both are read. `provider` is the model's provider when the
+  # client knows it, and `nil` otherwise.
+  defp context_length_exceeded?(%ReqLLM.Error.API.Stream{cause: cause}, provider),
+    do: context_length_exceeded?(cause, provider)
 
-  defp context_length_exceeded?(%ReqLLM.Error.API.Request{status: 400, response_body: body}) do
+  defp context_length_exceeded?(
+         %ReqLLM.Error.API.Request{status: 400, response_body: body},
+         provider
+       ) do
     case error_object(decode_error_body(body)) do
-      %{} = error -> overflow_error?(error)
+      %{} = error -> overflow_error?(error, provider)
       _other -> false
     end
   end
 
-  defp context_length_exceeded?(_reason), do: false
+  defp context_length_exceeded?(_reason, _provider), do: false
 
   defp decode_error_body(body) when is_binary(body) do
     case Jason.decode(body) do
@@ -516,6 +524,11 @@ defmodule Imp.Clients.ReqLLM do
 
   defp decode_error_body(body), do: body
 
+  # Gemini's `streamGenerateContent` answers with a JSON array, which ReqLLM
+  # reads as a stream of array elements (`ReqLLM.Providers.Google`'s
+  # `:json_array` stream protocol); an error on it arrives as a one-element
+  # array, and `ReqLLM.Streaming.Failure` keeps a decoded list as it is.
+  defp error_object([first | _rest]), do: error_object(first)
   defp error_object(%{"error" => %{} = error}), do: error
   defp error_object(%{} = error), do: error
   defp error_object(_body), do: nil
@@ -526,39 +539,66 @@ defmodule Imp.Clients.ReqLLM do
   # (https://github.com/langchain-ai/langchain/issues/16781), and
   # OpenAI-compatible servers copy the code (vLLM:
   # https://github.com/vllm-project/vllm/pull/37011).
-  defp overflow_error?(%{"code" => "context_length_exceeded"}), do: true
+  defp overflow_error?(%{"code" => "context_length_exceeded"}, _provider), do: true
 
   # OpenRouter: the typed `error_type` `context_length_exceeded`, "The combined
   # input and output tokens exceed the model's context window", at
   # `error.metadata.error_type` on Chat Completions and `error.error_type` on
   # its Anthropic Messages surface
-  # (https://openrouter.ai/docs/api-reference/errors).
-  defp overflow_error?(%{"metadata" => %{"error_type" => "context_length_exceeded"}}), do: true
-  defp overflow_error?(%{"error_type" => "context_length_exceeded"}), do: true
+  # (https://openrouter.ai/docs/api-reference/errors). The field is
+  # OpenRouter's, so another known provider's body is not read for it.
+  defp overflow_error?(%{"metadata" => %{"error_type" => "context_length_exceeded"}}, provider)
+       when provider in [nil, :openrouter],
+       do: true
 
-  # Anthropic: a 400 `invalid_request_error` whose message is "prompt is too
-  # long", returned when the input alone exceeds the context window
-  # (https://platform.claude.com/docs/en/build-with-claude/context-windows).
-  # The error type is shared by every malformed request, so the message is
-  # what names this one.
-  defp overflow_error?(%{"type" => "invalid_request_error", "message" => message})
+  defp overflow_error?(%{"error_type" => "context_length_exceeded"}, provider)
+       when provider in [nil, :openrouter],
+       do: true
+
+  # Anthropic answers a 400 `invalid_request_error` in two cases. "prompt is
+  # too long" when the input alone exceeds the context window
+  # (https://platform.claude.com/docs/en/build-with-claude/context-windows),
+  # in full "prompt is too long: 203284 tokens > 200000 maximum"
+  # (https://github.com/anthropics/claude-code/issues/59696). And, on models
+  # before Claude 4.5, a validation error when the input plus `max_tokens`
+  # exceeds it (same page), "input length and `max_tokens` exceed context
+  # limit: 186433 + 20000 > 200000, decrease input length or `max_tokens` and
+  # try again" (https://github.com/anthropics/claude-code/issues/476). The
+  # error type is shared by every malformed request, so the message is what
+  # names these.
+  @anthropic_overflow [
+    ~r/^prompt is too long: \d+ tokens > \d+ maximum/,
+    ~r/^input length and `?max_tokens`? exceed context limit: \d+ \+ \d+ > \d+/
+  ]
+
+  # Mistral: `{"object": "Error", "message": "Prompt contains 65673 tokens,
+  # too large for model with 32768 maximum context length", "type":
+  # "invalid_request_error", "code": 3051}`, as Mistral Large reported it
+  # (https://discuss.google.dev/t/mistral-large-2407-inference-context-length-error/165446).
+  @mistral_overflow ~r/^Prompt contains \d+ tokens, too large for model with \d+ maximum context length/
+
+  defp overflow_error?(%{"type" => "invalid_request_error", "message" => message}, _provider)
        when is_binary(message),
-       do: String.starts_with?(message, "prompt is too long")
+       do: Enum.any?([@mistral_overflow | @anthropic_overflow], &Regex.match?(&1, message))
 
   # Google Gemini: a 400 `INVALID_ARGUMENT` whose message is "The input token
-  # count (N) exceeds the maximum number of tokens allowed (M)." The status is
-  # shared by every invalid argument, so the message names this one. Google's
-  # error reference does not list it; the text is the API's own, as Google's
-  # Gemini CLI reports it (https://github.com/google-gemini/gemini-cli/issues/11248).
-  defp overflow_error?(%{"status" => "INVALID_ARGUMENT", "message" => message})
-       when is_binary(message),
-       do:
-         Regex.match?(
-           ~r/^The input token count \(\d*\) exceeds the maximum number of tokens allowed/,
-           message
-         )
+  # count (N) exceeds the maximum number of tokens allowed (M)." Google's error
+  # reference does not list it; the text is the API's own, as Google's Gemini
+  # CLI reports it (https://github.com/google-gemini/gemini-cli/issues/11248).
+  # Vertex AI words the same refusal "Unable to submit request because the
+  # input token count is N but model only supports up to M."
+  # (https://github.com/google-gemini/gemini-cli/issues/19727).
+  @google_overflow [
+    ~r/^The input token count \(\d*\) exceeds the maximum number of tokens allowed \(\d+\)/,
+    ~r/^Unable to submit request because the input token count is \d+ but model only supports up to \d+/
+  ]
 
-  defp overflow_error?(_error), do: false
+  defp overflow_error?(%{"message" => message} = error, _provider) when is_binary(message) do
+    Map.get(error, "status", "INVALID_ARGUMENT") == "INVALID_ARGUMENT" and
+      Enum.any?(@google_overflow, &Regex.match?(&1, message))
+  end
+
+  defp overflow_error?(_error, _provider), do: false
 
   defp lm_error_message(reason) when is_exception(reason), do: Exception.message(reason)
   defp lm_error_message(reason), do: inspect(reason, limit: 20, printable_limit: 500)
@@ -692,16 +732,18 @@ defmodule Imp.Clients.ReqLLM do
   end
 
   defp open_provider_stream(lm, messages, opts) do
+    provider = model_provider(lm.model)
+
     case lm.req_module.stream_text(lm.model, to_req_messages(messages), opts) do
       {:ok, %ReqLLM.StreamResponse{} = response} -> {:ok, response}
-      {:ok, other} -> {:error, lm_error({:invalid_req_llm_stream, other}, false)}
-      {:error, reason} -> {:error, lm_error(reason)}
-      other -> {:error, lm_error({:invalid_req_llm_stream, other}, false)}
+      {:ok, other} -> {:error, lm_error({:invalid_req_llm_stream, other}, false, provider)}
+      {:error, reason} -> {:error, lm_error(reason, provider)}
+      other -> {:error, lm_error({:invalid_req_llm_stream, other}, false, provider)}
     end
   rescue
-    error -> {:error, lm_error(error)}
+    error -> {:error, lm_error(error, model_provider(lm.model))}
   catch
-    kind, reason -> {:error, lm_error({kind, reason})}
+    kind, reason -> {:error, lm_error({kind, reason}, model_provider(lm.model))}
   end
 
   # A saved client holds no credential: none by key name, no header at all,
@@ -2017,7 +2059,8 @@ defmodule Imp.Clients.ReqLLM do
           completed?: false,
           failed?: false,
           terminal_error: nil,
-          metadata: %{}
+          metadata: %{},
+          provider: model_provider(lm.model)
         }
 
       {:error, reason} ->
@@ -2029,7 +2072,8 @@ defmodule Imp.Clients.ReqLLM do
           completed?: false,
           failed?: true,
           terminal_error: reason,
-          metadata: %{}
+          metadata: %{},
+          provider: model_provider(lm.model)
         }
     end
   end
@@ -2089,7 +2133,7 @@ defmodule Imp.Clients.ReqLLM do
   # The stream had opened, so the request reached the provider: sending it
   # again may be billed again, and repeats chunks the caller already has.
   defp stream_failure(state, error) do
-    reason = lm_error(error, true)
+    reason = lm_error(error, true, state.provider)
 
     {[%Imp.Streaming.Messages.StreamResponse{chunk: {:error, reason}, done: true}],
      %{state | completed?: true, failed?: true}}

@@ -32,6 +32,9 @@ User-visible changes to Imp are recorded here.
   match `{:error, %Imp.Predict.ReActV2.StepError{reason: reason, history:
   history}}` where you checked `Imp.Prediction.complete?/1` after a model
   failure, and store `history` as you store a finished turn's.
+  `Imp.Errors.retryable?/1` on it says whether the last model request may be
+  sent again, not the turn: its tools have run. Inspecting it shows the reason
+  and the history's size, not the history.
 - Breaking: an `Imp.Predict.ReActV2` step refused by an
   `Imp.OperationalSafetyError` (a route, cost, transport or budget guard) ends
   the turn at once with that error as the `StepError`'s `:reason`. It made the
@@ -39,14 +42,18 @@ User-visible changes to Imp are recorded here.
   `:last_text` or `:forced_submit`, passing the guard by. Migration: none for
   a caller that already treats safety errors as fatal; `Imp.Evaluate` and the
   optimizers find the guard inside the `StepError` and raise it.
-- `Imp.Clients.ReqLLM` marks `context_window_exceeded` on the length refusals
-  of Anthropic ("prompt is too long"), Google Gemini ("The input token count
-  ... exceeds the maximum number of tokens allowed") and OpenRouter
-  (`error_type: "context_length_exceeded"`), and on OpenAI's
-  `context_length_exceeded` when the request was streamed. Only OpenAI's
-  non-streamed refusal was marked, so the others failed the call instead of
-  letting `Imp.Predict.ReActV2` leave out older episodes or end the turn
-  `:incomplete`.
+- `Imp.Clients.ReqLLM` marks `context_window_exceeded` on more providers'
+  length refusals, streamed or not: Anthropic's "prompt is too long: N tokens
+  > M maximum" and "input length and `max_tokens` exceed context limit",
+  Google Gemini's "The input token count (N) exceeds the maximum number of
+  tokens allowed" (including a `streamGenerateContent` error sent as a JSON
+  array) and Vertex AI's "the input token count is N but model only supports
+  up to M", Mistral's "Prompt contains N tokens, too large for model with M
+  maximum context length", and OpenRouter's `error_type:
+  "context_length_exceeded"` from an OpenRouter model. Only OpenAI's
+  non-streamed `context_length_exceeded` was marked, so the others failed the
+  call instead of letting `Imp.Predict.ReActV2` leave out older episodes or
+  end the turn `:incomplete`.
 
 ### Fixed
 

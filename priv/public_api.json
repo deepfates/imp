@@ -980,6 +980,11 @@
     },
     {
       "category": "internal",
+      "module": "Inspect.Imp.Predict.ReActV2.StepError",
+      "source": "lib/imp/predict/react_v2/step_error.ex"
+    },
+    {
+      "category": "internal",
       "module": "Inspect.Imp.Retrievers.HTTP",
       "source": "lib/imp/redaction.ex"
     },

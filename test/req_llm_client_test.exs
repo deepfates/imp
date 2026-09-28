@@ -2453,80 +2453,168 @@ defmodule ReqLLMClientTest do
 
   describe "a request refused for its length" do
     # Each provider's refusal body, as its API sends it (sources in
-    # `Imp.Clients.ReqLLM`'s `overflow_error?/1`).
+    # `Imp.Clients.ReqLLM`'s `overflow_error?/2`), named by the provider the
+    # request goes to.
+    @gemini_overflow %{
+      "error" => %{
+        "code" => 400,
+        "message" =>
+          "The input token count (2551556) exceeds the maximum number of tokens allowed (1048576).",
+        "status" => "INVALID_ARGUMENT"
+      }
+    }
+
     @overflow_bodies [
-      openai:
-        {"/v1",
-         %{
-           "error" => %{
-             "message" => "This model's maximum context length is 128000 tokens.",
-             "type" => "invalid_request_error",
-             "param" => "messages",
-             "code" => "context_length_exceeded"
-           }
-         }},
-      anthropic:
-        {"/v1",
-         %{
-           "type" => "error",
-           "error" => %{
-             "type" => "invalid_request_error",
-             "message" => "prompt is too long: 210000 tokens > 200000 maximum"
-           }
-         }},
-      google:
-        {"",
-         %{
-           "error" => %{
-             "code" => 400,
-             "message" =>
-               "The input token count (2551556) exceeds the maximum number of tokens allowed (1048576).",
-             "status" => "INVALID_ARGUMENT"
-           }
-         }},
-      openrouter:
-        {"/v1",
-         %{
-           "error" => %{
-             "code" => 400,
-             "message" => "This endpoint's maximum context length is 128000 tokens.",
-             "metadata" => %{"error_type" => "context_length_exceeded"}
-           }
-         }}
+      {"openai",
+       {:openai, "/v1",
+        %{
+          "error" => %{
+            "message" => "This model's maximum context length is 128000 tokens.",
+            "type" => "invalid_request_error",
+            "param" => "messages",
+            "code" => "context_length_exceeded"
+          }
+        }}},
+      {"anthropic prompt too long",
+       {:anthropic, "/v1",
+        %{
+          "type" => "error",
+          "error" => %{
+            "type" => "invalid_request_error",
+            "message" => "prompt is too long: 210000 tokens > 200000 maximum"
+          }
+        }}},
+      {"anthropic input plus max_tokens",
+       {:anthropic, "/v1",
+        %{
+          "type" => "error",
+          "error" => %{
+            "type" => "invalid_request_error",
+            "message" =>
+              "input length and `max_tokens` exceed context limit: 189127 + 16000 > 200000, " <>
+                "decrease input length or `max_tokens` and try again"
+          }
+        }}},
+      {"gemini", {:google, "", @gemini_overflow}},
+      {"gemini as a JSON array", {:google, "", [@gemini_overflow]}},
+      {"vertex wording",
+       {:google, "",
+        %{
+          "error" => %{
+            "code" => 400,
+            "message" =>
+              "Unable to submit request because the input token count is 1251952 but model " <>
+                "only supports up to 1048576. Reduce the input token count and try again.",
+            "status" => "INVALID_ARGUMENT"
+          }
+        }}},
+      {"mistral",
+       {:mistral, "/v1",
+        %{
+          "object" => "Error",
+          "message" =>
+            "Prompt contains 65673 tokens, too large for model with 32768 maximum context length",
+          "type" => "invalid_request_error",
+          "code" => 3051
+        }}},
+      {"openrouter",
+       {:openrouter, "/v1",
+        %{
+          "error" => %{
+            "code" => 400,
+            "message" => "This endpoint's maximum context length is 128000 tokens.",
+            "metadata" => %{"error_type" => "context_length_exceeded"}
+          }
+        }}}
     ]
 
     # The same statuses and error types for another fault.
     @other_bodies [
-      anthropic:
-        {"/v1",
-         %{
-           "type" => "error",
-           "error" => %{
-             "type" => "invalid_request_error",
-             "message" => "messages: roles must alternate; the prompt is too long to tell"
-           }
-         }},
-      google:
-        {"",
-         %{
-           "error" => %{
-             "code" => 400,
-             "message" => "Invalid value at 'contents[0]': input token count unknown.",
-             "status" => "INVALID_ARGUMENT"
-           }
-         }},
-      openrouter:
-        {"/v1",
-         %{
-           "error" => %{
-             "code" => 400,
-             "message" => "maximum context length is mentioned in prose",
-             "metadata" => %{"error_type" => "invalid_request"}
-           }
-         }}
+      {"anthropic, another invalid request",
+       {:anthropic, "/v1",
+        %{
+          "type" => "error",
+          "error" => %{
+            "type" => "invalid_request_error",
+            "message" => "messages: roles must alternate; the prompt is too long to tell"
+          }
+        }}},
+      {"anthropic, the bare prefix",
+       {:anthropic, "/v1",
+        %{
+          "type" => "error",
+          "error" => %{
+            "type" => "invalid_request_error",
+            "message" => "prompt is too long for a system block"
+          }
+        }}},
+      {"anthropic, another input length fault",
+       {:anthropic, "/v1",
+        %{
+          "type" => "error",
+          "error" => %{
+            "type" => "invalid_request_error",
+            "message" => "input length and `max_tokens` must be positive"
+          }
+        }}},
+      {"gemini, another invalid argument",
+       {:google, "",
+        %{
+          "error" => %{
+            "code" => 400,
+            "message" => "Invalid value at 'contents[0]': input token count unknown.",
+            "status" => "INVALID_ARGUMENT"
+          }
+        }}},
+      {"gemini as a JSON array, another invalid argument",
+       {:google, "",
+        [
+          %{
+            "error" => %{
+              "code" => 400,
+              "message" => "Invalid value at 'contents[0]': input token count unknown.",
+              "status" => "INVALID_ARGUMENT"
+            }
+          }
+        ]}},
+      {"vertex, another refusal",
+       {:google, "",
+        %{
+          "error" => %{
+            "code" => 400,
+            "message" => "Unable to submit request because it has an empty text parameter.",
+            "status" => "INVALID_ARGUMENT"
+          }
+        }}},
+      {"mistral, another invalid request",
+       {:mistral, "/v1",
+        %{
+          "object" => "Error",
+          "message" => "Prompt contains an invalid role sequence",
+          "type" => "invalid_request_error",
+          "code" => 3230
+        }}},
+      {"openrouter, another error type",
+       {:openrouter, "/v1",
+        %{
+          "error" => %{
+            "code" => 400,
+            "message" => "maximum context length is mentioned in prose",
+            "metadata" => %{"error_type" => "invalid_request"}
+          }
+        }}},
+      {"openrouter's field from another provider",
+       {:openai, "/v1",
+        %{
+          "error" => %{
+            "code" => 400,
+            "message" => "This endpoint's maximum context length is 128000 tokens.",
+            "metadata" => %{"error_type" => "context_length_exceeded"}
+          }
+        }}}
     ]
 
-    defp overflow_lm(provider, {path, body}) do
+    defp overflow_lm({provider, path, body}) do
       url = Imp.Test.LocalHTTP.start(fn _request -> {400, body} end)
 
       Imp.req_llm(
@@ -2549,10 +2637,10 @@ defmodule ReqLLMClientTest do
       end)
     end
 
-    for {provider, response} <- @overflow_bodies, mode <- [:generate, :stream] do
+    for {name, response} <- @overflow_bodies, mode <- [:generate, :stream] do
       @response response
-      test "#{provider}'s refusal is marked, #{if mode == :stream, do: "streamed", else: "not streamed"}" do
-        lm = overflow_lm(unquote(provider), @response)
+      test "#{name}: the refusal is marked, #{if mode == :stream, do: "streamed", else: "not streamed"}" do
+        lm = overflow_lm(@response)
 
         assert {:error, %Imp.LMError{context_window_exceeded: true} = error} =
                  refusal(lm, unquote(mode))
@@ -2561,10 +2649,10 @@ defmodule ReqLLMClientTest do
       end
     end
 
-    for {provider, response} <- @other_bodies, mode <- [:generate, :stream] do
+    for {name, response} <- @other_bodies, mode <- [:generate, :stream] do
       @response response
-      test "#{provider}'s other 400 is not marked, #{if mode == :stream, do: "streamed", else: "not streamed"}" do
-        lm = overflow_lm(unquote(provider), @response)
+      test "#{name}: not marked, #{if mode == :stream, do: "streamed", else: "not streamed"}" do
+        lm = overflow_lm(@response)
 
         assert {:error, %Imp.LMError{context_window_exceeded: false}} =
                  refusal(lm, unquote(mode))

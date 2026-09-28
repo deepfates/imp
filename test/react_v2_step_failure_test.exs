@@ -283,6 +283,103 @@ defmodule ReActV2StepFailureTest do
     end
   end
 
+  describe "a guard's refusal a tool returned" do
+    # The tool's result is an observation the turn goes on from; only the
+    # request that stopped the turn says why it stopped.
+    defp charge_program(after_charge) do
+      cost = Imp.OperationalSafetyError.exception(kind: :cost, reason: :over_cap)
+      charge = Imp.tool(:charge, "Charge the card", fn _arguments -> {:error, cost} end)
+      counter = :counters.new(1, [])
+
+      lm =
+        Imp.Test.FunLM.new(fn _messages, _opts ->
+          :counters.add(counter, 1, 1)
+
+          case :counters.get(counter, 1) do
+            1 -> {:ok, %{tool_calls: [%{id: "charge", name: "charge", arguments: %{}}]}}
+            _later -> after_charge
+          end
+        end)
+
+      Imp.react("intent -> answer", [charge], lm: lm)
+    end
+
+    defp devset, do: [Imp.example(intent: "pay", answer: "Paid.") |> Imp.with_inputs(:intent)]
+    defp metric, do: fn _example, _prediction, _trace -> 1.0 end
+
+    test "a turn that answers after it is scored" do
+      result = Imp.evaluate(charge_program({:ok, "Could not pay."}), devset(), metric())
+
+      assert result.errors == []
+      assert result.score > 0
+    end
+
+    test "a turn whose model then fails is an error row, not the guard" do
+      program = charge_program({:error, unavailable()})
+
+      assert {:error, %StepError{reason: %Imp.LMError{status: 503}, history: history} = error} =
+               Imp.call(program, %{intent: "pay"})
+
+      assert inspect(history) =~ "over_cap"
+      assert Imp.OperationalSafetyError.find(error) == nil
+
+      result = Imp.evaluate(program, devset(), metric())
+      assert [%{reason: %StepError{reason: %Imp.LMError{status: 503}}}] = result.errors
+    end
+  end
+
+  # An endpoint that cannot name `submit` in `tool_choice` gets the forced
+  # submit again with "required"; a guard refusing that request ends the turn,
+  # rather than the typed extraction answering past it.
+  test "a guard refusing the required-only forced submit is fatal" do
+    safety = Imp.OperationalSafetyError.exception(kind: :route, reason: :refused_by_fixture)
+    owner = self()
+    counter = :counters.new(1, [])
+
+    unsupported = %Imp.LMError{
+      status: 400,
+      message: "Invalid value for 'tool_choice': supported string values are none, auto, required"
+    }
+
+    lm =
+      Imp.Test.FunLM.new(fn _messages, opts ->
+        :counters.add(counter, 1, 1)
+        send(owner, {:tool_choice, opts[:tool_choice]})
+
+        case :counters.get(counter, 1) do
+          1 -> {:ok, "Prose, no call."}
+          2 -> {:error, unsupported}
+          3 -> {:error, safety}
+          _extraction -> {:ok, %{reasoning: "From memory.", answer: "Paris", confidence: 0.5}}
+        end
+      end)
+
+    assert {:error, %StepError{reason: ^safety}} =
+             Imp.react(@submit_signature, [look(self())], lm: lm)
+             |> Imp.call(%{question: "Capital of France?"})
+
+    assert_received {:tool_choice, %{type: "tool", name: "submit"}}
+    assert_received {:tool_choice, "required"}
+    assert :counters.get(counter, 1) == 3
+  end
+
+  test "inspecting the error shows the reason and the history's size, not the history" do
+    owner = self()
+
+    assert {:error, %StepError{history: history} = error} =
+             Imp.react("intent -> answer", [look(owner)], lm: failing_after([@look_call]))
+             |> Imp.call(%{intent: "a secret intent"})
+
+    assert length(history.messages) == 1
+    text = inspect(error)
+
+    assert text =~ "#Imp.Predict.ReActV2.StepError<reason: %Imp.LMError{"
+    assert text =~ "status: 503"
+    assert text =~ "history: 1 message>"
+    refute text =~ "a secret intent"
+    refute text =~ "seen"
+  end
+
   # A last request refused because the context window is full ends the turn
   # incomplete, not as an error: the caller shortens the input.
   test "a last request refused for length is incomplete, not an error" do
