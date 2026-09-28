@@ -54,11 +54,11 @@
   {"bench/imp/benchmark_truth/runner.ex", :guard_fail, {651, 55}},
   # defensive clause: ReqLLM.model/1 contracts to ok/error tuples only; the
   # catch-all turns any unexpected registry result into a loud error (#75)
-  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {163, 7}},
+  {"lib/imp/clients/req_llm.ex", :pattern_match_cov, {172, 7}},
   # defensive guard: ReqLLM.Response types provider_meta as map() with a %{}
   # default, but the struct does not enforce it (a caller can build one with
   # nil), and ReqLLM's own OpenTelemetry attributes guard it with is_map/1.
-  {"lib/imp/clients/req_llm.ex", :guard_fail, 1868},
+  {"lib/imp/clients/req_llm.ex", :guard_fail, 1879},
   # defensive error clause on an always-ok internal call
   {"lib/imp/clients/training.ex", :pattern_match, {1215, 13}},
   # defensive error clause on an always-ok internal call
