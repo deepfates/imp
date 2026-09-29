@@ -115,8 +115,10 @@ defmodule Imp.Predict.ReActV2 do
 
   The last request says nothing about why it is being made unless
   `:last_request_note` is given: one line of host text put in front of it as a
-  user message and kept in the returned history like any other turn. Imp
-  writes no sentence of its own.
+  user message and kept in the returned history like any other turn. It is
+  recorded as a step that said nothing and called nothing, so it renders as
+  that user message alone, with no assistant reply after it, in the request and
+  whenever the history is passed back. Imp writes no sentence of its own.
 
   A request refused because the context window is full is not an
   interruption of this kind: a further request would be refused the same way,
@@ -700,7 +702,7 @@ defmodule Imp.Predict.ReActV2 do
   # the history first, as the user turn they are.
   defp note_after_inputs(history, pending, %{last_request_note: note} = react)
        when is_binary(note) and note != "" and map_size(pending) > 0 do
-    history = history |> append_history(pending) |> append_note(react.signature, note)
+    history = history |> append_user_turn(pending) |> append_note(react.signature, note)
     {history, %{}}
   end
 
@@ -768,12 +770,25 @@ defmodule Imp.Predict.ReActV2 do
   # prompt renders it as the last user message before the last request.
   defp append_note(history, signature, text) when is_binary(text) and text != "" do
     case Imp.Signature.input_names(signature) do
-      [first | _rest] -> append_history(history, %{first => text})
+      [first | _rest] -> append_user_turn(history, %{first => text})
       [] -> history
     end
   end
 
   defp append_note(history, _signature, _none), do: history
+
+  # A turn the loop records with only a user side (the note, or inputs no step
+  # spent) is a step event that called nothing and said nothing. The chat
+  # adapter renders such a step as its user message alone, in every tool mode,
+  # and a host that hands the history back gets the same rendering. Stored as
+  # inputs alone, it would be a DSPy `History` entry, which the adapter renders
+  # as a finished exchange with a filler reply the model never gave.
+  defp append_user_turn(history, fields) do
+    append_history(
+      history,
+      Map.merge(fields, %{tool_calls: %ToolCalls{tool_calls: []}, tool_call_results: []})
+    )
+  end
 
   defp forced_submit_prediction(react, history, pending) do
     forced = forced_submit_program(react, %{type: "tool", name: "submit"})

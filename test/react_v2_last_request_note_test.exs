@@ -71,6 +71,135 @@ defmodule ReActV2LastRequestNoteTest do
     refute Enum.any?(forced, &(&1[:role] == :user and String.trim(&1[:content] || "") == ""))
   end
 
+  # An LM that writes its tool calls as text: the step lists the tools and
+  # replays earlier steps as text, never as native tool messages.
+  defmodule TextOnlyLM do
+    @behaviour Imp.LM
+    defstruct [:handler]
+
+    @impl true
+    def generate(%__MODULE__{handler: handler}, messages, opts),
+      do: {:ok, handler.(messages, opts)}
+
+    def tool_calling_capability(%__MODULE__{}), do: false
+  end
+
+  @filler "Not supplied for this conversation history message."
+
+  # The first request looks; every later one submits. The replies are native
+  # tool calls, or the same calls written as text for an LM that cannot call
+  # tools.
+  defp moded_lm(owner, native?) do
+    counter = :counters.new(1, [])
+
+    handler = fn messages, opts ->
+      :counters.add(counter, 1, 1)
+      n = :counters.get(counter, 1)
+      send(owner, {:request, n, messages, opts})
+      step_reply(native?, if(n == 1, do: :look, else: :submit))
+    end
+
+    if native?, do: Imp.LM.Static.new(handler: handler), else: %TextOnlyLM{handler: handler}
+  end
+
+  defp step_reply(true, :look),
+    do: %{next_thought: "look first", tool_calls: [%{id: "c", name: "look", arguments: %{}}]}
+
+  defp step_reply(true, :submit),
+    do: %{tool_calls: [%{id: "s", name: "submit", arguments: %{answer: "ok", confidence: 1.0}}]}
+
+  defp step_reply(false, :look),
+    do:
+      ~s([[ ## next_thought ## ]]\nlook first\n\n[[ ## tool_calls ## ]]\n[{"name": "look", "arguments": {}}])
+
+  defp step_reply(false, :submit),
+    do:
+      ~s([[ ## next_thought ## ]]\nsubmitting\n\n[[ ## tool_calls ## ]]\n[{"name": "submit", "arguments": {"answer": "ok", "confidence": 1.0}}])
+
+  defp note_index(messages, note),
+    do: Enum.find_index(messages, &(&1.role == :user and to_string(&1.content) =~ note))
+
+  for {mode, native?} <- [native: true, prompt: false] do
+    @native native?
+
+    test "#{mode} tools: the note ends the forced request as a user message, with no invented reply" do
+      owner = self()
+      note = "You have used every turn. Submit the answer you have now."
+
+      program =
+        Imp.react(@signature, [look()],
+          lm: moded_lm(owner, @native),
+          max_iters: 1,
+          last_request_note: note
+        )
+
+      assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
+      assert prediction.metadata.termination_reason == :forced_submit
+
+      [_first, {forced, _opts}] = requests(2)
+      refute Enum.any?(forced, &(to_string(&1.content) =~ @filler))
+
+      index = note_index(forced, note)
+      assert index
+      after_note = Enum.drop(forced, index + 1)
+
+      # Natively the note is the last message. A step that lists its tools as
+      # text ends every request on that listing, a user message too.
+      if @native,
+        do: assert(after_note == []),
+        else:
+          assert([%{role: :user, content: listing}] = after_note) && assert(listing =~ "tools")
+    end
+
+    test "#{mode} tools: a returned history replays the note as the user turn the model answered" do
+      owner = self()
+      note = "You have used every turn. Submit the answer you have now."
+
+      program =
+        Imp.react(@signature, [look()],
+          lm: moded_lm(owner, @native),
+          max_iters: 1,
+          last_request_note: note
+        )
+
+      assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
+      _ = requests(2)
+
+      # A host keeps the history as data and hands it back on the next turn.
+      history = prediction.metadata.history |> Imp.History.dump() |> Imp.History.load!()
+      assert {:ok, _prediction} = Imp.call(program, %{intent: "again", history: history})
+
+      {replayed, _opts} = receive(do: ({:request, 3, m, o} -> {m, o}))
+      refute Enum.any?(replayed, &(to_string(&1.content) =~ @filler))
+
+      # What follows the note is the reply the model actually gave: the submit.
+      index = note_index(replayed, note)
+      assert index
+      reply = Enum.at(replayed, index + 1)
+      assert reply.role == :assistant
+
+      if @native,
+        do: assert(Enum.map(reply.tool_calls, & &1.function.name) == ["submit"]),
+        else: assert(reply.content =~ "submit")
+    end
+  end
+
+  # A `History` entry a host wrote with inputs and no outputs is DSPy's
+  # finished exchange whose outputs were not recorded, and renders as DSPy
+  # renders it. Only the turns the loop records itself say they have no reply.
+  test "a host's input-only history entry keeps DSPy's rendering" do
+    owner = self()
+    program = Imp.react(@signature, [look()], lm: moded_lm(owner, true), max_iters: 1)
+    history = Imp.History.new([%{intent: "earlier"}])
+
+    assert {:ok, _prediction} = Imp.call(program, %{intent: "hello", history: history})
+    [{first, _opts}, _forced] = requests(2)
+
+    index = note_index(first, "earlier")
+    assert %{role: :assistant, content: filler} = Enum.at(first, index + 1)
+    assert filler =~ @filler
+  end
+
   test "no note leaves the forced request exactly as it was" do
     owner = self()
 

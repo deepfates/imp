@@ -1257,7 +1257,15 @@ defmodule Imp.Adapter.Chat do
           [%{role: :user, content: renderers.input_section.(field, format_value(value))}]
       end
 
-    Enum.reject([user, assistant | result_messages], &blank_message?/1)
+    # A step that said nothing and called nothing has no assistant turn, as
+    # in native replay: the loop records the user side of a request this way,
+    # and a filler reply would put words in the model's mouth.
+    assistant =
+      if calls == [] and String.trim(blank_to_empty(fetch_field(turn, :next_thought))) == "",
+        do: nil,
+        else: assistant
+
+    Enum.reject([user, assistant | result_messages], &(is_nil(&1) or blank_message?(&1)))
   end
 
   # A loop whose guidance names no finish tool answers in plain text, and has

@@ -26,6 +26,17 @@ User-visible changes to Imp are recorded here.
 
 ### Fixed
 
+- `Imp.Predict.ReActV2`'s `:last_request_note` reaches the model as a user
+  message with no assistant reply after it, as documented. It was recorded as
+  a history entry with inputs and no outputs, which the chat adapter renders
+  as a finished DSPy exchange, so the last request ended on an invented
+  assistant message whose fields read "Not supplied for this conversation
+  history message." The note, and inputs no step spent before it, are now
+  recorded as steps that called nothing, which render as the user message
+  alone in native and written tool modes, in the last request and in a
+  returned history passed back later. A note recorded by an earlier version
+  still renders with the filler. `History` entries a host writes keep DSPy's
+  rendering.
 - A call streamed through `Imp.Clients.ReqLLM` records the usage
   and the cost the provider reported at the end of the stream. ReqLLM's
   stream is a `Stream.resource`, which reports its end as halted rather than

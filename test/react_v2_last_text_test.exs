@@ -186,6 +186,9 @@ defmodule ReActV2LastTextTest do
     [inputs, note] = Enum.take(user_contents(last), -2)
     assert inputs =~ "hello"
     assert note =~ "Last one."
+
+    # No step answered either of them, so no assistant turn follows them.
+    assert Enum.map(Enum.take(last, -2), & &1.role) == [:user, :user]
   end
 
   # A turn whose step and last request both got no response has no answer and
