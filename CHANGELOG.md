@@ -2,6 +2,20 @@
 
 User-visible changes to Imp are recorded here.
 
+## Unreleased
+
+### Security
+
+- Imp requires `finch` `~> 0.24`, and its lock file and the example projects'
+  take `finch` 0.24.0 with `mint` 1.11.0. Finch 0.24.0 closes an HTTP/1
+  connection a request timed out on, so `mint` 1.11.0 no longer makes the
+  next request on that connection fail, and the lock no longer holds `mint`
+  1.10.1. That removes the three `mint` advisories (EEF-CVE-2026-91043,
+  EEF-CVE-2026-92103, EEF-CVE-2026-94194) from `.audit_ignore` and the
+  Known limits entry from the release notes. Migration: an application that
+  added `{:mint, "~> 1.10.1"}` for this removes it; one whose lock has
+  `finch` below 0.24 runs `mix deps.update finch mint hpax`.
+
 ## 0.7.0 — 2026-09-28
 
 ### Changed
