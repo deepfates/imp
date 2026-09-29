@@ -23,21 +23,24 @@ defmodule Imp.TimedOutConnectionTest do
   }
 
   test "the call after a timed-out call is answered on a new connection" do
+    test_pid = self()
     {:ok, seen} = Agent.start_link(fn -> [] end)
 
     # Bandit serves each HTTP/1 connection from one process, so the handler's
-    # pid names the connection a request came in on. The first request is held
-    # past the client's timeout; every later one is answered at once.
+    # pid names the connection a request came in on. The first request is not
+    # answered while the test runs, so the first call times out however slow
+    # the machine is, and its connection stays busy: a request written behind
+    # it would not be answered either. Every later request is answered at once.
     base_url =
       Imp.Test.LocalHTTP.start(fn _request ->
         connection = self()
         count = Agent.get_and_update(seen, &{length(&1) + 1, &1 ++ [connection]})
 
         if count == 1 do
+          test_ref = Process.monitor(test_pid)
+
           receive do
-            :release -> :ok
-          after
-            2_000 -> :ok
+            {:DOWN, ^test_ref, :process, _pid, _reason} -> :ok
           end
         end
 
@@ -61,13 +64,16 @@ defmodule Imp.TimedOutConnectionTest do
     # connection only when it draws the same shard. Choosing the first shard
     # for every request makes that meeting certain.
     finch = [name: ReqLLM.Application.finch_name(), pool_strategy: &hd/1]
-    opts = [timeout: 200, max_retries: 0, req_http_options: [finch: finch]]
+    opts = [max_retries: 0, req_http_options: [finch: finch]]
     messages = [%{role: :user, content: "ping"}]
 
-    assert {:error, %Imp.LMError{retryable: true}} = Imp.LM.generate(lm, messages, opts)
-    # Only the first call has to time out. The second gets room to be answered
-    # on a loaded machine; landing on the stuck connection still fails below.
-    assert {:ok, _reply} = Imp.LM.generate(lm, messages, Keyword.put(opts, :timeout, 5_000))
+    assert {:error, %Imp.LMError{retryable: true}} =
+             Imp.LM.generate(lm, messages, Keyword.put(opts, :timeout, 200))
+
+    # The second call keeps ReqLLM's own receive timeout. On a new connection
+    # it is answered at once; on the stuck one it is not answered, and fails
+    # when that timeout runs out.
+    assert {:ok, _reply} = Imp.LM.generate(lm, messages, opts)
 
     assert [first, second] = Agent.get(seen, & &1)
     refute first == second
