@@ -78,5 +78,14 @@ external_excludes =
 
 ExUnit.configure(exclude: external_excludes)
 
+# ReqLLM reads its model catalog from LLMDB, which loads it on first use under
+# a :global.trans lock. A process that finds the lock taken sleeps a random
+# backoff that doubles up to 8 s before it asks again, so when the async tests
+# at the start of the suite all make their first model lookup at once, some
+# wait several times as long as the load itself (a 1.4 s load, waits of up to
+# 4.6 s among 16 first lookups on an idle machine), and on a loaded runner past
+# the 5 s of a Task.await. Loading it here, before any test runs, leaves nothing to contend for.
+{:ok, _catalog} = LLMDB.load()
+
 Imp.Test.OwnLog.install()
 ExUnit.start()
