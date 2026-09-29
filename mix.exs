@@ -132,19 +132,18 @@ defmodule Imp.MixProject do
       # something else brings it.
       {:decimal, "~> 2.0 or ~> 3.0", optional: true},
       # Imp.Clients.ReqLLM matches Finch's error structs (Finch.TransportError,
-      # Finch.Error) to tell a request that was never sent; 0.21 is Req's floor.
-      {:finch, "~> 0.21"},
+      # Finch.Error) to tell a request that was never sent. 0.24 is the first
+      # Finch that closes an HTTP/1 connection a request timed out on; before
+      # it, with mint 1.11, the pool reused that connection and every request
+      # after the timeout that drew it failed (test/timed_out_connection_test.exs).
+      {:finch, "~> 0.24"},
       {:jason, "~> 1.4"},
       {:jaxon, "~> 2.0.8"},
       # Imp matches Mint's error structs (Mint.TransportError, Mint.HTTPError)
       # to tell a request that was never sent from one that may have run
       # (Imp.Clients.ReqLLM, Imp.MCP.CallFailure), so it depends on Mint
       # directly. The requirement is Finch's own, so declaring it moves no
-      # application's lock. It is not 1.11: mint 1.11.0 leaves an HTTP/1
-      # connection open after a receive timeout and Finch 0.23.0 reuses it, so
-      # mix.lock holds 1.10.1 (test/timed_out_connection_test.exs,
-      # .audit_ignore) until a Finch release includes
-      # https://github.com/sneako/finch/pull/397.
+      # application's lock.
       {:mint, "~> 1.8"},
       {:nimble_csv, "~> 1.3"},
       {:nimble_options, "~> 1.1"},

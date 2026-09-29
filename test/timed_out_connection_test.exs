@@ -1,19 +1,12 @@
 defmodule Imp.TimedOutConnectionTest do
   use ExUnit.Case, async: true
 
-  # This test is why Imp's lock holds mint 1.10.1 rather than 1.11.0.
-  #
-  # mint 1.11.0 leaves an HTTP/1 connection open after a receive timeout, with
-  # the request still in flight, and Finch 0.23.0 returns any open connection to
-  # its pool. The next request that pool gives that connection is written behind
-  # the one that was never answered, so it times out too, and so does every
-  # retry that lands there. On mint 1.10.1 the timeout closes the connection and
-  # the next request opens a new one.
-  #
-  # The Finch fix is https://github.com/sneako/finch/pull/397 ("Close abandoned
-  # HTTP/1 connections after request errors"), which is open and in no release.
-  # When a Finch release includes it, the lock takes that release and mint 1.11
-  # together, and this test passes on both.
+  # mint 1.11 leaves an HTTP/1 connection open after a receive timeout, with
+  # the request still in flight. Finch closes such a connection rather than
+  # returning it to its pool (from 0.24.0, which mix.exs requires), so the next
+  # request opens a new connection. A pool that reused it would write the next
+  # request behind the one that was never answered, and that request would time
+  # out or fail when the late answer arrived.
 
   @completion %{
     "id" => "late",
