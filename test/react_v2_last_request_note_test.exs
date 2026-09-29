@@ -184,10 +184,11 @@ defmodule ReActV2LastRequestNoteTest do
     end
   end
 
-  # A `History` entry a host wrote with inputs and no outputs is DSPy's
-  # finished exchange whose outputs were not recorded, and renders as DSPy
-  # renders it. Only the turns the loop records itself say they have no reply.
-  test "a host's input-only history entry keeps DSPy's rendering" do
+  # A `History` entry a host wrote with inputs and no outputs is a finished
+  # exchange whose outputs were not recorded, and keeps Imp's rendering, with
+  # the filler (DSPy 3.2.1 renders `None`). Only the turns the loop records
+  # itself say they have no reply.
+  test "a host's input-only history entry keeps Imp's rendering" do
     owner = self()
     program = Imp.react(@signature, [look()], lm: moded_lm(owner, true), max_iters: 1)
     history = Imp.History.new([%{intent: "earlier"}])

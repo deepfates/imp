@@ -1257,15 +1257,31 @@ defmodule Imp.Adapter.Chat do
           [%{role: :user, content: renderers.input_section.(field, format_value(value))}]
       end
 
-    # A step that said nothing and called nothing has no assistant turn, as
-    # in native replay: the loop records the user side of a request this way,
-    # and a filler reply would put words in the model's mouth.
+    # A turn with no calls and no other output has no assistant message, as in
+    # native replay. That is a user turn the loop recorded on its own (a note,
+    # inputs no step spent) or a model reply that said nothing; a filler reply
+    # would put words in the model's mouth. A turn that recorded any output,
+    # an answer included, keeps its assistant message.
     assistant =
-      if calls == [] and String.trim(blank_to_empty(fetch_field(turn, :next_thought))) == "",
-        do: nil,
-        else: assistant
+      if calls == [] and not recorded_output?(signature, turn), do: nil, else: assistant
 
     Enum.reject([user, assistant | result_messages], &(is_nil(&1) or blank_message?(&1)))
+  end
+
+  defp recorded_output?(signature, turn) do
+    calls_field =
+      Map.get(signature.metadata, :tool_calls_field) ||
+        Map.get(signature.metadata, "tool_calls_field")
+
+    signature.outputs
+    |> Enum.reject(&Imp.FieldMap.same_name?(&1.name, calls_field))
+    |> Enum.any?(fn field ->
+      case fetch_field(turn, field.name) do
+        nil -> false
+        value when is_binary(value) -> String.trim(value) != ""
+        _value -> true
+      end
+    end)
   end
 
   # A loop whose guidance names no finish tool answers in plain text, and has

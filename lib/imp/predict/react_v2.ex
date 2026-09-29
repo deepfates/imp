@@ -781,8 +781,8 @@ defmodule Imp.Predict.ReActV2 do
   # spent) is a step event that called nothing and said nothing. The chat
   # adapter renders such a step as its user message alone, in every tool mode,
   # and a host that hands the history back gets the same rendering. Stored as
-  # inputs alone, it would be a DSPy `History` entry, which the adapter renders
-  # as a finished exchange with a filler reply the model never gave.
+  # inputs alone, it would be a `History` entry, which the adapter renders as a
+  # finished exchange with a filler reply the model never gave.
   defp append_user_turn(history, fields) do
     append_history(
       history,
