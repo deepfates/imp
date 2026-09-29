@@ -1,26 +1,26 @@
-# Imp v0.6.0
+# Imp v0.7.0
 
 Imp is a framework for typed, optimizable language-model programs on the BEAM.
 Declare a task as named inputs and outputs, call it like any other Elixir
 program, measure it on examples, compile it with an optimizer, and run the
 selected program under OTP.
 
-This release fixes bugs found after 0.5.0: failures that were reported as
-success, credentials that reached reports and checkpoints, requests that could
-be sent twice, and checkpoints that could not be resumed. It is `0.6.0` rather
-than a patch because several of those fixes change what a caller receives:
-`Imp.collect/3` returns a prediction; a ReActV2 turn whose model fails returns
-a `StepError`; examples without declared inputs are refused; a reply that
-answers no output is a parse error; `ReqLLMBatch` no longer resends a request
-that may have run; an MCP 503 or 529 is `:refused`; `Imp.Datasets.csv/3`
-refuses some files 0.5.0 loaded; an `Imp.react` signature may not have a
-`tools` field; and GEPA and `Imp.Observability` report errors where they
-reported `:ok` or `:failed`.
+This release makes the money a model call reports mean one thing, fixes
+streamed calls through `Imp.Clients.ReqLLM`, fixes reasoning efforts, and
+stops ReActV2's last-request note from being followed by a reply the model
+never gave. It is `0.7.0` rather than `0.6.1` because four of those fixes
+change what a caller receives: a call's `cost` is `nil` where the provider reported no
+charge, where it was ReqLLM's catalog estimate; a stream that did not
+complete returns `{:error, %Imp.LMError{}}`, where it returned the text that
+had arrived; a streamed call's recorded model is the configured model id
+without its provider prefix, where it was the whole `"provider:model"`
+string; and the history entry of ReActV2's `:last_request_note` carries
+empty `tool_calls` and `tool_call_results`, where it held the note alone.
 
 ## Install
 
 ```elixir
-{:imp, "~> 0.6"}
+{:imp, "~> 0.7"}
 ```
 
 Every dependency comes from Hex. Use a path dependency only while developing
@@ -47,91 +47,92 @@ an application has.
 
 ## Headline changes
 
-- An agent's step prompt asks for one format, as DSPy's does. With an LM that
-  calls tools natively, the step no longer also asks for a `tool_calls` field;
-  an LM that cannot is shown each tool's description and arguments in the
-  prompt and writes its calls in `tool_calls`.
-- Failures are reported instead of passing as success. A ReActV2 turn whose
-  model fails returns `Imp.Predict.ReActV2.StepError` with the history as far
-  as it got; a GEPA run that continued past failed proposals reports
-  `:with_errors`; the Chat, JSON and XML adapters report a reply that answers
-  no output as a parse error; and evaluation and optimizers refuse examples
-  that never declared their inputs, whose labels were passed to the program
-  as inputs.
-- Redaction runs before a term is converted, in reports, results, GRPO
-  checkpoints, session records and saved programs, so a client, retriever or
-  OAuth store in them is no longer written with its secrets. The SIMBA,
-  MIPROv2, InferRules, random-search and GEPA checkpoints redact their failure
-  reasons. Redaction still replaces the whole string, as in 0.5.0, and
-  recognizes more credential shapes.
-- Renderers (`:system_renderer`, `:output_renderer`) shape the JSON fallback
-  and every JSON or XML request, so a fallback sends the request the host
-  shaped.
-- `Imp.Clients.ReqLLMBatch` never sends again a request that may have run, and
-  waits for the provider's `retry-after` before a retry.
-- A streamed call is recorded in its run like any other, and a reply with text
-  and tool calls keeps all of them, streamed or not.
-- GEPA checkpoints resume: from a pending proposal batch, from a program that
-  is an agent, and in a fresh VM.
+- `cost` on `Imp.Core.LMResponse` and on the `:model_response` event is the
+  charge the provider reported, and `nil` when it reported none. OpenRouter
+  reports its charge unasked, and Imp now reads it for every model; 0.6.0
+  read it only for models ReqLLM's catalog does not price and reported the
+  catalog estimate for the rest. A call made through
+  OpenRouter with the caller's own provider key reports OpenRouter's fee plus
+  the upstream charge. A provider whose response carries no charge (the
+  Anthropic, OpenAI and Google APIs called directly among them) gives a `nil`
+  `cost`. ReqLLM's catalog price is the new `estimated_cost`.
+- A call streamed through `Imp.Clients.ReqLLM` (`Imp.stream/3` with
+  `provider_stream: true`) records the usage and cost the provider reported;
+  in 0.6.0 every such call was recorded with no usage and no cost. A stream
+  that stops with a provider error, with finish reason `:error` or
+  `:cancelled`, or with a body that ends before the provider finished, is an
+  error, and the usage that arrived before it is still recorded on the
+  failed `:model_response` event. A streamed call to a client built from a
+  spec map or a `{provider, opts}` or `{provider, model, opts}` tuple no
+  longer fails.
+- `:reasoning_effort` accepts every effort ReqLLM accepts, `max` among them,
+  read from ReqLLM's own option. An effort given as a string, as every effort
+  loaded from a saved program is, reaches ReqLLM as its atom; in 0.6.0 it
+  failed every call on most providers, OpenRouter (without
+  `openrouter_reasoning_wire: :nested`), Anthropic, Google and Groq among
+  them.
+- `Imp.Predict.ReActV2`'s `:last_request_note` reaches the model as a user
+  message with no assistant message after it, in the last request and
+  whenever the returned history is passed back. It was followed by an
+  assistant message the model never gave, each field reading "Not supplied
+  for this conversation history message." Using that text for history is
+  Imp's; DSPy 3.2.1
+  renders a missing history output as `None`. The note's history entry, and
+  the entry for inputs no step spent that comes before it when the first step
+  failed, now carry `tool_calls: %Imp.Adapter.Types.ToolCalls{tool_calls:
+  []}` and `tool_call_results: []`, like every other step the loop records.
+- In written tool mode (an LM that cannot call tools natively), a stored step
+  that recorded no call and no other output replays as its user message
+  alone, as native replay already did. A step that recorded any output, an
+  answer included, keeps its assistant message.
 
-## Upgrading from 0.5
+## Upgrading from 0.6
 
-1. Change the dependency to `{:imp, "~> 0.6"}`, run `mix deps.get`, and
-   commit `mix.lock`. `nimble_csv` and `mint` are new direct dependencies.
-2. `Imp.collect/3` returns `{:ok, prediction}` or `{:error, reason}`; read
-   fields with `Imp.get(prediction, :answer)` instead of matching a string.
-3. Where you checked `Imp.Prediction.complete?/1` after a ReActV2 model
-   failure, match `{:error, %Imp.Predict.ReActV2.StepError{reason: reason,
-   history: history}}` and store `history` as you store a finished turn's. A
-   step refused by an `Imp.OperationalSafetyError` ends the turn this way at
-   once; where you call the program yourself, match
-   `{:error, %Imp.Predict.ReActV2.StepError{reason:
-   %Imp.OperationalSafetyError{}}}`. `Imp.Evaluate` and the optimizers
-   already raise it.
-4. Call `Imp.with_inputs/2` on every example you evaluate or optimize on, and
-   build evaluation rows with `Imp.example/1 |> Imp.with_inputs(...)` rather
-   than plain maps or pair lists. Give each field of an example or prediction
-   once, under one spelling. To keep a signature's instructions, pass it to
-   `Imp.Signature.new/2` without instructions.
-5. A field called `tools` in an `Imp.react` task signature is refused, and a
-   saved program with one no longer loads. Rebuild the program with the field
-   renamed and save it; to keep a saved program's optimized instructions and
-   demos, rename the field in the saved file, or optimize again.
-6. Match `%Imp.AdapterParseError{kind: :missing_fields}` where you relied on a
-   prediction of defaults, or on ProgramOfThought's `:missing_program`, for a
-   reply that answered no output.
-7. Compare `Imp.Clients.ReqLLM` clients by `model`, not by the whole struct,
-   which now carries `:tool_calling`; `%Imp.Predict.ReActV2{}` likewise
-   carries `:tool_order`.
-8. Treat a `ReqLLMBatch` request that ends `:ambiguous` as possibly run, and
-   check it with the provider before sending it again. A 0.5.0 checkpoint's
-   `:transient_failure` requests become `:ambiguous` on resume.
-9. An MCP call answered with 503 or 529 is `:refused`, not `:unknown`.
-10. Quote CSV fields that hold a quote (`"12"" pipe",1`) and remove spaces
-    between a comma and a quoted field; `Imp.Datasets.csv/3` refuses both.
-11. Match `Imp.Observability.Status`'s new `:succeeded_with_errors`, which an
-    optimizer report with errors gives where it gave `:failed`. Read GEPA's
-    `report.errors` rather than expecting `status: :ok`: a run that went on
-    past failed proposals reports `:with_errors`. Review `:beam_native`
-    stoppers built on `consecutive_outcome/2`, which now counts an iteration
-    that raised as `:proposal_error` instead of `:none`.
-12. Keep 0.5.0 away from files 0.6.0 writes: it cannot read a trajectory with
-    atom keys (in a GEPA or Playbook checkpoint, or saved with `Imp.dump/1`),
-    an optimizer report that holds an `Imp.History`, or a `ReqLLMBatch`
-    checkpoint.
-13. A ReActV2 turn that reaches `max_iters` with text beside tool calls it
-    did not run now answers with that text, where it answered `nil`; the calls
-    are still listed as unexecuted. A host that publishes every non-empty
-    answer should decide whether to publish such a turn's text.
-14. Re-evaluate saved agents on held-out data: the step prompt and tool roster
-    order changed, so they send different prompt text.
-15. A `:system_renderer` or `:output_renderer` now also shapes the JSON
-    fallback and JSON and XML requests. Build on `opts[:default_system]` and
-    `opts[:default_outputs]` rather than ignoring the options, or the fallback
-    sends a Chat-shaped prompt.
+1. Change the dependency to `{:imp, "~> 0.7"}`, run `mix deps.get`, and
+   commit `mix.lock`. No dependency was added or removed.
+2. Treat a `nil` `cost` as an unknown charge, not a free call. A host that
+   wants the 0.6.0 number for a call with no reported charge reads
+   `estimated_cost` (or `:estimated_cost` on the event), knowing it is an
+   estimate; it is `nil` for a streamed call.
+3. Where you call `Imp.stream/3` with `provider_stream: true`, handle
+   `{:error, %Imp.LMError{}}` from a stream that did not complete as a failed
+   call. The request reached the provider, so it may have been charged.
+4. Where you match the model recorded for a streamed call (the `req_llm`
+   metadata of its `:model_response` event), expect the configured model id
+   without its provider prefix: `gpt-test` for `"openai:gpt-test"`. A client
+   built from a string-keyed spec map or a tuple now records its provider, so
+   the `Imp.Usage` key of its calls is `"provider/model"` where it was the
+   model alone.
+5. Expect spend totals built on `:model_response` events to grow: streamed
+   calls now carry their usage and cost, and a streamed call that fails after
+   the provider reported usage records it on its failed `:model_response`
+   event.
+6. If you store the histories ReActV2 returns (`metadata.history`) and
+   recognise the last-request note by its exact shape (only the first input's
+   key), accept the new `tool_calls` and `tool_call_results` fields, or match
+   the note by that key or by its text. A note stored by an earlier version
+   keeps the old input-only shape and, passed back, still renders with an
+   assistant message of "Not supplied" text. To render it as 0.7.0 does, add
+   `tool_calls: %Imp.Adapter.Types.ToolCalls{tool_calls: []}` and
+   `tool_call_results: []` to that entry; for a history saved with
+   `Imp.History.dump/1`, load it with `Imp.History.load!/1`, add them, and
+   dump it again. In a history reloaded with `Imp.History.load!/1` the field
+   is the plain map `%{tool_calls: []}`.
 
 ## Known limits
 
+- `Imp.Usage` does not see streamed calls: they run in a separate process,
+  so usage tracked around `Imp.collect` or a streamed `Imp.call` is empty.
+  Read usage from the run's `:model_response` events.
+- The usage map (`:usage` on the `:model_response` event, `Imp.Usage`,
+  `Imp.Prediction.get_lm_usage/1`) is ReqLLM's, unchanged. For a
+  non-streamed call its `:cost` and `:total_cost` are ReqLLM's catalog
+  estimate, not a charge, and OpenRouter's charge is its `"cost"`. Read money
+  from `cost` and `estimated_cost`.
+- An error the provider sends inside a stream has `status` `nil` and
+  `retryable: true`, because ReqLLM's stream decoder keeps only its message;
+  the same error in a non-streamed response may carry a status that says not
+  to retry.
 - `mint` 1.11.0 leaves an HTTP/1 connection open after a receive timeout,
   and Finch 0.23.0, the newest release, returns it to its pool with the
   unanswered request still on it. A later request the pool gives that
