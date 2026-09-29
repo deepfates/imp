@@ -206,11 +206,17 @@ defmodule DatasetsContractTest do
     File.write!(path, ["q,a\n" | rows] ++ ["bad,row,extra\n"])
 
     caller = spawn(fn -> Datasets.csv(path, [:q]) end)
-    walk = wait_for_monitored(caller)
+    walk = wait_for_walk(caller)
     ref = Process.monitor(walk)
+    # Suspended, the walk cannot run to its end and exit on its own, so it
+    # ends only when something kills it. The suspension is lifted if the test
+    # process exits.
+    :erlang.suspend_process(walk)
     Process.exit(caller, :kill)
 
-    assert_receive {:DOWN, ^ref, :process, ^walk, :killed}, 1_000
+    receive do
+      {:DOWN, ^ref, :process, ^walk, reason} -> assert reason == :killed
+    end
   after
     cleanup_tmp("killed-caller.csv")
   end
@@ -434,13 +440,15 @@ defmodule DatasetsContractTest do
     cleanup_tmp("typed-math.jsonl")
   end
 
-  # The process `pid` monitors, once it monitors one.
-  # The caller also monitors other processes for a moment (the file server
-  # while it reads), so the walk is the monitored process running the CSV code.
-  defp wait_for_monitored(pid, tries \\ 500) do
-    walk =
-      case Process.info(pid, :monitors) do
-        {:monitors, monitors} ->
+  # The walk `caller` starts, once it has started it. The caller also monitors
+  # other processes for a moment (the file server while it reads), so the walk
+  # is the monitored process running the CSV code. The caller parses the whole
+  # file before it starts the walk, which takes as long as the machine is slow,
+  # so this waits for as long as the caller is alive.
+  defp wait_for_walk(caller) do
+    case Process.info(caller, :monitors) do
+      {:monitors, monitors} ->
+        walk =
           Enum.find_value(monitors, fn
             {:process, monitored} when is_pid(monitored) ->
               if csv_walk?(monitored), do: monitored
@@ -449,15 +457,15 @@ defmodule DatasetsContractTest do
               nil
           end)
 
-        nil ->
-          nil
-      end
+        if walk do
+          walk
+        else
+          Process.sleep(5)
+          wait_for_walk(caller)
+        end
 
-    if walk || tries == 0 do
-      walk
-    else
-      Process.sleep(5)
-      wait_for_monitored(pid, tries - 1)
+      nil ->
+        flunk("the CSV caller ended before it started a walk")
     end
   end
 
