@@ -44,6 +44,28 @@ User-visible changes to Imp are recorded here.
   provider-prefixed model of a streamed call matches the model id, or the
   model the provider reported, and one that reads `Imp.Usage` by key for such
   a client uses the prefixed key.
+- Breaking: `Imp.Predict.ReActV2`'s `:last_request_note` reaches the model
+  as a user message with no assistant reply after it, as documented, in the
+  last request and whenever the returned history is passed back. It was
+  stored as a history entry with inputs and no outputs. The chat adapter
+  renders that as a finished exchange, so the note was followed by an
+  assistant message the model never gave, each field reading "Not supplied
+  for this conversation history message." That filler is Imp's; DSPy 3.2.1
+  renders a missing history output as `None`. The note, and the entry for
+  inputs no step spent that comes before it when the first step failed, now
+  carry `tool_calls: %Imp.Adapter.Types.ToolCalls{tool_calls: []}` and
+  `tool_call_results: []`, like every other step the loop records. Migration: a
+  host that recognises the note in `metadata.history` by its shape (only the
+  first input's key) matches it by that key with an empty `tool_calls` list,
+  or by its text. A note recorded by an earlier version keeps the old
+  shape and still renders with the filler. `History` entries a host writes
+  keep Imp's rendering.
+- In written tool mode (an LM that cannot call tools natively, where earlier
+  steps replay as text), a stored step that recorded no call and no other
+  output replays as its user message alone, as native replay already did. A
+  ReActV2 step that answered with nothing no longer replays as an assistant
+  message of filler. A turn that recorded any output, an answer included,
+  keeps its assistant message.
 
 ### Fixed
 

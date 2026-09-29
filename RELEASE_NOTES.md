@@ -6,14 +6,16 @@ program, measure it on examples, compile it with an optimizer, and run the
 selected program under OTP.
 
 This release makes the money a model call reports mean one thing, fixes
-streamed calls through `Imp.Clients.ReqLLM`, and fixes reasoning efforts. It
-is `0.7.0` rather than `0.6.1` because three of those fixes change what a
-caller receives: a call's `cost` is `nil` where the provider reported no
+streamed calls through `Imp.Clients.ReqLLM`, fixes reasoning efforts, and
+stops ReActV2's last-request note from being followed by a reply the model
+never gave. It is `0.7.0` rather than `0.6.1` because four of those fixes
+change what a caller receives: a call's `cost` is `nil` where the provider reported no
 charge, where it was ReqLLM's catalog estimate; a stream that did not
 complete returns `{:error, %Imp.LMError{}}`, where it returned the text that
 had arrived; and a streamed call's recorded model is the model id or the
 model the provider reported, where it was the whole `"provider:model"`
-string.
+string; and the history entry of ReActV2's `:last_request_note` carries
+empty `tool_calls` and `tool_call_results`, where it held the note alone.
 
 ## Install
 
@@ -66,6 +68,19 @@ an application has.
   failed every call on most providers, OpenRouter (without
   `openrouter_reasoning_wire: :nested`), Anthropic, Google and Groq among
   them.
+- `Imp.Predict.ReActV2`'s `:last_request_note` reaches the model as a user
+  message with no assistant message after it, in the last request and
+  whenever the returned history is passed back. It was followed by an
+  assistant message the model never gave, each field reading "Not supplied
+  for this conversation history message." That text is Imp's own; DSPy 3.2.1
+  renders a missing history output as `None`. The note's history entry, and
+  the entry for inputs no step spent that comes before it when the first step
+  failed, now carry `tool_calls: %Imp.Adapter.Types.ToolCalls{tool_calls:
+  []}` and `tool_call_results: []`, like every other step the loop records.
+- In written tool mode (an LM that cannot call tools natively), a stored step
+  that recorded no call and no other output replays as its user message
+  alone, as native replay already did. A step that recorded any output, an
+  answer included, keeps its assistant message.
 
 ## Upgrading from 0.6
 
@@ -89,6 +104,16 @@ an application has.
    grow: streamed calls now carry their usage and cost, and a streamed call
    that fails after the provider reported usage records it on its failed
    `:model_response` event and in `Imp.Usage`.
+6. If you store the histories ReActV2 returns (`metadata.history`) and
+   recognise the last-request note by its exact shape (only the first input's
+   key), accept the new `tool_calls` and `tool_call_results` fields, or match
+   the note by that key or by its text. A note stored by an earlier version
+   keeps the old input-only shape and, passed back, still renders with an
+   assistant message of "Not supplied" text. To render it as 0.7.0 does, add
+   `tool_calls: %Imp.Adapter.Types.ToolCalls{tool_calls: []}` and
+   `tool_call_results: []` to that entry; for a history saved with
+   `Imp.History.dump/1`, load it with `Imp.History.load!/1`, add them, and
+   dump it again.
 
 ## Known limits
 
