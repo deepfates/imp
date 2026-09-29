@@ -35,13 +35,15 @@ defmodule Imp.Clients.ReqLLM do
   event, and the provider stream is cancelled.
 
   `:reasoning_effort` is the one reasoning option, on the client or on a call.
-  It takes any value of ReqLLM's own `reasoning_effort` option, such as `high`,
-  `xhigh`, `max` or `default`, as an atom or a string, on every provider;
-  ReqLLM's provider maps or clamps it to what that provider's API takes. A
-  call naming `nil` spends no reasoning on that call whatever the client is
-  configured with. Native reasoning fields (`Imp.Predict`) set the same
-  option, so a client configured with an effort and a program that asks for
-  one never disagree.
+  It takes any value of ReqLLM's own `reasoning_effort` option, such as
+  `high`, `xhigh`, `max` or `default`, as an atom or a string, on every
+  provider. ReqLLM's provider translates it where it has a translation
+  (Anthropic and Google turn it into a thinking budget); OpenAI, OpenRouter,
+  Groq and xAI receive the effort as written, and it is the provider's to
+  accept. A call naming `nil` spends no reasoning on that call whatever the
+  client is configured with. Native reasoning fields (`Imp.Predict`) set the
+  same option, so a client configured with an effort and a program that asks
+  for one never disagree.
 
   OpenRouter accepts the effort in two wire fields, and its endpoint catalog
   says which one an endpoint supports: ReqLLM's top-level `reasoning_effort`

@@ -12,8 +12,8 @@ never gave. It is `0.7.0` rather than `0.6.1` because four of those fixes
 change what a caller receives: a call's `cost` is `nil` where the provider reported no
 charge, where it was ReqLLM's catalog estimate; a stream that did not
 complete returns `{:error, %Imp.LMError{}}`, where it returned the text that
-had arrived; and a streamed call's recorded model is the model id or the
-model the provider reported, where it was the whole `"provider:model"`
+had arrived; a streamed call's recorded model is the configured model id
+without its provider prefix, where it was the whole `"provider:model"`
 string; and the history entry of ReActV2's `:last_request_note` carries
 empty `tool_calls` and `tool_call_results`, where it held the note alone.
 
@@ -49,7 +49,9 @@ an application has.
 
 - `cost` on `Imp.Core.LMResponse` and on the `:model_response` event is the
   charge the provider reported, and `nil` when it reported none. OpenRouter
-  reports its charge unasked, and Imp now reads it; a call made through
+  reports its charge unasked, and Imp now reads it for every model; 0.6.0
+  read it only for models ReqLLM's catalog does not price and reported the
+  catalog estimate for the rest. A call made through
   OpenRouter with the caller's own provider key reports OpenRouter's fee plus
   the upstream charge. A provider whose response carries no charge (the
   Anthropic, OpenAI and Google APIs called directly among them) gives a `nil`
@@ -59,8 +61,9 @@ an application has.
   in 0.6.0 every such call was recorded with no usage and no cost. A stream
   that stops with a provider error, with finish reason `:error` or
   `:cancelled`, or with a body that ends before the provider finished, is an
-  error, and the usage that arrived before it is still recorded. A streamed
-  call to a client built from a spec map or a `{provider, opts}` tuple no
+  error, and the usage that arrived before it is still recorded on the
+  failed `:model_response` event. A streamed call to a client built from a
+  spec map or a `{provider, opts}` or `{provider, model, opts}` tuple no
   longer fails.
 - `:reasoning_effort` accepts every effort ReqLLM accepts, `max` among them,
   read from ReqLLM's own option. An effort given as a string, as every effort
@@ -72,7 +75,8 @@ an application has.
   message with no assistant message after it, in the last request and
   whenever the returned history is passed back. It was followed by an
   assistant message the model never gave, each field reading "Not supplied
-  for this conversation history message." That text is Imp's own; DSPy 3.2.1
+  for this conversation history message." Using that text for history is
+  Imp's; DSPy 3.2.1
   renders a missing history output as `None`. The note's history entry, and
   the entry for inputs no step spent that comes before it when the first step
   failed, now carry `tool_calls: %Imp.Adapter.Types.ToolCalls{tool_calls:
@@ -94,16 +98,15 @@ an application has.
    `{:error, %Imp.LMError{}}` from a stream that did not complete as a failed
    call. The request reached the provider, so it may have been charged.
 4. Where you match the model recorded for a streamed call (the `req_llm`
-   metadata of its `:model_response` event, or its `Imp.Usage` key), expect
-   the model the provider reported, or the configured model id without its
-   provider prefix: `gpt-test` for `"openai:gpt-test"`, and the `Imp.Usage`
-   key `"openai/gpt-test"`. A client built from a string-keyed spec map or a
-   tuple now records its provider, streamed or not, so its `Imp.Usage` key
-   is `"provider/model"` where it was the model alone.
-5. Expect spend totals built on `Imp.Usage` or on `:model_response` events to
-   grow: streamed calls now carry their usage and cost, and a streamed call
-   that fails after the provider reported usage records it on its failed
-   `:model_response` event and in `Imp.Usage`.
+   metadata of its `:model_response` event), expect the configured model id
+   without its provider prefix: `gpt-test` for `"openai:gpt-test"`. A client
+   built from a string-keyed spec map or a tuple now records its provider, so
+   the `Imp.Usage` key of its calls is `"provider/model"` where it was the
+   model alone.
+5. Expect spend totals built on `:model_response` events to grow: streamed
+   calls now carry their usage and cost, and a streamed call that fails after
+   the provider reported usage records it on its failed `:model_response`
+   event.
 6. If you store the histories ReActV2 returns (`metadata.history`) and
    recognise the last-request note by its exact shape (only the first input's
    key), accept the new `tool_calls` and `tool_call_results` fields, or match
@@ -113,10 +116,14 @@ an application has.
    `tool_calls: %Imp.Adapter.Types.ToolCalls{tool_calls: []}` and
    `tool_call_results: []` to that entry; for a history saved with
    `Imp.History.dump/1`, load it with `Imp.History.load!/1`, add them, and
-   dump it again.
+   dump it again. In a history reloaded with `Imp.History.load!/1` the field
+   is the plain map `%{tool_calls: []}`.
 
 ## Known limits
 
+- `Imp.Usage` does not see streamed calls: they run in a separate process,
+  so usage tracked around `Imp.collect` or a streamed `Imp.call` is empty.
+  Read usage from the run's `:model_response` events.
 - The usage map (`:usage` on the `:model_response` event, `Imp.Usage`,
   `Imp.Prediction.get_lm_usage/1`) is ReqLLM's, unchanged. For a
   non-streamed call its `:cost` and `:total_cost` are ReqLLM's catalog

@@ -32,17 +32,18 @@ User-visible changes to Imp are recorded here.
   caller of `Imp.stream/3` with `provider_stream: true` handles that error as
   any failed call; the request reached the provider, so it may have been
   charged.
-- Breaking: a call streamed through `Imp.Clients.ReqLLM` records the model
-  the provider reported, as a non-streamed call does, and otherwise the
-  configured model id (`gpt-test`, where it recorded the whole
-  `openai:gpt-test`), in the `req_llm` metadata of its `:model_response`
-  event's `:response` and in its `Imp.Usage` key (`"openai/gpt-test"`).
+- Breaking: a call streamed through `Imp.Clients.ReqLLM` records the
+  configured model id without its provider prefix (`gpt-test`, where it
+  recorded the whole `openai:gpt-test`) in the `req_llm` metadata of its
+  `:model_response` event's `:response`, and its `Imp.Usage` entry is keyed
+  `"openai/gpt-test"`. In 0.6.0 a real streamed call had no `Imp.Usage`
+  entry at all.
   A call to a client built from a string-keyed spec map or a
   `{provider, opts}` or `{provider, model, opts}` tuple, streamed or not,
   records its provider, where it recorded none, so its `Imp.Usage` key gains
   the `"provider/"` prefix. Migration: a host that matched the
-  provider-prefixed model of a streamed call matches the model id, or the
-  model the provider reported, and one that reads `Imp.Usage` by key for such
+  provider-prefixed model of a streamed call matches the model id, and one
+  that reads `Imp.Usage` by key for such
   a client uses the prefixed key.
 - Breaking: `Imp.Predict.ReActV2`'s `:last_request_note` reaches the model
   as a user message with no assistant reply after it, as documented, in the
@@ -50,7 +51,8 @@ User-visible changes to Imp are recorded here.
   stored as a history entry with inputs and no outputs. The chat adapter
   renders that as a finished exchange, so the note was followed by an
   assistant message the model never gave, each field reading "Not supplied
-  for this conversation history message." That filler is Imp's; DSPy 3.2.1
+  for this conversation history message." Using that filler for history is
+  Imp's; DSPy 3.2.1
   renders a missing history output as `None`. The note, and the entry for
   inputs no step spent that comes before it when the first step failed, now
   carry `tool_calls: %Imp.Adapter.Types.ToolCalls{tool_calls: []}` and
@@ -58,7 +60,9 @@ User-visible changes to Imp are recorded here.
   host that recognises the note in `metadata.history` by its shape (only the
   first input's key) matches it by that key with an empty `tool_calls` list,
   or by its text. A note recorded by an earlier version keeps the old
-  shape and still renders with the filler. `History` entries a host writes
+  shape and still renders with the filler; to render it as this release
+  does, add `tool_calls: %Imp.Adapter.Types.ToolCalls{tool_calls: []}` and
+  `tool_call_results: []` to that entry. `History` entries a host writes
   keep Imp's rendering.
 - In written tool mode (an LM that cannot call tools natively, where earlier
   steps replay as text), a stored step that recorded no call and no other
@@ -78,17 +82,20 @@ User-visible changes to Imp are recorded here.
   (including its `"cost"`), model and finish reason, taking the finish
   reason, and usage no chunk reported, from ReqLLM's metadata handle.
 - A streamed call that fails after the provider reported usage records that
-  usage and cost on its failed `:model_response` event and in
-  `Imp.Usage`, since the provider may have charged for it. The caller still
+  usage and cost on its failed `:model_response` event, since the provider
+  may have charged for it. The caller still
   receives `{:error, reason}`.
 - A streamed call to a client built from an inline spec map, with atom or
-  string keys, or a `{provider, opts}` tuple no longer fails with
+  string keys, or a `{provider, opts}` or `{provider, model, opts}` tuple no
+  longer fails with
   `{:lm_stream_failed, "protocol String.Chars not implemented ..."}`.
 - `:reasoning_effort` accepts `max`, when an LM is built, on a call and in a
   saved program. Imp's accepted efforts are read from ReqLLM's own
   `reasoning_effort` option, so they are every effort ReqLLM accepts, on every
-  provider; ReqLLM's provider maps or clamps it to what that provider's API
-  takes. OpenRouter receives `"max"` in either wire field.
+  provider. ReqLLM's provider translates it where it has a translation
+  (Anthropic and Google turn it into a thinking budget); OpenAI, OpenRouter,
+  Groq and xAI receive the effort as written, and it is the provider's to
+  accept. OpenRouter receives `"max"` in either wire field.
 - A string effort such as `"high"` reaches ReqLLM as its atom. ReqLLM checks
   the effort against its atom list before any provider sees it, so in 0.6.0 a
   string effort, including every effort loaded from a saved program, failed
