@@ -76,14 +76,19 @@ defmodule Imp.BenchmarkTruth.ParitySidecarTest do
     refute process_group_alive?(group_pid)
   end
 
+  test "the timeout option ends a command that does not finish" do
+    assert {:error, :timeout, %Output{}} =
+             ParitySidecar.run(@python, ["-c", "import time; time.sleep(60)"], timeout: 150)
+  end
+
   test "timeout returns captured output and terminates the process tree" do
     pid_path = tmp_path("timeout")
 
-    assert {:error, :timeout, %Output{} = output} =
-             ParitySidecar.run(@python, process_tree_args(pid_path), timeout: 150)
+    {result, [parent_pid, child_pid, group_pid]} =
+      time_out_ready_tree(process_tree_args(pid_path), pid_path)
 
+    assert {:error, :timeout, %Output{} = output} = result
     assert output.text =~ "tree ready"
-    [parent_pid, child_pid, group_pid] = await_pids(pid_path)
     refute await_alive?(parent_pid)
     refute await_alive?(child_pid)
     refute process_group_alive?(group_pid)
@@ -92,14 +97,13 @@ defmodule Imp.BenchmarkTruth.ParitySidecarTest do
   test "bounded cleanup kills a fully TERM-resistant process tree" do
     pid_path = tmp_path("term-resistant")
 
-    assert {:error, :timeout, %Output{}} =
-             ParitySidecar.run(
-               @python,
-               process_tree_args(pid_path, leader_ignore_term: true, child_ignore_term: true),
-               timeout: 150
-             )
+    {result, [parent_pid, child_pid, group_pid]} =
+      time_out_ready_tree(
+        process_tree_args(pid_path, leader_ignore_term: true, child_ignore_term: true),
+        pid_path
+      )
 
-    [parent_pid, child_pid, group_pid] = await_pids(pid_path)
+    assert {:error, :timeout, %Output{}} = result
     refute await_alive?(parent_pid)
     refute await_alive?(child_pid)
     refute process_group_alive?(group_pid)
@@ -108,18 +112,14 @@ defmodule Imp.BenchmarkTruth.ParitySidecarTest do
   test "Port exit does not hide a TERM-resistant child with redirected stdio" do
     pid_path = tmp_path("mixed-tree")
 
-    assert {:error, :timeout, %Output{text: text}} =
-             ParitySidecar.run(
-               @python,
-               process_tree_args(pid_path,
-                 child_ignore_term: true,
-                 child_redirect_stdio: true
-               ),
-               timeout: 150
-             )
+    {result, [parent_pid, child_pid, group_pid]} =
+      time_out_ready_tree(
+        process_tree_args(pid_path, child_ignore_term: true, child_redirect_stdio: true),
+        pid_path
+      )
 
+    assert {:error, :timeout, %Output{text: text}} = result
     assert text =~ "tree ready"
-    [parent_pid, child_pid, group_pid] = await_pids(pid_path)
     refute await_alive?(parent_pid)
     refute await_alive?(child_pid)
     refute process_group_alive?(group_pid)
@@ -203,11 +203,11 @@ defmodule Imp.BenchmarkTruth.ParitySidecarTest do
     #{if leader_ignore_term, do: "signal.signal(signal.SIGTERM, signal.SIG_IGN)", else: ""}
     child_code = #{inspect(child_code(child_ignore_term))}
     child = subprocess.Popen([sys.executable, "-c", child_code]#{child_stdio})
+    print("tree ready", flush=True)
     with open(#{inspect(pid_path)}, "w", encoding="utf-8") as handle:
         handle.write(f"{os.getpid()}\\n{child.pid}\\n{os.getpgrp()}\\n")
         handle.flush()
         os.fsync(handle.fileno())
-    print("tree ready", flush=True)
     time.sleep(60)
     """
 
@@ -220,25 +220,47 @@ defmodule Imp.BenchmarkTruth.ParitySidecarTest do
 
   defp child_code(false), do: "import time; time.sleep(60)"
 
-  defp await_pids(path, attempts \\ 100)
-  defp await_pids(_path, 0), do: flunk("sidecar did not publish process ids")
+  # A timeout is a timer in the process that owns the sidecar's port, counted
+  # from the start. A timer short enough for a fast test fires, on a loaded
+  # machine, before Python has started the tree, and a long one makes every
+  # run wait it out. So these tests run the tree with no timer, wait until it
+  # is ready, and send its owner the message the timer sends.
+  defp time_out_ready_tree(args, pid_path) do
+    task = Task.async(fn -> ParitySidecar.run(@python, args) end)
+    [parent_pid | _rest] = pids = await_pids(pid_path)
+    send(port_owner(parent_pid), :command_timeout)
+    {Task.await(task, :infinity), pids}
+  end
 
-  defp await_pids(path, attempts) do
+  defp port_owner(os_pid) do
+    Enum.find_value(Port.list(), fn port ->
+      with {:os_pid, ^os_pid} <- Port.info(port, :os_pid),
+           {:connected, owner} <- Port.info(port, :connected) do
+        owner
+      else
+        _other -> nil
+      end
+    end) || flunk("no port runs OS process #{os_pid}")
+  end
+
+  # The sidecar writes its process ids once the tree is running, which takes
+  # as long as the machine is slow.
+  defp await_pids(path) do
     case File.read(path) do
       {:ok, contents} ->
         case contents |> String.split("\n", trim: true) |> Enum.map(&Integer.parse/1) do
           [{parent, ""}, {child, ""}, {group, ""}] -> [parent, child, group]
-          _other -> retry_pids(path, attempts)
+          _other -> retry_pids(path)
         end
 
       _other ->
-        retry_pids(path, attempts)
+        retry_pids(path)
     end
   end
 
-  defp retry_pids(path, attempts) do
+  defp retry_pids(path) do
     Process.sleep(20)
-    await_pids(path, attempts - 1)
+    await_pids(path)
   end
 
   defp await_alive?(pid, attempts \\ 100)
