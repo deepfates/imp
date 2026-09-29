@@ -40,6 +40,11 @@ containing CR or LF, and a fresh `mix deps.get` resolves Cowboy 2.19.0. The seco
 for an outgoing `Cookie` request header, which nothing in Imp's dependency
 tree calls, and no cowlib release fixes it yet.
 
+Imp declares `mint` `~> 1.8`, as Finch does, and a fresh `mix deps.get` resolves `mint`
+1.11.0. That release fixes three advisories but reuses HTTP/1 connections
+that timed out; Imp's own lock holds 1.10.1. See Known limits for the choice
+an application has.
+
 ## Headline changes
 
 - `cost` on `Imp.Core.LMResponse` and on the `:model_response` event is the
@@ -128,6 +133,26 @@ tree calls, and no cowlib release fixes it yet.
   `retryable: true`, because ReqLLM's stream decoder keeps only its message;
   the same error in a non-streamed response may carry a status that says not
   to retry.
+- `mint` 1.11.0 leaves an HTTP/1 connection open after a receive timeout,
+  and Finch 0.23.0, the newest release, returns it to its pool with the
+  unanswered request still on it. A later request the pool gives that
+  connection waits behind the unanswered one and times out, and so does a
+  retry that lands there, until the server answers the first request or
+  closes the connection. If the late answer arrives while another request is
+  waiting, Finch raises `CaseClauseError`. This affects every Req or Finch user on HTTP/1, the
+  default for Req and ReqLLM, whose server can time out; ReqLLM spreads a
+  host's requests over several connections, so there only the requests that
+  draw the stuck one fail. With `mint` 1.10.1 a timeout closes the
+  connection and the next request opens a new one, so Imp's lock holds
+  1.10.1. It has three advisories that 1.11.0 fixes: EEF-CVE-2026-91043
+  (high) and EEF-CVE-2026-92103 are in Mint's HTTP/2 client only, and
+  EEF-CVE-2026-94194 is in HTTP/1 chunked framing and needs a malicious
+  server behind an intermediary that reads the framing strictly. An
+  application chooses one: add `{:mint, "~> 1.10.1"}` to its dependencies to
+  lock 1.10.1 and keep those advisories, or take 1.11.0 and accept that a
+  connection that timed out is reused until the server closes it. Finch has
+  an open, unreleased fix (https://github.com/sneako/finch/pull/397); a Finch
+  release that includes it ends the choice.
 - A flat two-element name-first list that is not itself an element of a
   list (at the top level, in a tuple, or under a key that is not a credential
   name), such as `["password", "hunter2"]`, is not redacted, where 0.5.0
