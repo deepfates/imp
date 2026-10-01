@@ -125,13 +125,13 @@ defmodule Imp.Predict.ReActV2 do
   so the turn ends at once as `:incomplete` with `termination_cause:
   :context_window_exceeded` (see below).
 
-  A step's outputs are `next_thought` and `tool_calls`. The provider holds the
-  tool roster natively, so a step normally comes back as native tool calls. A
-  step that comes back as plain text with no tool call is read as that text
-  being `next_thought` and no tool calls, by the `:text_field` metadata on the
-  internal step signature that `Imp.Adapter.Chat` honors: it is a thought that
-  called nothing, not a parse failure, so it costs one LM call rather than two
-  and keeps the provider's prefix cache. That thought is appended to the
+  For a single unconstrained text output, a step describes that task field
+  directly, including its description. Other signatures use `next_thought`
+  alongside the typed `submit` tool. The other step output is `tool_calls`
+  (`agent_tool_calls` when the task text output itself is named `tool_calls`).
+  The provider holds the tool roster natively. Plain text with no tool call
+  fills the declared text field through the step signature's `:text_field`
+  metadata. It completes the text task in one LM call and is appended to the
   history as its own step. A tool call the model writes as
   JSON rather than calling natively is accepted with `tool` for `name` and
   `args` or `parameters` for `arguments` (`Imp.Adapter.Types.ToolCall`); a map
@@ -152,9 +152,11 @@ defmodule Imp.Predict.ReActV2 do
   `tools`, the model writes its calls in `tool_calls`, and earlier steps are
   replayed as text (the step's fields, then the results), never as native
   tool messages. This is DSPy's structure. The guidance says where a text
-  answer goes, the same in every format: in `next_thought`, with
+  answer goes, the same in every format: in the task text field, with
   `tool_calls` left empty when that field is described. A reply in plain text
-  is still read as `next_thought` by `Imp.Adapter.Chat`. A stored turn that
+  is still read as that field by `Imp.Adapter.Chat`. Durable step history keeps
+  `next_thought` and `tool_calls` for compatibility with saved conversations;
+  adapters project them into the declared fields when rendering. A stored turn that
   carries a one-text-output task's answer and no step outputs is replayed as
   a step that answered in text. The name `tools` is reserved: a task
   signature cannot have a field of that name.
@@ -295,17 +297,14 @@ defmodule Imp.Predict.ReActV2 do
         inputs:
           Enum.map(signature.inputs, &Imp.Signature.Field.optional/1) ++
             [Imp.Signature.Field.new(%{name: :history, type: :history}, :input), tools_field()],
-        outputs: [
-          Imp.Signature.Field.new(%{name: :next_thought, metadata: %{optional: true}}, :output),
-          tool_calls_field()
-        ],
+        outputs: step_outputs(signature),
         instructions: signature.instructions,
         # A step answered in plain text, with no native tool call, is a
         # thought that called nothing. `Imp.Adapter.Chat` reads a marker-free
-        # completion as `next_thought`, and `tool_calls` takes its declared
+        # completion as the declared text field, and the calls field takes its declared
         # default of none, which ends the turn: as the answer when the
         # signature has one text output, and at the forced submit otherwise.
-        metadata: step_metadata()
+        metadata: step_metadata(signature)
       }
 
     config = Keyword.merge(opts[:config], provider_tool_config(tools, tool_order, signature))
@@ -415,7 +414,7 @@ defmodule Imp.Predict.ReActV2 do
     metadata =
       react.signature.metadata
       |> Map.drop(["text_field", "tool_calls_field", "tools_field"])
-      |> Map.merge(step_metadata())
+      |> Map.merge(step_metadata(agent.signature))
 
     # A program saved before the step had a `tools` input gets one, so it
     # describes its tools to an LM that cannot call them natively.
@@ -437,12 +436,7 @@ defmodule Imp.Predict.ReActV2 do
           react.signature
           | metadata: metadata,
             inputs: inputs,
-            outputs:
-              Enum.map(react.signature.outputs, fn field ->
-                if Imp.FieldMap.same_name?(field.name, :tool_calls),
-                  do: %{field | desc: tool_calls_field().desc},
-                  else: field
-              end)
+            outputs: step_outputs(agent.signature)
         }
     }
 
@@ -1008,11 +1002,6 @@ defmodule Imp.Predict.ReActV2 do
 
   defp error_text(value), do: inspect(value)
 
-  # What the step signature says about its fields: a reply with no marker is
-  # `next_thought` (`Imp.Adapter.Chat`), native tool calls fill `tool_calls`,
-  # and `tools` lists the tools as text. `Imp.Predict` leaves both tool fields
-  # out of the prompt when the step sends its tools natively, as DSPy's
-  # `Adapter._call_preprocess` does.
   # `tools` is the step's tool list, so a task field of that name would be
   # taken for it. A program saved before the name was reserved is refused on
   # load with the same words, naming what the caller did.
@@ -1023,8 +1012,32 @@ defmodule Imp.Predict.ReActV2 do
     end
   end
 
-  defp step_metadata,
-    do: %{text_field: :next_thought, tool_calls_field: :tool_calls, tools_field: :tools}
+  # The task's one text output is also the step's text output. The loop's
+  # persisted history still uses next_thought/tool_calls; prediction and history
+  # projection below isolate that storage vocabulary from the live contract.
+  defp step_text(signature) do
+    case text_output(signature) do
+      {:text, [field]} ->
+        Imp.Signature.Field.optional(field)
+
+      :submit ->
+        Imp.Signature.Field.new(%{name: :next_thought, metadata: %{optional: true}}, :output)
+    end
+  end
+
+  defp step_metadata(signature) do
+    text = step_text(signature).name
+
+    calls =
+      if Imp.FieldMap.same_name?(text, :tool_calls), do: :agent_tool_calls, else: :tool_calls
+
+    %{text_field: text, tool_calls_field: calls, tools_field: :tools}
+  end
+
+  defp step_outputs(signature) do
+    roles = step_metadata(signature)
+    [step_text(signature), %{tool_calls_field() | name: roles.tool_calls_field}]
+  end
 
   # The written form of a call, for an LM that writes its calls: the shape
   # `tool_calls` parses (a list; `name` and `arguments`, or `tool`/`args`).
@@ -1091,8 +1104,50 @@ defmodule Imp.Predict.ReActV2 do
     context_call(history, fn projected ->
       projected = %{projected | messages: Enum.map(projected.messages, &step_turn(&1, react))}
       inputs = pending |> Map.put(:history, projected) |> Map.put(:tools, tool_lines(react))
-      Imp.Predict.call(program, inputs)
+
+      program = %{program | demos: Enum.map(program.demos, &step_demo(&1, program.signature))}
+
+      case Imp.Predict.call(program, inputs) do
+        {:ok, prediction} -> {:ok, step_prediction(prediction, program.signature)}
+        error -> error
+      end
     end)
+  end
+
+  # Saved step demonstrations use the durable step vocabulary too. Project
+  # them at the request boundary, preserving the saved example itself.
+  defp step_demo(example, signature) do
+    example = Imp.Example.new(example)
+    roles = signature.metadata
+
+    supplied_text? = Imp.FieldMap.has_key?(example.fields, roles.text_field)
+
+    legacy_calls? =
+      Imp.FieldMap.same_name?(roles.text_field, :tool_calls) and
+        not is_binary(Imp.Example.get(example, :tool_calls))
+
+    case {Imp.FieldMap.fetch(example.fields, :next_thought), supplied_text? and not legacy_calls?} do
+      {{:ok, text}, false} ->
+        calls = Imp.Example.get(example, :tool_calls, [])
+
+        example
+        |> Imp.Example.delete(:next_thought)
+        |> Imp.Example.delete(:tool_calls)
+        |> Imp.Example.put(roles.text_field, text)
+        |> Imp.Example.put(roles.tool_calls_field, calls)
+
+      _ ->
+        example
+    end
+  end
+
+  # Normalize once at the loop boundary. Neither field is an additional
+  # model output; these are the existing history/execution representation.
+  defp step_prediction(prediction, signature) do
+    roles = signature.metadata
+    text = Imp.get(prediction, roles.text_field)
+    calls = Imp.get(prediction, roles.tool_calls_field, [])
+    %{prediction | fields: %{next_thought: text, tool_calls: calls}}
   end
 
   defp normalize_calls(%ToolCalls{} = calls, turn), do: ensure_ids(calls, turn)

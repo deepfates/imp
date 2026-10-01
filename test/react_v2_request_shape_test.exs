@@ -18,7 +18,7 @@ defmodule ReActV2RequestShapeTest do
 
         if n < steps,
           do: %{
-            next_thought: "look #{n}",
+            answer: "look #{n}",
             tool_calls: [%{id: "c#{n}", name: "look", arguments: %{}}]
           },
           else: "ok"
@@ -69,7 +69,7 @@ defmodule ReActV2RequestShapeTest do
     assert system.role == :system
 
     assert system.content =~
-             "When the final answer is ready, write it in `next_thought`."
+             "When the final answer is ready, write it in `answer`."
 
     assert system.content =~ "The available tools are: `look`."
     refute system.content =~ "submit"

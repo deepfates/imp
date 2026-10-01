@@ -22,7 +22,7 @@ defmodule ReActV2LastTextTest do
 
         if n <= steps do
           %{
-            next_thought: "look first",
+            answer: "look first",
             tool_calls: [%{id: "c#{n}", name: "look", arguments: %{}}]
           }
         else
@@ -327,7 +327,7 @@ defmodule ReActV2LastTextTest do
       end)
 
     last = %{
-      next_thought: "One more look, then: it is there.",
+      answer: "One more look, then: it is there.",
       tool_calls: [%{id: "late", name: "look", arguments: %{"where" => "shelf"}}]
     }
 

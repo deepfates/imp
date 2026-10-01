@@ -4,6 +4,17 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Changed
+
+- ReActV2 with one unconstrained text output now asks for that task field
+  directly, carrying its description into the step signature. A task named
+  `answer` no longer asks the model to put it in `next_thought`. Typed and
+  constrained tasks still complete through `submit`. Stored step history and
+  legacy step demonstrations keep working; loaded agents derive the new
+  contract from their task signature. Migration: scripted model responses and
+  custom step renderers must use the task output name. This changes the
+  model-facing contract, not the interpretation of nonempty prose as an answer.
+
 ### Security
 
 - Imp requires `finch` `~> 0.24`, and its lock file and the example projects'

@@ -188,13 +188,14 @@ copy safe for logs.
 
 ### A text answer
 
-A signature with one text output ends when the model writes text:
+A signature with one unconstrained text output asks for that field directly
+and ends when the model writes text without a tool call:
 
 ```elixir
 lm =
   script.([
     %{tool_calls: [%{name: "on_call", arguments: %{"team" => "atlas"}}]},
-    %{next_thought: "Maya from atlas is looking at the duplicate charge.", tool_calls: []}
+    %{reply: "Maya from atlas is looking at the duplicate charge.", tool_calls: []}
   ])
 
 reply = Imp.react(Imp.signature("ticket -> reply", "Tell the customer who is handling their ticket."), [on_call], lm: lm)
