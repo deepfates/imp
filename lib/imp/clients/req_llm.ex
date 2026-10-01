@@ -6,6 +6,10 @@ defmodule Imp.Clients.ReqLLM do
   owns provider/model resolution, Req/Finch transport, streaming, provider
   option translation, and canonical response structs.
 
+  For OpenRouter, an unspecified output-token limit stays absent on the wire,
+  leaving the endpoint to choose it. Explicit output limits are passed through
+  ReqLLM unchanged; Imp does not reserve the catalog's full output maximum.
+
   `:input_envelope` is an Imp-owned safety option. It accepts a positive
   `:max_bytes` guard and an optional positive `:reservation_tokens` value. Imp
   measures the rendered message content before cache lookup or transport,
@@ -364,6 +368,7 @@ defmodule Imp.Clients.ReqLLM do
   defp do_generate_uncached(lm, messages, opts) do
     opts =
       opts
+      |> preserve_openrouter_output_omission(lm.model)
       |> encode_openrouter_reasoning(lm.model)
       |> atomize_reasoning_effort()
       |> cap_transport_timeouts()
@@ -741,6 +746,7 @@ defmodule Imp.Clients.ReqLLM do
   defp safe_stream(lm, messages, opts) do
     opts =
       opts
+      |> preserve_openrouter_output_omission(lm.model, :stream)
       |> encode_openrouter_reasoning(lm.model)
       |> atomize_reasoning_effort()
       |> cap_transport_timeouts()
@@ -931,6 +937,71 @@ defmodule Imp.Clients.ReqLLM do
       _other ->
         opts
     end
+  end
+
+  # ReqLLM 1.24/1.25 fill an absent output limit with the catalog maximum.
+  # For OpenRouter this can reserve 450k output against a 500k context and
+  # reject an otherwise valid 51k input (#271). OpenRouter accepts omission;
+  # leave that decision to its endpoint instead of inventing a caller limit.
+  # Remove this compensation when ReqLLM can preserve omission itself.
+  @output_limits [:max_tokens, :max_completion_tokens, :max_output_tokens]
+  defp preserve_openrouter_output_omission(opts, model, mode \\ :generate) do
+    if openrouter_model?(model) and not explicit_output_limit?(opts) do
+      install_output_omission(opts, mode)
+    else
+      opts
+    end
+  end
+
+  defp install_output_omission(opts, :generate) do
+    http_opts = Keyword.get(opts, :req_http_options, [])
+    plugins = Keyword.get(http_opts, :plugins, [])
+
+    plugin = fn request ->
+      Req.Request.append_request_steps(request,
+        imp_openrouter_output_omission: &__MODULE__.omit_openrouter_output_limit/1
+      )
+    end
+
+    # As on the streaming path, the caller's request hooks run after this
+    # policy and can still deliberately override the request.
+    Keyword.put(opts, :req_http_options, Keyword.put(http_opts, :plugins, [plugin | plugins]))
+  end
+
+  # Streaming uses Finch directly, not Req request steps. Preserve the caller's
+  # supported request callback after applying the same body policy.
+  defp install_output_omission(opts, :stream) do
+    callback = Keyword.get(opts, :on_finch_request)
+
+    Keyword.put(opts, :on_finch_request, fn request ->
+      request = omit_openrouter_output_limit(request)
+      if callback, do: callback.(request), else: request
+    end)
+  end
+
+  defp explicit_output_limit?(opts) do
+    provider_opts = Keyword.get(opts, :provider_options, [])
+
+    Enum.any?(@output_limits, fn key ->
+      Keyword.has_key?(opts, key) or
+        case provider_opts do
+          values when is_map(values) ->
+            Map.has_key?(values, key) or Map.has_key?(values, Atom.to_string(key))
+
+          values when is_list(values) ->
+            Keyword.keyword?(values) and Keyword.has_key?(values, key)
+
+          _ ->
+            false
+        end
+    end)
+  end
+
+  @doc false
+  def omit_openrouter_output_limit(request)
+      when is_struct(request, Req.Request) or is_struct(request, Finch.Request) do
+    body = request.body |> IO.iodata_to_binary() |> Jason.decode!()
+    %{request | body: Jason.encode!(Map.drop(body, Enum.map(@output_limits, &Atom.to_string/1)))}
   end
 
   # With `openrouter_reasoning_wire: :nested` the effort leaves the ReqLLM

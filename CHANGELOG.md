@@ -4,6 +4,13 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Fixed
+
+- OpenRouter requests without an explicit output-token limit leave it to the
+  endpoint instead of reserving the model catalog's full output maximum. The
+  inherited maximum could make otherwise usable prompts exceed the total
+  context window. Ordinary and streamed requests preserve explicit limits.
+
 ### Security
 
 - Imp requires `finch` `~> 0.24`, and its lock file and the example projects'

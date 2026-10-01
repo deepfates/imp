@@ -350,6 +350,8 @@ defmodule ReActV2Test do
     lm =
       Imp.req_llm("openrouter:provider/model",
         req_module: NativeToolStub,
+        # Keep this test's request-step assertions about reasoning alone.
+        max_tokens: 512,
         state: state,
         test_pid: self(),
         reasoning_effort: :high,
