@@ -4,6 +4,18 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+## 0.8.1 — 2026-10-02
+
+### Fixed
+
+- ACP tool results distinguish capture omission from a genuine null or empty
+  result, render structured data and failures readably, and explicitly mark
+  previews cut at the presentation byte bound. Tool-call identity and outcome
+  remain intact; capture limits are unchanged.
+- Local ACP sockets retain permitted large JSON frames instead of splitting
+  them at the driver's default line buffer. Listener and client buffers follow
+  the existing frame limit, and oversized frames remain refused.
+
 ## 0.8.0 — 2026-10-01
 
 ### Changed
