@@ -45,7 +45,7 @@ defmodule ReActV2NativeReductionTest do
 
     lm =
       Imp.LM.Static.new(
-        handler: handler(["[[ ## tool_calls ## ]]\nnot a list", ~s({"next_thought": "done."})])
+        handler: handler(["[[ ## tool_calls ## ]]\nnot a list", ~s({"answer": "done."})])
       )
 
     step = %{step | lm: lm, dynamic_lm?: false, config: Keyword.put(step.config, :n, 2)}
@@ -67,9 +67,8 @@ defmodule ReActV2NativeReductionTest do
 
   test "a JSON-schema response format is built from what the step describes" do
     for {adapter, replies} <- [
-          {Imp.Adapter.JSON, [~s({"next_thought": "done."})]},
-          {Imp.Adapter.Chat,
-           ["[[ ## tool_calls ## ]]\nnot a list", ~s({"next_thought": "done."})]}
+          {Imp.Adapter.JSON, [~s({"answer": "done."})]},
+          {Imp.Adapter.Chat, ["[[ ## tool_calls ## ]]\nnot a list", ~s({"answer": "done."})]}
         ] do
       agent =
         Imp.react("intent -> answer", [look()],
@@ -81,7 +80,7 @@ defmodule ReActV2NativeReductionTest do
       assert {:ok, _prediction} = Imp.call(agent, %{intent: "what?"})
       {_messages, opts} = List.last(requests())
       schema = opts[:response_format].json_schema.schema
-      assert Map.keys(schema["properties"]) == ["next_thought"], inspect(adapter)
+      assert Map.keys(schema["properties"]) == ["answer"], inspect(adapter)
     end
   end
 

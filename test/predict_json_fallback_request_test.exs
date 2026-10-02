@@ -83,9 +83,9 @@ defmodule PredictJSONFallbackRequestTest do
 
     lm =
       scripted_lm(self(), [
-        %{next_thought: "Look first.", tool_calls: [%{id: "c1", name: "look", arguments: %{}}]},
+        %{answer: "Look first.", tool_calls: [%{id: "c1", name: "look", arguments: %{}}]},
         "[[ ## tool_calls ## ]]\nnot a list of calls",
-        ~s({"next_thought": "It holds 1.", "tool_calls": []})
+        ~s({"answer": "It holds 1.", "tool_calls": []})
       ])
 
     program = Imp.react("intent -> answer", [look], lm: lm)
@@ -98,7 +98,7 @@ defmodule PredictJSONFallbackRequestTest do
 
     for line <- [
           "You are an Agent. Use the supplied tools to produce `answer` from `intent`.",
-          "When the final answer is ready, write it in `next_thought`.",
+          "When the final answer is ready, write it in `answer`.",
           "The available tools are: `look`."
         ] do
       assert fallback_system.content =~ line
@@ -115,7 +115,7 @@ defmodule PredictJSONFallbackRequestTest do
   end
 
   defp json_requirements,
-    do: "Respond with a JSON object in the following order of fields: `next_thought`."
+    do: "Respond with a JSON object in the following order of fields: `answer`."
 
   defp request_contents(messages), do: Enum.map(messages, &to_string(&1.content))
 
@@ -143,7 +143,7 @@ defmodule PredictJSONFallbackRequestTest do
     lm =
       scripted_lm(self(), [
         "[[ ## tool_calls ## ]]\nnot a list of calls",
-        ~s({"next_thought": "It holds 1.", "tool_calls": []})
+        ~s({"answer": "It holds 1.", "tool_calls": []})
       ])
 
     program =

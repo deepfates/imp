@@ -19,7 +19,9 @@ defmodule Imp.ReActV2RoundTripTest do
 
       assert loaded.react.adapter_opts == agent.react.adapter_opts
       assert loaded.react.config == agent.react.config
-      assert loaded.react.signature.metadata[:text_field] == :next_thought
+
+      assert loaded.react.signature.metadata[:text_field] ==
+               agent.react.signature.metadata[:text_field]
     end
   end
 end

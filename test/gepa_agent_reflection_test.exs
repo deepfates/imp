@@ -119,7 +119,7 @@ defmodule Imp.Optimizer.GEPA.AgentReflectionTest do
     # first: with seed 0 one of these examples reflects on the answering step.
     assert Enum.any?(
              examples,
-             &(&1 =~ "## Generated Outputs\n### next_thought\nFINAL-ANSWER-MARKER")
+             &(&1 =~ "## Generated Outputs\n### answer\nFINAL-ANSWER-MARKER")
            )
 
     refute prompt =~ "%Imp."
