@@ -1489,15 +1489,19 @@ defmodule Imp.Predict.ReActV2 do
   # in the step's terms, a step that answered in text: `next_thought` is the
   # answer and it called nothing. Read that way, every adapter replays it as
   # the answer the model gave, not as step fields it never filled. Only the
-  # prompt's view changes; the history the caller holds does not.
+  # prompt's view changes; the history the caller holds does not. A binary
+  # task output named tool_calls is text, not the stored call collection.
   defp step_turn(turn, %__MODULE__{signature: signature}) when is_map(turn) do
     with {:text, [%Imp.Signature.Field{name: name}]} <- text_output(signature),
          false <- Imp.FieldMap.has_key?(turn, :next_thought),
-         false <- Imp.FieldMap.has_key?(turn, :tool_calls),
+         false <-
+           Imp.FieldMap.has_key?(turn, :tool_calls) and
+             not Imp.FieldMap.same_name?(name, :tool_calls),
          answer when is_binary(answer) <- Imp.FieldMap.get(turn, name) do
       if Enum.any?(Map.keys(turn), &is_binary/1),
-        do: turn |> Map.put("next_thought", answer) |> Map.put("tool_calls", []),
-        else: turn |> Map.put(:next_thought, answer) |> Map.put(:tool_calls, [])
+        do:
+          turn |> Imp.FieldMap.put("next_thought", answer) |> Imp.FieldMap.put("tool_calls", []),
+        else: turn |> Imp.FieldMap.put(:next_thought, answer) |> Imp.FieldMap.put(:tool_calls, [])
     else
       _step_turn -> turn
     end

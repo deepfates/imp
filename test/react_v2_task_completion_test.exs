@@ -149,6 +149,40 @@ defmodule ReActV2TaskCompletionTest do
     refute assistant.content =~ "next_thought"
   end
 
+  test "a supplied tool_calls text answer is replayed as authored text, not a call collection" do
+    for native? <- [true, false], string_keys? <- [true, false] do
+      owner = self()
+
+      handler = fn messages, _ ->
+        send(owner, {:supplied_history, messages})
+        "done"
+      end
+
+      lm =
+        if native?,
+          do: Imp.LM.Static.new(handler: handler),
+          else: %WrittenCallsLM{handler: handler}
+
+      agent = Imp.react("intent -> tool_calls", [], lm: lm)
+
+      turn =
+        if string_keys?,
+          do: %{"intent" => "before", "tool_calls" => "PRIOR AUTHORED WORDS"},
+          else: %{intent: "before", tool_calls: "PRIOR AUTHORED WORDS"}
+
+      history = Imp.History.new([turn])
+      assert {:ok, prediction} = Imp.call(agent, %{intent: "again", history: history})
+      assert_received {:supplied_history, messages}
+
+      assert Enum.any?(
+               messages,
+               &(&1.role == :assistant and &1.content =~ "PRIOR AUTHORED WORDS")
+             )
+
+      assert hd(prediction.metadata.history.messages) == turn
+    end
+  end
+
   test "blank completion stays blank in one request, without a semantic prose filter" do
     for text <- ["", "No reply needed."] do
       counter = :counters.new(1, [])
