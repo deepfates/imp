@@ -20,8 +20,8 @@ defmodule ReActV2StepContractTest do
     def tool_calling_capability(%__MODULE__{}), do: false
   end
 
-  @in_field "When the final answer is ready, write it in `next_thought`."
-  @leave_empty "When the final answer is ready, write it in `next_thought`, and leave `tool_calls` empty."
+  @in_field "When the final answer is ready, write it in `answer`."
+  @leave_empty "When the final answer is ready, write it in `answer`, and leave `tool_calls` empty."
 
   defp look, do: Imp.tool(:look, "Look at a thing", fn _ -> %{"seen" => [1]} end)
 
@@ -93,25 +93,25 @@ defmodule ReActV2StepContractTest do
   end
 
   describe "an LM that calls tools natively" do
-    test "Chat: the answer goes in next_thought, and plain text is still read as it" do
+    test "Chat: the answer goes in answer, and plain text is still read as it" do
       [request] = run(agent(Imp.Adapter.Chat, lm(true, ["done."])))
       assert_native(request, @in_field)
     end
 
-    test "JSON: the answer goes in next_thought" do
-      [request] = run(agent(Imp.Adapter.JSON, lm(true, [~s({"next_thought": "done."})])))
+    test "JSON: the answer goes in answer" do
+      [request] = run(agent(Imp.Adapter.JSON, lm(true, [~s({"answer": "done."})])))
       assert_native(request, @in_field)
     end
 
-    test "XML: the answer goes in next_thought" do
+    test "XML: the answer goes in answer" do
       [request] =
-        run(agent(Imp.Adapter.XML, lm(true, ["<next_thought>\ndone.\n</next_thought>"])))
+        run(agent(Imp.Adapter.XML, lm(true, ["<answer>\ndone.\n</answer>"])))
 
       assert_native(request, @in_field)
     end
 
     test "the JSON fallback of a Chat step" do
-      replies = ["[[ ## tool_calls ## ]]\nnot a list", ~s({"next_thought": "done."})]
+      replies = ["[[ ## tool_calls ## ]]\nnot a list", ~s({"answer": "done."})]
       [first, fallback] = run(agent(Imp.Adapter.Chat, lm(true, replies)))
       assert_native(first, @in_field)
       assert_native(fallback, @in_field)
@@ -141,7 +141,7 @@ defmodule ReActV2StepContractTest do
 
       assert "earlier reply" in assistant
       assert "noted" in assistant
-      assert "[[ ## next_thought ## ]]\nI will look\n\n[[ ## completed ## ]]\n" in assistant
+      assert "[[ ## answer ## ]]\nI will look\n\n[[ ## completed ## ]]\n" in assistant
       refute text(messages) =~ "Not supplied"
     end
   end
@@ -152,7 +152,7 @@ defmodule ReActV2StepContractTest do
         run(
           agent(
             Imp.Adapter.Chat,
-            lm(false, ["[[ ## next_thought ## ]]\ndone.\n\n[[ ## tool_calls ## ]]\n[]"])
+            lm(false, ["[[ ## answer ## ]]\ndone.\n\n[[ ## tool_calls ## ]]\n[]"])
           )
         )
 
@@ -161,13 +161,13 @@ defmodule ReActV2StepContractTest do
 
     test "JSON" do
       [request] =
-        run(agent(Imp.Adapter.JSON, lm(false, [~s({"next_thought": "done.", "tool_calls": []})])))
+        run(agent(Imp.Adapter.JSON, lm(false, [~s({"answer": "done.", "tool_calls": []})])))
 
       assert_text_only(request, ~s("tool_calls"))
     end
 
     test "XML" do
-      reply = "<next_thought>\ndone.\n</next_thought>\n<tool_calls>\n[]\n</tool_calls>"
+      reply = "<answer>\ndone.\n</answer>\n<tool_calls>\n[]\n</tool_calls>"
       [request] = run(agent(Imp.Adapter.XML, lm(false, [reply])))
       assert_text_only(request, "<tool_calls>")
     end
@@ -175,7 +175,7 @@ defmodule ReActV2StepContractTest do
     test "the JSON fallback of a Chat step" do
       replies = [
         "[[ ## tool_calls ## ]]\nnot a list",
-        ~s({"next_thought": "done.", "tool_calls": []})
+        ~s({"answer": "done.", "tool_calls": []})
       ]
 
       [first, fallback] = run(agent(Imp.Adapter.Chat, lm(false, replies)))
@@ -208,13 +208,13 @@ defmodule ReActV2StepContractTest do
   # has nothing left to ask but its output requirements: they are a user
   # message of their own, never text appended to the tool result.
   for {adapter, reply, requirements} <- [
-        {Imp.Adapter.JSON, ~s({"next_thought": "done."}),
-         "Respond with a JSON object in the following order of fields: `next_thought`."},
-        {Imp.Adapter.XML, "<next_thought>\ndone.\n</next_thought>",
-         "Respond with the corresponding output fields wrapped in XML tags `<next_thought>`."}
+        {Imp.Adapter.JSON, ~s({"answer": "done."}),
+         "Respond with a JSON object in the following order of fields: `answer`."},
+        {Imp.Adapter.XML, "<answer>\ndone.\n</answer>",
+         "Respond with the corresponding output fields wrapped in XML tags `<answer>`."}
       ] do
     test "#{inspect(adapter)} ends a later step on its output requirements" do
-      call = %{next_thought: "Look.", tool_calls: [%{id: "c1", name: "look", arguments: %{}}]}
+      call = %{answer: "Look.", tool_calls: [%{id: "c1", name: "look", arguments: %{}}]}
 
       agent =
         Imp.react("intent -> answer", [look()],
@@ -275,7 +275,7 @@ defmodule ReActV2StepContractTest do
         lm:
           lm(false, [
             "just prose, no call",
-            "[[ ## next_thought ## ]]\nDone.\n\n[[ ## tool_calls ## ]]\n" <>
+            "[[ ## answer ## ]]\nDone.\n\n[[ ## tool_calls ## ]]\n" <>
               ~s([{"name": "submit", "arguments": {"answer": "SKU 12", "confidence": 0.5}}])
           ]),
         max_iters: 1
@@ -309,7 +309,7 @@ defmodule ReActV2StepContractTest do
     counter = :counters.new(1, [])
 
     replies = [
-      "[[ ## next_thought ## ]]\nLook.\n\n[[ ## tool_calls ## ]]\n" <>
+      "[[ ## answer ## ]]\nLook.\n\n[[ ## tool_calls ## ]]\n" <>
         ~s([{"name": "look", "arguments": {}}]) <> "\n\n[[ ## completed ## ]]",
       "It holds 1."
     ]

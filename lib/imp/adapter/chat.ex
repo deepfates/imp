@@ -185,21 +185,30 @@ defmodule Imp.Adapter.Chat do
   # A completion that said something and called tools
   # (`Imp.LM.Result.tool_calls/2`): its text is read as a text completion is,
   # marker sections or the signature's `:text_field`, and its calls fill
-  # `tool_calls`, as DSPy's `Adapter._call_postprocess` does. A signature that
-  # declares a `text` output reads such a map as fields.
+  # the declared calls field, as DSPy's `Adapter._call_postprocess` does.
+  # An ordinary signature declaring `text`, without a calls role, reads
+  # such a map as fields.
   defp do_parse(signature, %{text: text, tool_calls: calls} = map)
        when map_size(map) == 2 and is_binary(text) do
-    if output_field(signature, :text),
+    if output_field(signature, :text) && is_nil(meta_field(signature, :tool_calls_field)),
       do: build_prediction(signature, map),
       else:
         build_text_prediction(
           signature,
           signature
           |> parse_fields(text)
-          |> Map.drop(["tool_calls"])
-          |> Map.put(:tool_calls, calls),
+          |> Imp.FieldMap.delete(meta_field(signature, :tool_calls_field) || :tool_calls)
+          |> Imp.FieldMap.put(meta_field(signature, :tool_calls_field) || :tool_calls, calls),
           text
         )
+  end
+
+  defp do_parse(signature, %{tool_calls: calls} = map)
+       when map_size(map) == 1 and not is_binary(calls) do
+    case meta_field(signature, :tool_calls_field) do
+      name when not is_nil(name) -> build_prediction(signature, %{name => calls})
+      _ -> build_prediction(signature, map)
+    end
   end
 
   defp do_parse(signature, map) when is_map(map), do: build_prediction(signature, map)
@@ -1230,7 +1239,13 @@ defmodule Imp.Adapter.Chat do
       content:
         renderers.output.(
           signature,
-          turn |> Imp.FieldMap.delete(:tool_call_results) |> Imp.FieldMap.put(:tool_calls, calls),
+          turn
+          |> Imp.FieldMap.delete(:tool_call_results)
+          |> Imp.FieldMap.put(
+            meta_field(signature, :text_field) || :next_thought,
+            fetch_field(turn, :next_thought)
+          )
+          |> Imp.FieldMap.put(meta_field(signature, :tool_calls_field) || :tool_calls, calls),
           "Not supplied for this conversation history message. "
         )
     }

@@ -2131,7 +2131,7 @@ submit(%{answer: observed <> ":" <> scratch})|
   defp tool_then_answer(messages, thought, call, answer) do
     if List.last(messages)[:role] == :tool,
       do: answer,
-      else: %{next_thought: thought, tool_calls: [call]}
+      else: %{answer: thought, tool_calls: [call]}
   end
 
   defp one_tool_program(tool, answer) do
@@ -2157,7 +2157,7 @@ submit(%{answer: observed <> ":" <> scratch})|
           case Enum.find(messages, &(Map.get(&1, :role) == :tool)) do
             nil ->
               %{
-                next_thought: "ask MCP",
+                answer: "ask MCP",
                 tool_calls: [
                   %{id: "mcp-call", name: "external_workspace_name", arguments: %{}}
                 ]
@@ -2211,7 +2211,7 @@ submit(%{answer: observed <> ":" <> scratch})|
   end
 
   defp tool_turn(thought, name, id, arguments) do
-    %{next_thought: thought, tool_calls: [%{id: id, name: name, arguments: arguments}]}
+    %{answer: thought, tool_calls: [%{id: id, name: name, arguments: arguments}]}
   end
 
   defp demo_mcp_server do

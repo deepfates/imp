@@ -1096,7 +1096,7 @@ defmodule ReActV2Test do
       action_lm(
         [
           %{
-            next_thought: "answering",
+            answer: "answering",
             tool_calls: [%{id: "r1", name: "reply", arguments: %{"text" => "Paris"}}]
           }
         ],
