@@ -14,6 +14,12 @@ User-visible changes to Imp are recorded here.
   contract from their task signature. Migration: scripted model responses and
   custom step renderers must use the task output name. This changes the
   model-facing contract, not the interpretation of nonempty prose as an answer.
+### Fixed
+
+- OpenRouter requests without an explicit output-token limit leave it to the
+  endpoint instead of reserving the model catalog's full output maximum. The
+  inherited maximum could make otherwise usable prompts exceed the total
+  context window. Ordinary and streamed requests preserve explicit limits.
 
 ### Security
 
