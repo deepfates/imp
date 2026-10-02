@@ -488,7 +488,6 @@ defmodule Imp.ACP.Session do
 
   defp emit_event(state, %Imp.Run.Event{kind: :tool_result} = event) do
     failed? = not is_nil(event.error)
-    value = if(failed?, do: event.error, else: event.output)
 
     case acp_tool_call_id(event) do
       {:ok, tool_call_id} ->
@@ -501,7 +500,7 @@ defmodule Imp.ACP.Session do
             "content" => [
               %{
                 "type" => "content",
-                "content" => %{"type" => "text", "text" => safe_event_text(value)}
+                "content" => %{"type" => "text", "text" => tool_result_text(event)}
               }
             ]
           })
@@ -714,6 +713,34 @@ defmodule Imp.ACP.Session do
 
   defp safe_reason_tag(%_{} = error), do: error.__struct__
   defp safe_reason_tag(_reason), do: :unknown
+
+  # Capture omission is not a tool's return value. In particular, printing nil
+  # here used to make a successful large search look like an empty result.
+  defp tool_result_text(%{metadata: %{capture: %{truncated: true}}} = event) do
+    outcome = if is_nil(event.error), do: "Tool output", else: "Tool failure details"
+    outcome <> " omitted by the run capture limit; this is not an empty result."
+  end
+
+  defp tool_result_text(event) do
+    result = if is_nil(event.error), do: event.output, else: {:error, event.error}
+    text = Imp.Adapter.Chat.format_tool_result(result)
+
+    # Presentation has its own byte bound. Rendering JSON can expand a captured
+    # term; don't turn a bounded event into an unbounded protocol message.
+    if byte_size(text) > 32_768 do
+      head = binary_part(text, 0, 32_768)
+      valid = trim_incomplete_utf8(head)
+      valid <> "\n[ACP preview truncated; #{byte_size(text)} bytes in the captured result.]"
+    else
+      text
+    end
+  end
+
+  defp trim_incomplete_utf8(text) do
+    if String.valid?(text),
+      do: text,
+      else: trim_incomplete_utf8(binary_part(text, 0, byte_size(text) - 1))
+  end
 
   defp safe_event_text(value) when is_binary(value), do: value
   defp safe_event_text(value), do: inspect(value, limit: 30, printable_limit: 2_000)

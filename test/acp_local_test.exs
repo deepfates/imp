@@ -140,4 +140,65 @@ defmodule Imp.ACPLocalTest do
     assert Process.alive?(listener)
     :gen_tcp.close(socket)
   end
+
+  test "large UTF-8 frames arrive whole in both socket directions", %{tmp_dir: tmp} do
+    parent = self()
+    question = String.duplicate("question 🦆 ", 2000)
+    answer = String.duplicate("answer 🌱 ", 2000)
+
+    lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _ ->
+          send(parent, {:model_input, messages})
+          %{answer: answer}
+        end
+      )
+
+    {_listener, path} =
+      listener(tmp,
+        agent_options: [
+          program: Imp.predict("question -> answer", lm: lm),
+          permission_policy: :unrestricted
+        ]
+      )
+
+    client = client(path)
+    assert {:ok, %{"sessionId" => session}} = Client.new_session(client, tmp)
+    assert {:ok, %{"text" => ^answer}} = Client.prompt(client, session, question, timeout: 2000)
+    assert_receive {:model_input, messages}
+    assert inspect(messages, limit: :infinity, printable_limit: :infinity) =~ question
+  end
+
+  test "connecting transport assembles fragments, separates lines, and refuses oversized frames" do
+    alias Imp.ACP.Local.Transport
+    path = "/tmp/imp-frames-#{System.unique_integer([:positive])}.sock"
+    limit = 32_768
+
+    {:ok, listener} =
+      :gen_tcp.listen(0, [:binary, active: false, ip: {:local, String.to_charlist(path)}])
+
+    on_exit(fn ->
+      :gen_tcp.close(listener)
+      File.rm(path)
+    end)
+
+    {:ok, transport} = Transport.connect(socket_path: path, max_frame_bytes: limit)
+    {:ok, socket} = :gen_tcp.accept(listener)
+
+    on_exit(fn ->
+      Transport.close(transport)
+      :gen_tcp.close(socket)
+    end)
+
+    frame = Jason.encode!(%{text: String.duplicate("🦆", 6000)})
+    <<first::binary-size(10_001), rest::binary>> = frame
+    receiving = Task.async(fn -> Transport.receive_message(transport) end)
+    :ok = :gen_tcp.send(socket, first)
+    assert Task.yield(receiving, 20) == nil
+    :ok = :gen_tcp.send(socket, [rest, "\n", "{}\n"])
+    assert {:ok, ^frame, ^transport} = Task.await(receiving)
+    assert {:ok, "{}", ^transport} = Transport.receive_message(transport)
+    :ok = :gen_tcp.send(socket, [String.duplicate("x", limit + 1), "\n"])
+    assert {:error, :frame_too_large} = Transport.receive_message(transport)
+  end
 end

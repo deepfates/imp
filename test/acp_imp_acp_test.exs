@@ -148,6 +148,27 @@ defmodule Imp.ACPTest do
     end
   end
 
+  defmodule ResultViewsProgram do
+    @behaviour Imp.Module
+    defstruct [:signature]
+
+    def call(_, _) do
+      for {id, attrs} <- [
+            {"structured", [output: %{"posts" => [%{"text" => "hello", "uri" => "at://post"}]}]},
+            {"nil", [output: nil]},
+            {"empty", [output: []]},
+            {"omitted", [output: String.duplicate("large", 20_000)]},
+            {"failed", [error: {:tool_denied, :post, :client_denied}]},
+            {"large-failure", [error: %{reason: String.duplicate("failure", 20_000)}]},
+            {"preview", [output: String.duplicate("🦆", 10_000)]}
+          ] do
+        Imp.Run.emit(:tool_result, [tool_call_id: id, tool_name: "search"] ++ attrs)
+      end
+
+      {:ok, Imp.Prediction.new(%{answer: "done"})}
+    end
+  end
+
   defmodule PermissionHandler do
     @behaviour ExMCP.ACP.Client.Handler
 
@@ -314,6 +335,43 @@ defmodule Imp.ACPTest do
     assert failed["sessionUpdate"] == "tool_call_update"
     assert failed["status"] == "failed"
     assert started["toolCallId"] == failed["toolCallId"]
+  end
+
+  test "tool result views distinguish empty, failed and omitted with readable bounded text" do
+    program = %ResultViewsProgram{signature: Imp.signature("question -> answer")}
+    {client, _} = start_pair(fn _ -> program end, permission_policy: :unrestricted)
+    {:ok, %{"sessionId" => session}} = Client.new_session(client, "/tmp/project")
+    assert {:ok, _} = Client.prompt(client, session, "results")
+    updates = session |> receive_updates([]) |> tool_updates()
+    pairs = Enum.chunk_every(updates, 2)
+    assert length(pairs) == 7
+
+    results =
+      for [started, completed] <- pairs do
+        assert started["toolCallId"] == completed["toolCallId"]
+        text = get_in(completed, ["content", Access.at(0), "content", "text"])
+        {completed["status"], text}
+      end
+
+    assert [
+             {"completed", structured},
+             {"completed", "null"},
+             {"completed", "[]"},
+             {"completed", omitted},
+             {"failed", failed},
+             {"failed", large_failure},
+             {"completed", preview}
+           ] = results
+
+    assert Jason.decode!(structured) == %{"posts" => [%{"text" => "hello", "uri" => "at://post"}]}
+    assert omitted =~ "omitted"
+    assert omitted =~ "capture limit"
+    refute omitted == "nil"
+    assert failed =~ "the person declined it"
+    assert large_failure =~ "omitted"
+    assert String.valid?(preview)
+    assert byte_size(preview) < 33_000
+    assert preview =~ "preview truncated"
   end
 
   test "demo policies use only the current turn's tool result" do
