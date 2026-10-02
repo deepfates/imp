@@ -1,10 +1,9 @@
-# Imp v0.8.0
+# Imp v0.8.1
 
 Imp is a framework for typed, optimizable language-model programs on the BEAM.
-This release makes a ReActV2 agent's text completion field match its task,
-preserves omitted output limits on OpenRouter requests, and includes the Finch
-connection-timeout fix. The model-facing completion contract changes, so this
-is a minor release rather than a patch.
+This patch makes ACP tool results readable and truthful about omitted content,
+and fixes local socket framing for large permitted JSON messages. It changes
+neither model-facing behavior nor MCP, dependency pins, or stored schemas.
 
 ## Install
 
@@ -21,32 +20,26 @@ in its release definition; see [releases that use MCP or
 ACP](docs/production.md#releases-that-use-mcp-or-acp).
 Ordinary Imp startup starts no protocol endpoint.
 
-## Changes and upgrading from 0.7
+## Changes and upgrading from 0.8.0
 
-- For a task with one unconstrained text output, ReActV2 now asks the model
-  for that output by name and carries its description into the step signature.
-  A task whose output is `answer` asks for `answer` instead of `next_thought`.
-  Update scripted model responses and custom step renderers to use the task
-  output name. Typed and constrained tasks still complete through `submit`.
-  Saved step history and legacy demonstrations keep working; a loaded agent
-  derives the new contract from its task signature. The stored internal step
-  fields remain compatible. A nonempty answer still means completion; prose
-  such as "No reply" is not interpreted as silence.
-- OpenRouter requests with no explicit output-token limit omit that limit on
-  the wire, rather than reserving the model catalog's maximum output. This
-  avoids rejecting usable prompts for exceeding the total context window.
-  Both ordinary and streamed requests retain caller-supplied limits. Other
-  providers are unchanged.
-- Imp now requires Finch 0.24, which closes an HTTP/1 connection after a
-  request timeout. Its lock uses Mint 1.11.0, removing the three Mint
-  advisories that accompanied the previous 1.10.1 hold. Remove any application
-  dependency added solely to hold Mint at 1.10.1, then update Finch, Mint and
-  hpax along with Imp. The reason for that hold no longer applies.
+- ACP now labels tool output omitted by the capture limit instead of printing
+  `nil`. Genuine nil renders as `null`; empty results, failures and completed
+  calls remain distinct. Structured output is JSON and errors use the same
+  readable wording the model receives. A preview exceeding 32,768 UTF-8 bytes
+  is explicitly cut; capture limits are unchanged. A host with full native
+  records can supply its own bounded view and recovery coordinates.
+- Local ACP listener and connecting sockets keep valid large JSON lines whole.
+  The socket buffer follows the existing frame cap, including the newline;
+  frames above the configured cap are still refused. This fixes frames split
+  at the default driver buffer even though they were within the cap.
 
-Change the Imp dependency to `{:imp, "~> 0.8"}`, resolve dependencies and commit
-`mix.lock`. See the [changelog](CHANGELOG.md) for earlier migration notes.
-Provider-free tests exercise these mechanics; this release does not establish
-how any particular model will respond to the revised completion contract.
+Keep `{:imp, "~> 0.8"}`, run `mix deps.update imp`, and commit `mix.lock`.
+No data migration is needed. This does not reconstruct content omitted from
+historical ACP transcripts, and does not add a full-result retrieval endpoint.
+Rollback means restoring the previous dependency lock and application release;
+it restores the old display/framing defects too. Provider-free tests cover
+capture distinctions, UTF-8 bounds, real socket fragmentation, consecutive
+frames and oversize refusal. See the [changelog](CHANGELOG.md) for older changes.
 
 ## Known limits
 
