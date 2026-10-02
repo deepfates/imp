@@ -5,16 +5,16 @@ where its credentials come from, how long a call may take and what it may
 cost. This page covers those decisions in the order you meet them: starting
 Imp, credentials, concurrency, timeouts, cost and caching, persistence and
 telemetry. The
-[deployment example](https://github.com/deepfates/imp/tree/v0.7.0/examples/deployment)
+[deployment example](https://github.com/deepfates/imp/tree/v0.8.0/examples/deployment)
 is a complete OTP application that puts them together.
 
 ## Imp in your supervision tree
 
-Imp is an OTP application, and adding `{:imp, "~> 0.7"}` to your
+Imp is an OTP application, and adding `{:imp, "~> 0.8"}` to your
 dependencies starts it with yours. It supervises its settings, its response
 cache and the task pools that bound its work. It opens no listener and
 starts no subprocess, and the MCP and ACP runtimes start only when you use
-them. In a script, `Mix.install([{:imp, "~> 0.7"}])` starts it too.
+them. In a script, `Mix.install([{:imp, "~> 0.8"}])` starts it too.
 
 ## Credentials at runtime
 
@@ -252,7 +252,7 @@ standard error.
 
 ## The reference application
 
-[`examples/deployment`](https://github.com/deepfates/imp/tree/v0.7.0/examples/deployment)
+[`examples/deployment`](https://github.com/deepfates/imp/tree/v0.8.0/examples/deployment)
 is a small OTP application that loads a checksummed artifact at startup, reads
 its key from the environment, serves calls from bounded supervised tasks,
 answers overload and timeouts with errors instead of blocking, and reloads

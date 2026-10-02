@@ -21,7 +21,7 @@ Save the whole program when it is made of Imp's modules: `Imp.predict/2`,
 when the program is your own struct implementing `Imp.Module`, or when you
 want the program's code to live in your release and only its tuned text to
 cross the persistence boundary. The
-[deployment example](https://github.com/deepfates/imp/tree/v0.7.0/examples/deployment)
+[deployment example](https://github.com/deepfates/imp/tree/v0.8.0/examples/deployment)
 does the second.
 
 ### 2. JSON with a checksum

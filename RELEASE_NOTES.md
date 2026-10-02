@@ -1,26 +1,15 @@
-# Imp v0.7.0
+# Imp v0.8.0
 
 Imp is a framework for typed, optimizable language-model programs on the BEAM.
-Declare a task as named inputs and outputs, call it like any other Elixir
-program, measure it on examples, compile it with an optimizer, and run the
-selected program under OTP.
-
-This release makes the money a model call reports mean one thing, fixes
-streamed calls through `Imp.Clients.ReqLLM`, fixes reasoning efforts, and
-stops ReActV2's last-request note from being followed by a reply the model
-never gave. It is `0.7.0` rather than `0.6.1` because four of those fixes
-change what a caller receives: a call's `cost` is `nil` where the provider reported no
-charge, where it was ReqLLM's catalog estimate; a stream that did not
-complete returns `{:error, %Imp.LMError{}}`, where it returned the text that
-had arrived; a streamed call's recorded model is the configured model id
-without its provider prefix, where it was the whole `"provider:model"`
-string; and the history entry of ReActV2's `:last_request_note` carries
-empty `tool_calls` and `tool_call_results`, where it held the note alone.
+This release makes a ReActV2 agent's text completion field match its task,
+preserves omitted output limits on OpenRouter requests, and includes the Finch
+connection-timeout fix. The model-facing completion contract changes, so this
+is a minor release rather than a patch.
 
 ## Install
 
 ```elixir
-{:imp, "~> 0.7"}
+{:imp, "~> 0.8"}
 ```
 
 Every dependency comes from Hex. Use a path dependency only while developing
@@ -32,92 +21,32 @@ in its release definition; see [releases that use MCP or
 ACP](docs/production.md#releases-that-use-mcp-or-acp).
 Ordinary Imp startup starts no protocol endpoint.
 
-`mix deps.get` and `mix hex.audit` report two cowlib advisories
-(CVE-2026-43966, CVE-2026-43969). cowlib arrives only through ExMCP's
-Cowboy server, and Imp's HTTP goes through Req, Finch and Mint. The first is
-fixed one layer up: Cowboy 2.16.0 and later refuse a response header
-containing CR or LF, and a fresh `mix deps.get` resolves Cowboy 2.19.0. The second is in the encoder
-for an outgoing `Cookie` request header, which nothing in Imp's dependency
-tree calls, and no cowlib release fixes it yet.
+## Changes and upgrading from 0.7
 
-Imp declares `mint` `~> 1.8`, as Finch does, and a fresh `mix deps.get` resolves `mint`
-1.11.0. That release fixes three advisories but reuses HTTP/1 connections
-that timed out; Imp's own lock holds 1.10.1. See Known limits for the choice
-an application has.
+- For a task with one unconstrained text output, ReActV2 now asks the model
+  for that output by name and carries its description into the step signature.
+  A task whose output is `answer` asks for `answer` instead of `next_thought`.
+  Update scripted model responses and custom step renderers to use the task
+  output name. Typed and constrained tasks still complete through `submit`.
+  Saved step history and legacy demonstrations keep working; a loaded agent
+  derives the new contract from its task signature. The stored internal step
+  fields remain compatible. A nonempty answer still means completion; prose
+  such as "No reply" is not interpreted as silence.
+- OpenRouter requests with no explicit output-token limit omit that limit on
+  the wire, rather than reserving the model catalog's maximum output. This
+  avoids rejecting usable prompts for exceeding the total context window.
+  Both ordinary and streamed requests retain caller-supplied limits. Other
+  providers are unchanged.
+- Imp now requires Finch 0.24, which closes an HTTP/1 connection after a
+  request timeout. Its lock uses Mint 1.11.0, removing the three Mint
+  advisories that accompanied the previous 1.10.1 hold. Remove any application
+  dependency added solely to hold Mint at 1.10.1, then update Finch, Mint and
+  hpax along with Imp. The reason for that hold no longer applies.
 
-## Headline changes
-
-- `cost` on `Imp.Core.LMResponse` and on the `:model_response` event is the
-  charge the provider reported, and `nil` when it reported none. OpenRouter
-  reports its charge unasked, and Imp now reads it for every model; 0.6.0
-  read it only for models ReqLLM's catalog does not price and reported the
-  catalog estimate for the rest. A call made through
-  OpenRouter with the caller's own provider key reports OpenRouter's fee plus
-  the upstream charge. A provider whose response carries no charge (the
-  Anthropic, OpenAI and Google APIs called directly among them) gives a `nil`
-  `cost`. ReqLLM's catalog price is the new `estimated_cost`.
-- A call streamed through `Imp.Clients.ReqLLM` (`Imp.stream/3` with
-  `provider_stream: true`) records the usage and cost the provider reported;
-  in 0.6.0 every such call was recorded with no usage and no cost. A stream
-  that stops with a provider error, with finish reason `:error` or
-  `:cancelled`, or with a body that ends before the provider finished, is an
-  error, and the usage that arrived before it is still recorded on the
-  failed `:model_response` event. A streamed call to a client built from a
-  spec map or a `{provider, opts}` or `{provider, model, opts}` tuple no
-  longer fails.
-- `:reasoning_effort` accepts every effort ReqLLM accepts, `max` among them,
-  read from ReqLLM's own option. An effort given as a string, as every effort
-  loaded from a saved program is, reaches ReqLLM as its atom; in 0.6.0 it
-  failed every call on most providers, OpenRouter (without
-  `openrouter_reasoning_wire: :nested`), Anthropic, Google and Groq among
-  them.
-- `Imp.Predict.ReActV2`'s `:last_request_note` reaches the model as a user
-  message with no assistant message after it, in the last request and
-  whenever the returned history is passed back. It was followed by an
-  assistant message the model never gave, each field reading "Not supplied
-  for this conversation history message." Using that text for history is
-  Imp's; DSPy 3.2.1
-  renders a missing history output as `None`. The note's history entry, and
-  the entry for inputs no step spent that comes before it when the first step
-  failed, now carry `tool_calls: %Imp.Adapter.Types.ToolCalls{tool_calls:
-  []}` and `tool_call_results: []`, like every other step the loop records.
-- In written tool mode (an LM that cannot call tools natively), a stored step
-  that recorded no call and no other output replays as its user message
-  alone, as native replay already did. A step that recorded any output, an
-  answer included, keeps its assistant message.
-
-## Upgrading from 0.6
-
-1. Change the dependency to `{:imp, "~> 0.7"}`, run `mix deps.get`, and
-   commit `mix.lock`. No dependency was added or removed.
-2. Treat a `nil` `cost` as an unknown charge, not a free call. A host that
-   wants the 0.6.0 number for a call with no reported charge reads
-   `estimated_cost` (or `:estimated_cost` on the event), knowing it is an
-   estimate; it is `nil` for a streamed call.
-3. Where you call `Imp.stream/3` with `provider_stream: true`, handle
-   `{:error, %Imp.LMError{}}` from a stream that did not complete as a failed
-   call. The request reached the provider, so it may have been charged.
-4. Where you match the model recorded for a streamed call (the `req_llm`
-   metadata of its `:model_response` event), expect the configured model id
-   without its provider prefix: `gpt-test` for `"openai:gpt-test"`. A client
-   built from a string-keyed spec map or a tuple now records its provider, so
-   the `Imp.Usage` key of its calls is `"provider/model"` where it was the
-   model alone.
-5. Expect spend totals built on `:model_response` events to grow: streamed
-   calls now carry their usage and cost, and a streamed call that fails after
-   the provider reported usage records it on its failed `:model_response`
-   event.
-6. If you store the histories ReActV2 returns (`metadata.history`) and
-   recognise the last-request note by its exact shape (only the first input's
-   key), accept the new `tool_calls` and `tool_call_results` fields, or match
-   the note by that key or by its text. A note stored by an earlier version
-   keeps the old input-only shape and, passed back, still renders with an
-   assistant message of "Not supplied" text. To render it as 0.7.0 does, add
-   `tool_calls: %Imp.Adapter.Types.ToolCalls{tool_calls: []}` and
-   `tool_call_results: []` to that entry; for a history saved with
-   `Imp.History.dump/1`, load it with `Imp.History.load!/1`, add them, and
-   dump it again. In a history reloaded with `Imp.History.load!/1` the field
-   is the plain map `%{tool_calls: []}`.
+Change the Imp dependency to `{:imp, "~> 0.8"}`, resolve dependencies and commit
+`mix.lock`. See the [changelog](CHANGELOG.md) for earlier migration notes.
+Provider-free tests exercise these mechanics; this release does not establish
+how any particular model will respond to the revised completion contract.
 
 ## Known limits
 
@@ -133,26 +62,6 @@ an application has.
   `retryable: true`, because ReqLLM's stream decoder keeps only its message;
   the same error in a non-streamed response may carry a status that says not
   to retry.
-- `mint` 1.11.0 leaves an HTTP/1 connection open after a receive timeout,
-  and Finch 0.23.0, the newest release, returns it to its pool with the
-  unanswered request still on it. A later request the pool gives that
-  connection waits behind the unanswered one and times out, and so does a
-  retry that lands there, until the server answers the first request or
-  closes the connection. If the late answer arrives while another request is
-  waiting, Finch raises `CaseClauseError`. This affects every Req or Finch user on HTTP/1, the
-  default for Req and ReqLLM, whose server can time out; ReqLLM spreads a
-  host's requests over several connections, so there only the requests that
-  draw the stuck one fail. With `mint` 1.10.1 a timeout closes the
-  connection and the next request opens a new one, so Imp's lock holds
-  1.10.1. It has three advisories that 1.11.0 fixes: EEF-CVE-2026-91043
-  (high) and EEF-CVE-2026-92103 are in Mint's HTTP/2 client only, and
-  EEF-CVE-2026-94194 is in HTTP/1 chunked framing and needs a malicious
-  server behind an intermediary that reads the framing strictly. An
-  application chooses one: add `{:mint, "~> 1.10.1"}` to its dependencies to
-  lock 1.10.1 and keep those advisories, or take 1.11.0 and accept that a
-  connection that timed out is reused until the server closes it. Finch has
-  an open, unreleased fix (https://github.com/sneako/finch/pull/397); a Finch
-  release that includes it ends the choice.
 - A flat two-element name-first list that is not itself an element of a
   list (at the top level, in a tuple, or under a key that is not a credential
   name), such as `["password", "hunter2"]`, is not redacted, where 0.5.0
