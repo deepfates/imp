@@ -5,7 +5,7 @@ Add Imp to a Mix project:
 ~~~elixir
 def deps do
   [
-    {:imp, "~> 0.7"}
+    {:imp, "~> 0.8"}
   ]
 end
 ~~~
@@ -13,7 +13,7 @@ end
 or, for a script or a Livebook notebook:
 
 ~~~elixir
-Mix.install([{:imp, "~> 0.7"}])
+Mix.install([{:imp, "~> 0.8"}])
 ~~~
 
 Imp needs Elixir 1.19 and a C and C++ compiler, for the native code in two

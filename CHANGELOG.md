@@ -4,6 +4,8 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+## 0.8.0 — 2026-10-01
+
 ### Changed
 
 - ReActV2 with one unconstrained text output now asks for that task field
@@ -14,6 +16,7 @@ User-visible changes to Imp are recorded here.
   contract from their task signature. Migration: scripted model responses and
   custom step renderers must use the task output name. This changes the
   model-facing contract, not the interpretation of nonempty prose as an answer.
+
 ### Fixed
 
 - OpenRouter requests without an explicit output-token limit leave it to the
