@@ -169,6 +169,9 @@ defmodule Imp.ACP.Local do
       active: false,
       packet: :line,
       packet_size: limit + 1,
+      # :line emits partial lines when the driver buffer fills, even when
+      # packet_size allows a larger frame. Include the terminating newline.
+      buffer: limit + 1,
       ip: {:local, String.to_charlist(path)},
       send_timeout: 5_000,
       send_timeout_close: true
@@ -286,6 +289,8 @@ defmodule Imp.ACP.Local.Transport do
                  active: false,
                  packet: :line,
                  packet_size: limit + 1,
+                 # Keep a permitted NDJSON frame whole, as on the listener.
+                 buffer: limit + 1,
                  send_timeout: 5000,
                  send_timeout_close: true
                ],
@@ -310,7 +315,12 @@ defmodule Imp.ACP.Local.Transport do
   def receive_message(state) do
     case :gen_tcp.recv(state.socket, 0) do
       {:ok, line} when byte_size(line) <= state.max_frame_bytes + 1 ->
-        {:ok, String.trim_trailing(line, "\n"), state}
+        frame = String.trim_trailing(line, "\n")
+
+        # A full buffer without its newline is already larger than the cap.
+        if byte_size(frame) <= state.max_frame_bytes,
+          do: {:ok, frame, state},
+          else: {:error, :frame_too_large}
 
       {:ok, _} ->
         {:error, :frame_too_large}

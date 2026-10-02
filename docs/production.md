@@ -231,6 +231,17 @@ Tickets.ImpMetrics.attach()
 lists the event families. `Imp.disable_logging/0` silences Imp's own log
 messages without touching your application's log level.
 
+## ACP tool result previews
+
+ACP tool cards render structured results as JSON and failures using the same
+words the model receives. A genuine nil is `null`; an output omitted by the
+run's capture limit is explicitly labelled as omitted, retaining the call's
+completed or failed status. Presentation is bounded to 32,768 UTF-8 bytes plus
+a truncation notice. Capture and socket frame limits remain independent.
+Hosts retaining complete native results should project a bounded readable view
+before emitting it into the observer run, including their own recovery
+coordinates; ACP cannot reconstruct content that capture already omitted.
+
 ## Releases that use MCP or ACP
 
 Imp compiles against its protocol libraries but does not start them for
