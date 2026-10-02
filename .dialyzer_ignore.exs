@@ -55,7 +55,7 @@
   # defensive guard: ReqLLM.Response types provider_meta as map() with a %{}
   # default, but the struct does not enforce it (a caller can build one with
   # nil), and ReqLLM's own OpenTelemetry attributes guard it with is_map/1.
-  {"lib/imp/clients/req_llm.ex", :guard_fail, 1919},
+  {"lib/imp/clients/req_llm.ex", :guard_fail, 1990},
   # defensive error clause on an always-ok internal call
   {"lib/imp/clients/training.ex", :pattern_match, {1215, 13}},
   # defensive error clause on an always-ok internal call

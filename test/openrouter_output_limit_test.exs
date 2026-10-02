@@ -38,7 +38,7 @@ defmodule Imp.OpenRouterOutputLimitTest do
                  Imp.Clients.ReqLLM.generate(lm, messages, per_call)
 
       :stream ->
-        lm |> Imp.Clients.ReqLLM.stream(messages, per_call) |> Enum.to_list()
+        assert [_ | _] = lm |> Imp.Clients.ReqLLM.stream(messages, per_call) |> Enum.to_list()
     end
 
     assert_receive {^ref, body}
