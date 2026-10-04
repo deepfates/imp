@@ -225,7 +225,7 @@ key and option.
 Use `result_mode: :multimodal` when importing a server that returns MCP image
 content. Imp retains the supplied base64 bytes through the normal history
 codec; image URLs written in text are still text and are never fetched.
-Only MCP text and image blocks receive this treatment. Other block types
+Only MCP text and image blocks receive this conversion. Other block types
 remain textual data; errors retain their original envelope.
 
 Chat places result text in the tool response, then adds user messages carrying
