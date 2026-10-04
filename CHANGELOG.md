@@ -4,6 +4,14 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Added
+
+- Opt-in MCP `result_mode: :multimodal` preserves image content alongside
+  text and structured results. ReAct and saved-history replay send typed
+  images as call-labelled user attachments after the turn's tool responses.
+  `Imp.Adapter.Chat.format_tool_content/1` lets host renderers preserve images
+  while bounding text; `format_tool_result/1` remains textual.
+
 ## 0.8.1 — 2026-10-02
 
 ### Fixed

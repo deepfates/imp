@@ -188,6 +188,11 @@ The options you will reach for:
   fails the import with `{:mcp_server_not_authorized, server_name, reason}`;
   one missing from `trusted_servers:` has the reason `:not_trusted`.
 - `timeout:` bounds each dial and each call.
+- `result_mode: :multimodal` preserves MCP image blocks as
+  `Imp.Adapter.Types.Image` values alongside text. Without images it returns
+  the same value as `:structured`; with images it returns a list of strings
+  and typed images, including any `structuredContent` as JSON text. The
+  default `:text` and opt-in `:structured` modes retain their existing behavior.
 - `on_failure: :drop` keeps the servers that answered when one does not.
   The default, `:refuse`, fails the whole import, which is what a program
   that needs every tool wants. Under `:drop`, a server whose connection,
@@ -214,6 +219,31 @@ refuses the first probe, and the extra `pool_size` connections, dialed
 together), so budget a boot that connects `n` servers at about
 `3 * n * timeout` in the worst case. `Imp.MCP.Connections` documents every
 key and option.
+
+#### Images returned by tools
+
+Use `result_mode: :multimodal` when importing a server that returns MCP image
+content. Imp retains the supplied base64 bytes through the normal history
+codec; image URLs written in text are still text and are never fetched.
+Only MCP text and image blocks receive this treatment. Other block types
+remain textual data; errors retain their original envelope.
+
+Chat places result text in the tool response, then adds user messages carrying
+the images and their originating call name and ID. All responses in a parallel
+tool group precede those attachments. This common projection uses the existing
+provider image-input path because
+[OpenAI Chat tool messages accept only text](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create).
+It also applies to providers that support nested tool images, such as
+[Anthropic](https://platform.claude.com/docs/en/agents-and-tools/tool-use/handle-tool-calls):
+call association is explicit text rather than native tool-result nesting.
+The attachment label identifies tool data, not a new human instruction.
+
+Custom `:tool_result_renderer` functions should use
+`Imp.Adapter.Chat.format_tool_content/1`, bound text parts as needed, and retain
+the typed images. `format_tool_result/1` continues to produce text for tool
+cards, search and other textual consumers. Images remain subject to the
+selected model's format, size and vision capabilities. Provider-free request
+tests establish byte transport and ordering; they do not establish perception.
 
 #### Local servers
 

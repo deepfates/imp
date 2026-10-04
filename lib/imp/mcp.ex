@@ -14,8 +14,15 @@ defmodule Imp.MCP do
   list, and non-text blocks are returned when no text is present. Set
   `result_mode: :structured` to return `structuredContent` exactly when the
   server includes it—even when its value is `nil`, `false`, `0`, or empty—and
-  fall back to the text conversion only when that field is absent. MCP error
-  results become `{:error, {:mcp_tool_error, original_envelope}}` before either
+  fall back to the text conversion only when that field is absent.
+  `result_mode: :multimodal` keeps the structured-mode behavior for results
+  without images. An image-bearing result becomes an ordered list of strings
+  and `Imp.Adapter.Types.Image` values: structured data is included as JSON
+  text, followed by the content blocks. Image bytes remain base64 data; no
+  URLs are fetched. Text and image blocks are supported; other block types
+  remain textual data. A vision-capable model is still required.
+
+  Error results become `{:error, {:mcp_tool_error, original_envelope}}` before
   conversion. The original structured failure and content remain available;
   uncertainty about an effect must not be collapsed into a retryable refusal.
   A call that got no answer from its tool returns
@@ -181,7 +188,8 @@ defmodule Imp.MCP do
   @doc false
   def tool_result(result, mode \\ :text)
 
-  def tool_result(result, mode) when mode in [:text, :structured] and is_map(result) do
+  def tool_result(result, mode)
+      when mode in [:text, :structured, :multimodal] and is_map(result) do
     if call_tool_result?(result) do
       text = text_content(result)
 
@@ -198,7 +206,7 @@ defmodule Imp.MCP do
     end
   end
 
-  def tool_result(result, mode) when mode in [:text, :structured], do: result
+  def tool_result(result, mode) when mode in [:text, :structured, :multimodal], do: result
 
   defp call_tool_result?(result) do
     has_field?(result, :content) or has_field?(result, :structuredContent) or
@@ -213,6 +221,43 @@ defmodule Imp.MCP do
   end
 
   defp convert_tool_result(result, :text, text), do: text_fallback(result, text)
+
+  defp convert_tool_result(result, :multimodal, text) do
+    content = fetch_field(result, :content, [])
+
+    if Enum.any?(content, &(fetch_field(&1, :type, nil) in ["image", :image])) do
+      structured =
+        case fetch_present(result, :structuredContent) do
+          {:ok, value} -> [Jason.encode!(value)]
+          :error -> []
+        end
+
+      structured ++ Enum.map(content, &multimodal_content/1)
+    else
+      convert_tool_result(result, :structured, text)
+    end
+  end
+
+  defp multimodal_content(block) do
+    case fetch_field(block, :type, nil) do
+      type when type in ["image", :image] ->
+        data = fetch_field(block, :data, nil)
+        mime_type = fetch_field(block, :mimeType, nil)
+
+        unless is_binary(data) and is_binary(mime_type) do
+          raise ArgumentError, "MCP image content requires base64 data and mimeType strings"
+        end
+
+        Imp.Adapter.Types.decode_data!(data, "MCP image")
+        %Imp.Adapter.Types.Image{data: data, mime_type: mime_type}
+
+      type when type in ["text", :text] ->
+        fetch_field(block, :text, "")
+
+      _other ->
+        Imp.Adapter.Chat.format_value(block)
+    end
+  end
 
   defp text_fallback(result, []) do
     result
@@ -256,5 +301,6 @@ defmodule Imp.MCP do
 
   defp snake_case(:structuredContent), do: :structured_content
   defp snake_case(:isError), do: :is_error
+  defp snake_case(:mimeType), do: :mime_type
   defp snake_case(name), do: name
 end
