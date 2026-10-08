@@ -68,7 +68,10 @@ defmodule Imp.Predict.ReActV2 do
 
   A turn that could not get a model response returns
   `{:error, %Imp.Predict.ReActV2.StepError{}}` rather than a prediction: its
-  last request failed with an `Imp.LMError`, its LM client raised
+  last request failed with an `Imp.LMError`, a step's request was stopped by
+  the provider's content filter (`Imp.LMError` with `content_filtered: true`;
+  sending it again would be filtered and billed again, so no last request is
+  made, as DSPy makes none after a step's LM error), its LM client raised
   (`{:lm_failed, client, exception}`), or a renderer raised
   (`{:adapter_format_failed, adapter, exception}`). The error's `:reason` is
   that request's error as `Imp.Predict` returns it, which `Imp.Errors`
@@ -82,7 +85,8 @@ defmodule Imp.Predict.ReActV2 do
   ## When a turn is interrupted
 
   A turn is interrupted when it reaches `max_iters`, when a step's request
-  fails (`:prediction_error`, `:parse_error`), or when a step of a signature
+  fails (`:prediction_error`, `:parse_error`) other than by the content
+  filter, or when a step of a signature
   with `submit` calls no tool (`:empty_tool_calls`). An `enum` output is such a
   signature: text that is not a `submit` call is `:empty_tool_calls`, never
   an answer, and a turn with no valid `submit`, the forced one included, ends
@@ -578,9 +582,12 @@ defmodule Imp.Predict.ReActV2 do
       # is also one more try at a model response after a transient failure,
       # which a host that answers every turn relies on. The call fails only
       # when that request gets no response either (`last_request_failed/4`).
-      # An operational safety guard (route, cost, transport, budget) is
-      # fatal, as `Imp.OperationalSafetyError` requires: a further request
-      # would pass the guard by, so the turn stops here.
+      # A request the content filter stopped is not transient: the last
+      # request would carry the same history, be filtered again and be billed
+      # again, so the turn fails at once, as in DSPy. An operational safety
+      # guard (route, cost, transport, budget) is fatal, as
+      # `Imp.OperationalSafetyError` requires: a further request would pass
+      # the guard by, so the turn stops here.
       {:error, reason, history} ->
         cond do
           safety_error?(reason) ->
@@ -588,6 +595,9 @@ defmodule Imp.Predict.ReActV2 do
 
           Imp.Errors.context_window_exceeded?(reason) ->
             incomplete_prediction(history, :context_window_exceeded, reason)
+
+          match?(%Imp.LMError{content_filtered: true}, reason) ->
+            step_error(history, reason)
 
           true ->
             interrupted(

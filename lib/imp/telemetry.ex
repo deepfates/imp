@@ -125,5 +125,6 @@ defmodule Imp.Telemetry do
 
   defp result_status({:ok, _value}), do: :ok
   defp result_status({:error, _reason}), do: :error
+  defp result_status({:error, _reason, _partial}), do: :error
   defp result_status(_value), do: :ok
 end

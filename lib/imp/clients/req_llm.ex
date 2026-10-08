@@ -27,7 +27,13 @@ defmodule Imp.Clients.ReqLLM do
   and generic HTTP 400 responses do not trigger context recovery. A successful
   HTTP response whose body carries a provider error, which is how OpenRouter
   relays an upstream refusal, is returned as that error, never as an empty
-  completion.
+  completion. So is a completion that finished with reason `:content_filter`
+  or `:error` (ReqLLM's reason for any finish reason it does not recognise):
+  a non-retryable `Imp.LMError` whose message ends with the response's text,
+  with `content_filtered: true` for the filter.
+  The provider billed such a response, so through `Imp.LM` its usage and cost
+  are still recorded, on the call's failed `:model_response` event and in
+  `Imp.Usage`.
 
   `stream/3` ends with exactly one terminal event. A provider stream that runs
   to its end closes with `done: true` and the metadata the provider reported
@@ -226,30 +232,49 @@ defmodule Imp.Clients.ReqLLM do
   @doc false
   def configured_option(%__MODULE__{opts: opts}, key), do: Keyword.fetch(opts, key)
 
+  # A completion the provider answered and billed but that is a failed request
+  # (a content filter stopped it, or it finished with reason `:error`) fails
+  # with `{:error, reason, partial}`: `partial` carries the usage and cost the
+  # provider reported, which `Imp.LM` records on the call's `:model_response`
+  # and in `Imp.Usage` while the caller still receives `{:error, reason}`.
   @impl true
   def request(%__MODULE__{} = lm, %Imp.Core.LMRequest{} = request) do
     {messages, opts} = Imp.Core.request_parts(request)
 
-    with {:ok, raw} <- generate(lm, messages, opts),
-         {:ok, response} <- Imp.Core.response(raw) do
-      {:ok, response}
+    case do_generate(lm, messages, opts) do
+      {:ok, raw} ->
+        Imp.Core.response(raw)
+
+      {:error, reason, raw} ->
+        case Imp.Core.response(raw) do
+          {:ok, partial} -> {:error, reason, partial}
+          {:error, _invalid} -> {:error, reason}
+        end
+
+      {:error, _reason} = error ->
+        error
     end
   end
 
   @impl true
-  def generate(lm, messages, opts)
+  def generate(lm, messages, opts) do
+    case do_generate(lm, messages, opts) do
+      {:error, reason, _billed} -> {:error, reason}
+      result -> result
+    end
+  end
 
   # The module itself, with the model named in the call's options.
-  def generate(__MODULE__, messages, opts) do
+  defp do_generate(__MODULE__, messages, opts) do
     opts = validate_call_opts!(opts, "#{inspect(__MODULE__)}.generate/3")
 
     case Keyword.fetch(opts, :model) do
-      {:ok, model} -> generate(new(model, opts), messages, opts)
+      {:ok, model} -> do_generate(new(model, opts), messages, opts)
       :error -> {:error, :req_llm_model_required}
     end
   end
 
-  def generate(%__MODULE__{} = lm, messages, opts) do
+  defp do_generate(%__MODULE__{} = lm, messages, opts) do
     opts = validate_call_opts!(opts, "#{inspect(__MODULE__)}.generate/3")
 
     {rollout_id, opts} =
@@ -304,7 +329,7 @@ defmodule Imp.Clients.ReqLLM do
             Imp.Cache.put(cache_key, success)
             success
 
-          {:error, _reason} = error ->
+          error ->
             error
         end
 
@@ -384,9 +409,9 @@ defmodule Imp.Clients.ReqLLM do
 
     case lm.req_module.generate_text(lm.model, to_req_messages(messages), opts) do
       {:ok, response} ->
-        case relayed_error(response) || filtered(response) do
+        case relayed_error(response) || stopped(response) do
           nil -> {:ok, from_response(response, lm.model)}
-          error -> {:error, lm_error(error, provider)}
+          error -> {:error, lm_error(error, provider), from_response(response, lm.model)}
         end
 
       {:error, reason} ->
@@ -416,18 +441,32 @@ defmodule Imp.Clients.ReqLLM do
   # A completion the provider's content filter stopped (`finish_reason`
   # `:content_filter`) is not the model's answer: OpenRouter, for one, returns
   # the filter's message ("The request was rejected because it was considered
-  # high risk") as the message content. Read as a completion, that text would
-  # be the model's words. It is the failed request it reports.
-  defp filtered(%ReqLLM.Response{finish_reason: :content_filter} = response) do
+  # high risk") as the message content. Nor is one that finished with reason
+  # `:error`: OpenRouter reports a generation that failed partway that way, and
+  # ReqLLM maps every finish reason it does not recognise to `:error`. Read as
+  # a completion, that text would be the model's words. It is the failed
+  # request it reports, and sending it again is likely to fail the same way.
+  defp stopped(%ReqLLM.Response{finish_reason: :content_filter} = response),
+    do:
+      stopped_error(
+        response,
+        "content_filter",
+        "the provider's content filter stopped the completion: "
+      )
+
+  defp stopped(%ReqLLM.Response{finish_reason: :error} = response),
+    do: stopped_error(response, "error", "the completion finished with reason error: ")
+
+  defp stopped(_response), do: nil
+
+  defp stopped_error(response, finish_reason, prefix) do
     text = ReqLLM.Response.text(response) || ""
 
     %ReqLLM.Error.API.Request{
-      reason: "the provider's content filter stopped the completion: " <> text,
-      response_body: %{"finish_reason" => "content_filter", "content" => text}
+      reason: prefix <> text,
+      response_body: %{"finish_reason" => finish_reason, "content" => text}
     }
   end
-
-  defp filtered(_response), do: nil
 
   # A provider's error object or message, as ReqLLM carries it in a response's
   # `provider_meta` or a stream's metadata, in the shape ReqLLM gives an HTTP
@@ -463,9 +502,17 @@ defmodule Imp.Clients.ReqLLM do
       status: status(reason),
       reason: stripped,
       retryable: retryable,
-      context_window_exceeded: context_length_exceeded?(reason, provider)
+      context_window_exceeded: context_length_exceeded?(reason, provider),
+      content_filtered: content_filtered?(reason)
     }
   end
+
+  defp content_filtered?(%ReqLLM.Error.API.Request{
+         response_body: %{"finish_reason" => "content_filter"}
+       }),
+       do: true
+
+  defp content_filtered?(_reason), do: false
 
   defp status(%{status: status}) when is_integer(status), do: status
   defp status(_reason), do: nil

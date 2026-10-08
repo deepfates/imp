@@ -4540,6 +4540,7 @@
       "source": "lib/imp/exceptions.ex",
       "struct_fields": [
         "__exception__",
+        "content_filtered",
         "context_window_exceeded",
         "message",
         "reason",
