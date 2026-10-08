@@ -1,11 +1,13 @@
 # Imp v0.10.0
 
 Imp is a framework for typed, optimizable language-model programs on the BEAM.
-This release shows the model the turns it actually had, keeps images that MCP
+This release shows the model the turns it actually had, stops a plain-text
+ReActV2 step from telling the model two ways to finish, keeps images that MCP
 tools return, makes the ATIF export read as the model saw the run, and counts
 streamed calls in `Imp.Usage`. What the model receives changes (history
-turns, the system message's field list, and opt-in tool images), and so do
-the meanings of ATIF fields, so this is a minor release rather than a patch.
+turns, the system message's field list and opening line, and opt-in tool
+images), and so do the meanings of ATIF fields, so this is a minor release
+rather than a patch.
 
 ## Install
 
@@ -49,6 +51,15 @@ change, if anything.
   without those inputs. Both history changes alter the request, so a
   provider prompt cache keyed on the old system message misses once after
   the upgrade.
+- **ReActV2's plain-text opening line agrees with how it finishes.** For an
+  LM that calls tools natively and a task with one unconstrained text output
+  (no `submit` tool), the system message opened with "Use the supplied tools
+  to produce `answer`" and later said the answer is the reply sent without a
+  tool call. The opening line now reads "You are an Agent. Produce `answer`
+  from `intent`, using the supplied tools to gather information and take
+  actions." Steps with `submit`, written tool calls, and the JSON and XML
+  formats keep the old line. Migration: a test that matched the old opening
+  line for this mode must match the new one.
 - **Images from MCP tools (opt-in).** Import a server with
   `result_mode: :multimodal` to keep its image content as
   `Imp.Adapter.Types.Image` values beside the result's text. The Chat adapter
@@ -91,7 +102,8 @@ change, if anything.
 
 Rollback means restoring the previous dependency requirement, lock and
 application release; it brings back the filler text, the history section,
-dropped tool images, the 0.9 ATIF shape and uncounted streamed usage.
+the contradictory opening line, dropped tool images, the 0.9 ATIF shape and
+uncounted streamed usage.
 Provider-free tests assert the new request messages, the image bytes and
 their order on the provider wire, the ATIF projection, and usage counted
 across processes; this release does not establish how any particular model
