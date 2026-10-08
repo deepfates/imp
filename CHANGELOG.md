@@ -4,6 +4,8 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+## 0.10.0 — 2026-10-08
+
 ### Added
 
 - Opt-in MCP `result_mode: :multimodal` keeps MCP image content as typed
@@ -11,29 +13,15 @@ User-visible changes to Imp are recorded here.
   images as call-labelled user attachments after the turn's tool responses.
   `Imp.Adapter.Chat.format_tool_content/1` lets host renderers keep images
   while bounding text; `format_tool_result/1` remains textual.
+  `format_tool_content/1` is now the Chat adapter's default tool-result
+  renderer, so a result from any tool that is a list of strings and
+  `Imp.Adapter.Types.Image` values with at least one image is sent the same
+  way; every other result renders as `format_tool_result/1` rendered it. In
+  this mode an MCP image block without string `data` and `mimeType`, or whose
+  data is not base64, raises `ArgumentError` in the tool call; it is not sent
+  to the model.
 
-### Fixed
-
-- A stored history turn no longer shows "Not supplied for this conversation
-  history message." for an output it did not record: missing outputs are
-  left out, and a turn with none is its user message alone. A predictor
-  that names a tool-calls output keeps its recorded outputs when its history
-  is replayed with native tool calls; it showed an empty message. Migration:
-  a test that matched the filler must expect the turn without it.
-- The system message no longer lists a history input or shows a
-  `[[ ## history ## ]]` section, in any format. History arrives as earlier
-  turns, never as that section. Migration: a test or custom renderer that
-  matched the old field list must match the new one.
-- `Imp.Usage.track/1` counts streamed calls (`Imp.collect/3`, a stream with
-  `provider_stream: true`), successful or failed, and a call made by
-  `Imp.Predict` with `track_usage` on, including a failed one. A streamed
-  call has ReqLLM's `estimated_cost` when ReqLLM priced it, as a
-  non-streamed call does. This retires the 0.9.0 Known limit on streamed
-  usage.
-
-## 0.9.0 — 2026-10-07
-
-### Fixed
+### Changed
 
 - `Imp.Trajectory.to_atif/2` now shows a run as the model saw it. Each model
   response is one agent step with `model_name`, `metrics` (tokens and cost),
@@ -48,6 +36,58 @@ User-visible changes to Imp are recorded here.
   step instead of a separate step. Migration: a reader that took
   `reasoning_content` as the step's visible thought, or expected tool calls
   as separate `llm_call_count: 0` steps, should read the new fields.
+  Also: a response served from Imp's cache has `llm_call_count` null; a tool
+  call no response asked for (one a host dispatched) is still its own
+  `llm_call_count: 0` step; a call's `extra.outcome` is on the call in
+  `tool_calls`, and on the step only for such a host-dispatched call; a user
+  or system message a later request appends is a step of its own; a
+  `:reasoning` event that follows no response to its request is a
+  diagnostic; an `:agent` option is merged over the computed `agent` instead
+  of replacing it; and `extra.capture` no longer says inference counts are
+  unknown. This entry was listed under 0.9.0 on main after that release was
+  tagged; it shipped in no release before this one.
+
+### Fixed
+
+- A stored history turn no longer shows "Not supplied for this conversation
+  history message." for an output it did not record: missing outputs are
+  left out, and a turn with none is its user message alone. A predictor
+  that names a tool-calls output keeps its recorded outputs when its history
+  is replayed with native tool calls; it showed an empty message. Migration:
+  a test that matched the filler must expect the turn without it.
+- The system message no longer lists a history input or shows a
+  `[[ ## history ## ]]` section, in any format. History arrives as earlier
+  turns, never as that section. A field typed `history` is left out, and so
+  is any input the call supplies as an `Imp.History`; a custom
+  `:system_renderer` receives the signature without them. Migration: a test
+  or custom renderer that matched the old field list must match the new one.
+- With native tool calls, a tool call whose result renders as blank text
+  keeps its tool message, in a loop's earlier steps and in replayed history.
+  The message was dropped, leaving the assistant's call with no answer.
+- `Imp.Usage.track/1` counts streamed calls (`Imp.collect/3`, a stream with
+  `provider_stream: true`), successful or failed, and a call made by
+  `Imp.Predict` with `track_usage` on, including a failed one. A streamed
+  call has ReqLLM's `estimated_cost` when ReqLLM priced it, as a
+  non-streamed call does: ReqLLM's stream-level usage now fills the fields
+  the chunks lack, and the chunks' figures stand where both report one.
+  This retires the 0.9.0 Known limit on streamed usage. Migration: a host
+  that worked around that limit by adding streamed usage, or a
+  `track_usage` prediction's `get_lm_usage/1`, to its own tracker counts
+  those calls twice and must stop.
+- In a ReActV2 step with one unconstrained text output and native tool
+  calls (no `submit` tool), the system message's opening line no longer
+  says to use the tools to produce the answer, which contradicted the later
+  line that the answer is the reply without a tool call. It now reads
+  "You are an Agent. Produce `answer` from `intent`, using the supplied
+  tools to gather information and take actions." Steps with `submit`,
+  written tool calls, or the JSON and XML formats are unchanged. Migration:
+  a test that matched the old opening line for this mode must match the
+  new one.
+
+## 0.9.0 — 2026-10-07
+
+### Fixed
+
 - A ReActV2 step with one unconstrained text output, for an LM that calls
   tools natively, no longer asks for `[[ ## answer ## ]]` and
   `[[ ## completed ## ]]` markers while also saying the answer is the text of
