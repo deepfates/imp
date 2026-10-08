@@ -6,6 +6,19 @@ User-visible changes to Imp are recorded here.
 
 ### Fixed
 
+- `Imp.Trajectory.to_atif/2` now shows a run as the model saw it. Each model
+  response is one agent step with `model_name`, `metrics` (tokens and cost),
+  `llm_call_count: 1`, the provider's own reasoning as `reasoning_content`,
+  and the tool calls the loop ran for it. A tool result's `content` is the
+  tool message the model read next; the tool's own output is kept in
+  `extra.output` when it differs, and `extra.seen_by_model` says whether the
+  model read it at all. History replayed in the first request keeps its tool
+  calls, results and reasoning. `agent.tool_definitions`, `agent.model_name`
+  and `final_metrics` are filled in. A loop's `:reasoning` event (the
+  visible thought beside a tool call) is `extra.next_thought` on its response
+  step instead of a separate step. Migration: a reader that took
+  `reasoning_content` as the step's visible thought, or expected tool calls
+  as separate `llm_call_count: 0` steps, should read the new fields.
 - A ReActV2 step with one unconstrained text output, for an LM that calls
   tools natively, no longer asks for `[[ ## answer ## ]]` and
   `[[ ## completed ## ]]` markers while also saying the answer is the text of
