@@ -569,7 +569,7 @@ defmodule ReqLLMClientTest do
   end
 
   test "a completion the content filter stopped is a failed request, not the model's answer" do
-    lm = Imp.req_llm("openrouter:xiaomi/mimo-v2.5-pro", req_module: FilteredStub)
+    lm = Imp.req_llm("openrouter:openai/gpt-4o-mini", req_module: FilteredStub)
 
     assert {:error, %Imp.LMError{retryable: false, message: message}} =
              Imp.Clients.ReqLLM.generate(lm, [%{role: :user, content: "hello"}], [])
