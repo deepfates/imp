@@ -36,6 +36,16 @@ defmodule Imp.Clients.TRLTrainer do
 
   alias Imp.Clients.{ReinforcementSession, TRLArtifact, TRLProtocol, TRLWorker}
 
+  @type t :: %__MODULE__{
+          python: String.t(),
+          model_path: String.t(),
+          root: String.t(),
+          contract_path: String.t(),
+          worker_script: String.t() | nil,
+          worker_key: term(),
+          timeout: timeout()
+        }
+
   @enforce_keys [:python, :model_path, :root, :contract_path]
   defstruct [
     :python,

@@ -264,7 +264,7 @@ defmodule Imp.BenchmarkTruth.MusiqueAns do
   defp verify_file!(path, expected) do
     digest =
       path
-      |> File.stream!([], 1_048_576)
+      |> File.stream!(1_048_576)
       |> Enum.reduce(:crypto.hash_init(:sha256), &:crypto.hash_update(&2, &1))
       |> :crypto.hash_final()
       |> Base.encode16(case: :lower)

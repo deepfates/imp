@@ -863,6 +863,7 @@ defmodule Mix.Tasks.Imp.PublicApi do
 
   defp valid_semver?(_version), do: false
 
+  @spec invalid_snapshot!(term(), term()) :: no_return()
   defp invalid_snapshot!(label, reason),
     do: Mix.raise("invalid public API snapshot #{label}: #{reason}")
 

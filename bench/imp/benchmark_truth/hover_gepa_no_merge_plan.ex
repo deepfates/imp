@@ -1277,7 +1277,7 @@ defmodule Imp.BenchmarkTruth.HoverGepaNoMergePlan do
   defp sha256(bytes), do: :crypto.hash(:sha256, bytes) |> Base.encode16(case: :lower)
 
   defp line_count(path) do
-    path |> File.stream!([], :line) |> Enum.count()
+    path |> File.stream!(:line) |> Enum.count()
   end
 
   defp first_jsonl!(path) do

@@ -511,6 +511,7 @@ defmodule Mix.Tasks.Imp.Benchmark.Parity do
     end
   end
 
+  @spec invalid_python!(term()) :: no_return()
   defp invalid_python!(path) do
     Mix.raise("--python must name an executable: #{inspect(path)}")
   end

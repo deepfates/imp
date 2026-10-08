@@ -156,6 +156,8 @@ defmodule Imp.Optimizer.MIPROv2 do
   end
 
   @doc "Raises the typed operational guard error outside normalized call boundaries."
+  @spec operational_error!(term(), term()) :: no_return()
+  @spec operational_error!(term(), term(), keyword()) :: no_return()
   def operational_error!(kind, reason, opts \\ []) when is_list(opts) do
     {_tag, error} = operational_error(kind, reason, opts)
     raise error

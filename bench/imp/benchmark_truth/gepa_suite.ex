@@ -265,7 +265,7 @@ defmodule Imp.BenchmarkTruth.GepaSuite do
 
   defp row_count!(path) do
     path
-    |> File.stream!([], :line)
+    |> File.stream!(:line)
     |> Enum.count(&(String.trim(&1) != ""))
   end
 
