@@ -2,7 +2,7 @@
 
 User-visible changes to Imp are recorded here.
 
-## Unreleased
+## 0.12.0 — 2026-10-08
 
 ### Fixed
 
@@ -41,6 +41,12 @@ User-visible changes to Imp are recorded here.
 - `Imp.LMError` has a `content_filtered` field, `true` when the provider's
   content filter stopped the completion, so a caller can tell a filtered
   request from other non-retryable failures without reading `reason`.
+
+### Changed
+
+- The install lines recommend `{:imp, "~> 0.12.0"}`. The two-part
+  requirement they used before, such as `~> 0.11`, accepts every later 0.x
+  release, including minor releases that change what callers receive.
 
 ## 0.11.0 — 2026-10-08
 

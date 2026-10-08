@@ -1,20 +1,25 @@
-# Imp v0.11.0
+# Imp v0.12.0
 
 Imp is a framework for typed, optimizable language-model programs on the BEAM.
-This release stops Imp from returning a provider's content-filter message as
-if the model had written it. A completion the filter stopped is now a failed
-request, so what a caller receives for that response changes from a
-completion to an error. Under Imp's versioning rule that makes it a minor
-release rather than a patch, even though it is a fix.
-
-This is also the first release published to Hex by CI from its tag, after
-every gate passed on the tagged commit.
+This release makes a failed completion the provider billed count as spending.
+Since 0.11.0 a completion the content filter stopped is an error, and that
+error carried no usage or cost, so a host that caps spending from recorded
+cost undercounted. Its usage and cost are now recorded. A filtered ReAct step
+no longer sends a second, equally filtered request, and a completion that
+finished with `finish_reason: :error` is now a failed request. What a caller
+receives changes in each case, so under Imp's versioning rule this is a minor
+release.
 
 ## Install
 
 ```elixir
-{:imp, "~> 0.11"}
+{:imp, "~> 0.12.0"}
 ```
+
+`~> 0.12.0` takes later 0.12 patch releases and nothing newer. The two-part
+form, `~> 0.12`, means `>= 0.12.0 and < 1.0.0` in Mix, so `mix deps.update
+imp` under it takes every later 0.x release, including minor releases that
+change what callers receive. Earlier install lines used the two-part form.
 
 Every dependency comes from Hex. Use a path dependency only while developing
 against a local checkout.
@@ -25,36 +30,48 @@ in its release definition; see [releases that use MCP or
 ACP](docs/production.md#releases-that-use-mcp-or-acp).
 Ordinary Imp startup starts no protocol endpoint.
 
-## Changes and upgrading from 0.10
+## Changes and upgrading from 0.11
 
-Change the Imp dependency to `{:imp, "~> 0.11"}`, run `mix deps.update imp`,
-and commit `mix.lock`. (A two-part requirement such as `~> 0.10` allows any
-later 0.x version, so `mix deps.update imp` under it also takes 0.11. To stay
-on 0.10 releases only, write `~> 0.10.0`.) No data migration is needed.
+Change the Imp dependency to `{:imp, "~> 0.12.0"}`, run `mix deps.update imp`,
+and commit `mix.lock`. No data migration is needed.
 
-- **A content-filtered completion is a failed request.** When a provider
-  ends a non-streamed completion with `finish_reason: :content_filter`,
-  `Imp.Clients.ReqLLM` returns `{:error, %Imp.LMError{retryable: false}}`
-  instead of `{:ok, completion}`. Some providers put the filter's own
-  message in the content (OpenRouter, for example, sends "The request was
-  rejected because it was considered high risk"), and before this release a
-  program read that text as the model's answer: a prediction could parse
-  it, a ReAct loop could finish with it, and an optimizer could score it.
-  The error's message is "API request failed: the provider's content filter
-  stopped the completion: " followed by the provider's text, and its
-  `reason` is a `ReqLLM.Error.API.Request` whose `response_body` holds
-  `"finish_reason"` and `"content"`. Migration: `Imp.Predict`, ReAct and
-  other callers now handle a failed LM call where they handled a completion.
-  A host that recognised the filter by its text, or by `finish_reason` on
-  the completion, matches the `Imp.LMError` instead and can remove its own
-  check. A host that retries every `Imp.LMError` should honour `retryable`,
-  since the same request is likely to be filtered again.
+- **A billed failed completion records its usage and cost.** When
+  `Imp.Clients.ReqLLM` turns a non-streamed completion into an error (the
+  content filter stopped it, or it finished with `:error`), the failed call's
+  `:model_response` event now carries the same `usage`, `cost`,
+  `estimated_cost` and `billing` metadata a completed call's does, beside
+  `error`, and the usage is added to `Imp.Usage`. A streamed call that failed
+  after reporting usage already worked this way. `Imp.LM.generate/3` still
+  returns `{:error, reason}`. Migration: a host that summed `cost` only over
+  `:model_response` events without an `error` should sum it over all of them.
+- **A filtered ReActV2 step ends the turn.** An `Imp.Predict.ReActV2` step the
+  content filter stopped fails the turn at once with
+  `{:error, %Imp.Predict.ReActV2.StepError{}}`. Before, the turn made its
+  usual last request (`:last_text` or the forced `submit`) with the same
+  history, which was filtered and billed again. DSPy's ReAct also makes no
+  further request after a step's LM error. Other failed steps still get the
+  last request. Migration: a host that read a filtered turn's `:incomplete`
+  prediction, or a `StepError` from its last request, receives the step's
+  `StepError` instead.
+- **`finish_reason: :error` is a failed request.** `Imp.Clients.ReqLLM`
+  returns `{:error, %Imp.LMError{retryable: false}}` whose message is "API
+  request failed: the completion finished with reason error: " followed by
+  the response's text. It returned `{:ok, completion}`, so that text could
+  become a prediction or a ReAct answer. ReqLLM gives this finish reason when
+  the provider reports a generation failed partway, and for any finish reason
+  it does not recognise. Migration: a caller sees a failed LM call where it
+  saw a completion, and should not retry it.
+- **Added:** `Imp.LMError` has a `content_filtered` field, `true` when the
+  provider's content filter stopped the completion, so a caller can tell that
+  case from other non-retryable failures without reading `reason`. The type
+  `t:Imp.Clients.TRLTrainer.t/0` is now public; `Imp.Clients.TRLDeployment`
+  specs already referred to it.
 
 Rollback means restoring the previous dependency requirement, lock and
-application release; it brings back the filter's text returned as a
-completion. A provider-free test with a ReqLLM stub asserts the error for
-a `:content_filter` response; this release does not establish which
-providers send `:content_filter` or what text each one puts in the content.
+application release; failed billed calls then record no cost again.
+Provider-free tests against a local HTTP server answering in OpenRouter's
+response shape cover each of the three changes; this release does not
+establish which providers send which finish reasons.
 See the [changelog](CHANGELOG.md) for every change.
 
 ## Known limits
