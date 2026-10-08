@@ -4,6 +4,8 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+## 0.9.0 — 2026-10-07
+
 ### Fixed
 
 - A ReActV2 step with one unconstrained text output, for an LM that calls
