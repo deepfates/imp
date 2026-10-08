@@ -243,6 +243,14 @@ When one step calls several finishing tools, the first in call order ends
 the turn; the others still run and are recorded, and a `submit` in the same
 step wins.
 
+`finish_on:` sees only calls that succeeded. A failed call is an
+observation, and the model can correct it and try again. When a failure
+means no further step can do what the turn was for, such as a write refused
+because the account can write nothing until later, `finish_on_error:` takes
+the same map for failed calls. Its function gets the `{:error, reason}` the
+call recorded in place of the result. Returning `{:finish, outputs}` ends
+the turn the same way, and the error stays the call's recorded result.
+
 ### Why a turn ended
 
 `termination_reason` says how the turn ended:

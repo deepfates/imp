@@ -1241,6 +1241,141 @@ defmodule ReActV2Test do
     end
   end
 
+  # A write refused because the account can write nothing until later: the
+  # shape an MCP server returns, and the error a host may decide no further step
+  # can get past. `finish_on` sees only calls that succeeded, so without
+  # `finish_on_error` a model that retries the refused call keeps the turn going.
+  defp quota_refusal do
+    {:error,
+     {:mcp_tool_error,
+      %{
+        "isError" => true,
+        "content" => [%{"type" => "text", "text" => "error: write quota exhausted"}],
+        "structuredContent" => %{"code" => "write_quota_exhausted"}
+      }}}
+  end
+
+  defp refused_reply, do: Imp.tool(:reply, "reply", fn _arguments -> quota_refusal() end)
+
+  defp retrying_reply_lm(notify) do
+    action_lm(
+      List.duplicate(
+        %{tool_calls: [%{id: "r", name: "reply", arguments: %{"text" => "Paris"}}]},
+        5
+      ),
+      notify
+    )
+  end
+
+  test "finish_on_error ends the run on a failed call and keeps the error as its result" do
+    parent = self()
+
+    assert {:ok, prediction} =
+             Imp.react("question -> answer", [refused_reply()],
+               lm: retrying_reply_lm(parent),
+               finish_on: %{reply: fn _arguments, _result, _inputs -> flunk("not a success") end},
+               finish_on_error: %{
+                 reply: fn arguments, error, inputs ->
+                   send(parent, {:finish_on_error, arguments, error, inputs})
+                   {:finish, %{answer: ""}}
+                 end
+               }
+             )
+             |> Imp.call(%{question: "Capital of France?"})
+
+    assert prediction.metadata[:termination_reason] == :finished_by_tool
+    assert prediction.metadata[:finished_by_tool] == "reply"
+    assert Imp.get(prediction, :answer) == ""
+
+    refusal = quota_refusal()
+
+    assert_received {:finish_on_error, %{"text" => "Paris"}, ^refusal,
+                     %{question: "Capital of France?"}}
+
+    assert %Imp.History{messages: [event]} = prediction.metadata[:history]
+    assert [%{id: "r", name: "reply", result: ^refusal, error: true}] = event.tool_call_results
+
+    assert_received {:lm_call, _only_call}
+    refute_received {:lm_call, _second}
+  end
+
+  test "a failed call is an observation unless finish_on_error finishes on it" do
+    parent = self()
+
+    # `finish_on` alone: the refused call is an ordinary observation, and the
+    # model retries it until the iteration bound.
+    assert {:ok, prediction} =
+             Imp.react("question -> answer", [refused_reply()],
+               lm: retrying_reply_lm(parent),
+               max_iters: 3,
+               finish_on: %{
+                 reply: fn _arguments, _result, _inputs -> {:finish, %{answer: "x"}} end
+               }
+             )
+             |> Imp.call(%{question: "Capital of France?"})
+
+    refute prediction.metadata[:termination_reason] == :finished_by_tool
+    assert length(prediction.metadata[:history].messages) == 3
+
+    # `finish_on_error` returning :continue leaves the loop running too.
+    assert {:ok, prediction} =
+             Imp.react("question -> answer", [refused_reply()],
+               lm: retrying_reply_lm(nil),
+               max_iters: 2,
+               finish_on_error: %{"reply" => fn _arguments, _error, _inputs -> :continue end}
+             )
+             |> Imp.call(%{question: "Capital of France?"})
+
+    refute prediction.metadata[:termination_reason] == :finished_by_tool
+    assert length(prediction.metadata[:history].messages) == 2
+
+    # And it is not consulted for a call that succeeded.
+    sent = Imp.tool(:reply, "reply", fn _arguments -> "sent" end)
+
+    assert {:ok, prediction} =
+             Imp.react("question -> answer", [sent],
+               lm:
+                 action_lm([%{tool_calls: [%{id: "r", name: "reply", arguments: %{}}]}, "Paris"]),
+               finish_on_error: %{
+                 reply: fn _arguments, _error, _inputs -> flunk("not an error") end
+               }
+             )
+             |> Imp.call(%{question: "Capital of France?"})
+
+    assert Imp.get(prediction, :answer) == "Paris"
+
+    assert_raise ArgumentError, ~r/:finish_on_error names no tool/, fn ->
+      Imp.react("question -> answer", [sent],
+        finish_on_error: %{nope: fn _a, _e, _i -> :continue end}
+      )
+    end
+  end
+
+  test "finish_on_error is saved by registry name like finish_on" do
+    runner = fn _arguments -> quota_refusal() end
+    finish = fn _arguments, _error, _inputs -> {:finish, %{answer: ""}} end
+    registry = Imp.Saving.Registry.new(reply_runner: runner, quota_spent: finish)
+    reply = Imp.tool(:reply, "reply", runner)
+
+    dumped =
+      Imp.react("question -> answer", [reply], finish_on_error: %{reply: finish})
+      |> Imp.dump(registry: registry)
+
+    assert dumped["finish_on_error"] == %{"reply" => "quota_spent"}
+
+    restored =
+      dumped
+      |> Jason.encode!()
+      |> Jason.decode!()
+      |> Imp.load!(registry: registry)
+
+    assert restored.finish_on_error == %{"reply" => finish}
+
+    # A program saved before `finish_on_error` existed loads with none.
+    assert Imp.load!(Map.delete(dumped, "finish_on_error"), registry: registry).finish_on_error ==
+             %{}
+  end
+
   # What a model writes when it spells a tool call out as JSON rather than
   # calling natively. `Imp.Adapter.Types.ToolCall.from_map/1` reads it as one
   # call instead of an unexecutable malformed observation.

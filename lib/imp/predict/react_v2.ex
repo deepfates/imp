@@ -59,7 +59,17 @@ defmodule Imp.Predict.ReActV2 do
       call order finishes the run; the rest still execute and are recorded,
       and a `submit` in the same step still wins. Outputs that fail validation
       are recorded as that call's result, the same error a bad `submit`
-      records, and the loop continues.
+      records, and the loop continues. `finish_on` sees only calls that
+      succeeded.
+    * `:finished_by_tool`, from a failed call. `finish_on_error` is the same
+      map for calls that failed: its function gets the `{:error, reason}` the
+      call recorded, whether the tool returned it or the loop refused the
+      call (policy, authorization, input that does not fit the schema). It
+      is for an error after which no further step can do what the turn was
+      for, such as a write refused because the account can write nothing
+      until later. The error stays the call's recorded result, so the
+      history says what happened. Validation, call order and `submit`
+      winning are as for `finish_on`.
     * `:last_text`, `:forced_submit`, `:extracted`. The turn was interrupted
       and its last request answered (below).
     * `:incomplete`. The turn was interrupted and has no answer: its last
@@ -191,7 +201,8 @@ defmodule Imp.Predict.ReActV2 do
     tool_order: [],
     max_iters: 20,
     tool_policy: :allow,
-    finish_on: %{}
+    finish_on: %{},
+    finish_on_error: %{}
   ]
 
   @type t :: %__MODULE__{}
@@ -259,6 +270,14 @@ defmodule Imp.Predict.ReActV2 do
       doc:
         "Tools whose call ends the turn: a map from tool name to " <>
           "`fn arguments, result, inputs -> {:finish, outputs} | :continue end`. " <>
+          "See \"How a turn ends\" above."
+    ],
+    finish_on_error: [
+      type: {:custom, __MODULE__, :validate_finish_on, []},
+      default: %{},
+      doc:
+        "Tools whose failed call may end the turn: a map from tool name to " <>
+          "`fn arguments, {:error, reason}, inputs -> {:finish, outputs} | :continue end`. " <>
           "See \"How a turn ends\" above."
     ]
   ]
@@ -332,7 +351,8 @@ defmodule Imp.Predict.ReActV2 do
       max_iters: opts[:max_iters],
       tool_policy: opts[:tool_policy],
       last_request_note: opts[:last_request_note],
-      finish_on: resolve_finish_on!(opts[:finish_on], tools)
+      finish_on: resolve_finish_on!(opts[:finish_on], tools, :finish_on),
+      finish_on_error: resolve_finish_on!(opts[:finish_on_error], tools, :finish_on_error)
     }
   end
 
@@ -373,15 +393,16 @@ defmodule Imp.Predict.ReActV2 do
   def validate_finish_on(other),
     do: {:error, "expected a map of tool name to 3-arity function, got: #{inspect(other)}"}
 
-  # A `finish_on` key is normalized to the tool's own name the same way a model's
-  # spelling of a call is, so the loop looks it up by one key. An unknown name is
-  # a typo the caller should hear about at construction, not a tool that silently
-  # never finishes.
-  defp resolve_finish_on!(finish_on, tools) do
+  # A `finish_on` or `finish_on_error` key is normalized to the tool's own name
+  # the same way a model's spelling of a call is, so the loop looks it up by one
+  # key. An unknown name is a typo the caller should hear about at construction,
+  # not a tool that silently never finishes.
+  defp resolve_finish_on!(finish_on, tools, option) do
     Map.new(finish_on, fn {name, fun} ->
       case Imp.Tool.resolve_name(tools, name) do
         nil ->
-          raise ArgumentError, "Imp.Predict.ReActV2.new/3: :finish_on names no tool: #{name}"
+          raise ArgumentError,
+                "Imp.Predict.ReActV2.new/3: #{inspect(option)} names no tool: #{name}"
 
         :submit ->
           raise ArgumentError, "Imp.Predict.ReActV2.new/3: submit already ends the turn"
@@ -1237,22 +1258,25 @@ defmodule Imp.Predict.ReActV2 do
     end)
   end
 
-  # `finish_on` is consulted for every successful call to a terminal tool, but
-  # only the first one that finishes ends the run: the rest of the step's calls
-  # still execute and are recorded, as they would be in any other step. Outputs
-  # that do not satisfy the signature are that call's recorded result, which is
-  # the error an invalid `submit` records, and the loop keeps going.
+  # `finish_on` is consulted for every successful call to a terminal tool, and
+  # `finish_on_error` for every failed one, but only the first call that
+  # finishes ends the run: the rest of the step's calls still execute and are
+  # recorded, as they would be in any other step. A failed call that finishes
+  # keeps its error as its result. Outputs that do not satisfy the signature are
+  # that call's recorded result, which is the error an invalid `submit` records,
+  # and the loop keeps going.
   defp finish_on_result(react, call, result, error?, inputs, finished_by) do
-    with false <- error?,
-         false <- malformed_call?(call),
-         {:ok, fun} <- fetch_finish_on(react, call),
+    terminal = if error?, do: react.finish_on_error, else: react.finish_on
+
+    with false <- malformed_call?(call),
+         {:ok, fun} <- fetch_finish_on(terminal, react.tools, call),
          {:finish, outputs} <- fun.(Imp.Tool.normalize_arguments(call.arguments), result, inputs) do
       case validate_submit(react.signature, outputs) do
         {validated, false} when finished_by == nil ->
-          {result, false, {to_string(Imp.Tool.resolve_name(react.tools, call.name)), validated}}
+          {result, error?, {to_string(Imp.Tool.resolve_name(react.tools, call.name)), validated}}
 
         {_validated, false} ->
-          {result, false, finished_by}
+          {result, error?, finished_by}
 
         {error, true} ->
           {error, true, finished_by}
@@ -1262,12 +1286,12 @@ defmodule Imp.Predict.ReActV2 do
     end
   end
 
-  defp fetch_finish_on(%{finish_on: finish_on}, _call) when map_size(finish_on) == 0, do: :error
+  defp fetch_finish_on(terminal, _tools, _call) when map_size(terminal) == 0, do: :error
 
-  defp fetch_finish_on(react, call) do
-    case Imp.Tool.resolve_name(react.tools, call.name) do
+  defp fetch_finish_on(terminal, tools, call) do
+    case Imp.Tool.resolve_name(tools, call.name) do
       nil -> :error
-      name -> Map.fetch(react.finish_on, to_string(name))
+      name -> Map.fetch(terminal, to_string(name))
     end
   end
 

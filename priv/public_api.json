@@ -8021,6 +8021,7 @@
       "source": "lib/imp/predict/react_v2.ex",
       "struct_fields": [
         "finish_on",
+        "finish_on_error",
         "last_request_note",
         "max_iters",
         "react",

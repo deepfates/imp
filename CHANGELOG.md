@@ -4,6 +4,16 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Added
+
+- `ReActV2` gains `finish_on_error`, the `finish_on` map for calls that
+  failed. Its function gets the `{:error, reason}` the call recorded and may
+  end the turn with `{:finish, outputs}`, so a host can stop a turn at an
+  error no further step can get past, such as a write refused until the
+  account's quota resets. The error stays the call's recorded result.
+  `finish_on` still sees only calls that succeeded, and a program saved
+  without `finish_on_error` loads with none.
+
 ## 0.8.1 — 2026-10-02
 
 ### Fixed

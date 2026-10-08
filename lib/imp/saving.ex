@@ -303,6 +303,7 @@ defmodule Imp.Saving do
       "max_iters" => react.max_iters,
       "last_request_note" => react.last_request_note,
       "finish_on" => dump_finish_on(react.finish_on),
+      "finish_on_error" => dump_finish_on(react.finish_on_error, "ReActV2 finish_on_error"),
       "tool_policy" => dump_tool_policy(react.tool_policy, "ReActV2 tool policy")
     }
   end
@@ -643,6 +644,7 @@ defmodule Imp.Saving do
       max_iters: require_non_negative_integer!(state["max_iters"], "ReActV2 max_iters"),
       last_request_note: load_react_v2_last_request_note!(state["last_request_note"]),
       finish_on: load_finish_on!(state["finish_on"]),
+      finish_on_error: load_finish_on!(state["finish_on_error"], "ReActV2 finish_on_error"),
       tool_policy: load_tool_policy!(state["tool_policy"], "ReActV2 tool policy")
     }
     |> Imp.Predict.ReActV2.restore_loop()
@@ -1258,19 +1260,20 @@ defmodule Imp.Saving do
 
   # A terminal tool's decision function is host code, so it persists the way a
   # tool runner and a tool policy do: by registry name, not by value.
-  defp dump_finish_on(finish_on),
-    do: Map.new(finish_on, fn {name, fun} -> {name, dump_callback!(fun, "ReActV2 finish_on")} end)
+  # `finish_on_error` is the same map for failed calls; a file saved before it
+  # existed has none.
+  defp dump_finish_on(finish_on, context \\ "ReActV2 finish_on"),
+    do: Map.new(finish_on, fn {name, fun} -> {name, dump_callback!(fun, context)} end)
 
-  defp load_finish_on!(nil), do: %{}
+  defp load_finish_on!(finish_on, context \\ "ReActV2 finish_on")
 
-  defp load_finish_on!(finish_on) when is_map(finish_on),
-    do:
-      Map.new(finish_on, fn {name, key} ->
-        {name, load_callback!(key, 3, "ReActV2 finish_on")}
-      end)
+  defp load_finish_on!(nil, _context), do: %{}
 
-  defp load_finish_on!(other),
-    do: raise(ArgumentError, "invalid saved ReActV2 finish_on: #{inspect(other)}")
+  defp load_finish_on!(finish_on, context) when is_map(finish_on),
+    do: Map.new(finish_on, fn {name, key} -> {name, load_callback!(key, 3, context)} end)
+
+  defp load_finish_on!(other, context),
+    do: raise(ArgumentError, "invalid saved #{context}: #{inspect(other)}")
 
   defp load_react_v2_last_request_note!(nil), do: nil
   defp load_react_v2_last_request_note!(note) when is_binary(note), do: note
