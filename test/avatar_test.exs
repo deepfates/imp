@@ -292,9 +292,14 @@ defmodule AvatarTest do
 
     avatar = Imp.avatar("question -> answer", [tool], lm: hanging_tool_lm())
     caller = spawn(fn -> Imp.call(avatar, %{question: "q"}) end)
+    caller_monitor = Process.monitor(caller)
 
     assert_receive {:tool_started, tool_pid}, 1_000
     tool_monitor = Process.monitor(tool_pid)
+    # This failed once in CI with the tool already gone (:noproc) and no second
+    # tool call, so the caller may have ended first. These say which next time.
+    refute_received {:DOWN, ^caller_monitor, :process, ^caller, _reason}
+    refute_received {:DOWN, ^tool_monitor, :process, ^tool_pid, :noproc}
     Process.exit(caller, :kill)
     assert_receive {:DOWN, ^tool_monitor, :process, ^tool_pid, :killed}, 1_000
   end
