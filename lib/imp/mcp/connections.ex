@@ -1556,8 +1556,8 @@ defmodule Imp.MCP.Connections do
       raise ArgumentError, ":reserved_tool_names must be a list of atom or string names"
     end
 
-    unless result_mode(opts) in [:text, :structured] do
-      raise ArgumentError, ":result_mode must be :text or :structured"
+    unless result_mode(opts) in [:text, :structured, :multimodal] do
+      raise ArgumentError, ":result_mode must be :text, :structured or :multimodal"
     end
 
     unless Keyword.get(opts, :on_failure, :refuse) in [:refuse, :drop] do
