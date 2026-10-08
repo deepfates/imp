@@ -384,7 +384,7 @@ defmodule Imp.Clients.ReqLLM do
 
     case lm.req_module.generate_text(lm.model, to_req_messages(messages), opts) do
       {:ok, response} ->
-        case relayed_error(response) do
+        case relayed_error(response) || filtered(response) do
           nil -> {:ok, from_response(response, lm.model)}
           error -> {:error, lm_error(error, provider)}
         end
@@ -412,6 +412,22 @@ defmodule Imp.Clients.ReqLLM do
     do: provider_error(Map.get(meta, "error") || Map.get(meta, :error))
 
   defp relayed_error(_response), do: nil
+
+  # A completion the provider's content filter stopped (`finish_reason`
+  # `:content_filter`) is not the model's answer: OpenRouter, for one, returns
+  # the filter's message ("The request was rejected because it was considered
+  # high risk") as the message content. Read as a completion, that text would
+  # be the model's words. It is the failed request it reports.
+  defp filtered(%ReqLLM.Response{finish_reason: :content_filter} = response) do
+    text = ReqLLM.Response.text(response) || ""
+
+    %ReqLLM.Error.API.Request{
+      reason: "the provider's content filter stopped the completion: " <> text,
+      response_body: %{"finish_reason" => "content_filter", "content" => text}
+    }
+  end
+
+  defp filtered(_response), do: nil
 
   # A provider's error object or message, as ReqLLM carries it in a response's
   # `provider_meta` or a stream's metadata, in the shape ReqLLM gives an HTTP
