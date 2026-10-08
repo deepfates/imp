@@ -364,6 +364,25 @@ defmodule ReqLLMClientTest do
     end
   end
 
+  # What ReqLLM returns for a completion the provider's content filter stopped,
+  # as OpenRouter returned one: the filter's message as the content, and
+  # `finish_reason: "content_filter"`.
+  defmodule FilteredStub do
+    def generate_text(model, messages, _opts) do
+      {:ok,
+       %ReqLLM.Response{
+         id: "gen-filtered",
+         model: to_string(model),
+         context: ReqLLM.Context.new(messages),
+         message:
+           ReqLLM.Context.assistant(
+             "The request was rejected because it was considered high risk"
+           ),
+         finish_reason: :content_filter
+       }}
+    end
+  end
+
   defmodule InvalidStub do
     def generate_text(_model, _messages, _opts), do: :not_a_req_llm_response
   end
@@ -547,6 +566,15 @@ defmodule ReqLLMClientTest do
              Imp.Clients.ReqLLM.generate(lm, [%{role: :user, content: "hello"}],
                relayed_error: %{"code" => 400, "message" => message}
              )
+  end
+
+  test "a completion the content filter stopped is a failed request, not the model's answer" do
+    lm = Imp.req_llm("openrouter:openai/gpt-4o-mini", req_module: FilteredStub)
+
+    assert {:error, %Imp.LMError{retryable: false, message: message}} =
+             Imp.Clients.ReqLLM.generate(lm, [%{role: :user, content: "hello"}], [])
+
+    assert message =~ "content filter"
   end
 
   test "provider metadata preserves semantic schema descriptors while redacting credentials" do
