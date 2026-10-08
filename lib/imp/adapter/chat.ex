@@ -756,6 +756,18 @@ defmodule Imp.Adapter.Chat do
           "When the final answer is ready, call `#{tool}` with #{names.(:output_names)}."
       end
 
+    # With no finish tool in a plain-text loop, the answer is the reply
+    # without a tool call, so the opening line does not say the tools
+    # produce it: they gather information and act.
+    opening =
+      if plain? and Map.get(guidance, :submit_tool, :submit) == nil do
+        "You are an Agent. Produce #{names.(:output_names)} from #{names.(:input_names)}, " <>
+          "using the supplied tools to gather information and take actions."
+      else
+        "You are an Agent. Use the supplied tools to produce #{names.(:output_names)} " <>
+          "from #{names.(:input_names)}."
+      end
+
     outputs =
       case Map.get(guidance, :outputs, []) do
         [] -> ""
@@ -764,7 +776,7 @@ defmodule Imp.Adapter.Chat do
 
     """
     #{instructions}
-    You are an Agent. Use the supplied tools to produce #{names.(:output_names)} from #{names.(:input_names)}.#{outputs}
+    #{opening}#{outputs}
     Call tools when more information is needed.
     #{finish}
     The available tools are: #{names.(:tool_names)}.
