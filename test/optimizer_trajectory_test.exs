@@ -1,5 +1,9 @@
 defmodule Imp.Optimizer.TrajectoryTest do
-  use ExUnit.Case, async: true
+  # Not async: rows run as Imp tasks, which wait for a place in one pool shared
+  # by every Imp task on the node, and a row's :timeout counts that wait. Beside
+  # async tests whose tasks hold places, a fast row can be killed before it
+  # starts, and these tests assert that fast rows are not killed.
+  use ExUnit.Case, async: false
 
   defmodule TwoStage do
     defstruct [:first, :second, fail_after_first: false]
