@@ -150,4 +150,4 @@ Use a whole-program artifact for a supported portable Imp shape. Use
 its selected predictor parameters should cross the persistence boundary.
 
 During source development set `IMP_PATH` to the Imp checkout. Other
-applications use the Hex dependency in `mix.exs`, `{:imp, "~> 0.10"}`.
+applications use the Hex dependency in `mix.exs`, `{:imp, "~> 0.11"}`.

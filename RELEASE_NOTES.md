@@ -1,18 +1,19 @@
-# Imp v0.10.0
+# Imp v0.11.0
 
 Imp is a framework for typed, optimizable language-model programs on the BEAM.
-This release shows the model the turns it actually had, stops a plain-text
-ReActV2 step from telling the model two ways to finish, keeps images that MCP
-tools return, makes the ATIF export read as the model saw the run, and counts
-streamed calls in `Imp.Usage`. What the model receives changes (history
-turns, the system message's field list and opening line, and opt-in tool
-images), and so do the meanings of ATIF fields, so this is a minor release
-rather than a patch.
+This release stops Imp from returning a provider's content-filter message as
+if the model had written it. A completion the filter stopped is now a failed
+request, so what a caller receives for that response changes from a
+completion to an error. Under Imp's versioning rule that makes it a minor
+release rather than a patch, even though it is a fix.
+
+This is also the first release published to Hex by CI from its tag, after
+every gate passed on the tagged commit.
 
 ## Install
 
 ```elixir
-{:imp, "~> 0.10"}
+{:imp, "~> 0.11"}
 ```
 
 Every dependency comes from Hex. Use a path dependency only while developing
@@ -24,91 +25,37 @@ in its release definition; see [releases that use MCP or
 ACP](docs/production.md#releases-that-use-mcp-or-acp).
 Ordinary Imp startup starts no protocol endpoint.
 
-## Changes and upgrading from 0.9
+## Changes and upgrading from 0.10
 
-Change the Imp dependency to `{:imp, "~> 0.10"}` (`~> 0.9` does not take
-0.10), run `mix deps.update imp`, and commit `mix.lock`. No data migration is
-needed: stored history, saved programs and run events are read as before and
-rendered in the new form. Each change below says what a caller has to
-change, if anything.
+Change the Imp dependency to `{:imp, "~> 0.11"}`, run `mix deps.update imp`,
+and commit `mix.lock`. (A two-part requirement such as `~> 0.10` allows any
+later 0.x version, so `mix deps.update imp` under it also takes 0.11. To stay
+on 0.10 releases only, write `~> 0.10.0`.) No data migration is needed.
 
-- **History turns are shown as recorded.** A stored turn no longer gives an
-  output it did not record the filler "Not supplied for this conversation
-  history message."; it leaves that output out, and a turn that recorded no
-  output is its user message alone. A predictor that names a tool-calls
-  output, but is not a tool loop, now keeps its recorded outputs as the
-  assistant text when its history is replayed with native tool calls, where
-  it showed an empty message. With native tool calls, a tool call whose
-  result renders as blank text keeps its tool message instead of being left
-  without an answer. Migration: a test, fixture or scripted response that
-  matched the filler, or the empty message, must expect the turn without it.
-- **No history input in the system message.** In every format, the system
-  message no longer lists a history input or shows a `[[ ## history ## ]]`
-  section, since history arrives as earlier turns. This covers a field typed
-  `history` and any input the call supplies as an `Imp.History`. Migration:
-  a test or custom renderer that matched the old field list or structure
-  must match the new one; a custom `:system_renderer` receives the signature
-  without those inputs. Both history changes alter the request, so a
-  provider prompt cache keyed on the old system message misses once after
-  the upgrade.
-- **ReActV2's plain-text opening line agrees with how it finishes.** For an
-  LM that calls tools natively and a task with one unconstrained text output
-  (no `submit` tool), the system message opened with "Use the supplied tools
-  to produce `answer`" and later said the answer is the reply sent without a
-  tool call. The opening line now reads "You are an Agent. Produce `answer`
-  from `intent`, using the supplied tools to gather information and take
-  actions." Steps with `submit`, written tool calls, and the JSON and XML
-  formats keep the old line. Migration: a test that matched the old opening
-  line for this mode must match the new one.
-- **Images from MCP tools (opt-in).** Import a server with
-  `result_mode: :multimodal` to keep its image content as
-  `Imp.Adapter.Types.Image` values beside the result's text. The Chat adapter
-  keeps the text in the tool message and sends the images in user messages
-  after all of the turn's tool responses, each labelled with the tool name
-  and call ID as tool data. `Imp.Adapter.Chat.format_tool_content/1` is new
-  and is the default tool-result renderer; `format_tool_result/1` stays
-  textual. Migration: none for the default `:text` and `:structured` modes.
-  A custom `:tool_result_renderer` that should pass images through calls
-  `format_tool_content/1` and bounds only the strings. Any tool, not only an
-  MCP one, whose result is a list of strings and images with at least one
-  image now has those images sent; such a list was rendered as text before.
-- **ATIF shows a run as the model saw it.** In `Imp.Trajectory.to_atif/2`
-  each model response is one agent step (`llm_call_count: 1`, null when
-  served from Imp's cache) carrying `model_name`, `metrics`, the provider's
-  own reasoning as `reasoning_content` and the tool calls run for it. A tool
-  result's `content` is the tool message the model read next, with the
-  tool's own output in `extra.output` when it differs and
-  `extra.seen_by_model` saying whether a later request carried it. Replayed
-  history keeps its tool calls, results and reasoning; `agent.model_name`,
-  `agent.tool_definitions` and `final_metrics` are filled in. Migration: a
-  reader that took `reasoning_content` as the visible thought reads
-  `extra.next_thought`; one that expected each tool call as its own
-  `llm_call_count: 0` step reads `tool_calls` on the response step (only a
-  call a host dispatched itself is still its own step); one that read a
-  call's `extra.outcome` on the step reads it on the call; and one that
-  displayed `content` as the tool's raw output reads `extra.output` when
-  present. An `:agent` option is now merged over the computed agent rather
-  than replacing it. (On main this entry had been filed under 0.9.0 after
-  that release was tagged; 0.9.0 does not contain it.)
-- **Streamed calls are counted in `Imp.Usage`.** `Imp.Usage.track/1` now
-  counts a streamed call (`Imp.collect/3`, `Imp.stream/3` with
-  `provider_stream: true`), successful, failed or halted, and a call made by
-  `Imp.Predict` with `track_usage` on, including a failed one. A streamed
-  call has ReqLLM's `estimated_cost` when ReqLLM prices the model, as a
-  non-streamed call does. Migration: a host that worked around the 0.9 limit
-  by adding usage from `:model_response` events, or a prediction's
-  `get_lm_usage/1`, into its own tracker now counts those calls twice and
-  must stop.
+- **A content-filtered completion is a failed request.** When a provider
+  ends a non-streamed completion with `finish_reason: :content_filter`,
+  `Imp.Clients.ReqLLM` returns `{:error, %Imp.LMError{retryable: false}}`
+  instead of `{:ok, completion}`. Some providers put the filter's own
+  message in the content (OpenRouter, for example, sends "The request was
+  rejected because it was considered high risk"), and before this release a
+  program read that text as the model's answer: a prediction could parse
+  it, a ReAct loop could finish with it, and an optimizer could score it.
+  The error's message is "API request failed: the provider's content filter
+  stopped the completion: " followed by the provider's text, and its
+  `reason` is a `ReqLLM.Error.API.Request` whose `response_body` holds
+  `"finish_reason"` and `"content"`. Migration: `Imp.Predict`, ReAct and
+  other callers now handle a failed LM call where they handled a completion.
+  A host that recognised the filter by its text, or by `finish_reason` on
+  the completion, matches the `Imp.LMError` instead and can remove its own
+  check. A host that retries every `Imp.LMError` should honour `retryable`,
+  since the same request is likely to be filtered again.
 
 Rollback means restoring the previous dependency requirement, lock and
-application release; it brings back the filler text, the history section,
-the contradictory opening line, dropped tool images, the 0.9 ATIF shape and
-uncounted streamed usage.
-Provider-free tests assert the new request messages, the image bytes and
-their order on the provider wire, the ATIF projection, and usage counted
-across processes; this release does not establish how any particular model
-responds to the revised prompts or whether it perceives the images. See the
-[changelog](CHANGELOG.md) for every change.
+application release; it brings back the filter's text returned as a
+completion. A provider-free test with a ReqLLM stub asserts the error for
+a `:content_filter` response; this release does not establish which
+providers send `:content_filter` or what text each one puts in the content.
+See the [changelog](CHANGELOG.md) for every change.
 
 ## Known limits
 
@@ -151,6 +98,10 @@ responds to the revised prompts or whether it perceives the images. See the
   and is marked unseen. `agent.tool_definitions` comes only from `:tools_sent`
   events, and `final_metrics` totals are left out when any response lacks
   that figure.
+- A streamed completion that the provider's content filter stops still ends
+  as a completion: the stream's `finish_reason` is `:content_filter` and the
+  filter's text has already arrived as chunks. Only non-streamed requests
+  turn it into an `Imp.LMError`.
 - When a streamed ReqLLM request fails, ReqLLM's own warning log prints the
   error with its response headers. Imp strips them from the error it returns,
   but cannot change that log line.
