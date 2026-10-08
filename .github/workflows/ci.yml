@@ -75,9 +75,13 @@ jobs:
 
   # `check` above restores the deps/_build cache when mix.lock matches, so on
   # a cache hit it never proves that a cold checkout can fetch and build. This
-  # job does what a stranger does: clone, deps.get, mix check. No cache, no
-  # Hex warm step, nothing carried over from another run. Full history because
+  # job does what a stranger does: clone, deps.get, build. No cache, no Hex
+  # warm step, nothing carried over from another run. Full history because
   # `git clone` has it and some default tests read it.
+  #
+  # On a pull request it fetches and compiles both environments cold, and
+  # `check` runs the suite on the same commit. On main it runs the whole
+  # `mix check` cold as well.
   stranger:
     name: stranger.check
     runs-on: ubuntu-latest
@@ -91,13 +95,18 @@ jobs:
           elixir-version: "1.19"
       - run: mix local.hex --force
       - run: mix deps.get
-      - run: mix check
+      - if: github.event_name == 'pull_request'
+        run: mix compile --warnings-as-errors && MIX_ENV=test mix compile --warnings-as-errors
+      - if: github.event_name != 'pull_request'
+        run: mix check
 
+  # package.check and differential.check take 6 to 10 minutes and are not
+  # required to merge, so they run on main, where a failure is still seen.
   package:
     name: package.check
     runs-on: ubuntu-latest
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && github.event_name != 'pull_request'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -184,7 +193,7 @@ jobs:
     name: differential.check
     runs-on: ubuntu-latest
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && github.event_name != 'pull_request'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
