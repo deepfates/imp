@@ -1,8 +1,11 @@
 name: CI
 
+# Pushing a v* tag runs every gate below on the tagged commit and, only if
+# all of them pass, publishes that version to Hex (the `hex` job).
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
 
 # dorny/paths-filter diffs the PR via the GitHub API, which needs
@@ -31,12 +34,14 @@ jobs:
   changes:
     name: classify changes
     runs-on: ubuntu-latest
+    # A tag runs every gate, whatever changed.
     outputs:
-      code: ${{ steps.filter.outputs.code }}
-      docs: ${{ steps.filter.outputs.docs }}
+      code: ${{ github.ref_type == 'tag' && 'true' || steps.filter.outputs.code }}
+      docs: ${{ github.ref_type == 'tag' && 'true' || steps.filter.outputs.docs }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        if: github.ref_type != 'tag'
         id: filter
         with:
           filters: |
@@ -239,3 +244,29 @@ jobs:
       # Run the tutorials as notebooks. No provider key is set here, so the
       # live cells show their setup guidance and every other cell runs.
       - run: mix livebook.execute.check
+
+  # Publishes the tagged version to Hex once every gate above has passed. The
+  # tag must be `v` + the version in mix.exs. HEX_API_KEY is a Hex key that can
+  # publish this package, kept in the `hex` environment, which only v* tags
+  # can use.
+  hex:
+    name: publish to Hex
+    runs-on: ubuntu-latest
+    needs: [check, stranger, package, integration, protocol, quality, dialyzer, differential, docs]
+    if: github.ref_type == 'tag'
+    environment: hex
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+        with:
+          otp-version: "28"
+          elixir-version: "1.19"
+      - name: The tag names mix.exs's version
+        run: |
+          version=$(sed -n 's/^  @version "\(.*\)"$/\1/p' mix.exs)
+          [ "$GITHUB_REF_NAME" = "v$version" ] || { echo "tag $GITHUB_REF_NAME, but mix.exs says $version"; exit 1; }
+      - run: mix local.hex --force
+      - run: mix deps.get
+      - run: mix hex.publish --yes
+        env:
+          HEX_API_KEY: ${{ secrets.HEX_API_KEY }}

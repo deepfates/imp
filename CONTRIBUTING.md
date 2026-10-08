@@ -51,6 +51,20 @@ scripts/setup_reference_test_env.sh
 EVIDENCE_INFRASTRUCTURE=1 mix test        # or: mix test --include evidence_infrastructure
 ```
 
+## Publishing a release
+
+Bump `@version` in `mix.exs` in a pull request and merge it, then tag that
+commit of `main` with `v` and the version:
+
+```sh
+git tag v0.10.0 && git push origin v0.10.0
+```
+
+CI runs every gate on the tagged commit and, only if all of them pass,
+publishes the package and its docs to Hex. A tag that is not `v` + the
+version in `mix.exs` is refused. Publishing needs the `HEX_API_KEY` secret in
+the repository's `hex` environment.
+
 ## Maintainer Authority
 
 Public behavior belongs to code, tests, and user documentation. Pinned upstream
