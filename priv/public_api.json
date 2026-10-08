@@ -2650,6 +2650,9 @@
           "new/1": [
             "new(opts)"
           ]
+        },
+        "types": {
+          "t/0": []
         }
       },
       "source": "lib/imp/clients/trl_trainer.ex",
@@ -2662,7 +2665,12 @@
         "worker_key",
         "worker_script"
       ],
-      "types": []
+      "types": [
+        {
+          "kind": "type",
+          "name": "t/0"
+        }
+      ]
     },
     {
       "callbacks": [

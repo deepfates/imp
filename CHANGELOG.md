@@ -4,6 +4,11 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Added
+
+- `Imp.Clients.TRLTrainer.t/0`, the struct type that
+  `Imp.Clients.TRLDeployment` specs already referred to.
+
 ## 0.11.0 — 2026-10-08
 
 ### Fixed
