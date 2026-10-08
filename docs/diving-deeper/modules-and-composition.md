@@ -149,7 +149,7 @@ A custom module is your code, so it is not saved as a whole. What an optimizer
 chose for it is data: `Imp.ProgramParameters.values/1` reads it,
 `Imp.ProgramParameters.apply_values/2` puts it on a freshly built program, and
 `Imp.Optimizer.Artifact` writes it to a checksummed file. The
-[deployment example](https://github.com/deepfates/imp/blob/v0.8.0/examples/deployment/README.md)
+[deployment example](https://github.com/deepfates/imp/blob/v0.9.0/examples/deployment/README.md)
 does this in a supervised application.
 
 ### Built-in variants

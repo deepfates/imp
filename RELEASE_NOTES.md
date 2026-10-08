@@ -1,14 +1,14 @@
-# Imp v0.8.1
+# Imp v0.9.0
 
 Imp is a framework for typed, optimizable language-model programs on the BEAM.
-This patch makes ACP tool results readable and truthful about omitted content,
-and fixes local socket framing for large permitted JSON messages. It changes
-neither model-facing behavior nor MCP, dependency pins, or stored schemas.
+This release stops a native-tool ReActV2 step with one text output from asking
+the model to finish two contradictory ways. The prompt the model receives
+changes, so this is a minor release rather than a patch.
 
 ## Install
 
 ```elixir
-{:imp, "~> 0.8"}
+{:imp, "~> 0.9"}
 ```
 
 Every dependency comes from Hex. Use a path dependency only while developing
@@ -20,26 +20,31 @@ in its release definition; see [releases that use MCP or
 ACP](docs/production.md#releases-that-use-mcp-or-acp).
 Ordinary Imp startup starts no protocol endpoint.
 
-## Changes and upgrading from 0.8.0
+## Changes and upgrading from 0.8
 
-- ACP now labels tool output omitted by the capture limit instead of printing
-  `nil`. Genuine nil renders as `null`; empty results, failures and completed
-  calls remain distinct. Structured output is JSON and errors use the same
-  readable wording the model receives. A preview exceeding 32,768 UTF-8 bytes
-  is explicitly cut; capture limits are unchanged. A host with full native
-  records can supply its own bounded view and recovery coordinates.
-- Local ACP listener and connecting sockets keep valid large JSON lines whole.
-  The socket buffer follows the existing frame cap, including the newline;
-  frames above the configured cap are still refused. This fixes frames split
-  at the default driver buffer even though they were within the cap.
+- For an LM that calls tools natively and a task with one unconstrained text
+  output (no `submit` tool), ReActV2's system message no longer asks for
+  `[[ ## answer ## ]]` and `[[ ## completed ## ]]` markers while also saying
+  the answer is the message sent without a tool call. It lays out the inputs
+  alone, with no `history` placeholder, and the loop line reads "When the
+  final answer is ready, reply without calling a tool: that message is
+  `answer`." Step demos and stored turns are shown as plain text. The input
+  template comes from the signature, so the system message stays the same
+  across steps and keeps the provider prompt-cache prefix.
+- Replies that still use markers parse as before. Written tool calls (an LM
+  without native tool calling), signatures with `submit`, and the JSON and XML
+  formats are unchanged. No data migration is needed: stored turns and saved
+  demonstrations are rendered in the new form when replayed.
 
-Keep `{:imp, "~> 0.8"}`, run `mix deps.update imp`, and commit `mix.lock`.
-No data migration is needed. This does not reconstruct content omitted from
-historical ACP transcripts, and does not add a full-result retrieval endpoint.
-Rollback means restoring the previous dependency lock and application release;
-it restores the old display/framing defects too. Provider-free tests cover
-capture distinctions, UTF-8 bounds, real socket fragmentation, consecutive
-frames and oversize refusal. See the [changelog](CHANGELOG.md) for older changes.
+Change the Imp dependency to `{:imp, "~> 0.9"}`, run `mix deps.update imp`,
+and commit `mix.lock`. Migration: a test, fixture or custom renderer that
+matched the old system message text, or the marker-framed step demos, must
+match the new text. Rollback means restoring the previous dependency
+requirement, lock and application release; it restores the contradictory
+prompt too. Provider-free tests assert the exact system message and that
+marker replies still parse; this release does not establish how any
+particular model responds to the revised prompt. See the
+[changelog](CHANGELOG.md) for older changes.
 
 ## Known limits
 
