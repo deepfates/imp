@@ -64,6 +64,94 @@ defmodule Imp.HistoryTest do
     assert current_user =~ "lookup"
   end
 
+  # History arrives as earlier turns, so no format describes it as an input
+  # section. DSPy 3.2.1 lists it and shows `[[ ## history ## ]]` in the
+  # system message's structure, which no message in the request contains.
+  test "the system message does not advertise a history input as a section" do
+    signature = Imp.signature("question, history -> answer")
+    history = Imp.history([%{question: "Capital of France?", answer: "Paris"}])
+
+    for adapter <- [Imp.Adapter.Chat, Imp.Adapter.JSON, Imp.Adapter.XML] do
+      [%{role: :system, content: system} | _rest] =
+        adapter.format(signature, %{question: "And Italy?", history: history}, [])
+
+      refute system =~ "`history` (", inspect(adapter)
+      refute system =~ "[[ ## history ## ]]", inspect(adapter)
+      assert system =~ "`question`", inspect(adapter)
+    end
+  end
+
+  # A stored turn shows the outputs it recorded and nothing in place of the
+  # rest: no filler, and no `None` as DSPy 3.2.1 writes. A turn with no
+  # recorded output is its user message alone.
+  test "a history turn's missing outputs are left out, not filled in" do
+    signature = Imp.signature("question, history -> answer, source")
+
+    history =
+      Imp.history([
+        %{question: "Capital of France?", answer: "Paris"},
+        %{question: "Capital of Spain?"}
+      ])
+
+    messages =
+      Imp.Adapter.Chat.format(signature, %{question: "And Italy?", history: history}, [])
+
+    assert [
+             %{role: :system},
+             %{role: :user, content: "[[ ## question ## ]]\nCapital of France?"},
+             %{role: :assistant, content: "[[ ## answer ## ]]\nParis\n\n[[ ## completed ## ]]\n"},
+             %{role: :user, content: "[[ ## question ## ]]\nCapital of Spain?"},
+             %{role: :user, content: current}
+           ] = messages
+
+    assert current =~ "And Italy?"
+  end
+
+  # A predictor that names a tool-calls output, called with an LM that calls
+  # tools natively, wrote its outputs beside the calls. Replayed natively, the
+  # assistant message keeps them.
+  test "native replay keeps a predictor's recorded outputs beside its calls" do
+    signature = Imp.Signature.ensure("question, history -> answer, tool_calls: array")
+
+    signature = %{
+      signature
+      | metadata: Map.put(signature.metadata, :tool_calls_field, :tool_calls)
+    }
+
+    call = %{id: "call-1", name: "lookup", arguments: %{"q" => "France"}}
+
+    history =
+      Imp.history([
+        %{
+          question: "Capital of France?",
+          answer: "Checking.",
+          tool_calls: [call],
+          tool_call_results: [%{id: "call-1", name: "lookup", result: "Paris"}]
+        }
+      ])
+
+    owner = self()
+
+    lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          send(owner, {:messages, messages})
+          "[[ ## answer ## ]]\nRome\n\n[[ ## completed ## ]]"
+        end
+      )
+
+    program = Imp.Predict.new(signature, lm: lm)
+    # Only the request matters here, not how the reply parses.
+    _result = Imp.call(program, %{question: "And Italy?", history: history})
+
+    assert_received {:messages, messages}
+
+    assert %{role: :assistant, content: content, tool_calls: [_call]} =
+             Enum.find(messages, &(&1.role == :assistant))
+
+    assert content =~ "Checking."
+  end
+
   test "history redaction preserves structure while hiding secrets" do
     history =
       Imp.history([

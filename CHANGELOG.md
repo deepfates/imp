@@ -4,6 +4,19 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Fixed
+
+- A stored history turn no longer shows "Not supplied for this conversation
+  history message." for an output it did not record: missing outputs are
+  left out, and a turn with none is its user message alone. A predictor
+  that names a tool-calls output keeps its recorded outputs when its history
+  is replayed with native tool calls; it showed an empty message. Migration:
+  a test that matched the filler must expect the turn without it.
+- The system message no longer lists a history input or shows a
+  `[[ ## history ## ]]` section, in any format. History arrives as earlier
+  turns, never as that section. Migration: a test or custom renderer that
+  matched the old field list must match the new one.
+
 ## 0.9.0 — 2026-10-07
 
 ### Fixed
