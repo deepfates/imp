@@ -42,8 +42,7 @@ defmodule ReActV2PlainTextAnswerTest do
 
     assert system_message() ==
              "Your input fields are:\n" <>
-               "1. `intent` (string): \n" <>
-               "2. `history` (history):\n" <>
+               "1. `intent` (string):\n" <>
                "Your output fields are:\n" <>
                "1. `answer` (string):\n" <>
                "Inputs will be structured in the following way, with the appropriate values filled in.\n" <>

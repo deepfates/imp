@@ -184,11 +184,10 @@ defmodule ReActV2LastRequestNoteTest do
     end
   end
 
-  # A `History` entry a host wrote with inputs and no outputs is a finished
-  # exchange whose outputs were not recorded, and keeps Imp's rendering, with
-  # the filler (DSPy 3.2.1 renders `None`). Only the turns the loop records
-  # itself say they have no reply.
-  test "a host's input-only history entry keeps Imp's rendering" do
+  # A `History` entry a host wrote with inputs and no outputs has no reply to
+  # show, so it is its user message alone, like a turn the loop recorded
+  # without one. DSPy 3.2.1 renders the missing outputs as `None`.
+  test "a host's input-only history entry is its user message alone" do
     owner = self()
     program = Imp.react(@signature, [look()], lm: moded_lm(owner, true), max_iters: 1)
     history = Imp.History.new([%{intent: "earlier"}])
@@ -197,8 +196,8 @@ defmodule ReActV2LastRequestNoteTest do
     [{first, _opts}, _forced] = requests(2)
 
     index = note_index(first, "earlier")
-    assert %{role: :assistant, content: filler} = Enum.at(first, index + 1)
-    assert filler =~ @filler
+    assert %{role: :user} = Enum.at(first, index + 1)
+    refute Enum.any?(first, &(&1.role == :assistant and to_string(&1.content) =~ @filler))
   end
 
   test "no note leaves the forced request exactly as it was" do

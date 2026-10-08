@@ -151,7 +151,8 @@ defmodule Imp.Adapter.Chat do
       input_section: input_renderer,
       tool_result: tool_result_renderer,
       history_note: Keyword.get(opts, :history_note_renderer) || (&no_history_note/2),
-      submit_is_text?: submit_is_text?(Keyword.get(opts, :guidance))
+      submit_is_text?: submit_is_text?(Keyword.get(opts, :guidance)),
+      loop?: not is_nil(Keyword.get(opts, :guidance))
     }
 
     {history_messages, history_fields} = extract_history(signature, inputs, renderers)
@@ -171,7 +172,12 @@ defmodule Imp.Adapter.Chat do
     trailing =
       if opts[:omit_empty_request] and blank_message?(request), do: [], else: [request]
 
-    [%{role: :system, content: system_renderer.(signature, opts)}] ++
+    [
+      %{
+        role: :system,
+        content: system_renderer.(system_signature(signature, history_fields), opts)
+      }
+    ] ++
       render_demos(signature, demos, output_renderer, input_renderer) ++
       history_messages ++ trailing
   end
@@ -876,11 +882,9 @@ defmodule Imp.Adapter.Chat do
     |> Enum.join("\n\n")
   end
 
-  # The input fields' markers alone. A history input is left out: its turns
-  # are messages, never a `[[ ## history ## ]]` section.
+  # The input fields' markers alone.
   defp render_input_template(signature) do
     signature.inputs
-    |> Enum.reject(&(&1.type in [:history, "history"]))
     |> Enum.map_join("\n\n", fn field ->
       "[[ ## #{field.name} ## ]]\n" <> Imp.Adapter.FieldType.placeholder(field, :input)
     end)
@@ -1235,17 +1239,9 @@ defmodule Imp.Adapter.Chat do
                     section_renderer: renderers.input_section
                   )
               },
-              %{
-                role: :assistant,
-                content:
-                  renderers.output.(
-                    signature,
-                    turn,
-                    "Not supplied for this conversation history message. "
-                  )
-              }
+              recorded_reply(signature, turn, renderers.output)
             ]
-            |> Enum.reject(&blank_message?/1)
+            |> Enum.reject(&(is_nil(&1) or blank_message?(&1)))
         end
 
       messages ++ history_note_messages(signature, turn, renderers.history_note)
@@ -1299,21 +1295,14 @@ defmodule Imp.Adapter.Chat do
         )
     }
 
-    assistant = %{
-      role: :assistant,
-      content:
-        renderers.output.(
-          signature,
-          turn
-          |> Imp.FieldMap.delete(:tool_call_results)
-          |> Imp.FieldMap.put(
-            meta_field(signature, :text_field) || :next_thought,
-            fetch_field(turn, :next_thought)
-          )
-          |> Imp.FieldMap.put(meta_field(signature, :tool_calls_field) || :tool_calls, calls),
-          "Not supplied for this conversation history message. "
-        )
-    }
+    step =
+      turn
+      |> Imp.FieldMap.delete(:tool_call_results)
+      |> Imp.FieldMap.put(
+        meta_field(signature, :text_field) || :next_thought,
+        fetch_field(turn, :next_thought)
+      )
+      |> Imp.FieldMap.put(meta_field(signature, :tool_calls_field) || :tool_calls, calls)
 
     result_messages =
       case results do
@@ -1343,9 +1332,25 @@ defmodule Imp.Adapter.Chat do
     # would put words in the model's mouth. A turn that recorded any output,
     # an answer included, keeps its assistant message.
     assistant =
-      if calls == [] and not recorded_output?(signature, turn), do: nil, else: assistant
+      if calls == [] and not recorded_output?(signature, turn),
+        do: nil,
+        else: recorded_reply(signature, step, renderers.output)
 
     Enum.reject([user, assistant | result_messages], &(is_nil(&1) or blank_message?(&1)))
+  end
+
+  # The assistant side of a stored turn: the outputs it recorded and no
+  # others, or no message when it recorded none. A missing output is not
+  # rendered as a filler or as `None` (DSPy 3.2.1), since either would put
+  # words in the model's mouth that it never wrote.
+  defp recorded_reply(signature, turn, renderer) do
+    case Enum.reject(signature.outputs, &is_nil(fetch_field(turn, &1.name))) do
+      [] ->
+        nil
+
+      outputs ->
+        %{role: :assistant, content: renderer.(%{signature | outputs: outputs}, turn, nil)}
+    end
   end
 
   defp recorded_output?(signature, turn) do
@@ -1391,7 +1396,18 @@ defmodule Imp.Adapter.Chat do
         )
     }
 
-    thought = turn |> fetch_field(:next_thought) |> blank_to_empty()
+    # A tool loop's step records its text as `next_thought`, beside the
+    # outputs a `submit` call carried. Any other predictor that names a
+    # tool-calls output records the outputs it wrote alongside the calls.
+    thought =
+      if renderers.loop? or Imp.FieldMap.has_key?(turn, :next_thought) do
+        turn |> fetch_field(:next_thought) |> blank_to_empty()
+      else
+        case recorded_reply(signature, turn, renderers.output) do
+          nil -> ""
+          %{content: content} -> content
+        end
+      end
 
     # A step that said something and called nothing is a plain assistant turn:
     # no `tool_calls` key for a provider to reconcile, and the thought is shown
@@ -1544,6 +1560,21 @@ defmodule Imp.Adapter.Chat do
 
   defp blank_to_empty(nil), do: ""
   defp blank_to_empty(value), do: to_string(value)
+
+  # The signature the system message describes. A history input arrives as
+  # earlier turns, never as a section of a message, so the field list and the
+  # structure template leave it out: a field typed `history`, whether or not
+  # this call supplies it, and any input this call supplies as an
+  # `Imp.History`. DSPy 3.2.1 lists it and shows a `[[ ## history ## ]]`
+  # section the request never contains.
+  defp system_signature(signature, history_fields) do
+    inputs =
+      Enum.reject(signature.inputs, fn field ->
+        field.type in [:history, "history"] or MapSet.member?(history_fields, field.name)
+      end)
+
+    %{signature | inputs: inputs}
+  end
 
   defp history_input_fields(signature) do
     signature.inputs
