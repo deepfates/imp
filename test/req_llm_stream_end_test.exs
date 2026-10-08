@@ -31,6 +31,20 @@ defmodule Imp.ReqLLMStreamEndTest do
     }
   }
 
+  @byok_usage %{
+    "id" => "gen-1",
+    "model" => "local-model",
+    "choices" => [],
+    "usage" => %{
+      "prompt_tokens" => 7,
+      "completion_tokens" => 1,
+      "total_tokens" => 8,
+      "cost" => 0.0001,
+      "is_byok" => true,
+      "cost_details" => %{"upstream_inference_cost" => 0.002}
+    }
+  }
+
   defp sse(events, done? \\ true) do
     body = Enum.map_join(events, "", &("data: " <> Jason.encode!(&1) <> "\n\n"))
     if done?, do: body <> "data: [DONE]\n\n", else: body
@@ -220,6 +234,27 @@ defmodule Imp.ReqLLMStreamEndTest do
     assert response.metadata.cost == 0.00042
   end
 
+  test "an OpenRouter stream on the caller's own key costs the fee plus the upstream charge" do
+    answer = "[[ ## answer ## ]]\nParis\n\n[[ ## completed ## ]]"
+    content = put_in(@content, ["choices", Access.at(0), "delta", "content"], answer)
+    client = lm(sse([content, @finish, @byok_usage]))
+
+    assert %StreamResponse{done: true, metadata: %{usage: usage}} =
+             client |> stream() |> List.last()
+
+    assert usage["cost"] == 0.0001
+
+    program = Imp.predict("question -> answer", lm: client)
+    {:ok, run} = Imp.Run.start(%Collecting{program: program}, %{question: "Capital of France?"})
+    assert {:ok, _prediction} = Task.await(run.task)
+    events = Imp.Run.events(run)
+    Imp.Run.stop(run)
+
+    assert [response] = Enum.filter(events, &(&1.kind == :model_response))
+    assert_in_delta response.metadata.cost, 0.0021, 1.0e-12
+    assert response.metadata.usage["cost"] == 0.0001
+  end
+
   defp run(program) do
     {:ok, run} = Imp.Run.start(%Collecting{program: program}, %{question: "Capital of France?"})
 
@@ -240,6 +275,28 @@ defmodule Imp.ReqLLMStreamEndTest do
     assert %Imp.LMError{} = response.error
     assert %{input_tokens: 7, output_tokens: 1, total_tokens: 8} = response.metadata.usage
     assert response.metadata.cost == 0.00042
+  end
+
+  test "a stream that fails after a byok usage chunk records the resolved charge" do
+    error = %{"error" => %{"message" => "upstream died"}}
+
+    charged =
+      Imp.predict("question -> answer", lm: lm(sse([@content, @byok_usage, error], false)))
+
+    assert {{:error, %Imp.LMError{}}, _usage, events} = run(charged)
+    assert [response] = Enum.filter(events, &(&1.kind == :model_response))
+    assert_in_delta response.metadata.cost, 0.0021, 1.0e-12
+    assert response.metadata.usage["cost"] == 0.0001
+
+    bare = %{@byok_usage | "usage" => Map.delete(@byok_usage["usage"], "cost_details")}
+
+    missing =
+      Imp.predict("question -> answer", lm: lm(sse([@content, bare, error], false)))
+
+    assert {{:error, %Imp.LMError{}}, _usage, missing_events} = run(missing)
+    assert [partial] = Enum.filter(missing_events, &(&1.kind == :model_response))
+    assert partial.metadata.cost == nil
+    assert partial.metadata.usage["cost"] == 0.0001
   end
 
   test "a failure that carries a partial response counts its usage and returns the reason" do

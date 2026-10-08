@@ -228,38 +228,34 @@ defmodule Imp.ModelResponseCostTest do
     assert response.billing == nil
   end
 
-  # With the caller's own provider key, OpenRouter's "cost" is its fee only,
-  # and the provider's own charge is reported beside it.
-  test "an OpenRouter call on the caller's own key costs the fee plus the upstream charge" do
-    raw = %{
-      __imp_lm_output__: "pong",
-      __imp_lm_metadata__: %{
-        req_llm: %{
-          usage: %{
+  # The bring-your-own-key rule lives with the client. A raw envelope that
+  # carries no resolved charge reports the fee, upstream figure or not.
+  test "a raw byok envelope with no charge reports the fee" do
+    for usage <- [
+          %{
             "is_byok" => true,
             "cost" => 0.0001,
             "cost_details" => %{"upstream_inference_cost" => 0.002},
             cost: @breakdown
+          },
+          %{"is_byok" => true, "cost" => 0.0001, cost: @breakdown},
+          %{
+            "is_byok" => true,
+            "cost" => 0.0001,
+            "cost_details" => %{},
+            cost: @breakdown
+          },
+          %{
+            "is_byok" => true,
+            "cost" => 0.0001,
+            "cost_details" => %{"upstream_inference_cost" => nil},
+            cost: @breakdown
           }
-        }
-      }
-    }
-
-    assert {:ok, response} = Imp.Core.response(raw)
-    assert_in_delta response.cost, 0.0021, 1.0e-12
-    assert response.estimated_cost == 0.001858
-  end
-
-  test "an OpenRouter call on the caller's own key with no upstream charge has no cost" do
-    for details <- [nil, %{}, %{"upstream_inference_cost" => nil}] do
-      usage =
-        %{"is_byok" => true, "cost" => 0.0001, cost: @breakdown}
-        |> then(&if(details, do: Map.put(&1, "cost_details", details), else: &1))
-
+        ] do
       raw = %{__imp_lm_output__: "pong", __imp_lm_metadata__: %{req_llm: %{usage: usage}}}
 
       assert {:ok, response} = Imp.Core.response(raw)
-      assert response.cost == nil
+      assert response.cost == 0.0001
       assert response.estimated_cost == 0.001858
     end
   end

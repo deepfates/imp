@@ -220,13 +220,22 @@ defmodule Imp.Streaming.Execution do
   # records it, and otherwise the id the client was configured with.
   defp normalize_metadata(%Imp.Clients.ReqLLM{model: model}, metadata) do
     {provider, model_id} = Imp.Clients.ReqLLM.model_identity(model)
+    usage = metadata[:usage] || metadata["usage"]
 
     req_llm = %{
       provider: provider,
       model: metadata[:model] || metadata["model"] || model_id,
-      usage: metadata[:usage] || metadata["usage"],
+      usage: usage,
       finish_reason: metadata[:finish_reason] || metadata["finish_reason"]
     }
+
+    # A stream never passes through response metadata. Resolve the same
+    # OpenRouter charge here so the recorded response reads that one figure.
+    req_llm =
+      case Imp.Clients.ReqLLM.resolve_openrouter_charge(model, usage) do
+        {:resolved, charge} -> Map.put(req_llm, :charge, charge)
+        :unresolved -> req_llm
+      end
 
     metadata
     |> Map.drop([:usage, "usage", :finish_reason, "finish_reason"])
