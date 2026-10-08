@@ -16,6 +16,12 @@ User-visible changes to Imp are recorded here.
   `[[ ## history ## ]]` section, in any format. History arrives as earlier
   turns, never as that section. Migration: a test or custom renderer that
   matched the old field list must match the new one.
+- `Imp.Usage.track/1` counts streamed calls (`Imp.collect/3`, a stream with
+  `provider_stream: true`), successful or failed, and a call made by
+  `Imp.Predict` with `track_usage` on, including a failed one. A streamed
+  call has ReqLLM's `estimated_cost` when ReqLLM priced it, as a
+  non-streamed call does. This retires the 0.9.0 Known limit on streamed
+  usage.
 
 ## 0.9.0 — 2026-10-07
 

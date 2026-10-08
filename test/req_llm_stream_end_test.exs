@@ -36,19 +36,34 @@ defmodule Imp.ReqLLMStreamEndTest do
     if done?, do: body <> "data: [DONE]\n\n", else: body
   end
 
-  defp lm(body) do
+  defp lm(body, model \\ %{}) do
     url = Imp.Test.LocalHTTP.start(fn _request -> {200, body} end)
 
     Imp.req_llm(
-      %{
-        provider: :openrouter,
-        id: "local-model",
-        model: "local-model",
-        base_url: url <> "/api/v1"
-      },
+      Map.merge(
+        %{
+          provider: :openrouter,
+          id: "local-model",
+          model: "local-model",
+          base_url: url <> "/api/v1"
+        },
+        model
+      ),
       api_key: "local-test-key",
       cache: false
     )
+  end
+
+  defp priced_lm(body) do
+    lm(body, %{
+      pricing: %{
+        currency: "USD",
+        components: [
+          %{id: "token.input", kind: "token", unit: "token", per: 1_000_000, rate: 0.1},
+          %{id: "token.output", kind: "token", unit: "token", per: 1_000_000, rate: 0.4}
+        ]
+      }
+    })
   end
 
   defp stream(lm),
@@ -272,6 +287,72 @@ defmodule Imp.ReqLLMStreamEndTest do
       assert %{provider: "openai", model: "local-model"} =
                response.metadata.response.req_llm,
              inspect(model)
+    end
+  end
+
+  defp track_collect(program) do
+    Imp.Usage.track(fn ->
+      Imp.collect(program, %{question: "Capital of France?"}, provider_stream: true)
+    end)
+  end
+
+  # A streamed call is counted as a non-streamed one is: what the provider
+  # charged as `cost`, ReqLLM's catalog price as `estimated_cost`, and both in
+  # the usage `Imp.Usage.track` returns around `Imp.collect`.
+  test "a streamed call carries the same charge and estimate as a non-streamed one" do
+    answer = "[[ ## answer ## ]]\nParis\n\n[[ ## completed ## ]]"
+    content = put_in(@content, ["choices", Access.at(0), "delta", "content"], answer)
+
+    completion = %{
+      "id" => "gen-1",
+      "model" => "local-model",
+      "choices" => [
+        %{
+          "index" => 0,
+          "finish_reason" => "stop",
+          "message" => %{"role" => "assistant", "content" => answer}
+        }
+      ],
+      "usage" => @usage["usage"]
+    }
+
+    streamed = Imp.predict("question -> answer", lm: priced_lm(sse([content, @finish, @usage])))
+    plain = Imp.predict("question -> answer", lm: priced_lm(Jason.encode!(completion)))
+
+    {:ok, run} = Imp.Run.start(plain, %{question: "?"})
+    assert {:ok, _prediction} = Task.await(run.task)
+    [expected] = Enum.filter(Imp.Run.events(run), &(&1.kind == :model_response))
+    Imp.Run.stop(run)
+    assert is_float(expected.metadata.estimated_cost)
+
+    assert {{:ok, prediction}, _usage, events} = run(streamed)
+    assert Imp.get(prediction, :answer) == "Paris"
+    assert [response] = Enum.filter(events, &(&1.kind == :model_response))
+    assert response.metadata.cost == 0.00042
+    assert response.metadata.estimated_cost == expected.metadata.estimated_cost
+
+    assert {{:ok, _prediction}, usage} = track_collect(streamed)
+    assert %{"openrouter/local-model" => tracked} = usage
+    assert %{input_tokens: 7, output_tokens: 1, total_tokens: 8} = tracked
+    assert tracked["cost"] == 0.00042
+    assert tracked.total_cost == expected.metadata.estimated_cost
+  end
+
+  test "a streamed call that failed after usage arrived is counted by Imp.Usage" do
+    error = %{"error" => %{"message" => "upstream died"}}
+    program = Imp.predict("question -> answer", lm: lm(sse([@content, @usage, error], false)))
+
+    # With `track_usage` on, the predictor keeps a tracker of its own, and
+    # the failed call still reaches the caller's.
+    for track_usage <- [false, true] do
+      assert {{:error, %Imp.LMError{}}, usage} =
+               Imp.context([track_usage: track_usage], fn -> track_collect(program) end)
+
+      assert %{"openrouter/local-model" => %{input_tokens: 7, output_tokens: 1} = tracked} =
+               usage,
+             "track_usage: #{track_usage}"
+
+      assert tracked["cost"] == 0.00042
     end
   end
 end

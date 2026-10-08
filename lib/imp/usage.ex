@@ -10,7 +10,10 @@ defmodule Imp.Usage do
 
   The tracker is a per-process stack. Nested trackers shadow outer ones for the
   duration of the inner call, exactly as DSPy's `settings.context(usage_tracker=...)`
-  does. Parallel program runs (`Imp.Predict.Parallel`) execute in separate
+  does; `Imp.Predict.call` adds its own tracker's usage to the enclosing one,
+  whether the call succeeded or failed. A streamed call (`Imp.collect/3`,
+  `Imp.stream/3` with `provider_stream: true`) runs in another process and
+  sends its usage back, so a tracker around it counts it. Parallel program runs (`Imp.Predict.Parallel`) execute in separate
   processes, so each result carries only its own usage — the isolation DSPy's
   thread-local tracker provides.
   """
