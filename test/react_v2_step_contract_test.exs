@@ -21,6 +21,7 @@ defmodule ReActV2StepContractTest do
   end
 
   @in_field "When the final answer is ready, write it in `answer`."
+  @plain_reply "When the final answer is ready, reply without calling a tool: that message is `answer`."
   @leave_empty "When the final answer is ready, write it in `answer`, and leave `tool_calls` empty."
 
   defp look, do: Imp.tool(:look, "Look at a thing", fn _ -> %{"seen" => [1]} end)
@@ -93,9 +94,9 @@ defmodule ReActV2StepContractTest do
   end
 
   describe "an LM that calls tools natively" do
-    test "Chat: the answer goes in answer, and plain text is still read as it" do
+    test "Chat: the message without a tool call is the answer" do
       [request] = run(agent(Imp.Adapter.Chat, lm(true, ["done."])))
-      assert_native(request, @in_field)
+      assert_native(request, @plain_reply)
     end
 
     test "JSON: the answer goes in answer" do
@@ -113,7 +114,7 @@ defmodule ReActV2StepContractTest do
     test "the JSON fallback of a Chat step" do
       replies = ["[[ ## tool_calls ## ]]\nnot a list", ~s({"answer": "done."})]
       [first, fallback] = run(agent(Imp.Adapter.Chat, lm(true, replies)))
-      assert_native(first, @in_field)
+      assert_native(first, @plain_reply)
       assert_native(fallback, @in_field)
     end
 
@@ -141,7 +142,9 @@ defmodule ReActV2StepContractTest do
 
       assert "earlier reply" in assistant
       assert "noted" in assistant
-      assert "[[ ## answer ## ]]\nI will look\n\n[[ ## completed ## ]]\n" in assistant
+      # A demo is shown as the model would write it: plain text, no markers.
+      assert "I will look" in assistant
+      refute text(messages) =~ "[[ ## completed ## ]]"
       refute text(messages) =~ "Not supplied"
     end
   end

@@ -68,6 +68,26 @@ reads nearly the same in Imp. One thing differs: Imp names each type in plain
 words (`string`, `one of: atlas, harbor, ...`) where DSPy writes Python
 annotations (`str`, `Literal[...]`).
 
+One place shows no output markers: a [ReAct](react.md) loop with one
+unconstrained text output, whose tools the provider holds natively. Its
+answer is the plain text of the message that calls no tool, so the system
+message lays out only the inputs and says so:
+
+```text
+Inputs will be structured in the following way, with the appropriate values filled in.
+
+[[ ## intent ## ]]
+{intent}
+
+In adhering to this structure, your objective is: 
+        ...
+        When the final answer is ready, reply without calling a tool: that message is `answer`.
+        The available tools are: `look`.
+```
+
+Its demos and stored turns are shown the same way, as plain text. A reply
+written in markers is still read.
+
 ## API walkthrough
 
 ### The adapters

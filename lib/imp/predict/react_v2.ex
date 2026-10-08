@@ -152,9 +152,11 @@ defmodule Imp.Predict.ReActV2 do
   `tools`, the model writes its calls in `tool_calls`, and earlier steps are
   replayed as text (the step's fields, then the results), never as native
   tool messages. This is DSPy's structure. The guidance says where a text
-  answer goes, the same in every format: in the task text field, with
-  `tool_calls` left empty when that field is described. A reply in plain text
-  is still read as that field by `Imp.Adapter.Chat`. Durable step history keeps
+  answer goes: in the task text field, with `tool_calls` left empty when that
+  field is described. With native tool calls the Chat adapter asks for no
+  field markers at all: its system message lays out the inputs alone and says
+  the message without a tool call is the answer. A reply in plain text, or in
+  markers, is read as that field by `Imp.Adapter.Chat`. Durable step history keeps
   `next_thought` and `tool_calls` for compatibility with saved conversations;
   adapters project them into the declared fields when rendering. A stored turn that
   carries a one-text-output task's answer and no step outputs is replayed as
