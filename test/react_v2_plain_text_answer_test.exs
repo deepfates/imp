@@ -52,7 +52,7 @@ defmodule ReActV2PlainTextAnswerTest do
                "\n" <>
                "In adhering to this structure, your objective is: \n" <>
                "        Given the fields `intent`, produce the fields `answer`.\n" <>
-               "        You are an Agent. Use the supplied tools to produce `answer` from `intent`.\n" <>
+               "        You are an Agent. Produce `answer` from `intent`, using the supplied tools to gather information and take actions.\n" <>
                "        The outputs to produce are:\n" <>
                "        1. `answer` (string):\n" <>
                "        Call tools when more information is needed.\n" <>

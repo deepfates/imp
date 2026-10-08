@@ -74,6 +74,15 @@ User-visible changes to Imp are recorded here.
   that worked around that limit by adding streamed usage, or a
   `track_usage` prediction's `get_lm_usage/1`, to its own tracker counts
   those calls twice and must stop.
+- In a ReActV2 step with one unconstrained text output and native tool
+  calls (no `submit` tool), the system message's opening line no longer
+  says to use the tools to produce the answer, which contradicted the later
+  line that the answer is the reply without a tool call. It now reads
+  "You are an Agent. Produce `answer` from `intent`, using the supplied
+  tools to gather information and take actions." Steps with `submit`,
+  written tool calls, or the JSON and XML formats are unchanged. Migration:
+  a test that matched the old opening line for this mode must match the
+  new one.
 
 ## 0.9.0 — 2026-10-07
 
