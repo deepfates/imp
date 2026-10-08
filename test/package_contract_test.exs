@@ -114,7 +114,7 @@ defmodule PackageContractTest do
     version = Mix.Project.config()[:version]
     dependency = hex_dependency(version)
 
-    assert version == "0.11.0"
+    assert version == "0.12.0"
     assert File.read!("RELEASE_NOTES.md") =~ "# Imp v#{version}"
     assert File.read!("CHANGELOG.md") =~ "## #{version}"
     assert File.read!("examples/deployment/mix.exs") =~ dependency
@@ -125,10 +125,11 @@ defmodule PackageContractTest do
     end
   end
 
-  # The requirement a consumer writes for this release: `~> major.minor`.
+  # The requirement a consumer writes for this release: `~> major.minor.0`,
+  # which takes later patch releases only (`~> major.minor` takes every later 0.x).
   defp hex_dependency(version) do
     [major, minor | _patch] = String.split(version, ".")
-    ~s({:imp, "~> #{major}.#{minor}"})
+    ~s({:imp, "~> #{major}.#{minor}.0"})
   end
 
   test "clean-room package gate is discoverable from the root Mix project" do
