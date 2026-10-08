@@ -2263,8 +2263,10 @@ defmodule Imp.Clients.ReqLLM do
   # The chunks carry what the provider sent; ReqLLM's metadata handle carries
   # what ReqLLM concluded about the stream as a whole. Its finish reason is
   # `:incomplete` when the body ended with no termination event, a stream
-  # cut short that the chunks alone cannot tell from a finished one, and its
-  # usage stands in when no chunk reported any.
+  # cut short that the chunks alone cannot tell from a finished one. Its
+  # usage adds what the chunks lack, ReqLLM's catalog price among it, so a
+  # streamed call carries the same `estimated_cost` as a non-streamed one;
+  # where both report a field, the chunks' figure stands.
   defp finish_stream(state) do
     state = %{state | metadata: merge_handle_metadata(state.metadata, state.response)}
 
@@ -2296,17 +2298,27 @@ defmodule Imp.Clients.ReqLLM do
 
     metadata
     |> put_handle_value(:finish_reason, handle_metadata, :always)
-    |> put_handle_value(:usage, handle_metadata, :when_missing)
+    |> put_handle_value(:usage, handle_metadata, :fill)
   end
 
   defp merge_handle_metadata(metadata, _response), do: metadata
 
   defp put_handle_value(metadata, key, handle_metadata, rule) do
     case {Map.get(handle_metadata, key), rule, Map.get(metadata, key)} do
-      {nil, _rule, _current} -> metadata
-      {value, :always, _current} -> Map.put(metadata, key, value)
-      {value, :when_missing, nil} -> Map.put(metadata, key, value)
-      {_value, :when_missing, _current} -> metadata
+      {nil, _rule, _current} ->
+        metadata
+
+      {value, :always, _current} ->
+        Map.put(metadata, key, value)
+
+      {value, :fill, %{} = current} when is_map(value) ->
+        Map.put(metadata, key, Map.merge(value, current))
+
+      {value, :fill, nil} ->
+        Map.put(metadata, key, value)
+
+      {_value, :fill, _current} ->
+        metadata
     end
   end
 

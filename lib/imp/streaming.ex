@@ -143,9 +143,20 @@ defmodule Imp.Streaming do
     ref = make_ref()
     context = %{owner: owner, ref: ref, targets: targets}
 
+    # The program runs in its own process, so the usage its calls record is
+    # sent back ahead of its result and counted in the consumer's
+    # `Imp.Usage` frame, as a call made in the consumer's process would be.
     task =
       Imp.Tasks.async_nolink_borrowed(fn ->
-        Imp.Streaming.Execution.with_context(context, fn -> Imp.Module.call(program, inputs) end)
+        {result, usage} =
+          Imp.Usage.track(fn ->
+            Imp.Streaming.Execution.with_context(context, fn ->
+              Imp.Module.call(program, inputs)
+            end)
+          end)
+
+        send(owner, {:imp_stream_usage, ref, usage})
+        result
       end)
 
     %{task: task, ref: ref, include_final?: include_final?, done?: false, pending_ack: nil}
@@ -158,6 +169,10 @@ defmodule Imp.Streaming do
     state = %{state | pending_ack: nil}
 
     receive do
+      {:imp_stream_usage, ref, usage} when ref == state.ref ->
+        record_usage(usage)
+        next_program_stream(state)
+
       {:imp_stream, ref, producer, acknowledgement, event} when ref == state.ref ->
         {[event], %{state | pending_ack: {producer, acknowledgement}}}
 
@@ -189,10 +204,21 @@ defmodule Imp.Streaming do
       end
     end
 
+    # A program that stopped after the consumer halted still sent what it
+    # spent.
+    receive do
+      {:imp_stream_usage, ^ref, usage} -> record_usage(usage)
+    after
+      0 -> :ok
+    end
+
     :ok
   end
 
   defp stop_program_stream(_state), do: :ok
+
+  defp record_usage(usage),
+    do: Enum.each(usage, fn {model, entry} -> Imp.Usage.record(model, entry) end)
 
   defp acknowledge(nil), do: :ok
   defp acknowledge({producer, ref}), do: send(producer, {:imp_stream_ack, ref})

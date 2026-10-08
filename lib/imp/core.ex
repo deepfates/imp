@@ -90,7 +90,7 @@ defmodule Imp.Core do
 
     `estimated_cost` is ReqLLM's estimate for the call: the reported token
     counts priced from its model catalog, as a non-negative float, or `nil`
-    when the catalog has no price for the model or the call was streamed. It
+    when the catalog has no price for the model. It
     is a different number from
     the charge whenever prices have changed, the provider routed to an endpoint
     with other prices, or the provider prices caching and reasoning differently

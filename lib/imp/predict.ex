@@ -89,8 +89,10 @@ defmodule Imp.Predict do
   def call(%__MODULE__{} = predict, inputs) when is_list(inputs) or is_map(inputs) do
     if Map.get(Imp.Settings.get(), :track_usage, false) do
       # The call runs inside a usage tracker and the aggregate lands on the
-      # prediction, readable with `Imp.Prediction.get_lm_usage/1`.
+      # prediction, readable with `Imp.Prediction.get_lm_usage/1`. A tracker
+      # around this call counts it too, whether it succeeded or failed.
       {result, usage} = Imp.Usage.track(fn -> do_call(predict, inputs) end)
+      Enum.each(usage, fn {model, entry} -> Imp.Usage.record(model, entry) end)
 
       case result do
         {:ok, prediction} -> {:ok, Imp.Prediction.set_lm_usage(prediction, usage)}
