@@ -1881,7 +1881,7 @@ defmodule Imp.BenchmarkTruth.GepaCampaign do
 
   defp jsonl_row_count!(path) do
     path
-    |> File.stream!([], :line)
+    |> File.stream!(:line)
     |> Enum.count(&(String.trim(&1) != ""))
   end
 
