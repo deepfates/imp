@@ -41,6 +41,10 @@ defmodule Imp.LMError do
     * `:context_window_exceeded` — `true` when the provider refused the
       request because its input is longer than the model accepts. Sending it
       again unchanged will fail again; a shorter input may not.
+    * `:content_filtered` — `true` when the provider's content filter stopped
+      the completion (`finish_reason: :content_filter`). Such a request is
+      not retryable: sent again unchanged, it is likely to be filtered, and
+      billed, again.
 
   An error the provider sends inside a stream arrives without its code,
   because ReqLLM's stream decoder keeps only its message, so it has `:status`
@@ -56,14 +60,22 @@ defmodule Imp.LMError do
   nothing about the provider.
   """
 
-  defexception [:message, :status, :reason, retryable: false, context_window_exceeded: false]
+  defexception [
+    :message,
+    :status,
+    :reason,
+    retryable: false,
+    context_window_exceeded: false,
+    content_filtered: false
+  ]
 
   @type t :: %__MODULE__{
           message: String.t() | nil,
           status: non_neg_integer() | nil,
           reason: term(),
           retryable: boolean(),
-          context_window_exceeded: boolean()
+          context_window_exceeded: boolean(),
+          content_filtered: boolean()
         }
 end
 

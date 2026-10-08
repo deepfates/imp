@@ -4,10 +4,43 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Fixed
+
+- A non-streamed completion the provider stopped and billed still records its
+  usage and cost. Since 0.11.0 a completion with `finish_reason:
+  :content_filter` is `{:error, %Imp.LMError{}}`, and its `:model_response`
+  event carried only the error, so a host that caps spend from recorded cost
+  undercounted. The failed call's `:model_response` event now carries the
+  same `usage`, `cost`, `estimated_cost` and `billing` metadata a completed
+  call's does, beside `error`, and the usage is added to `Imp.Usage`, as a
+  streamed call that fails after reporting usage already was. Migration: a
+  host that summed `cost` only over `:model_response` events without an
+  `error` should sum it over all of them.
+- A completion with `finish_reason: :error` is a failed request:
+  `Imp.Clients.ReqLLM` returns `{:error, %Imp.LMError{retryable: false}}`
+  whose message is "API request failed: the completion finished with reason
+  error: " followed by the response's text, with its usage and cost recorded
+  as above. It returned `{:ok, completion}`, so the provider's text could
+  become a prediction or a ReAct answer. ReqLLM gives this finish reason for
+  a generation the provider reports as failed partway, and for any finish
+  reason it does not recognise. Migration: a caller sees a failed LM call
+  where it saw a completion.
+- An `Imp.Predict.ReActV2` step stopped by the content filter fails the turn
+  at once with `{:error, %Imp.Predict.ReActV2.StepError{}}`. The turn made
+  its usual last request (`:last_text` or the forced `submit`), which carried
+  the same history, was filtered again and was billed again. DSPy's ReAct
+  makes no further request after a step's LM error either. Other failed steps
+  still get the last request. Migration: a host that read a filtered turn's
+  `:incomplete` prediction, or a `StepError` from its last request, receives
+  the step's `StepError` instead.
+
 ### Added
 
 - `t:Imp.Clients.TRLTrainer.t/0`, the struct type that
   `Imp.Clients.TRLDeployment` specs already referred to.
+- `Imp.LMError` has a `content_filtered` field, `true` when the provider's
+  content filter stopped the completion, so a caller can tell a filtered
+  request from other non-retryable failures without reading `reason`.
 
 ## 0.11.0 — 2026-10-08
 
