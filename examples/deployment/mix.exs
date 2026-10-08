@@ -11,7 +11,7 @@ defmodule ImpDeployment.MixProject do
 
   defp deps do
     case System.get_env("IMP_PATH") do
-      nil -> [{:imp, "~> 0.10"}]
+      nil -> [{:imp, "~> 0.11"}]
       path -> [{:imp, path: path}]
     end
   end

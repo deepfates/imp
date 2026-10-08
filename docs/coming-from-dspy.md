@@ -12,7 +12,7 @@ brought in.
 ## The five-minute version
 
 ```elixir
-# pip install dspy             ->  {:imp, "~> 0.10"}
+# pip install dspy             ->  {:imp, "~> 0.11"}
 # lm = dspy.LM("openai/...")    ->  lm = Imp.req_llm("openai:gpt-5.4-mini", api_key: ...)
 # dspy.Predict("q -> a")        ->  program = Imp.predict("q -> a", lm: lm)
 # program(q="...")              ->  {:ok, pred} = Imp.call(program, %{q: "..."})
@@ -87,7 +87,7 @@ error row too. Each model request has a receive timeout, and
 has no time limit of its own (an MCP tool call does, 30 seconds by default),
 so to bound an agent, start it with `Imp.start_run/3` and cancel it when you
 choose. The
-[deployment example](https://github.com/deepfates/imp/blob/v0.10.0/examples/deployment/README.md)
+[deployment example](https://github.com/deepfates/imp/blob/v0.11.0/examples/deployment/README.md)
 is a complete OTP application.
 
 **Optimizers see what you name.** DSPy finds predictors by walking a module's

@@ -4,6 +4,26 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+## 0.11.0 — 2026-10-08
+
+### Fixed
+
+- A non-streamed completion that the provider's content filter stopped
+  (`finish_reason: :content_filter`) is a failed request:
+  `Imp.Clients.ReqLLM` returns `{:error, %Imp.LMError{retryable: false}}`,
+  whose message is "API request failed: the provider's content filter
+  stopped the completion: " followed by the response's text. It returned
+  `{:ok, completion}` with that text as the content, so a caller read the
+  filter's message (OpenRouter's, for example, "The request was rejected
+  because it was considered high risk") as the model's answer. Migration:
+  `Imp.Predict`, ReAct and every other caller now see a failed LM call where
+  they saw a completion. A host that detected the filter by matching the
+  text, or by reading `finish_reason` on the completion, matches the
+  `Imp.LMError` instead. A host that retries every `Imp.LMError` should
+  check `retryable`, because sending the same request again is likely to be
+  filtered again. Streamed completions are unchanged; see Known limits in
+  the release notes.
+
 ## 0.10.0 — 2026-10-08
 
 ### Added

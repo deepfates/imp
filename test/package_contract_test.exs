@@ -114,7 +114,7 @@ defmodule PackageContractTest do
     version = Mix.Project.config()[:version]
     dependency = hex_dependency(version)
 
-    assert version == "0.10.0"
+    assert version == "0.11.0"
     assert File.read!("RELEASE_NOTES.md") =~ "# Imp v#{version}"
     assert File.read!("CHANGELOG.md") =~ "## #{version}"
     assert File.read!("examples/deployment/mix.exs") =~ dependency
