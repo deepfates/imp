@@ -70,7 +70,7 @@ Inputs will be structured in the following way, with the appropriate values fill
 
 In adhering to this structure, your objective is: 
         Given the fields `intent`, produce the fields `answer`.
-        You are an Agent. Use the supplied tools to produce `answer` from `intent`.
+        You are an Agent. Produce `answer` from `intent`, using the supplied tools to gather information and take actions.
         The outputs to produce are:
         1. `answer` (string):
         Call tools when more information is needed.
@@ -82,7 +82,9 @@ What is in the box?
 ```
 
 The tool names are listed in the text as DSPy lists them; the tools
-themselves go to the provider. A reply that still writes
+themselves go to the provider. The "You are an Agent..." line is yours to
+change: pass `adapter_opts: [agent_line: "..."]` for your own text, or
+`agent_line: nil` to leave it out. A reply that still writes
 `[[ ## answer ## ]]` sections, as replies did before, is read as before.
 When the model writes its tool calls as text instead (an LM without native
 tool calling), and for every signature with `submit`, the step keeps the

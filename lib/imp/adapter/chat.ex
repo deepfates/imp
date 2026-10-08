@@ -30,6 +30,8 @@ defmodule Imp.Adapter.Chat do
   signature; see that module.
 
   Options to `format/3`: `:demos`, `:response_instruction`, `:guidance`,
+  `:agent_line` (the guidance's "You are an Agent..." line: a string replaces
+  it, nil leaves it out, and when absent it is DSPy's),
   `:omit_empty_request`, and the renderer seams `:output_renderer`,
   `:input_section_renderer`, `:system_renderer`, `:tool_result_renderer` and
   `:history_note_renderer`,
@@ -104,6 +106,12 @@ defmodule Imp.Adapter.Chat do
     # `signature.instructions`: `%{submit_tool:, input_names:, output_names:,
     # tool_names:}`.
     guidance: [type: {:or, [:map, nil]}],
+    # The guidance line that tells the model it is an agent. Absent, it is
+    # DSPy ReActV2's "You are an Agent. Use the supplied tools to produce
+    # <outputs> from <inputs>." (in a plain-text loop: "You are an Agent.
+    # Produce <outputs> from <inputs>, using the supplied tools to gather
+    # information and take actions."). A string replaces it; nil leaves it out.
+    agent_line: [type: {:or, [:string, nil]}],
     # Drop the trailing user message when it is blank. A native tool loop has
     # nothing left to ask once every input is in the history, and an empty
     # message still counts as a turn to the provider.
@@ -715,7 +723,12 @@ defmodule Imp.Adapter.Chat do
   # any format says the same.
   def objective(signature, opts) do
     signature.instructions
-    |> with_guidance(Keyword.get(opts, :guidance), signature, opts[:plain_text_answer] == true)
+    |> with_guidance(
+      Keyword.get(opts, :guidance),
+      signature,
+      opts[:plain_text_answer] == true,
+      Keyword.fetch(opts, :agent_line)
+    )
     |> Imp.Adapter.Instructions.objective_text()
   end
 
@@ -738,9 +751,9 @@ defmodule Imp.Adapter.Chat do
   # In a plain-text loop rendered by this adapter (`plain_text_answer?/2`),
   # the reply has no fields to write the answer in, so the sentence says
   # what is true there: the message without a tool call is the answer.
-  defp with_guidance(instructions, nil, _signature, _plain?), do: instructions
+  defp with_guidance(instructions, nil, _signature, _plain?, _agent_line), do: instructions
 
-  defp with_guidance(instructions, %{} = guidance, signature, plain?) do
+  defp with_guidance(instructions, %{} = guidance, signature, plain?, agent_line) do
     names = fn key -> guidance |> Map.get(key, []) |> Enum.map_join(", ", &"`#{&1}`") end
 
     finish =
@@ -756,32 +769,42 @@ defmodule Imp.Adapter.Chat do
           "When the final answer is ready, call `#{tool}` with #{names.(:output_names)}."
       end
 
-    # With no finish tool in a plain-text loop, the answer is the reply
-    # without a tool call, so the opening line does not say the tools
-    # produce it: they gather information and act.
     opening =
-      if plain? and Map.get(guidance, :submit_tool, :submit) == nil do
-        "You are an Agent. Produce #{names.(:output_names)} from #{names.(:input_names)}, " <>
-          "using the supplied tools to gather information and take actions."
-      else
-        "You are an Agent. Use the supplied tools to produce #{names.(:output_names)} " <>
-          "from #{names.(:input_names)}."
+      case agent_line do
+        {:ok, line} -> line
+        :error -> default_agent_line(guidance, plain?, names)
       end
 
     outputs =
       case Map.get(guidance, :outputs, []) do
-        [] -> ""
-        fields -> "\nThe outputs to produce are:\n" <> render_field_list(fields)
+        [] -> nil
+        fields -> "The outputs to produce are:\n" <> render_field_list(fields)
       end
 
-    """
-    #{instructions}
-    #{opening}#{outputs}
-    Call tools when more information is needed.
-    #{finish}
-    The available tools are: #{names.(:tool_names)}.
-    """
+    [
+      instructions,
+      opening,
+      outputs,
+      "Call tools when more information is needed.",
+      finish,
+      "The available tools are: #{names.(:tool_names)}."
+    ]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.join("\n")
     |> String.trim()
+  end
+
+  # With no finish tool in a plain-text loop, the answer is the reply
+  # without a tool call, so the opening line does not say the tools
+  # produce it: they gather information and act.
+  defp default_agent_line(guidance, plain?, names) do
+    if plain? and Map.get(guidance, :submit_tool, :submit) == nil do
+      "You are an Agent. Produce #{names.(:output_names)} from #{names.(:input_names)}, " <>
+        "using the supplied tools to gather information and take actions."
+    else
+      "You are an Agent. Use the supplied tools to produce #{names.(:output_names)} " <>
+        "from #{names.(:input_names)}."
+    end
   end
 
   defp text_answer(signature) do

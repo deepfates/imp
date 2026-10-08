@@ -2,6 +2,17 @@
 
 User-visible changes to Imp are recorded here.
 
+## Unreleased
+
+### Added
+
+- A host can set or remove the "You are an Agent..." line in a tool loop's
+  guidance. `Imp.Adapter.Chat` (and the JSON and XML adapters, which share its
+  objective) take an `:agent_line` option: a string replaces the line and `nil`
+  leaves it out. Without the option the line is unchanged, so existing prompts
+  are byte-for-byte the same. With `Imp.react/3`, pass it as
+  `adapter_opts: [agent_line: ...]`.
+
 ## 0.12.0 — 2026-10-08
 
 ### Fixed
