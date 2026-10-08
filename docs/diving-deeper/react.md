@@ -51,6 +51,43 @@ about to do, instead of doing it, has given that sentence as its answer.
 A constrained output never takes that path: its allowed values are in
 `submit`'s schema, and text is not an answer to it.
 
+The prompt says the same. When the provider holds the tools natively, the
+Chat adapter's system message for `Imp.react("intent -> answer", [look])`
+shows the input layout and no output markers to write, because the answer is
+the plain text of the message that calls no tool:
+
+```text
+--- system
+Your input fields are:
+1. `intent` (string):
+2. `history` (history):
+Your output fields are:
+1. `answer` (string):
+Inputs will be structured in the following way, with the appropriate values filled in.
+
+[[ ## intent ## ]]
+{intent}
+
+In adhering to this structure, your objective is: 
+        Given the fields `intent`, produce the fields `answer`.
+        You are an Agent. Use the supplied tools to produce `answer` from `intent`.
+        The outputs to produce are:
+        1. `answer` (string):
+        Call tools when more information is needed.
+        When the final answer is ready, reply without calling a tool: that message is `answer`.
+        The available tools are: `look`.
+--- user
+[[ ## intent ## ]]
+What is in the box?
+```
+
+The tool names are listed in the text as DSPy lists them; the tools
+themselves go to the provider. A reply that still writes
+`[[ ## answer ## ]]` sections, as replies did before, is read as before.
+When the model writes its tool calls as text instead (an LM without native
+tool calling), and for every signature with `submit`, the step keeps the
+`[[ ## field ## ]]` layout and its `[[ ## completed ## ]]` marker.
+
 ### 3. An interrupted turn gets one last request
 
 A turn is interrupted when it reaches `max_iters`, when a step's request or

@@ -110,12 +110,14 @@ defmodule Imp.Adapter.Chat do
   ]
 
   @impl true
-  def format(signature, inputs, opts),
-    do:
-      assemble(signature, inputs, opts, %{
-        system: &default_system/2,
-        outputs: &default_outputs/3
-      })
+  def format(signature, inputs, opts) do
+    outputs =
+      if plain_text_answer?(signature, opts),
+        do: &plain_text_outputs/3,
+        else: &default_outputs/3
+
+    assemble(signature, inputs, opts, %{system: &default_system/2, outputs: outputs})
+  end
 
   @doc false
   # The message assembly, with the formatting adapter's default system and
@@ -642,18 +644,62 @@ defmodule Imp.Adapter.Chat do
 
   # The system message: the field listing, the `[[ ## name ## ]]` interaction
   # template and the objective, with any loop guidance.
+  #
+  # A loop whose answer is the plain text of its last message (see
+  # `plain_text_answer?/2`) shows only the input template: its replies carry
+  # no markers, so a template asking for `[[ ## answer ## ]]` and
+  # `[[ ## completed ## ]]` would contradict the guidance and the replayed
+  # turns, which are plain text.
   defp default_system(signature, opts) do
-    """
-    Your input fields are:
-    #{render_field_list(signature.inputs)}
-    Your output fields are:
-    #{render_field_list(signature.outputs)}
-    All interactions will be structured in the following way, with the appropriate values filled in.
+    if plain_text_answer?(signature, opts) do
+      """
+      Your input fields are:
+      #{render_field_list(signature.inputs)}
+      Your output fields are:
+      #{render_field_list(signature.outputs)}
+      Inputs will be structured in the following way, with the appropriate values filled in.
 
-    #{render_interaction_template(signature)}
-    In adhering to this structure, your objective is: #{objective(signature, opts)}
-    """
+      #{render_input_template(signature)}
+
+      In adhering to this structure, your objective is: #{objective(signature, Keyword.put(opts, :plain_text_answer, true))}
+      """
+    else
+      """
+      Your input fields are:
+      #{render_field_list(signature.inputs)}
+      Your output fields are:
+      #{render_field_list(signature.outputs)}
+      All interactions will be structured in the following way, with the appropriate values filled in.
+
+      #{render_interaction_template(signature)}
+      In adhering to this structure, your objective is: #{objective(signature, opts)}
+      """
+    end
     |> String.trim()
+  end
+
+  # A tool loop with no finish tool, whose tools the provider holds natively
+  # and whose only output is the text field: `Imp.Predict.ReActV2` for one
+  # unconstrained text output with an LM that calls tools natively. The
+  # step's tool-calls output names a field that `Imp.Predict` took out of the
+  # request, so the model answers with tool calls or with plain text, and the
+  # plain text of a message without a tool call is the answer. With the
+  # tool-calls output present (written tool calls) or a finish tool, the
+  # reply is fields under markers, as everywhere else.
+  defp plain_text_answer?(signature, opts) do
+    guidance = if Keyword.keyword?(opts), do: Keyword.get(opts, :guidance)
+    text = output_field(signature, meta_field(signature, :text_field))
+    calls_name = meta_field(signature, :tool_calls_field)
+
+    submit_is_text?(guidance) and not is_nil(text) and signature.outputs == [text] and
+      not is_nil(calls_name) and is_nil(output_field(signature, calls_name))
+  end
+
+  # The assistant side of a demo or stored turn in a plain-text loop: the
+  # text field's value, as the model would have written it.
+  defp plain_text_outputs(signature, outputs, missing_field_message) do
+    [{_name, value}] = resolve_demo_outputs(signature, outputs, missing_field_message)
+    format_value(value)
   end
 
   @doc false
@@ -662,7 +708,7 @@ defmodule Imp.Adapter.Chat do
   # any format says the same.
   def objective(signature, opts) do
     signature.instructions
-    |> with_guidance(Keyword.get(opts, :guidance), signature)
+    |> with_guidance(Keyword.get(opts, :guidance), signature, opts[:plain_text_answer] == true)
     |> Imp.Adapter.Instructions.objective_text()
   end
 
@@ -677,16 +723,25 @@ defmodule Imp.Adapter.Chat do
   # With no finish tool the answer is text, and it goes in the signature's
   # text output (`metadata[:text_field]`), which every format describes; when
   # the request also describes a tool-calls output
-  # (`metadata[:tool_calls_field]`), that is left empty. The same sentence in
-  # every format, so it never contradicts the structure the request shows. A
-  # reply that is plain text is still read as the text output by this adapter.
-  defp with_guidance(instructions, nil, _signature), do: instructions
+  # (`metadata[:tool_calls_field]`), that is left empty. The JSON and XML
+  # formats say that sentence, so it never contradicts the structure their
+  # requests show. A reply that is plain text is still read as the text output
+  # by this adapter.
+  #
+  # In a plain-text loop rendered by this adapter (`plain_text_answer?/2`),
+  # the reply has no fields to write the answer in, so the sentence says
+  # what is true there: the message without a tool call is the answer.
+  defp with_guidance(instructions, nil, _signature, _plain?), do: instructions
 
-  defp with_guidance(instructions, %{} = guidance, signature) do
+  defp with_guidance(instructions, %{} = guidance, signature, plain?) do
     names = fn key -> guidance |> Map.get(key, []) |> Enum.map_join(", ", &"`#{&1}`") end
 
     finish =
       case Map.get(guidance, :submit_tool, :submit) do
+        nil when plain? ->
+          "When the final answer is ready, reply without calling a tool: " <>
+            "that message is `#{output_field(signature, meta_field(signature, :text_field)).name}`."
+
         nil ->
           text_answer(signature)
 
@@ -819,6 +874,16 @@ defmodule Imp.Adapter.Chat do
     end)
     |> Kernel.++(["[[ ## completed ## ]]"])
     |> Enum.join("\n\n")
+  end
+
+  # The input fields' markers alone. A history input is left out: its turns
+  # are messages, never a `[[ ## history ## ]]` section.
+  defp render_input_template(signature) do
+    signature.inputs
+    |> Enum.reject(&(&1.type in [:history, "history"]))
+    |> Enum.map_join("\n\n", fn field ->
+      "[[ ## #{field.name} ## ]]\n" <> Imp.Adapter.FieldType.placeholder(field, :input)
+    end)
   end
 
   defp fetch_meta(map, key, default \\ nil)

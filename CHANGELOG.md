@@ -4,6 +4,19 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Fixed
+
+- A ReActV2 step with one unconstrained text output, for an LM that calls
+  tools natively, no longer asks for `[[ ## answer ## ]]` and
+  `[[ ## completed ## ]]` markers while also saying the answer is the text of
+  the message without a tool call. The Chat adapter's system message lays out
+  the inputs alone (without a `history` placeholder), and the loop line reads
+  "When the final answer is ready, reply without calling a tool: that message
+  is `answer`." Step demos and stored turns are shown as that plain text.
+  Replies that still use markers parse as before. Written tool calls and
+  signatures with `submit` are unchanged. Migration: a test or custom
+  renderer that matched the old system message text must match the new one.
+
 ## 0.8.1 — 2026-10-02
 
 ### Fixed
