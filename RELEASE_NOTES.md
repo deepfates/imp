@@ -1,14 +1,12 @@
-# Imp v0.12.0
+# Imp v0.12.1
 
 Imp is a framework for typed, optimizable language-model programs on the BEAM.
-This release makes a failed completion the provider billed count as spending.
-Since 0.11.0 a completion the content filter stopped is an error, and that
-error carried no usage or cost, so a host that caps spending from recorded
-cost undercounted. Its usage and cost are now recorded. A filtered ReAct step
-no longer sends a second, equally filtered request, and a completion that
-finished with `finish_reason: :error` is now a failed request. What a caller
-receives changes in each case, so under Imp's versioning rule this is a minor
-release.
+This release lets a conversation continue when a provider repeats a tool call
+ID, and lets a host set or remove the "You are an Agent..." line in a tool
+loop's guidance. Neither changes what an existing caller receives: the ID fix
+changes only the request sent to the provider, and the new option leaves
+prompts byte-for-byte the same when it is not given. Under Imp's versioning
+rule this is a patch release.
 
 ## Install
 
@@ -30,48 +28,27 @@ in its release definition; see [releases that use MCP or
 ACP](docs/production.md#releases-that-use-mcp-or-acp).
 Ordinary Imp startup starts no protocol endpoint.
 
-## Changes and upgrading from 0.11
+## Changes and upgrading from 0.12.0
 
-Change the Imp dependency to `{:imp, "~> 0.12.0"}`, run `mix deps.update imp`,
-and commit `mix.lock`. No data migration is needed.
+Under `{:imp, "~> 0.12.0"}`, run `mix deps.update imp` and commit `mix.lock`.
+No code or data migration is needed.
 
-- **A billed failed completion records its usage and cost.** When
-  `Imp.Clients.ReqLLM` turns a non-streamed completion into an error (the
-  content filter stopped it, or it finished with `:error`), the failed call's
-  `:model_response` event now carries the same `usage`, `cost`,
-  `estimated_cost` and `billing` metadata a completed call's does, beside
-  `error`, and the usage is added to `Imp.Usage`. A streamed call that failed
-  after reporting usage already worked this way. `Imp.LM.generate/3` still
-  returns `{:error, reason}`. Migration: a host that summed `cost` only over
-  `:model_response` events without an `error` should sum it over all of them.
-- **A filtered ReActV2 step ends the turn.** An `Imp.Predict.ReActV2` step the
-  content filter stopped fails the turn at once with
-  `{:error, %Imp.Predict.ReActV2.StepError{}}`. Before, the turn made its
-  usual last request (`:last_text` or the forced `submit`) with the same
-  history, which was filtered and billed again. DSPy's ReAct also makes no
-  further request after a step's LM error. Other failed steps still get the
-  last request. Migration: a host that read a filtered turn's `:incomplete`
-  prediction, or a `StepError` from its last request, receives the step's
-  `StepError` instead.
-- **`finish_reason: :error` is a failed request.** `Imp.Clients.ReqLLM`
-  returns `{:error, %Imp.LMError{retryable: false}}` whose message is "API
-  request failed: the completion finished with reason error: " followed by
-  the response's text. It returned `{:ok, completion}`, so that text could
-  become a prediction or a ReAct answer. ReqLLM gives this finish reason when
-  the provider reports a generation failed partway, and for any finish reason
-  it does not recognise. Migration: a caller sees a failed LM call where it
-  saw a completion, and should not retry it.
-- **Added:** `Imp.LMError` has a `content_filtered` field, `true` when the
-  provider's content filter stopped the completion, so a caller can tell that
-  case from other non-retryable failures without reading `reason`. The type
-  `t:Imp.Clients.TRLTrainer.t/0` is now public; `Imp.Clients.TRLDeployment`
-  specs already referred to it.
+- **A request names each tool call once.** A provider can return the same
+  tool call ID for two calls in one conversation (seen from OpenRouter with a
+  Google model). The upstream then refused every later request that replayed
+  both with 400 `INVALID_ARGUMENT`, so the conversation could not continue.
+  `Imp.Clients.ReqLLM` now sends a repeated call under a fresh ID (`<id>_2`,
+  ...), and gives its results and the reasoning details that name it the same
+  ID. Stored histories and the text the model reads are unchanged.
+- **Added:** `Imp.Adapter.Chat`, and the JSON and XML adapters that share its
+  objective, take an `:agent_line` option: a string replaces the guidance's
+  "You are an Agent..." line and `nil` leaves it out. With `Imp.react/3`, pass
+  it as `adapter_opts: [agent_line: ...]`. Without it the line is unchanged.
 
-Rollback means restoring the previous dependency requirement, lock and
-application release; failed billed calls then record no cost again.
-Provider-free tests against a local HTTP server answering in OpenRouter's
-response shape cover each of the three changes; this release does not
-establish which providers send which finish reasons.
+Rollback means restoring `0.12.0` in the lock; a conversation with a repeated
+tool call ID then fails again at the provider. A provider-free test replays a
+conversation with a repeated ID and checks the IDs in the request; this
+release does not establish which providers repeat IDs, or how often.
 See the [changelog](CHANGELOG.md) for every change.
 
 ## Known limits

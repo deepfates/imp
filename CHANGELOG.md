@@ -4,6 +4,8 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+## 0.12.1 — 2026-10-09
+
 ### Added
 
 - A host can set or remove the "You are an Agent..." line in a tool loop's
