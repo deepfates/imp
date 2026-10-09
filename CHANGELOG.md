@@ -13,6 +13,17 @@ User-visible changes to Imp are recorded here.
   are byte-for-byte the same. With `Imp.react/3`, pass it as
   `adapter_opts: [agent_line: ...]`.
 
+### Fixed
+
+- A request names each tool call once. A provider can return the same tool
+  call ID for two calls in one conversation (seen from OpenRouter with a
+  Google model), and the upstream then refused every later request that
+  replayed both with 400 `INVALID_ARGUMENT`, so the conversation could not
+  continue. `Imp.Clients.ReqLLM` now sends a repeated call under a fresh ID
+  (`<id>_2`, ...), and gives its results and the reasoning details that name
+  it the same ID. Stored histories and the text the model reads are
+  unchanged.
+
 ## 0.12.0 — 2026-10-08
 
 ### Fixed
