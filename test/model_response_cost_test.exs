@@ -228,9 +228,10 @@ defmodule Imp.ModelResponseCostTest do
     assert response.billing == nil
   end
 
-  # The bring-your-own-key rule lives with the client. A raw envelope that
-  # carries no resolved charge reports the fee, upstream figure or not.
-  test "a raw byok envelope with no charge reports the fee" do
+  # A raw envelope carries no charge the client resolved. On a
+  # bring-your-own-key usage `"cost"` is only the fee, upstream figure or
+  # not, so the charge is unknown rather than that lower number.
+  test "a raw byok envelope with no resolved charge has no cost" do
     for usage <- [
           %{
             "is_byok" => true,
@@ -255,7 +256,7 @@ defmodule Imp.ModelResponseCostTest do
       raw = %{__imp_lm_output__: "pong", __imp_lm_metadata__: %{req_llm: %{usage: usage}}}
 
       assert {:ok, response} = Imp.Core.response(raw)
-      assert response.cost == 0.0001
+      assert response.cost == nil
       assert response.estimated_cost == 0.001858
     end
   end

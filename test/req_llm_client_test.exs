@@ -100,12 +100,15 @@ defmodule ReqLLMClientTest do
       {:ok,
        %ReqLLM.Response{
          id: "resp_charge",
-         model: to_string(model),
+         model: response_model(model),
          context: ReqLLM.Context.new(messages),
          message: ReqLLM.Context.assistant("pong"),
          usage: Keyword.fetch!(opts, :stub_usage)
        }}
     end
+
+    defp response_model(model) when is_binary(model), do: model
+    defp response_model(model), do: inspect(model)
   end
 
   defmodule StreamingUsageStub do
@@ -991,20 +994,8 @@ defmodule ReqLLMClientTest do
           },
           %{
             "is_byok" => true,
-            "cost" => Decimal.new("0.0001"),
-            "cost_details" => %{"upstream_inference_cost" => 0.002},
-            cost: @catalog
-          },
-          %{
-            "is_byok" => true,
             "cost" => 0.0001,
             "cost_details" => %{"upstream_inference_cost" => "0.002"},
-            cost: @catalog
-          },
-          %{
-            "is_byok" => true,
-            "cost" => 0.0001,
-            "cost_details" => %{"upstream_inference_cost" => Decimal.new("0.002")},
             cost: @catalog
           }
         ] do
@@ -1016,7 +1007,10 @@ defmodule ReqLLMClientTest do
     end
   end
 
-  test "a byok usage map on a model that is not OpenRouter reports the fee" do
+  # `openrouter:` strings are not the only spec this client accepts.
+  # `"is_byok"` is what identifies the call, so each of these costs the fee
+  # plus the upstream charge, and the client records that figure as `:charge`.
+  test "a byok response on an OpenRouter model spec costs the fee plus the upstream charge" do
     usage = %{
       "is_byok" => true,
       "cost" => 0.0001,
@@ -1024,10 +1018,17 @@ defmodule ReqLLMClientTest do
       cost: @catalog
     }
 
-    response = byok_response("openai:gpt-test", usage, cache: false)
+    for model <- [
+          {:openrouter, "id"},
+          {:openrouter, "id", []},
+          %{"provider" => "openrouter"}
+        ] do
+      response = byok_response(model, usage, cache: false)
 
-    assert response.cost == 0.0001
-    assert response.estimated_cost == 0.001858
+      assert_in_delta response.cost, 0.0021, 1.0e-12
+      assert_in_delta response.metadata.req_llm.charge, 0.0021, 1.0e-12
+      assert response.usage["cost"] == 0.0001
+    end
   end
 
   test "a repeated OpenRouter call on the caller's own key does not bill the cached charge" do

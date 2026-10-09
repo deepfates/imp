@@ -287,15 +287,23 @@ defmodule Imp.Core do
 
   # `:charge` on the client metadata is the charge that client resolved.
   # Present, it is the charge, `nil` included: nil is unknown, not a cue to
-  # read another figure. Otherwise the charge is `"cost"` on the usage map,
-  # the wire figure left under its string key, and then `:cost` in the
-  # response metadata. Atom `:cost` on the usage map is the catalog estimate,
-  # read as `estimated_cost`, not as the charge.
+  # read another figure. A bring-your-own-key usage that carries no resolved
+  # charge is unknown too: its `"cost"` is only the fee, and reporting that
+  # would understate spend. Any other envelope still reports its wire
+  # `"cost"`, then `:cost` in the response metadata. Atom `:cost` on the
+  # usage map is the catalog estimate, read as `estimated_cost`, not as the
+  # charge.
   defp reported_cost(metadata, usage) do
     case resolved_charge(metadata) do
       {:resolved, charge} -> charge
-      :unresolved -> Map.get(usage, "cost", map_value(metadata, :cost, nil))
+      :unresolved -> unresolved_cost(metadata, usage)
     end
+  end
+
+  defp unresolved_cost(_metadata, %{"is_byok" => true}), do: nil
+
+  defp unresolved_cost(metadata, usage) do
+    Map.get(usage, "cost", map_value(metadata, :cost, nil))
   end
 
   defp resolved_charge(metadata) do

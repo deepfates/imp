@@ -2000,21 +2000,22 @@ defmodule Imp.Clients.ReqLLM do
 
   defp from_response(other, _model_spec), do: other
 
-  # OpenRouter's `"cost"` on a bring-your-own-key call is its fee. The upstream
+  # `"cost"` on a bring-your-own-key call is the gateway fee. The upstream
   # charge is `"cost_details"` under `:upstream_inference_cost`. Both numbers
-  # are the charge; either missing or not a number makes the charge unknown.
-  # Any other usage stays unresolved, and the caller reads `"cost"` itself.
+  # are the charge; either missing or not a number makes it unknown.
+  # `"is_byok"` identifies the call for every model spec this client accepts.
+  # Any other usage reports its `"cost"`, or `nil` when the provider reported
+  # none. Callers always store the figure as `:charge`.
   @doc false
-  @spec resolve_openrouter_charge(term(), term()) :: {:resolved, number() | nil} | :unresolved
-  def resolve_openrouter_charge(model, %{"is_byok" => true} = usage) do
-    if openrouter_model?(model) do
-      {:resolved, openrouter_byok_charge(usage)}
-    else
-      :unresolved
-    end
+  @spec resolve_openrouter_charge(term(), term()) :: {:resolved, term()}
+  def resolve_openrouter_charge(_model, %{"is_byok" => true} = usage) do
+    {:resolved, openrouter_byok_charge(usage)}
   end
 
-  def resolve_openrouter_charge(_model, _usage), do: :unresolved
+  def resolve_openrouter_charge(_model, usage), do: {:resolved, wire_cost(usage)}
+
+  defp wire_cost(%{"cost" => cost}), do: cost
+  defp wire_cost(_usage), do: nil
 
   defp openrouter_byok_charge(usage) do
     fee = Map.get(usage, "cost")
@@ -2034,7 +2035,9 @@ defmodule Imp.Clients.ReqLLM do
     logprobs = sanitize_logprobs(map_value(provider_meta, :logprobs))
     usage = sanitize_usage(ReqLLM.Response.usage(response))
 
-    metadata = %{
+    {:resolved, charge} = resolve_openrouter_charge(model_spec, usage)
+
+    %{
       provider: provider_name(model_spec),
       model: response.model,
       api: map_value(provider_meta, :api_type),
@@ -2042,13 +2045,9 @@ defmodule Imp.Clients.ReqLLM do
       usage: usage,
       content: ReqLLM.Response.text(response) || "",
       logprobs: logprobs,
-      provider_meta: sanitize_provider_meta(provider_meta, logprobs)
+      provider_meta: sanitize_provider_meta(provider_meta, logprobs),
+      charge: charge
     }
-
-    case resolve_openrouter_charge(model_spec, usage) do
-      {:resolved, charge} -> Map.put(metadata, :charge, charge)
-      :unresolved -> metadata
-    end
   end
 
   defp provider_name(model_spec), do: model_spec |> model_identity() |> elem(0)
@@ -2087,11 +2086,6 @@ defmodule Imp.Clients.ReqLLM do
     |> Map.drop([:logprobs, "logprobs"])
     |> Map.put(:logprobs, logprobs)
   end
-
-  # `Decimal` is a value the charge guard reads whole. It is a struct, so
-  # walking it as a map raises. The guard (not a `%Decimal{}` match) keeps
-  # compilation working when the optional `:decimal` dependency is absent.
-  defp sanitize_usage_value(value) when is_struct(value, Decimal), do: value
 
   defp sanitize_usage_value(value) when is_map(value) do
     Map.new(value, fn {key, nested} ->
