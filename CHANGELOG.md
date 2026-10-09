@@ -4,6 +4,18 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Fixed
+
+- A ReqLLM call's `usage`, streamed or not, says whether `input_tokens` already
+  counts the cached prompt, as `input_includes_cached`, which ReqLLM decides
+  when it normalizes and prices the call but leaves off the response.
+  OpenAI-style usage counts cache reads inside `prompt_tokens` (`true`);
+  Anthropic-style usage counts `cache_read_input_tokens` and
+  `cache_creation_input_tokens` apart (`false`). A flag the provider usage
+  already carries is kept. The ATIF export's `prompt_tokens` for an
+  Anthropic-style call now includes its cache reads and writes, where before
+  it was only the tokens after the last cache breakpoint.
+
 ### Added
 
 - A ReActV2 call can give its own `last_request_note`, as it can its own

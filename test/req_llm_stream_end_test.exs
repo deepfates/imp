@@ -163,7 +163,9 @@ defmodule Imp.ReqLLMStreamEndTest do
   end
 
   test "usage only ReqLLM's metadata handle reported is on the done event" do
-    usage = %{input_tokens: 4, output_tokens: 2, total_tokens: 6}
+    # As ReqLLM's handle reports it: normalized, so it says how input counts
+    # the cache.
+    usage = %{input_tokens: 4, output_tokens: 2, total_tokens: 6, input_includes_cached: true}
 
     events =
       %{provider: :openai, id: "local-model", model: "local-model"}

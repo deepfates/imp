@@ -2163,7 +2163,25 @@ defmodule Imp.Clients.ReqLLM do
   defp provider_label(_model), do: nil
 
   defp sanitize_usage(nil), do: nil
-  defp sanitize_usage(usage) when is_map(usage), do: sanitize_usage_value(usage)
+
+  defp sanitize_usage(usage) when is_map(usage),
+    do: usage |> declare_cached_input() |> sanitize_usage_value()
+
+  # Providers disagree on whether `input_tokens` already counts the cached
+  # prompt: OpenAI-style usage (`prompt_tokens`, as OpenAI and OpenRouter
+  # return it) counts cache reads inside it, Anthropic-style usage
+  # (`cache_read_input_tokens`) counts them apart. A response's usage carries
+  # `cached_tokens` and `cache_creation_tokens` either way, so on their own the
+  # counts cannot say which. ReqLLM decides it when it normalizes usage and
+  # prices the call by that answer, but leaves it off the response; it is put
+  # back here, so whoever reads this usage, ATIF export included, adds cached
+  # tokens to the prompt only when the provider counted them apart. A streamed
+  # call's usage gets the same answer when the stream ends.
+  defp declare_cached_input(usage) do
+    Map.put_new_lazy(usage, :input_includes_cached, fn ->
+      ReqLLM.Usage.normalize(usage).input_includes_cached
+    end)
+  end
 
   defp sanitize_provider_meta(provider_meta, logprobs) do
     provider_meta
@@ -2401,7 +2419,8 @@ defmodule Imp.Clients.ReqLLM do
   # streamed call carries the same `estimated_cost` as a non-streamed one;
   # where both report a field, the chunks' figure stands.
   defp finish_stream(state) do
-    state = %{state | metadata: merge_handle_metadata(state.metadata, state.response)}
+    metadata = merge_handle_metadata(state.metadata, state.response)
+    state = %{state | metadata: declare_stream_cached_input(metadata)}
 
     case stream_end_error(state.metadata) do
       nil ->
@@ -2435,6 +2454,11 @@ defmodule Imp.Clients.ReqLLM do
   end
 
   defp merge_handle_metadata(metadata, _response), do: metadata
+
+  defp declare_stream_cached_input(%{usage: %{} = usage} = metadata),
+    do: %{metadata | usage: declare_cached_input(usage)}
+
+  defp declare_stream_cached_input(metadata), do: metadata
 
   defp put_handle_value(metadata, key, handle_metadata, rule) do
     case {Map.get(handle_metadata, key), rule, Map.get(metadata, key)} do
