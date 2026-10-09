@@ -4,6 +4,8 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+## 0.12.2 — 2026-10-09
+
 ### Added
 
 - A ReActV2 call can give its own `last_request_note`, as it can its own
