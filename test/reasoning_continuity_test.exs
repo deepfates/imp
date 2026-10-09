@@ -86,6 +86,80 @@ defmodule ReasoningContinuityTest do
     end
   end
 
+  # A provider can issue the same tool call ID twice in one conversation. The
+  # request must still name each call once, with its result and its signed
+  # reasoning under the same ID, or the upstream refuses every later request.
+  test "a tool call ID the provider repeated is sent once per call, with its result and reasoning" do
+    test = self()
+
+    plug = fn conn ->
+      {:ok, body, conn} = Plug.Conn.read_body(conn)
+      send(test, {:wire, JSON.decode!(body)})
+
+      Plug.Conn.send_resp(
+        conn,
+        200,
+        JSON.encode!(%{
+          "id" => "r",
+          "model" => "fixture/model",
+          "choices" => [
+            %{
+              "index" => 0,
+              "message" => %{"role" => "assistant", "content" => "done"},
+              "finish_reason" => "stop"
+            }
+          ]
+        })
+      )
+    end
+
+    step = fn name, signature ->
+      [
+        %{
+          "role" => "assistant",
+          "content" => "",
+          "tool_calls" => [%{"id" => "call_7", "name" => name, "arguments" => %{}}],
+          "reasoning_details" => [
+            %{
+              "provider" => "openrouter",
+              "format" => "fixture-v1",
+              "index" => 0,
+              "provider_data" => %{
+                "type" => "reasoning.encrypted",
+                "data" => signature,
+                "id" => "call_7"
+              }
+            }
+          ]
+        },
+        %{"role" => "tool", "content" => "#{name} ok", "tool_calls" => [%{"id" => "call_7"}]}
+      ]
+    end
+
+    messages =
+      [%{"role" => "user", "content" => "look around"}] ++
+        step.("follow", "sig-follow") ++ step.("like", "sig-like")
+
+    lm =
+      Imp.req_llm("openrouter:fixture/model",
+        api_key: "fixture",
+        cache: false,
+        req_http_options: [plug: plug, retry: false]
+      )
+
+    assert {:ok, _} = Imp.Clients.ReqLLM.generate(lm, messages, [])
+    assert_received {:wire, %{"messages" => [_user, follow, follow_result, like, like_result]}}
+
+    [%{"id" => follow_id, "function" => %{"name" => "follow"}}] = follow["tool_calls"]
+    [%{"id" => like_id, "function" => %{"name" => "like"}}] = like["tool_calls"]
+
+    assert follow_id != like_id
+    assert follow_result["tool_call_id"] == follow_id
+    assert like_result["tool_call_id"] == like_id
+    assert [%{"id" => ^follow_id, "data" => "sig-follow"}] = follow["reasoning_details"]
+    assert [%{"id" => ^like_id, "data" => "sig-like"}] = like["reasoning_details"]
+  end
+
   test "Anthropic tool history replays signed and redacted blocks once after nested JSON decoding" do
     details = [
       %ReqLLM.Message.ReasoningDetails{

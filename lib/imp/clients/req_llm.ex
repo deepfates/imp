@@ -1254,6 +1254,76 @@ defmodule Imp.Clients.ReqLLM do
       other ->
         ReqLLM.Context.user(inspect(other))
     end)
+    |> unique_tool_call_ids()
+  end
+
+  # A tool result names its call by ID, so the IDs in one request must be
+  # unique. A provider issues them, and can issue the same one twice in a long
+  # conversation (seen from OpenRouter with Google models, whose upstream then
+  # refuses every later request with 400 INVALID_ARGUMENT). A repeated call is
+  # sent under a fresh ID, and so are its results and the reasoning details
+  # that name it (OpenRouter ties a call's signature to it by that ID). The
+  # stored history and the text the model reads are unchanged.
+  defp unique_tool_call_ids(messages) do
+    {messages, _acc} = Enum.map_reduce(messages, {MapSet.new(), %{}}, &unique_ids/2)
+    messages
+  end
+
+  defp unique_ids(%ReqLLM.Message{role: :assistant, tool_calls: [_ | _]} = message, {seen, _}) do
+    {calls, {seen, sent_as}} =
+      Enum.map_reduce(message.tool_calls, {seen, %{}}, fn call, {seen, sent_as} ->
+        id = if MapSet.member?(seen, call.id), do: fresh_id(call.id, seen, 2), else: call.id
+
+        {%{call | id: id},
+         {MapSet.put(seen, id), Map.update(sent_as, call.id, [id], &(&1 ++ [id]))}}
+      end)
+
+    details =
+      case message.reasoning_details do
+        details when is_list(details) -> Enum.map(details, &rename_detail(&1, sent_as))
+        other -> other
+      end
+
+    {%{message | tool_calls: calls, reasoning_details: details}, {seen, sent_as}}
+  end
+
+  # Results follow their calls; each takes the next ID its call was sent as.
+  defp unique_ids(%ReqLLM.Message{role: :tool, tool_call_id: id} = message, {seen, sent_as}) do
+    case Map.get(sent_as, id) do
+      [sent | rest] when rest != [] ->
+        {%{message | tool_call_id: sent}, {seen, Map.put(sent_as, id, rest)}}
+
+      [sent] ->
+        {%{message | tool_call_id: sent}, {seen, sent_as}}
+
+      _ ->
+        {message, {seen, sent_as}}
+    end
+  end
+
+  defp unique_ids(message, acc), do: {message, acc}
+
+  defp fresh_id(id, seen, n) do
+    candidate = "#{id}_#{n}"
+    if MapSet.member?(seen, candidate), do: fresh_id(id, seen, n + 1), else: candidate
+  end
+
+  defp rename_detail(
+         %ReqLLM.Message.ReasoningDetails{provider_data: %{"id" => id} = data} = detail,
+         sent_as
+       ),
+       do: %{detail | provider_data: %{data | "id" => sent_id(sent_as, id)}}
+
+  defp rename_detail(%{"id" => id} = raw_detail, sent_as),
+    do: %{raw_detail | "id" => sent_id(sent_as, id)}
+
+  defp rename_detail(detail, _sent_as), do: detail
+
+  defp sent_id(sent_as, id) do
+    case Map.get(sent_as, id) do
+      [sent | _] -> sent
+      _ -> id
+    end
   end
 
   defp preserve_reasoning(%ReqLLM.Message{role: :assistant} = message, source) do
