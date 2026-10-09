@@ -60,6 +60,25 @@ defmodule ReActV2PlainTextAnswerTest do
                "        The available tools are: `look`."
   end
 
+  test "a host sets the agent line through adapter options, or omits it" do
+    custom =
+      Imp.react("intent -> answer", [look()],
+        lm: lm("ok"),
+        adapter_opts: [agent_line: "Help the user."]
+      )
+
+    assert {:ok, _prediction} = Imp.call(custom, %{intent: "hello"})
+    system = system_message()
+    assert system =~ "`answer`.\n        Help the user.\n        The outputs to produce are:"
+    refute system =~ "You are an Agent"
+
+    omitted =
+      Imp.react("intent -> answer", [look()], lm: lm("ok"), adapter_opts: [agent_line: nil])
+
+    assert {:ok, _prediction} = Imp.call(omitted, %{intent: "hello"})
+    assert system_message() =~ "`answer`.\n        The outputs to produce are:"
+  end
+
   test "a final message with no markers is the answer" do
     program = Imp.react("intent -> answer", [look()], lm: lm("It is a cat."))
     assert {:ok, prediction} = Imp.call(program, %{intent: "what is it?"})
