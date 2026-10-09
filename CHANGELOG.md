@@ -4,6 +4,18 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Added
+
+- A ReActV2 call can give its own `last_request_note`, as it can its own
+  `max_iters`: either key beside the inputs replaces the program's value for
+  that call. With a `:history` and `max_iters: 0`, the call makes one
+  request: the loop's system message, tools and history, then the note. No
+  tool runs and the reply's text is the answer. A host can use it to ask a
+  model about a conversation it has had, as the model saw it, for example
+  to summarise it. A note that is not a string or `nil` is refused with
+  `{:error, {:invalid_react_v2_last_request_note, value}}` before any model
+  call. Programs and calls that do not pass the key are unchanged.
+
 ## 0.12.1 — 2026-10-09
 
 ### Added

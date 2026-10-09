@@ -252,6 +252,31 @@ text instead of making it, and that text was the answer. When an
 answer has to follow a tool call, give the signature a second output, so the
 turn ends only through `submit`, or end it from the tool with `finish_on:`.
 
+### One more request on a history you hold
+
+A call can give its own `max_iters` and `last_request_note` beside its
+inputs. With a history, `max_iters: 0` and a note, the call makes one
+request, the last one: the loop's system message, its tools and the history
+as the model saw them, then the note. No tool runs, and the text the model
+writes is the answer. Codex CLI and Anthropic's SDK build a request to
+summarise a conversation the same way: the conversation's own messages, then
+one instruction.
+
+```elixir
+lm = script.([%{reply: "Maya from atlas has the duplicate charge.", tool_calls: []}])
+reply = Imp.react(Imp.signature("ticket -> reply"), [on_call], lm: lm)
+
+{:ok, summary} =
+  Imp.call(reply, %{
+    history: prediction.metadata.history,
+    max_iters: 0,
+    last_request_note: "Summarise this ticket for the next shift."
+  })
+
+{Imp.get(summary, :reply), summary.metadata.termination_reason}
+#=> {"Maya from atlas has the duplicate charge.", :last_text}
+```
+
 ### Ending the turn from a tool
 
 `finish_on:` maps a tool name to a function of the call's arguments, its
