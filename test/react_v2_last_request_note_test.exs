@@ -224,6 +224,76 @@ defmodule ReActV2LastRequestNoteTest do
     end
   end
 
+  # A host holding a conversation asks one more thing of it: the conversation's
+  # own messages, the loop's tools, then the note. One request, and no tool runs.
+  test "a call's own note with max_iters 0 continues a history with one request" do
+    owner = self()
+    ran = :counters.new(1, [])
+    look = Imp.tool(:look, "Look at a thing", fn _ -> :counters.add(ran, 1, 1) && "seen" end)
+
+    lm =
+      Imp.LM.Static.new(
+        handler: fn messages, opts ->
+          send(owner, {:request, messages, opts})
+          # Asked to summarise, the model reaches for a tool anyway, and says so.
+          %{
+            answer: "I looked at the box.",
+            tool_calls: [%{id: "x", name: "look", arguments: %{}}]
+          }
+        end
+      )
+
+    program = Imp.react("intent -> answer", [look], lm: lm, last_request_note: "Last action.")
+
+    history =
+      Imp.History.new([
+        %{
+          intent: "what is in the box?",
+          next_thought: "",
+          tool_calls: %{tool_calls: [%{id: "c", name: "look", arguments: %{}}]},
+          tool_call_results: [%{id: "c", name: "look", result: "a cat"}]
+        }
+      ])
+
+    note = "Summarise this conversation."
+
+    assert {:ok, prediction} =
+             Imp.call(program, %{history: history, max_iters: 0, last_request_note: note})
+
+    assert Imp.get(prediction, :answer) == "I looked at the box."
+    assert prediction.metadata.termination_reason == :last_text
+    assert [%{name: "look"}] = prediction.metadata.unexecuted_tool_calls
+    assert :counters.get(ran, 1) == 0
+
+    assert_received {:request, messages, opts}
+    refute_received {:request, _, _}
+
+    # The loop's own tools, offered as on every step.
+    assert opts[:tool_choice] == "auto"
+    assert [_look] = opts[:tools]
+
+    # The conversation as the model saw it, the call's note last, and not the
+    # program's own.
+    assert [:system, :user, :assistant, :tool, :user] == Enum.map(messages, & &1.role)
+    assert Enum.at(messages, 3).content =~ "a cat"
+    assert List.last(messages).content =~ note
+    refute Enum.any?(messages, &(to_string(&1.content) =~ "Last action."))
+  end
+
+  test "a call's note is a string or nil, refused before the model is called" do
+    owner = self()
+    program = Imp.react("intent -> answer", [look()], lm: recording_lm(owner))
+
+    for bad <- [7, %{text: "no"}] do
+      for key <- [:last_request_note, "last_request_note"] do
+        assert {:error, {:invalid_react_v2_last_request_note, ^bad}} =
+                 Imp.call(program, %{key => bad, intent: "hello"})
+      end
+    end
+
+    refute_received {:request, _, _, _}
+  end
+
   test "the option takes a string or nil and nothing else" do
     for bad <- [fn _reason -> "no" end, 7] do
       assert_raise ArgumentError, ~r/last_request_note/, fn ->

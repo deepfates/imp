@@ -124,6 +124,24 @@ defmodule Imp.Predict.ReActV2 do
   that user message alone, with no assistant reply after it, in the request and
   whenever the history is passed back. Imp writes no sentence of its own.
 
+  ## Per-call options
+
+  A call may give `max_iters` and `last_request_note` beside its inputs,
+  under atom or string keys. Each replaces the program's own for that call
+  and is not an input field. `max_iters` is a non-negative integer and
+  `last_request_note` a string or `nil`; any other value is refused before a
+  model is called.
+
+  Together they continue a conversation the caller holds. A call with a
+  `:history`, `max_iters: 0` and a note makes one request, the last request:
+  the loop's own system message, tools and history, then the note, with
+  `tool_choice: "auto"`. No tool runs, and the reply's text is the answer
+  (`termination_reason: :last_text`). This is how a host asks a model about
+  a conversation it has had, as that model saw it, for instance for a summary
+  of it before the history is shortened. Codex CLI and Anthropic's SDK
+  compaction build that request the same way: the conversation's own
+  messages, then one instruction.
+
   A request refused because the context window is full is not an
   interruption of this kind: a further request would be refused the same way,
   so the turn ends at once as `:incomplete` with `termination_cause:
@@ -498,7 +516,11 @@ defmodule Imp.Predict.ReActV2 do
     with {:ok, inputs} <- normalize_inputs(inputs),
          {max_iters, inputs} <- pop_max_iters(inputs, react.max_iters),
          :ok <- validate_call_max_iters(max_iters),
+         {note, inputs} <- pop_call_option(inputs, :last_request_note, react.last_request_note),
+         :ok <- validate_call_note(note),
          {:ok, history} <- coerce_history(Map.get(inputs, :history, Map.get(inputs, "history"))) do
+      react = %{react | last_request_note: note}
+
       # ReActV2 filters inputs down to signature names before any Predict call,
       # so extra keys would vanish silently here; warn at this boundary the same
       # way Imp.Predict does (:history is a documented call-time key).
@@ -1611,16 +1633,23 @@ defmodule Imp.Predict.ReActV2 do
 
   defp normalize_inputs(inputs), do: {:ok, Map.new(inputs)}
 
-  defp pop_max_iters(inputs, default) do
-    max_iters =
+  defp pop_max_iters(inputs, default), do: pop_call_option(inputs, :max_iters, default)
+
+  # A call-time option is read under its atom or its string name and taken out
+  # of the inputs, so it never reaches the step's fields.
+  defp pop_call_option(inputs, key, default) do
+    value =
       cond do
-        Map.has_key?(inputs, :max_iters) -> Map.fetch!(inputs, :max_iters)
-        Map.has_key?(inputs, "max_iters") -> Map.fetch!(inputs, "max_iters")
+        Map.has_key?(inputs, key) -> Map.fetch!(inputs, key)
+        Map.has_key?(inputs, to_string(key)) -> Map.fetch!(inputs, to_string(key))
         true -> default
       end
 
-    {max_iters, Map.drop(inputs, [:max_iters, "max_iters"])}
+    {value, Map.drop(inputs, [key, to_string(key)])}
   end
+
+  defp validate_call_note(note) when is_binary(note) or is_nil(note), do: :ok
+  defp validate_call_note(note), do: {:error, {:invalid_react_v2_last_request_note, note}}
 
   defp validate_call_max_iters(max_iters) when is_integer(max_iters) and max_iters >= 0, do: :ok
 
