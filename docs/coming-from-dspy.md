@@ -87,7 +87,7 @@ error row too. Each model request has a receive timeout, and
 has no time limit of its own (an MCP tool call does, 30 seconds by default),
 so to bound an agent, start it with `Imp.start_run/3` and cancel it when you
 choose. The
-[deployment example](https://github.com/deepfates/imp/blob/v0.12.1/examples/deployment/README.md)
+[deployment example](https://github.com/deepfates/imp/blob/v0.12.2/examples/deployment/README.md)
 is a complete OTP application.
 
 **Optimizers see what you name.** DSPy finds predictors by walking a module's

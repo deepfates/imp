@@ -1,12 +1,11 @@
-# Imp v0.12.1
+# Imp v0.12.2
 
 Imp is a framework for typed, optimizable language-model programs on the BEAM.
-This release lets a conversation continue when a provider repeats a tool call
-ID, and lets a host set or remove the "You are an Agent..." line in a tool
-loop's guidance. Neither changes what an existing caller receives: the ID fix
-changes only the request sent to the provider, and the new option leaves
-prompts byte-for-byte the same when it is not given. Under Imp's versioning
-rule this is a patch release.
+This release lets a ReActV2 call give its own `last_request_note`, as it can
+its own `max_iters`. With a history and `max_iters: 0`, a host can ask a model
+about a conversation it has had, as the model saw it. Calls that do not pass
+the key are unchanged, so nothing an existing caller receives changes. Under
+Imp's versioning rule this is a patch release.
 
 ## Install
 
@@ -28,27 +27,25 @@ in its release definition; see [releases that use MCP or
 ACP](docs/production.md#releases-that-use-mcp-or-acp).
 Ordinary Imp startup starts no protocol endpoint.
 
-## Changes and upgrading from 0.12.0
+## Changes and upgrading from 0.12.1
 
 Under `{:imp, "~> 0.12.0"}`, run `mix deps.update imp` and commit `mix.lock`.
-No code or data migration is needed.
+No code or data migration is needed. A caller that passes the new key should
+require `{:imp, "~> 0.12.2"}`, since earlier 0.12 releases do not read it.
 
-- **A request names each tool call once.** A provider can return the same
-  tool call ID for two calls in one conversation (seen from OpenRouter with a
-  Google model). The upstream then refused every later request that replayed
-  both with 400 `INVALID_ARGUMENT`, so the conversation could not continue.
-  `Imp.Clients.ReqLLM` now sends a repeated call under a fresh ID (`<id>_2`,
-  ...), and gives its results and the reasoning details that name it the same
-  ID. Stored histories and the text the model reads are unchanged.
-- **Added:** `Imp.Adapter.Chat`, and the JSON and XML adapters that share its
-  objective, take an `:agent_line` option: a string replaces the guidance's
-  "You are an Agent..." line and `nil` leaves it out. With `Imp.react/3`, pass
-  it as `adapter_opts: [agent_line: ...]`. Without it the line is unchanged.
+- **Added:** an `Imp.Predict.ReActV2` call can pass `last_request_note` beside
+  its inputs, as it can `max_iters`; either key replaces the program's value
+  for that call. With a `:history` and `max_iters: 0`, the call makes one
+  request: the loop's system message, tools and history, then the note. No
+  tool runs and the reply's text is the answer. A note that is not a string
+  or `nil` is refused with
+  `{:error, {:invalid_react_v2_last_request_note, value}}` before any model
+  call.
 
-Rollback means restoring `0.12.0` in the lock; a conversation with a repeated
-tool call ID then fails again at the provider. A provider-free test replays a
-conversation with a repeated ID and checks the IDs in the request; this
-release does not establish which providers repeat IDs, or how often.
+Rollback means restoring `0.12.1` in the lock; a call that passes
+`last_request_note` then gets the program's note instead. Provider-free tests
+check the request such a call sends and the refusal of a bad note; this
+release does not establish how well any model summarises from that request.
 See the [changelog](CHANGELOG.md) for every change.
 
 ## Known limits
