@@ -168,7 +168,9 @@ defmodule Imp.StreamedRunRecordTest do
   defp calls(names),
     do: Enum.map(names, &%{id: "call_#{&1}", name: to_string(&1), arguments: %{}})
 
-  defp steps(prediction), do: prediction.metadata.history.messages
+  # When each result came back differs between the two runs by construction.
+  defp steps(prediction),
+    do: Enum.map(prediction.metadata.history.messages, &Imp.History.without_return_times/1)
 
   defp tool_calls(events),
     do:

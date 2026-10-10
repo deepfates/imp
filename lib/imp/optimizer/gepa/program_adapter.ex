@@ -532,7 +532,15 @@ defmodule Imp.Optimizer.GEPA.ProgramAdapter do
     do: module.to_iso8601(value)
 
   defp plain(%_{} = struct), do: struct
-  defp plain(map) when is_map(map), do: Map.new(map, fn {key, value} -> {key, plain(value)} end)
+
+  # When each tool result came back is a fact of one run, not of the
+  # program, so the reflection model is not shown it.
+  defp plain(map) when is_map(map),
+    do:
+      map
+      |> Imp.History.without_return_times()
+      |> Map.new(fn {key, value} -> {key, plain(value)} end)
+
   defp plain(list) when is_list(list), do: Enum.map(list, &plain/1)
   defp plain(value), do: value
 

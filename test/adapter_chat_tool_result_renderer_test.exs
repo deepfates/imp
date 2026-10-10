@@ -56,6 +56,27 @@ defmodule Imp.Adapter.ChatToolResultRendererTest do
     assert recorded == big()
   end
 
+  test "the renderer is told when the result came back, and history keeps it" do
+    owner = self()
+    look = Imp.tool(:look, "Look", fn _ -> "seen" end)
+    before = DateTime.utc_now()
+
+    program =
+      Imp.react("intent -> answer", [look],
+        lm: recording_lm(owner),
+        adapter_opts: [tool_result_renderer: fn _result, call -> "at #{call[:returned_at]}" end]
+      )
+
+    assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
+    assert ["at " <> at] = tool_contents(request(2))
+    assert {:ok, returned, 0} = DateTime.from_iso8601(at)
+    assert DateTime.compare(returned, before) != :lt
+    assert DateTime.compare(returned, DateTime.utc_now()) != :gt
+
+    [turn | _] = Imp.History.messages(prediction.metadata[:history])
+    assert [%{returned_at: ^at}] = turn.tool_call_results
+  end
+
   test "the default renderer is today's prose" do
     owner = self()
     look = Imp.tool(:look, "Look", fn _ -> "seen" end)
