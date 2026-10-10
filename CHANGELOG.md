@@ -10,9 +10,9 @@ User-visible changes to Imp are recorded here.
   what the server wrote in `content` for a model, its text, or its text and
   typed images as `:multimodal` returns them. Where that text only repeats
   `structuredContent` as JSON, or there is no content, it returns
-  `structuredContent` as `:multimodal` does. MCP's `content` is what a client
-  shows a model and `structuredContent` what a program validates; a server
-  that writes its text for a model is now read as it wrote it. `Imp.MCP.call(tool, arguments,
+  `structuredContent` as `:multimodal` does. A server that writes its text
+  for a model and keeps every field in `structuredContent` for programs, as
+  the MCP specification's own examples do, is now read as it wrote it. `Imp.MCP.call(tool, arguments,
   result_mode: :structured)` calls the same tool with its result read in
   another mode, for a host that reads a field of the structured result itself.
   Existing modes are unchanged.

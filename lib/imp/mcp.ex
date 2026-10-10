@@ -23,10 +23,10 @@ defmodule Imp.MCP do
   is left out, because the spec asks a server to repeat it as a text block.
   `result_mode: :content` returns what the server wrote in `content` for a
   model, the way `:multimodal` does for an image-bearing result: its text, as
-  `:text` returns it, or its text and typed images. MCP's `content` is what a
-  client puts in front of a model and `structuredContent` what a program
-  validates against the tool's `outputSchema`, so a server that writes its
-  text for a model is read as it wrote it. Where the text only repeats the
+  `:text` returns it, or its text and typed images. A server may write that
+  text for a model and keep every field in `structuredContent` for programs,
+  which validate it against the tool's `outputSchema`, as the specification's
+  own examples do; such a server is read as it wrote it. Where the text only repeats the
   structured content as JSON, which the specification asks of a server for
   older clients, or there is no content, the result is `structuredContent`,
   as `:multimodal` returns it. A host that reads a field of a structured
