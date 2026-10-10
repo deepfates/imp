@@ -854,6 +854,33 @@ defmodule Imp.MCP.Connections do
         schema = stringify_keys(schema)
         name = Map.get(schema, "name")
 
+        # One call, in any result mode: the tool's own runs read results in the
+        # mode it was imported with, and `Imp.MCP.call/3` in the mode its caller
+        # names.
+        call = fn
+          arguments, mode when not pooled? ->
+            call_tool(
+              client,
+              index,
+              name,
+              arguments,
+              server,
+              Keyword.put(opts, :result_mode, mode)
+            )
+
+          arguments, mode ->
+            borrowed_call(
+              bridge,
+              index,
+              name,
+              arguments,
+              server,
+              Keyword.put(opts, :result_mode, mode)
+            )
+        end
+
+        mode = result_mode(opts)
+
         schema =
           Map.put(schema, "metadata", %{
             mcp: %{
@@ -862,16 +889,12 @@ defmodule Imp.MCP.Connections do
               tool_name: name,
               schema: Map.drop(schema, ["run", "metadata"]),
               annotations: Map.get(schema, "annotations", %{})
-            }
+            },
+            # Not provenance, which is data: the function `Imp.MCP.call/3` calls.
+            mcp_call: call
           })
 
-        Map.put(schema, "run", fn
-          arguments when not pooled? ->
-            call_tool(client, index, name, arguments, server, opts)
-
-          arguments ->
-            borrowed_call(bridge, index, name, arguments, server, opts)
-        end)
+        Map.put(schema, "run", fn arguments -> call.(arguments, mode) end)
       end)
 
     {:ok, Enum.map(schemas, &{server, &1})}
@@ -1556,8 +1579,8 @@ defmodule Imp.MCP.Connections do
       raise ArgumentError, ":reserved_tool_names must be a list of atom or string names"
     end
 
-    unless result_mode(opts) in [:text, :structured, :multimodal] do
-      raise ArgumentError, ":result_mode must be :text, :structured or :multimodal"
+    unless result_mode(opts) in Imp.MCP.result_modes() do
+      raise ArgumentError, ":result_mode must be one of #{inspect(Imp.MCP.result_modes())}"
     end
 
     unless Keyword.get(opts, :on_failure, :refuse) in [:refuse, :drop] do
