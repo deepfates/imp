@@ -89,7 +89,9 @@ defmodule Imp.Adapter.Chat do
     # and build on the default. Replacing it leaves parsing unchanged.
     system_renderer: [type: {:fun, 2}],
     # Renderer for one TOOL result message: (result, call), where call is
-    # `%{id:, name:}` for the call that produced it. Default:
+    # `%{id:, name:, returned_at:}` for the call that produced it;
+    # `returned_at` is when the result came back, as ISO 8601 UTC, when the
+    # loop recorded it (ReActV2 does), else nil. Default:
     # `format_tool_content/1`. Return text or a list of text and typed Images.
     # This is where a host bounds what the model reads
     # of a large result: the loop still records the whole result in history and
@@ -1373,7 +1375,7 @@ defmodule Imp.Adapter.Chat do
               id = fetch_field(result, :id)
               name = result |> fetch_field(:name) |> blank_to_empty()
 
-              call = %{id: id, name: name}
+              call = %{id: id, name: name, returned_at: fetch_field(result, :returned_at)}
               content = renderers.tool_result.(fetch_field(result, :result), call)
               {text, images} = tool_content_messages(content, call)
               {%{"name" => name, "result" => text}, images}
@@ -1489,7 +1491,12 @@ defmodule Imp.Adapter.Chat do
     rendered_results =
       Enum.map(results, fn result ->
         id = fetch_field(result, :id)
-        call = %{id: id, name: result |> fetch_field(:name) |> blank_to_empty()}
+
+        call = %{
+          id: id,
+          name: result |> fetch_field(:name) |> blank_to_empty(),
+          returned_at: fetch_field(result, :returned_at)
+        }
 
         content = tool_result_renderer.(fetch_field(result, :result), call)
         {text, images} = tool_content_messages(content, call)

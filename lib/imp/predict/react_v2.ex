@@ -3,7 +3,11 @@ defmodule Imp.Predict.ReActV2 do
   Native-tool-aware ReAct loop with structured history and typed completion.
 
   ReActV2 preserves parallel tool call IDs and results in `Imp.History` and
-  keeps unknown and failed tool calls as observations.
+  keeps unknown and failed tool calls as observations. Each recorded result
+  carries `returned_at`, when it came back (ISO 8601, UTC), which the Chat
+  adapter passes to a `:tool_result_renderer` with the call. Nothing shows it
+  by default; a host that wants the model to know the time during a turn
+  renders it there.
 
   ## Which signatures get `submit`
 
@@ -1285,8 +1289,16 @@ defmodule Imp.Predict.ReActV2 do
               do: result.result,
               else: final
 
-          {:cont,
-           {results ++ [Map.put(Map.from_struct(result), :error, error?)], final, finished_by}}
+          # When the result came back is recorded with it, as a fact of the
+          # history: a renderer that shows it reads the same bytes on every
+          # later request.
+          recorded =
+            result
+            |> Map.from_struct()
+            |> Map.put(:error, error?)
+            |> Map.put(:returned_at, DateTime.utc_now() |> DateTime.to_iso8601())
+
+          {:cont, {results ++ [recorded], final, finished_by}}
       end
     end)
   end

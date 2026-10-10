@@ -132,9 +132,12 @@ defmodule Imp.Optimizer.GEPA.InstructionProposal do
   defp maybe_trim_upstream_template(prompt, _mode), do: prompt
 
   # A struct is not a map of headings: a history renders as its turns, a date
-  # as its ISO 8601 text, anything else as its complete inspected term.
+  # as its ISO 8601 text, anything else as its complete inspected term. When
+  # each tool result came back (`returned_at`) is a fact of one run, not of
+  # the program, so the reflection model is not shown it: the same
+  # trajectories make the same prompt, in a resumed run too.
   defp render_value(%Imp.History{messages: messages}, level, _order),
-    do: render_value(messages, level, [])
+    do: render_value(Enum.map(messages, &Imp.History.without_return_times/1), level, [])
 
   defp render_value(%module{} = value, _level, _order)
        when module in [Date, Time, DateTime, NaiveDateTime],

@@ -4,6 +4,19 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Added
+
+- ReActV2 records when each tool result came back, as `returned_at` (ISO 8601,
+  UTC) beside the result in the history, and the Chat adapter passes it to a
+  `:tool_result_renderer` in the call map (`%{id:, name:, returned_at:}`;
+  nil for a result recorded without it). A host can tell the model the time
+  during a tool loop, the way some agent frameworks stamp each tool result,
+  and the stamp is the same on every later request, so a cached prompt
+  prefix survives. The default rendering is unchanged.
+  `Imp.History.without_return_times/1` gives a turn without those times; GEPA
+  leaves them out of what its reflection model reads, so the same trajectories
+  make the same reflection prompt in any run, a resumed one included.
+
 ## 0.12.3 — 2026-10-10
 
 ### Added

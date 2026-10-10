@@ -506,11 +506,27 @@ defmodule Imp.Optimizer.GEPA.ParallelProposalTest do
 
   defp receive_evaluations(acc) do
     receive do
-      {:evaluation_end, evaluation} -> receive_evaluations([evaluation | acc])
+      {:evaluation_end, evaluation} -> receive_evaluations([untimed(evaluation) | acc])
     after
       0 -> Enum.reverse(acc)
     end
   end
+
+  # When each tool result came back differs between two runs of the same
+  # trajectory by construction.
+  defp untimed(%{__struct__: module} = struct),
+    do: struct |> Map.from_struct() |> untimed() |> then(&struct(module, &1))
+
+  defp untimed(%{} = map),
+    do:
+      map |> Map.drop([:returned_at, "returned_at"]) |> Map.new(fn {k, v} -> {k, untimed(v)} end)
+
+  defp untimed(list) when is_list(list), do: Enum.map(list, &untimed/1)
+
+  defp untimed(tuple) when is_tuple(tuple),
+    do: tuple |> Tuple.to_list() |> untimed() |> List.to_tuple()
+
+  defp untimed(value), do: value
 
   defp program(:predict), do: predict_program()
 

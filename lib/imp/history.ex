@@ -53,6 +53,34 @@ defmodule Imp.History do
   @doc "Returns the signature-shaped field maps in insertion order."
   def messages(%__MODULE__{messages: messages}), do: messages
 
+  @doc """
+  One turn without the time each of its tool results came back
+  (`returned_at`, recorded by `Imp.Predict.ReActV2`). That time is a fact of
+  one run rather than of the program, so what is built from a trajectory for
+  another model to read, such as an optimizer's reflection prompt, leaves it
+  out and reads the same for the same trajectory in any run. Any other value
+  is returned as it is.
+  """
+  @spec without_return_times(term()) :: term()
+  def without_return_times(%{} = turn) when not is_struct(turn) do
+    Enum.reduce([:tool_call_results, "tool_call_results"], turn, fn key, turn ->
+      case Map.get(turn, key) do
+        results when is_list(results) ->
+          Map.put(turn, key, Enum.map(results, &without_return_time/1))
+
+        _other ->
+          turn
+      end
+    end)
+  end
+
+  def without_return_times(other), do: other
+
+  defp without_return_time(%{} = result) when not is_struct(result),
+    do: Map.drop(result, [:returned_at, "returned_at"])
+
+  defp without_return_time(result), do: result
+
   @doc "Redacts secret-looking values while preserving history structure."
   def redact(%__MODULE__{messages: messages} = history, keys \\ Imp.Redaction.default_keys()) do
     %{history | messages: Imp.Redaction.redact(messages, keys)}
