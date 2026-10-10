@@ -4,6 +4,8 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+## 0.12.3 — 2026-10-10
+
 ### Added
 
 - `Imp.MCP.connect(..., result_mode: :content)`: an imported tool returns

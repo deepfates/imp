@@ -5,7 +5,7 @@ where its credentials come from, how long a call may take and what it may
 cost. This page covers those decisions in the order you meet them: starting
 Imp, credentials, concurrency, timeouts, cost and caching, persistence and
 telemetry. The
-[deployment example](https://github.com/deepfates/imp/tree/v0.12.2/examples/deployment)
+[deployment example](https://github.com/deepfates/imp/tree/v0.12.3/examples/deployment)
 is a complete OTP application that puts them together.
 
 ## Imp in your supervision tree
@@ -263,7 +263,7 @@ standard error.
 
 ## The reference application
 
-[`examples/deployment`](https://github.com/deepfates/imp/tree/v0.12.2/examples/deployment)
+[`examples/deployment`](https://github.com/deepfates/imp/tree/v0.12.3/examples/deployment)
 is a small OTP application that loads a checksummed artifact at startup, reads
 its key from the environment, serves calls from bounded supervised tasks,
 answers overload and timeouts with errors instead of blocking, and reloads
