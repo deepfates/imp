@@ -1,11 +1,14 @@
-# Imp v0.12.2
+# Imp v0.12.3
 
 Imp is a framework for typed, optimizable language-model programs on the BEAM.
-This release lets a ReActV2 call give its own `last_request_note`, as it can
-its own `max_iters`. With a history and `max_iters: 0`, a host can ask a model
-about a conversation it has had, as the model saw it. Calls that do not pass
-the key are unchanged, so nothing an existing caller receives changes. Under
-Imp's versioning rule this is a patch release.
+This release adds three things a caller opts into. An MCP tool can return
+the text its server wrote for a model while a host still reads its structured
+result (`result_mode: :content`, `Imp.MCP.call/3`). A ReActV2 call can give
+its own request options (`config`). A ReActV2 text answer says why the
+provider stopped its reply (`:finish_reason`). Calls and connections that do
+not use the new options send and receive what they did in 0.12.2, apart from
+one new metadata key on such predictions. Under Imp's versioning rule this is
+a patch release.
 
 ## Install
 
@@ -27,25 +30,40 @@ in its release definition; see [releases that use MCP or
 ACP](docs/production.md#releases-that-use-mcp-or-acp).
 Ordinary Imp startup starts no protocol endpoint.
 
-## Changes and upgrading from 0.12.1
+## Changes and upgrading from 0.12.2
 
 Under `{:imp, "~> 0.12.0"}`, run `mix deps.update imp` and commit `mix.lock`.
-No code or data migration is needed. A caller that passes the new key should
-require `{:imp, "~> 0.12.2"}`, since earlier 0.12 releases do not read it.
+No code or data migration is needed. A caller that uses any of the additions
+below should require `{:imp, "~> 0.12.3"}`, since earlier 0.12 releases do not
+have them.
 
-- **Added:** an `Imp.Predict.ReActV2` call can pass `last_request_note` beside
-  its inputs, as it can `max_iters`; either key replaces the program's value
-  for that call. With a `:history` and `max_iters: 0`, the call makes one
-  request: the loop's system message, tools and history, then the note. No
-  tool runs and the reply's text is the answer. A note that is not a string
-  or `nil` is refused with
-  `{:error, {:invalid_react_v2_last_request_note, value}}` before any model
-  call.
+- **Added:** `Imp.MCP.connect(..., result_mode: :content)`. An imported tool
+  returns what the server wrote in `content` for a model: its text, or its
+  text and typed images as `:multimodal` returns them. Where that text only
+  repeats `structuredContent` as JSON, or there is no content, it returns
+  `structuredContent`, as `:multimodal` does. `Imp.MCP.call(tool, arguments,
+  result_mode: :structured)` calls the same tool with its result read in
+  another mode. Existing modes are unchanged.
+- **Added:** an `Imp.Predict.ReActV2` call can pass `config` beside its
+  inputs, as it can `max_iters` and `last_request_note`: request options
+  merged over the program's `:config` for every request of that call only,
+  such as an output budget for one last request on a history. A value that is
+  not a keyword list, or that names `:tools` or `:tool_choice`, is refused with
+  `{:error, {:invalid_react_v2_config, value}}` before any model call.
+- **Added:** a ReActV2 prediction whose answer is a reply's text
+  (`termination_reason: :answered` or `:last_text`) carries that reply's
+  `:finish_reason` in its metadata, as the LM client reports it (`:stop`,
+  `:length`, ...). `:length` means the provider's output limit cut the answer
+  short. The termination itself is unchanged: a cut answer is still the text.
 
-Rollback means restoring `0.12.1` in the lock; a call that passes
-`last_request_note` then gets the program's note instead. Provider-free tests
-check the request such a call sends and the refusal of a bad note; this
-release does not establish how well any model summarises from that request.
+Rollback means restoring `0.12.2` in the lock. A call that passes `config`
+then has it read as an extra input and ignored, with a warning; a caller that
+reads `:finish_reason` finds it absent; `result_mode: :content` is refused at
+connect. Provider-free tests check the request options a call sends, the
+refusal of a bad `config`, the finish reason on both kinds of text answer, and
+an HTTP MCP server read in `:content` and `:structured` modes; this release
+does not establish what any particular provider reports as a finish reason
+beyond what its LM client passes through.
 See the [changelog](CHANGELOG.md) for every change.
 
 ## Known limits

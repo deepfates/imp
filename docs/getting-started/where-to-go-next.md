@@ -51,7 +51,7 @@ The module documentation is the reference for every function.
 [Running Imp in production](../production.md) covers what the last page began:
 supervision, provider failures, runs you can observe and cancel, and
 telemetry. The
-[deployment example](https://github.com/deepfates/imp/blob/v0.12.2/examples/deployment/README.md)
+[deployment example](https://github.com/deepfates/imp/blob/v0.12.3/examples/deployment/README.md)
 is a complete application to copy from.
 
 ## Try it in a notebook
