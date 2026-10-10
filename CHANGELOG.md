@@ -16,6 +16,17 @@ User-visible changes to Imp are recorded here.
   result_mode: :structured)` calls the same tool with its result read in
   another mode, for a host that reads a field of the structured result itself.
   Existing modes are unchanged.
+- A ReActV2 call can give its own request options as `config` beside its
+  inputs, as it can its own `max_iters` and `last_request_note`. They are
+  merged over the program's `:config` for every request of that call only,
+  for example an output budget for one last request on a history. A value
+  that is not a keyword list, or that names `:tools` or `:tool_choice`, is
+  refused with `{:error, {:invalid_react_v2_config, value}}` before any model
+  call.
+- A ReActV2 prediction whose answer is a reply's text (`:answered`,
+  `:last_text`) carries that reply's `:finish_reason` in its metadata, as the
+  LM client reports it. `:length` means the provider's output limit cut the
+  answer short.
 
 ## 0.12.2 — 2026-10-09
 
