@@ -68,7 +68,14 @@ defmodule Imp.NormalizedLMRuntimeTest do
 
     {{:ok, response}, usage} = Imp.Usage.track(fn -> Imp.LM.request(lm, request) end)
     assert response.outputs == ["pong"]
-    assert response.usage == %{input_tokens: 3, output_tokens: 2, total_tokens: 5}
+
+    assert response.usage == %{
+             input_tokens: 3,
+             output_tokens: 2,
+             total_tokens: 5,
+             input_includes_cached: true
+           }
+
     assert response.raw.__imp_lm_output__ == "pong"
     assert usage == %{"openai/openai:gpt-test" => response.usage}
 
