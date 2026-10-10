@@ -79,11 +79,76 @@ defmodule ReasoningContinuityTest do
       assert_received {:native_messages, [%ReqLLM.Message{} = message]}
       assert message.reasoning_details == [detail]
 
-      assert [
-               %ReqLLM.Message.ContentPart{type: :thinking, text: "native plan"},
-               %ReqLLM.Message.ContentPart{type: :text, text: "visible answer"}
-             ] = message.content
+      # The reasoning goes back in its details only (OpenRouter takes one or
+      # the other), so no thinking part repeats it.
+      assert [%ReqLLM.Message.ContentPart{type: :text, text: "visible answer"}] =
+               message.content
     end
+  end
+
+  # OpenRouter documents `reasoning_details` and `reasoning_content` as two
+  # ways to pass the same reasoning back; a replayed step sends it once, as
+  # its details, which carry the text.
+  test "an OpenRouter step's replayed reasoning is sent once, as reasoning_details" do
+    test = self()
+
+    plug = fn conn ->
+      {:ok, body, conn} = Plug.Conn.read_body(conn)
+      send(test, {:wire, body})
+
+      Plug.Conn.send_resp(
+        conn,
+        200,
+        JSON.encode!(%{
+          "id" => "r",
+          "model" => "fixture/model",
+          "choices" => [
+            %{
+              "index" => 0,
+              "message" => %{"role" => "assistant", "content" => "done"},
+              "finish_reason" => "stop"
+            }
+          ]
+        })
+      )
+    end
+
+    reasoning = "Check the timeline before replying."
+
+    messages = [
+      %{"role" => "user", "content" => "look around"},
+      %{
+        "role" => "assistant",
+        "content" => "",
+        "tool_calls" => [%{"id" => "call_1", "name" => "lookup", "arguments" => %{}}],
+        "reasoning_content" => reasoning,
+        "reasoning_details" => [
+          %{
+            "provider" => "openrouter",
+            "format" => "unknown",
+            "index" => 0,
+            "text" => reasoning,
+            "provider_data" => %{"type" => "reasoning.text"}
+          }
+        ]
+      },
+      %{"role" => "tool", "content" => "found", "tool_calls" => [%{"id" => "call_1"}]}
+    ]
+
+    lm =
+      Imp.req_llm("openrouter:fixture/model",
+        api_key: "fixture",
+        cache: false,
+        req_http_options: [plug: plug, retry: false]
+      )
+
+    assert {:ok, _} = Imp.Clients.ReqLLM.generate(lm, messages, [])
+    assert_received {:wire, body}
+    assert length(String.split(body, reasoning)) - 1 == 1
+
+    %{"messages" => [_user, step, _result]} = JSON.decode!(body)
+    assert [%{"type" => "reasoning.text", "text" => ^reasoning}] = step["reasoning_details"]
+    refute Map.has_key?(step, "reasoning_content")
   end
 
   # A provider can issue the same tool call ID twice in one conversation. The
