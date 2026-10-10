@@ -1,4 +1,6 @@
 defmodule Imp.MCP do
+  @result_modes [:text, :structured, :multimodal, :content]
+
   @moduledoc """
   Imports the tools of authorized MCP servers as ordinary `Imp.Tool` values.
 
@@ -19,6 +21,17 @@ defmodule Imp.MCP do
   without images. An image-bearing result becomes its content blocks, in
   order, as strings and `Imp.Adapter.Types.Image` values; `structuredContent`
   is left out, because the spec asks a server to repeat it as a text block.
+  `result_mode: :content` returns what the server wrote in `content` for a
+  model, the way `:multimodal` does for an image-bearing result: its text, as
+  `:text` returns it, or its text and typed images. A server may write that
+  text for a model and keep every field in `structuredContent` for programs,
+  which validate it against the tool's `outputSchema`, as the specification's
+  own examples do; such a server is read as it wrote it. Where the text only repeats the
+  structured content as JSON, which the specification asks of a server for
+  older clients, or there is no content, the result is `structuredContent`,
+  as `:multimodal` returns it. A host that reads a field of a structured
+  result whose tool writes text for the model calls the tool with `call/3`
+  and `result_mode: :structured`.
   Image bytes remain base64 data; no
   URLs are fetched. Text and image blocks are supported; other block types
   remain textual data. A vision-capable model is still required.
@@ -186,11 +199,43 @@ defmodule Imp.MCP do
   defp exit_text(:noproc), do: no_answer_reason(:not_connected)
   defp exit_text(_reason), do: no_answer_reason(:closed)
 
+  @doc """
+  Calls an imported MCP tool with its result read in another result mode.
+
+  The tool keeps the mode it was imported with for every other caller, so a
+  model can read a tool's content while the host reads the same tool's
+  structured result:
+
+      Imp.MCP.call(tool, %{}, result_mode: :structured)
+
+  Input is validated as `Imp.Tool.call/2` validates it. A tool that was not
+  imported from an MCP server is called as it is.
+  """
+  @spec call(Imp.Tool.t(), map(), keyword()) :: term()
+  def call(%Imp.Tool{} = tool, arguments, opts) do
+    mode = Keyword.fetch!(opts, :result_mode)
+
+    unless mode in @result_modes do
+      raise ArgumentError, ":result_mode must be one of #{inspect(@result_modes)}"
+    end
+
+    case tool.metadata do
+      %{mcp_call: call} when is_function(call, 2) ->
+        Imp.Tool.call(%{tool | run: &call.(&1, mode)}, arguments)
+
+      _other ->
+        Imp.Tool.call(tool, arguments)
+    end
+  end
+
+  @doc false
+  def result_modes, do: @result_modes
+
   @doc false
   def tool_result(result, mode \\ :text)
 
   def tool_result(result, mode)
-      when mode in [:text, :structured, :multimodal] and is_map(result) do
+      when mode in @result_modes and is_map(result) do
     if call_tool_result?(result) do
       text = text_content(result)
 
@@ -207,7 +252,7 @@ defmodule Imp.MCP do
     end
   end
 
-  def tool_result(result, mode) when mode in [:text, :structured, :multimodal], do: result
+  def tool_result(result, mode) when mode in @result_modes, do: result
 
   defp call_tool_result?(result) do
     has_field?(result, :content) or has_field?(result, :structuredContent) or
@@ -223,6 +268,21 @@ defmodule Imp.MCP do
 
   defp convert_tool_result(result, :text, text), do: text_fallback(result, text)
 
+  defp convert_tool_result(result, :content, text) do
+    content = fetch_field(result, :content, [])
+
+    cond do
+      Enum.any?(content, &(fetch_field(&1, :type, nil) in ["image", :image])) ->
+        Enum.map(content, &multimodal_content/1)
+
+      content == [] or repeats_structured?(result, text) ->
+        convert_tool_result(result, :structured, text)
+
+      true ->
+        text_fallback(result, text)
+    end
+  end
+
   defp convert_tool_result(result, :multimodal, text) do
     content = fetch_field(result, :content, [])
 
@@ -235,6 +295,19 @@ defmodule Imp.MCP do
       convert_tool_result(result, :structured, text)
     end
   end
+
+  # The MCP specification asks a tool with structured content to repeat it as
+  # serialized JSON in a text block, for clients that do not read
+  # `structuredContent`. Such text says nothing the structured value does not,
+  # and the structured value is the one a host can read a field of.
+  defp repeats_structured?(result, text) when is_binary(text) do
+    case fetch_present(result, :structuredContent) do
+      {:ok, structured} -> Jason.decode(text) == {:ok, structured}
+      :error -> false
+    end
+  end
+
+  defp repeats_structured?(_result, _text), do: false
 
   defp multimodal_content(block) do
     case fetch_field(block, :type, nil) do
