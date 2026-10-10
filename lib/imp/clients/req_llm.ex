@@ -10,6 +10,10 @@ defmodule Imp.Clients.ReqLLM do
   leaving the endpoint to choose it. Explicit output limits are passed through
   ReqLLM unchanged; Imp does not reserve the catalog's full output maximum.
 
+  On an OpenRouter call made with the caller's own provider key (`"is_byok"`),
+  the charge is OpenRouter's fee plus the upstream charge it reports in
+  `"cost_details"`, and `nil` when either figure is missing.
+
   `:input_envelope` is an Imp-owned safety option. It accepts a positive
   `:max_bytes` guard and an optional positive `:reservation_tokens` value. Imp
   measures the rendered message content before cache lookup or transport,
@@ -370,12 +374,22 @@ defmodule Imp.Clients.ReqLLM do
   defp cache_hit_result(value), do: value
 
   defp mark_cache_hit(%{req_llm: provider_meta} = metadata) when is_map(provider_meta) do
-    provider_meta = provider_meta |> Map.put(:usage, %{}) |> Map.put(:cache_hit, true)
+    provider_meta =
+      provider_meta
+      |> Map.put(:usage, %{})
+      |> Map.put(:cache_hit, true)
+      |> Map.drop([:charge, "charge"])
+
     Map.put(metadata, :req_llm, provider_meta)
   end
 
   defp mark_cache_hit(%{"req_llm" => provider_meta} = metadata) when is_map(provider_meta) do
-    provider_meta = provider_meta |> Map.put("usage", %{}) |> Map.put("cache_hit", true)
+    provider_meta =
+      provider_meta
+      |> Map.put("usage", %{})
+      |> Map.put("cache_hit", true)
+      |> Map.drop([:charge, "charge"])
+
     Map.put(metadata, "req_llm", provider_meta)
   end
 
@@ -2132,19 +2146,53 @@ defmodule Imp.Clients.ReqLLM do
 
   defp from_response(other, _model_spec), do: other
 
+  # `"cost"` on a bring-your-own-key call is the gateway fee. The upstream
+  # charge is `"cost_details"` under `:upstream_inference_cost`. Both numbers
+  # are the charge; either missing or not a number makes it unknown.
+  # `"is_byok"` identifies the call for every model spec this client accepts.
+  # Any other usage reports its `"cost"`, or `nil` when the provider reported
+  # none. Callers always store the figure as `:charge`.
+  @doc false
+  @spec resolve_openrouter_charge(term(), term()) :: {:resolved, term()}
+  def resolve_openrouter_charge(_model, %{"is_byok" => true} = usage) do
+    {:resolved, openrouter_byok_charge(usage)}
+  end
+
+  def resolve_openrouter_charge(_model, usage), do: {:resolved, wire_cost(usage)}
+
+  defp wire_cost(%{"cost" => cost}), do: cost
+  defp wire_cost(_usage), do: nil
+
+  defp openrouter_byok_charge(usage) do
+    fee = Map.get(usage, "cost")
+    upstream = usage |> Map.get("cost_details") |> upstream_inference_cost()
+
+    if is_number(fee) and is_number(upstream), do: fee + upstream, else: nil
+  end
+
+  defp upstream_inference_cost(details) when is_map(details) do
+    Map.get(details, :upstream_inference_cost, Map.get(details, "upstream_inference_cost"))
+  end
+
+  defp upstream_inference_cost(_details), do: nil
+
   defp response_metadata(%ReqLLM.Response{} = response, model_spec) do
     provider_meta = response.provider_meta || %{}
     logprobs = sanitize_logprobs(map_value(provider_meta, :logprobs))
+    usage = sanitize_usage(ReqLLM.Response.usage(response))
+
+    {:resolved, charge} = resolve_openrouter_charge(model_spec, usage)
 
     %{
       provider: provider_name(model_spec),
       model: response.model,
       api: map_value(provider_meta, :api_type),
       finish_reason: response.finish_reason,
-      usage: sanitize_usage(ReqLLM.Response.usage(response)),
+      usage: usage,
       content: ReqLLM.Response.text(response) || "",
       logprobs: logprobs,
-      provider_meta: sanitize_provider_meta(provider_meta, logprobs)
+      provider_meta: sanitize_provider_meta(provider_meta, logprobs),
+      charge: charge
     }
   end
 

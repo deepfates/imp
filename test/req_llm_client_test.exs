@@ -95,6 +95,22 @@ defmodule ReqLLMClientTest do
     end
   end
 
+  defmodule ChargeStub do
+    def generate_text(model, messages, opts) do
+      {:ok,
+       %ReqLLM.Response{
+         id: "resp_charge",
+         model: response_model(model),
+         context: ReqLLM.Context.new(messages),
+         message: ReqLLM.Context.assistant("pong"),
+         usage: Keyword.fetch!(opts, :stub_usage)
+       }}
+    end
+
+    defp response_model(model) when is_binary(model), do: model
+    defp response_model(model), do: inspect(model)
+  end
+
   defmodule StreamingUsageStub do
     def generate_text(_model, _messages, _opts), do: {:error, :stream_expected}
 
@@ -956,6 +972,115 @@ defmodule ReqLLMClientTest do
 
     assert_received {:req_llm_generate, ^model, _messages, _opts}
     refute_received {:req_llm_generate, ^model, _messages, _opts}
+  end
+
+  @catalog %{total: 0.001858}
+
+  defp byok_response(model, usage, opts) do
+    lm = Imp.req_llm(model, [req_module: ChargeStub] ++ opts)
+
+    request =
+      Imp.LM.new_request(lm, [%{role: :user, content: "ping"}], [stub_usage: usage], "byok")
+
+    assert {:ok, response} = Imp.Clients.ReqLLM.request(lm, request)
+    response
+  end
+
+  # With the caller's own provider key, OpenRouter's "cost" is its fee only,
+  # and the provider's own charge is reported beside it.
+  test "an OpenRouter call on the caller's own key costs the fee plus the upstream charge" do
+    usage = %{
+      "is_byok" => true,
+      "cost" => 0.0001,
+      "cost_details" => %{"upstream_inference_cost" => 0.002},
+      cost: @catalog
+    }
+
+    response = byok_response("openrouter:byok", usage, cache: false)
+
+    assert_in_delta response.cost, 0.0021, 1.0e-12
+    assert response.estimated_cost == 0.001858
+    assert response.usage["cost"] == 0.0001
+    assert response.usage["is_byok"] == true
+  end
+
+  test "an OpenRouter call on the caller's own key with no upstream charge has no cost" do
+    for usage <- [
+          %{"is_byok" => true, "cost" => 0.0001, "cost_details" => nil, cost: @catalog},
+          %{"is_byok" => true, "cost" => 0.0001, "cost_details" => %{}, cost: @catalog},
+          %{
+            "is_byok" => true,
+            "cost" => 0.0001,
+            "cost_details" => %{"upstream_inference_cost" => nil},
+            cost: @catalog
+          },
+          %{
+            "is_byok" => true,
+            "cost" => "0.0001",
+            "cost_details" => %{"upstream_inference_cost" => 0.002},
+            cost: @catalog
+          },
+          %{
+            "is_byok" => true,
+            "cost" => 0.0001,
+            "cost_details" => %{"upstream_inference_cost" => "0.002"},
+            cost: @catalog
+          }
+        ] do
+      response = byok_response("openrouter:byok", usage, cache: false)
+
+      assert response.cost == nil, inspect(usage["cost_details"] || usage["cost"])
+      assert response.usage["cost"] == usage["cost"]
+      assert response.estimated_cost == 0.001858
+    end
+  end
+
+  # `openrouter:` strings are not the only spec this client accepts.
+  # `"is_byok"` is what identifies the call, so each of these costs the fee
+  # plus the upstream charge, and the client records that figure as `:charge`.
+  test "a byok response on an OpenRouter model spec costs the fee plus the upstream charge" do
+    usage = %{
+      "is_byok" => true,
+      "cost" => 0.0001,
+      "cost_details" => %{"upstream_inference_cost" => 0.002},
+      cost: @catalog
+    }
+
+    for model <- [
+          {:openrouter, "id"},
+          {:openrouter, "id", []},
+          %{"provider" => "openrouter"}
+        ] do
+      response = byok_response(model, usage, cache: false)
+
+      assert_in_delta response.cost, 0.0021, 1.0e-12
+      assert_in_delta response.metadata.req_llm.charge, 0.0021, 1.0e-12
+      assert response.usage["cost"] == 0.0001
+    end
+  end
+
+  test "a repeated OpenRouter call on the caller's own key does not bill the cached charge" do
+    Imp.Cache.clear()
+    model = "openrouter:byok-cache-#{System.unique_integer([:positive])}"
+
+    usage = %{
+      "is_byok" => true,
+      "cost" => 0.0001,
+      "cost_details" => %{"upstream_inference_cost" => 0.002},
+      cost: @catalog
+    }
+
+    lm = Imp.req_llm(model, req_module: ChargeStub)
+
+    request =
+      Imp.LM.new_request(lm, [%{role: :user, content: "ping"}], [stub_usage: usage], "byok")
+
+    assert {:ok, first} = Imp.Clients.ReqLLM.request(lm, request)
+    assert_in_delta first.cost, 0.0021, 1.0e-12
+
+    assert {:ok, second} = Imp.Clients.ReqLLM.request(lm, request)
+    assert second.cost == nil
+    assert second.usage == %{}
   end
 
   test "ReqLLM cache behavior isolates endpoints and semantic secret-shaped values" do

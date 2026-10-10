@@ -75,18 +75,9 @@ defmodule Imp.Core do
     @moduledoc """
     Provider-neutral LM response: normalized outputs, usage, cost, and raw data.
 
-    `cost` is what the provider says it charged for this call, in USD, as a
-    non-negative float, or `nil` when the provider reported no charge. `nil`
-    means the charge is unknown, not that the call was free. OpenRouter reports
-    its charge, unasked, as the `"cost"` field of its usage object;
-    ReqLLM carries that field through unchanged, and Imp reads it from there.
-    A provider whose response carries no charge — the Anthropic, OpenAI and
-    Google APIs called directly among them — gives a `nil` cost. On an
-    OpenRouter call made with the caller's own provider key (`"is_byok"`),
-    `cost` is OpenRouter's fee plus the upstream charge it reports in
-    `"cost_details"`, and `nil` when that upstream charge is missing. An LM
-    client other than ReqLLM reports its charge as `:cost` in its response
-    metadata.
+    `cost` is the charge the client reported for this call, in USD, as a
+    non-negative float, or `nil` when none was reported. `nil` means the
+    charge is unknown, not that the call was free.
 
     `estimated_cost` is ReqLLM's estimate for the call: the reported token
     counts priced from its model catalog, as a non-negative float, or `nil`
@@ -294,30 +285,43 @@ defmodule Imp.Core do
     end
   end
 
-  # In ReqLLM's usage map the atom keys are ReqLLM's own: its usage step
-  # prices the token counts from the model catalog and stores that estimate as
-  # `:cost` and `:total_cost`. The provider's wire fields that ReqLLM does not
-  # interpret stay under their string keys, so OpenRouter's charge is
-  # `"cost"`. OpenRouter includes it without being asked (its
-  # `usage: %{include: true}` request option is not needed for it). A client
-  # that is not ReqLLM reports its charge as `:cost` in its own metadata.
-  #
-  # With the caller's own provider key (`"is_byok"`), OpenRouter's `"cost"` is
-  # only its fee; the provider billed the key separately, and OpenRouter
-  # reports that as `"cost_details"."upstream_inference_cost"`. Counting the fee
-  # alone would understate spend, so without the upstream figure the charge
-  # is unknown.
-  defp reported_cost(_metadata, %{"is_byok" => true} = usage) do
-    upstream = usage |> Map.get("cost_details") |> map_value(:upstream_inference_cost, nil)
-
-    case Map.get(usage, "cost") do
-      fee when is_number(fee) and is_number(upstream) -> fee + upstream
-      _incomplete -> nil
+  # `:charge` on the client metadata is the charge that client resolved.
+  # Present, it is the charge, `nil` included: nil is unknown, not a cue to
+  # read another figure. A bring-your-own-key usage that carries no resolved
+  # charge is unknown too: its `"cost"` is only the fee, and reporting that
+  # would understate spend. Any other envelope still reports its wire
+  # `"cost"`, then `:cost` in the response metadata. Atom `:cost` on the
+  # usage map is the catalog estimate, read as `estimated_cost`, not as the
+  # charge.
+  defp reported_cost(metadata, usage) do
+    case resolved_charge(metadata) do
+      {:resolved, charge} -> charge
+      :unresolved -> unresolved_cost(metadata, usage)
     end
   end
 
-  defp reported_cost(metadata, usage) do
+  defp unresolved_cost(_metadata, %{"is_byok" => true}), do: nil
+
+  defp unresolved_cost(metadata, usage) do
     Map.get(usage, "cost", map_value(metadata, :cost, nil))
+  end
+
+  defp resolved_charge(metadata) do
+    provider = map_value(metadata, :req_llm, %{})
+
+    cond do
+      not is_map(provider) ->
+        :unresolved
+
+      Map.has_key?(provider, :charge) ->
+        {:resolved, Map.get(provider, :charge)}
+
+      Map.has_key?(provider, "charge") ->
+        {:resolved, Map.get(provider, "charge")}
+
+      true ->
+        :unresolved
+    end
   end
 
   # A cost breakdown is ReqLLM's map. Anything else under `:cost` is a value,
