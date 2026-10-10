@@ -30,6 +30,14 @@ User-visible changes to Imp are recorded here.
   LM client reports it. `:length` means the provider's output limit cut the
   answer short.
 
+### Fixed
+
+- An OpenRouter request replays each earlier step's reasoning once, as its
+  `reasoning_details`. Before, it also went out as `reasoning_content`, which
+  OpenRouter documents as the other way to pass reasoning back, not as an
+  addition. The provider counted it once, but the request carried it twice.
+  Other providers still receive `reasoning_content` as before.
+
 ## 0.12.2 — 2026-10-09
 
 ### Added
