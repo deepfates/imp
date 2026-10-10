@@ -277,6 +277,13 @@ reply = Imp.react(Imp.signature("ticket -> reply"), [on_call], lm: lm)
 #=> {"Maya from atlas has the duplicate charge.", :last_text}
 ```
 
+The call can also give its own request options as `config`, merged over the
+program's for that call only, such as an output budget for the summary:
+`config: [max_tokens: 4_000]`. A text answer's `:finish_reason` metadata says
+why the provider stopped the reply, as the LM client reports it; `:length`
+means the budget cut it short, so a host keeping the summary can tell a whole
+one from a cut one.
+
 ### Ending the turn from a tool
 
 `finish_on:` maps a tool name to a function of the call's arguments, its
