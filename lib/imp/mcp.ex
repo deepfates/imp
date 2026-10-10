@@ -283,19 +283,6 @@ defmodule Imp.MCP do
     end
   end
 
-  # The MCP specification asks a tool with structured content to repeat it as
-  # serialized JSON in a text block, for clients that do not read
-  # `structuredContent`. Such text says nothing the structured value does not,
-  # and the structured value is the one a host can read a field of.
-  defp repeats_structured?(result, text) when is_binary(text) do
-    case fetch_present(result, :structuredContent) do
-      {:ok, structured} -> Jason.decode(text) == {:ok, structured}
-      :error -> false
-    end
-  end
-
-  defp repeats_structured?(_result, _text), do: false
-
   defp convert_tool_result(result, :multimodal, text) do
     content = fetch_field(result, :content, [])
 
@@ -308,6 +295,19 @@ defmodule Imp.MCP do
       convert_tool_result(result, :structured, text)
     end
   end
+
+  # The MCP specification asks a tool with structured content to repeat it as
+  # serialized JSON in a text block, for clients that do not read
+  # `structuredContent`. Such text says nothing the structured value does not,
+  # and the structured value is the one a host can read a field of.
+  defp repeats_structured?(result, text) when is_binary(text) do
+    case fetch_present(result, :structuredContent) do
+      {:ok, structured} -> Jason.decode(text) == {:ok, structured}
+      :error -> false
+    end
+  end
+
+  defp repeats_structured?(_result, _text), do: false
 
   defp multimodal_content(block) do
     case fetch_field(block, :type, nil) do
