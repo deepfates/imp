@@ -94,6 +94,41 @@ defmodule Imp.Adapter.ChatToolResultRendererTest do
     assert Enum.any?(messages, &(&1[:role] == :tool and &1[:content] == "look said :nope"))
   end
 
+  # A host that shortens results the model has already read, several steps
+  # back, needs to know how far back each one is; the call says so.
+  test "the renderer is told how many entries follow each result" do
+    owner = self()
+    counter = :counters.new(1, [])
+
+    lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          n = :counters.get(counter, 1) + 1
+          :counters.put(counter, 1, n)
+          send(owner, {:request, n, messages, []})
+
+          if n <= 3,
+            do: %{
+              next_thought: "look",
+              tool_calls: [%{id: "c#{n}", name: "look", arguments: %{}}]
+            },
+            else: "ok"
+        end
+      )
+
+    program =
+      Imp.react("intent -> answer", [Imp.tool(:look, "Look", fn _ -> "seen" end)],
+        lm: lm,
+        adapter_opts: [
+          tool_result_renderer: fn _result, call -> "#{call.id}:#{call.steps_after}" end
+        ]
+      )
+
+    assert {:ok, _} = Imp.call(program, %{intent: "hello"})
+    assert tool_contents(request(2)) == ["c1:0"]
+    assert tool_contents(request(4)) == ["c1:2", "c2:1", "c3:0"]
+  end
+
   test "the option must be a 2-arity function" do
     signature = Imp.Signature.ensure("intent -> answer")
 

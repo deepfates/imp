@@ -89,7 +89,9 @@ defmodule Imp.Adapter.Chat do
     # and build on the default. Replacing it leaves parsing unchanged.
     system_renderer: [type: {:fun, 2}],
     # Renderer for one TOOL result message: (result, call), where call is
-    # `%{id:, name:}` for the call that produced it. Default:
+    # `%{id:, name:, steps_after:}`: the call that produced it, and how many
+    # history entries follow the one that holds the result in this request
+    # (0 for the newest). Default:
     # `format_tool_content/1`. Return text or a list of text and typed Images.
     # This is where a host bounds what the model reads
     # of a large result: the loop still records the whole result in history and
@@ -1275,9 +1277,16 @@ defmodule Imp.Adapter.Chat do
   end
 
   defp render_history_turns(signature, turns, renderers) do
+    count = length(turns)
+
     turns
-    |> Enum.flat_map(fn turn ->
+    |> Enum.with_index(1)
+    |> Enum.flat_map(fn {turn, position} ->
       turn = Imp.Example.new(turn) |> Imp.Example.to_map()
+      # How many entries follow this one: what a tool result renderer is told
+      # as `steps_after`, so a host can tell a result just returned from one
+      # the model has read on every request since.
+      renderers = Map.put(renderers, :steps_after, count - position)
 
       messages =
         cond do
@@ -1373,7 +1382,7 @@ defmodule Imp.Adapter.Chat do
               id = fetch_field(result, :id)
               name = result |> fetch_field(:name) |> blank_to_empty()
 
-              call = %{id: id, name: name}
+              call = %{id: id, name: name, steps_after: renderers.steps_after}
               content = renderers.tool_result.(fetch_field(result, :result), call)
               {text, images} = tool_content_messages(content, call)
               {%{"name" => name, "result" => text}, images}
@@ -1489,7 +1498,12 @@ defmodule Imp.Adapter.Chat do
     rendered_results =
       Enum.map(results, fn result ->
         id = fetch_field(result, :id)
-        call = %{id: id, name: result |> fetch_field(:name) |> blank_to_empty()}
+
+        call = %{
+          id: id,
+          name: result |> fetch_field(:name) |> blank_to_empty(),
+          steps_after: renderers.steps_after
+        }
 
         content = tool_result_renderer.(fetch_field(result, :result), call)
         {text, images} = tool_content_messages(content, call)

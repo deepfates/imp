@@ -4,6 +4,16 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Added
+
+- A `:tool_result_renderer` is told how far back each result is: the call
+  map it receives carries `steps_after`, how many history entries follow the
+  one that holds the result in the request being rendered (0 for the newest).
+  A host can then read a result the model has already seen on several
+  requests differently from one just returned, for example as a one-line
+  pointer to where the whole is kept, as context-editing schemes that clear
+  old tool results do. The call map keeps `:id` and `:name`.
+
 ## 0.12.3 — 2026-10-10
 
 ### Added
