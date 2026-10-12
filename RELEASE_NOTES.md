@@ -6,8 +6,9 @@ Avatar history keeps each input, tool call and tool result exactly as it was,
 where before anything credential-shaped in them was replaced by
 `"[REDACTED]"` on every later step. A ReActV2 step whose answer is its plain
 reply no longer presents that answer as a named output field. It also adds
-two things a host can read: when each tool result came back, and whether a
-call's input token count already includes the cached prompt. A caller's model
+three things a host can use: a ReActV2 call can give its own tool runners,
+tool results record when they came back, and usage says whether a call's
+input token count already includes the cached prompt. A caller's model
 reads different requests, and a host that stores histories stores different
 data, so under Imp's versioning rule this is a minor release.
 
@@ -63,6 +64,18 @@ and commit `mix.lock`. No data migration is needed.
   signature with no instructions of its own still opens with the default
   "Given the fields ..., produce the fields ...". Migration: a test that
   compares that system message exactly expects the new text.
+- **Added: a ReActV2 call can give its own tool runners.** `Imp.call(react,
+  %{..., tools: [tool, ...]})` uses, for that call only, the runners of the
+  given tools in place of the program's, as a call can already give its own
+  `max_iters`, `last_request_note` and `config`. Each tool must be one the
+  program holds, with the same name, description and schema, so the request
+  and its cacheable prefix are unchanged; anything else is refused before
+  any request with `{:error, {:invalid_react_v2_tools, message}}`. The
+  program value is not changed, and `with_tools/2`, the path an optimizer's
+  updates take, still refuses a changed runner. A host can keep state that
+  belongs to one call in that call's runners, so copies of one program
+  called at once (by an optimizer, `Imp.parallel` or evaluation) never share
+  it. See "One call's own tool runners" in the ReAct guide.
 - **Added: tool results carry when they came back.** ReActV2 records
   `returned_at` (ISO 8601, UTC) beside each tool result in the history, and
   the Chat adapter passes it to a `:tool_result_renderer` as
@@ -86,11 +99,13 @@ and commit `mix.lock`. No data migration is needed.
 
 Rollback means restoring `0.12.3` in the lock. Histories are then redacted as
 they are built again, the plain-text step lists its output field again,
-`returned_at` is no longer recorded (a renderer receives `nil`), and usage
-loses `input_includes_cached`. Provider-free tests check that
+`returned_at` is no longer recorded (a renderer receives `nil`), usage
+loses `input_includes_cached`, and a call that passes `tools` is not given
+its own runners. Provider-free tests check that
 the next request carries a tool result as the tool returned it, for each of
 the three loops, along with the exact system message of a plain-text step,
-the time a renderer receives, and the flag and ATIF prompt count for both
+the time a renderer receives, a call's own runners and the refusals of
+tools shown differently, and the flag and ATIF prompt count for both
 usage shapes. This release does not establish how any particular model
 responds to the new system message.
 See the [changelog](CHANGELOG.md) for every change.
@@ -99,9 +114,9 @@ See the [changelog](CHANGELOG.md) for every change.
 
 - The usage map (`:usage` on the `:model_response` event, `Imp.Usage`,
   `Imp.Prediction.get_lm_usage/1`) is ReqLLM's, with `input_includes_cached`
-  added. Its `:cost` and
-  `:total_cost` are ReqLLM's catalog estimate, not a charge, for streamed
-  and non-streamed calls alike, and OpenRouter's charge is its `"cost"`.
+  added. Its `:cost` and `:total_cost` are ReqLLM's catalog estimate, not a
+  charge, for streamed and non-streamed calls alike, and OpenRouter's charge
+  is its `"cost"`.
   Read money from `cost` and `estimated_cost`.
 - An error the provider sends inside a stream has `status` `nil` and
   `retryable: true`, because ReqLLM's stream decoder keeps only its message;
