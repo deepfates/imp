@@ -66,8 +66,9 @@ defmodule Imp.Predict.ReAct do
   ## The prediction
 
   The prediction's fields are the signature's outputs (and, from an extraction
-  pass, its `reasoning`). Its metadata carries the redacted tool call
-  `:history`, `:termination_reason`, how the turn ended, and, when something
+  pass, its `reasoning`). Its metadata carries the tool call
+  `:history` (as the model read it; `Imp.History.redact/1` gives a
+  diagnostic copy), `:termination_reason`, how the turn ended, and, when something
   interrupted it, `:termination_cause`:
 
     * `:submit`, `:finish` — the model called the reserved tool.
@@ -503,7 +504,7 @@ defmodule Imp.Predict.ReAct do
       {name, args, outcome} = prepare_tool_call(agent, call)
       {result, call_failure} = interpret_outcome(agent.mode, name, outcome)
 
-      event = Imp.Redaction.redact(%{tool: name, arguments: args, result: result})
+      event = %{tool: name, arguments: args, result: result}
       submitted? = name == :submit
 
       final =
@@ -534,7 +535,7 @@ defmodule Imp.Predict.ReAct do
   defp attach_thought(:dspy, prediction, [event | events]) do
     case Imp.Prediction.get(prediction, :next_thought) do
       nil -> [event | events]
-      thought -> [Imp.Redaction.redact(Map.put(event, :thought, thought)) | events]
+      thought -> [Map.put(event, :thought, thought) | events]
     end
   end
 
@@ -771,7 +772,7 @@ defmodule Imp.Predict.ReAct do
     end
   end
 
-  # Build the redacted tool-event history from the final trajectory pairs. Each
+  # Build the tool-event history from the final trajectory pairs. Each
   # tool call is four consecutive keys (thought/tool_name/tool_args/observation);
   # tool names resolve back to the catalog atom for stable event identity.
   defp faithful_history(agent, trajectory) do
@@ -780,12 +781,12 @@ defmodule Imp.Predict.ReAct do
     |> Enum.map(fn chunk ->
       fields = Map.new(chunk, fn {key, value} -> {trajectory_key_kind(key), value} end)
 
-      Imp.Redaction.redact(%{
+      %{
         thought: fields[:thought],
         tool: normalize_tool_name(agent.tools, fields[:tool_name]) || fields[:tool_name],
         arguments: fields[:tool_args] || %{},
         result: fields[:observation]
-      })
+      }
     end)
   end
 
