@@ -363,8 +363,11 @@ defmodule ReasoningContinuityTest do
     assert_received {:wire_request, 1, _initial}
     assert_received {:wire_request, 2, continuation}
 
+    # The history is the conversation itself: it keeps the input as given, and
+    # the run's events, which are its trace, redact it.
     history = first.metadata[:history]
-    refute inspect(history, limit: :infinity) =~ @input_token
+    assert inspect(history, limit: :infinity) =~ @input_token
+    refute inspect(events, limit: :infinity) =~ @input_token
 
     restarted = Imp.react("question -> answer", [lookup], lm: lm, max_iters: 4)
 
