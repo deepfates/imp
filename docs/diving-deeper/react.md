@@ -53,16 +53,14 @@ A constrained output never takes that path: its allowed values are in
 
 The prompt says the same. When the provider holds the tools natively, the
 Chat adapter's system message for `Imp.react("intent -> answer", [look])`
-shows the input layout and no output markers to write, because the answer is
-the plain text of the message that calls no tool:
+shows the input layout, no output markers to write and no output fields,
+because the answer is the plain text of the message that calls no tool. The
+answer's description, when it has one, follows the sentence that says so:
 
 ```text
 --- system
 Your input fields are:
 1. `intent` (string):
-2. `history` (history):
-Your output fields are:
-1. `answer` (string):
 Inputs will be structured in the following way, with the appropriate values filled in.
 
 [[ ## intent ## ]]
@@ -70,11 +68,9 @@ Inputs will be structured in the following way, with the appropriate values fill
 
 In adhering to this structure, your objective is: 
         Given the fields `intent`, produce the fields `answer`.
-        You are an Agent. Produce `answer` from `intent`, using the supplied tools to gather information and take actions.
-        The outputs to produce are:
-        1. `answer` (string):
+        You are an Agent. Use the supplied tools to gather information and take actions.
         Call tools when more information is needed.
-        When the final answer is ready, reply without calling a tool: that message is `answer`.
+        When the final answer is ready, reply without calling a tool.
         The available tools are: `look`.
 --- user
 [[ ## intent ## ]]

@@ -4,7 +4,44 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Added
+
+- ReActV2 records when each tool result came back, as `returned_at` (ISO 8601,
+  UTC) beside the result in the history, and the Chat adapter passes it to a
+  `:tool_result_renderer` in the call map (`%{id:, name:, returned_at:}`;
+  nil for a result recorded without it). A host can tell the model the time
+  during a tool loop, the way some agent frameworks stamp each tool result,
+  and the stamp is the same on every later request, so a cached prompt
+  prefix survives. The default rendering is unchanged.
+  GEPA leaves those times out of what its reflection model reads, so the same
+  trajectories make the same reflection prompt in any run, a resumed one
+  included.
+
+### Changed
+
+- A ReActV2 step with one unconstrained text output and natively held tools
+  no longer presents that output as a field. Its system message drops
+  "Your output fields are: 1. `answer` (string): …", the second copy under
+  "The outputs to produce are:", and the field's name from the agent line
+  ("Produce `answer` from …") and the finish line ("… that message is
+  `answer`."). The finish line now reads "When the final answer is ready,
+  reply without calling a tool." followed by the field's description, said
+  once. The inputs, their markers, the instructions, history and tools are
+  unchanged, and a reply in markers is still read. A field name the model
+  never writes read as a label to write: models on several providers put
+  `answer:`, `**answer**` or `[[ ## answer ## ]]` into the message itself,
+  ahead of notes and the reply, and all of it was the answer.
+
 ### Fixed
+
+- The history of `Imp.Predict.ReActV2`, `Imp.Predict.ReAct` and
+  `Imp.Predict.Avatar` keeps each input, tool call and tool result as it was.
+  Before, `Imp.Redaction` ran over them as they were added, so a tool result
+  or input that only contained something credential-shaped (a quoted
+  `curl -H "Authorization: Bearer ..."`, a JWT in a discussion) was replaced
+  whole by `"[REDACTED]"`, and the model read that on every later step, as did
+  a host that stored the history and continued from it. Run events,
+  telemetry, traces and inspection still redact their own copies.
 
 - A ReqLLM call's `usage`, streamed or not, says whether `input_tokens` already
   counts the cached prompt, as `input_includes_cached`, which ReqLLM decides

@@ -21,7 +21,7 @@ defmodule ReActV2StepContractTest do
   end
 
   @in_field "When the final answer is ready, write it in `answer`."
-  @plain_reply "When the final answer is ready, reply without calling a tool: that message is `answer`."
+  @plain_reply "When the final answer is ready, reply without calling a tool."
   @leave_empty "When the final answer is ready, write it in `answer`, and leave `tool_calls` empty."
 
   defp look, do: Imp.tool(:look, "Look at a thing", fn _ -> %{"seen" => [1]} end)

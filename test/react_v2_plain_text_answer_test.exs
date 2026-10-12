@@ -5,7 +5,9 @@ defmodule ReActV2PlainTextAnswerTest do
   # with an LM that calls tools natively, the message the model writes without
   # a tool call is the answer. The system message says only that. It shows no
   # `[[ ## answer ## ]]` or `[[ ## completed ## ]]` marker to write, which
-  # would be a second, different way to finish.
+  # would be a second, different way to finish, and it lists no output field:
+  # the answer is the message, so a field name would be a label with no place
+  # to go, and models wrote it into the message ahead of their reply.
 
   defmodule TextOnlyLM do
     @behaviour Imp.LM
@@ -43,8 +45,6 @@ defmodule ReActV2PlainTextAnswerTest do
     assert system_message() ==
              "Your input fields are:\n" <>
                "1. `intent` (string):\n" <>
-               "Your output fields are:\n" <>
-               "1. `answer` (string):\n" <>
                "Inputs will be structured in the following way, with the appropriate values filled in.\n" <>
                "\n" <>
                "[[ ## intent ## ]]\n" <>
@@ -52,12 +52,34 @@ defmodule ReActV2PlainTextAnswerTest do
                "\n" <>
                "In adhering to this structure, your objective is: \n" <>
                "        Given the fields `intent`, produce the fields `answer`.\n" <>
-               "        You are an Agent. Produce `answer` from `intent`, using the supplied tools to gather information and take actions.\n" <>
-               "        The outputs to produce are:\n" <>
-               "        1. `answer` (string):\n" <>
+               "        You are an Agent. Use the supplied tools to gather information and take actions.\n" <>
                "        Call tools when more information is needed.\n" <>
-               "        When the final answer is ready, reply without calling a tool: that message is `answer`.\n" <>
+               "        When the final answer is ready, reply without calling a tool.\n" <>
                "        The available tools are: `look`."
+  end
+
+  test "the answer's description is said once, with the message it describes, and its name not at all" do
+    signature =
+      Imp.signature(
+        %{
+          inputs: [%{name: :intent, desc: "What happened."}],
+          outputs: [%{name: :answer, desc: "What you say back: all of your last message."}]
+        },
+        "Be brief."
+      )
+
+    program = Imp.react(signature, [look()], lm: lm("ok"))
+    assert {:ok, _prediction} = Imp.call(program, %{intent: "hello"})
+    system = system_message()
+
+    assert system =~
+             "        When the final answer is ready, reply without calling a tool. " <>
+               "What you say back: all of your last message.\n"
+
+    assert length(String.split(system, "What you say back")) == 2
+    refute system =~ "`answer`"
+    refute system =~ "output fields"
+    refute system =~ "outputs to produce"
   end
 
   test "a host sets the agent line through adapter options, or omits it" do
@@ -69,14 +91,17 @@ defmodule ReActV2PlainTextAnswerTest do
 
     assert {:ok, _prediction} = Imp.call(custom, %{intent: "hello"})
     system = system_message()
-    assert system =~ "`answer`.\n        Help the user.\n        The outputs to produce are:"
+
+    assert system =~
+             "`answer`.\n        Help the user.\n        Call tools when more information is needed."
+
     refute system =~ "You are an Agent"
 
     omitted =
       Imp.react("intent -> answer", [look()], lm: lm("ok"), adapter_opts: [agent_line: nil])
 
     assert {:ok, _prediction} = Imp.call(omitted, %{intent: "hello"})
-    assert system_message() =~ "`answer`.\n        The outputs to produce are:"
+    assert system_message() =~ "`answer`.\n        Call tools when more information is needed."
   end
 
   test "a final message with no markers is the answer" do
