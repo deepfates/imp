@@ -206,10 +206,11 @@ defmodule Imp.Predict.ReActV2 do
   the window, an incomplete prediction retains history and context diagnostics.
   This is lossy prompt selection, not summarization or deletion of memory.
 
-  Tool history retains provider-native reasoning text and opaque reasoning
-  details for continuation, including after `Imp.History.dump/1` and `Imp.History.load!/1`.
-  These are operational protocol data and must remain unmodified. Store history
-  privately; use redacted events or `Imp.History.redact/1` for diagnostic copies.
+  Tool history is the conversation the model reads: it keeps each input, tool
+  call and tool result as it was, and provider-native reasoning text and opaque
+  reasoning details for continuation, including after `Imp.History.dump/1` and
+  `Imp.History.load!/1`. Store history privately; use redacted events or
+  `Imp.History.redact/1` for diagnostic copies.
   """
 
   @behaviour Imp.Module

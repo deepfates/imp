@@ -66,8 +66,9 @@ defmodule Imp.Predict.ReAct do
   ## The prediction
 
   The prediction's fields are the signature's outputs (and, from an extraction
-  pass, its `reasoning`). Its metadata carries the redacted tool call
-  `:history`, `:termination_reason`, how the turn ended, and, when something
+  pass, its `reasoning`). Its metadata carries the tool call
+  `:history` (as the model read it; `Imp.History.redact/1` gives a
+  diagnostic copy), `:termination_reason`, how the turn ended, and, when something
   interrupted it, `:termination_cause`:
 
     * `:submit`, `:finish` — the model called the reserved tool.
