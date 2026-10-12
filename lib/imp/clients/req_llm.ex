@@ -407,7 +407,7 @@ defmodule Imp.Clients.ReqLLM do
   defp send_generate(lm, messages, opts) do
     provider = model_provider(lm.model)
 
-    case lm.req_module.generate_text(lm.model, to_req_messages(messages), opts) do
+    case lm.req_module.generate_text(lm.model, to_req_messages(messages, lm.model), opts) do
       {:ok, response} ->
         case relayed_error(response) || stopped(response) do
           nil -> {:ok, from_response(response, lm.model)}
@@ -694,7 +694,7 @@ defmodule Imp.Clients.ReqLLM do
     identity = {
       lm.req_module,
       cache_identity_value(lm.model),
-      to_req_messages(messages),
+      to_req_messages(messages, lm.model),
       cache_identity_options(opts)
     }
 
@@ -821,7 +821,7 @@ defmodule Imp.Clients.ReqLLM do
   defp open_provider_stream(lm, messages, opts) do
     provider = model_provider(lm.model)
 
-    case lm.req_module.stream_text(lm.model, to_req_messages(messages), opts) do
+    case lm.req_module.stream_text(lm.model, to_req_messages(messages, lm.model), opts) do
       {:ok, %ReqLLM.StreamResponse{} = response} -> {:ok, response}
       {:ok, other} -> {:error, lm_error({:invalid_req_llm_stream, other}, false, provider)}
       {:error, reason} -> {:error, lm_error(reason, provider)}
@@ -1229,7 +1229,9 @@ defmodule Imp.Clients.ReqLLM do
   defp maybe_put_rollout_id(opts, nil), do: opts
   defp maybe_put_rollout_id(opts, rollout_id), do: Keyword.put(opts, :rollout_id, rollout_id)
 
-  defp to_req_messages(messages) do
+  defp to_req_messages(messages, model) do
+    openrouter? = openrouter_model?(model)
+
     Enum.map(messages, fn
       %{role: role, content: content} = message ->
         build_message(
@@ -1237,7 +1239,7 @@ defmodule Imp.Clients.ReqLLM do
           content,
           Map.get(message, :tool_calls) || Map.get(message, "tool_calls")
         )
-        |> preserve_reasoning(message)
+        |> preserve_reasoning(message, openrouter?)
 
       # Messages that went through a JSON round trip (ReqLLMBatch checkpoints,
       # anything decoded from disk or the wire) arrive with string keys and
@@ -1249,7 +1251,7 @@ defmodule Imp.Clients.ReqLLM do
           content,
           Map.get(message, "tool_calls") || Map.get(message, :tool_calls)
         )
-        |> preserve_reasoning(message)
+        |> preserve_reasoning(message, openrouter?)
 
       other ->
         ReqLLM.Context.user(inspect(other))
@@ -1326,7 +1328,7 @@ defmodule Imp.Clients.ReqLLM do
     end
   end
 
-  defp preserve_reasoning(%ReqLLM.Message{role: :assistant} = message, source) do
+  defp preserve_reasoning(%ReqLLM.Message{role: :assistant} = message, source, openrouter?) do
     message =
       case map_value(source, :reasoning_details) do
         details when is_list(details) ->
@@ -1347,6 +1349,17 @@ defmodule Imp.Clients.ReqLLM do
         # tool turns and produces an unsigned continuation.
         %{message | content: without_thinking(message.content)}
 
+      openrouter? and (message.reasoning_details || []) != [] ->
+        # OpenRouter takes reasoning back in one of two ways: the
+        # `reasoning_details` blocks, or the plain `reasoning` text, for which
+        # `reasoning_content` is an alias
+        # (https://openrouter.ai/docs/use-cases/reasoning-tokens, "Preserving
+        # Reasoning"). The details keep everything the model returned,
+        # signatures and encrypted blocks included, so they are what is sent.
+        # ReqLLM writes a thinking part as `reasoning_content`, so adding one
+        # would send the reasoning twice.
+        %{message | content: without_thinking(message.content)}
+
       is_binary(text) and text != "" ->
         %{
           message
@@ -1360,7 +1373,7 @@ defmodule Imp.Clients.ReqLLM do
     end
   end
 
-  defp preserve_reasoning(message, _source), do: message
+  defp preserve_reasoning(message, _source, _openrouter?), do: message
 
   defp without_thinking(content), do: Enum.reject(content, &match?(%{type: :thinking}, &1))
 

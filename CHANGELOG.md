@@ -16,6 +16,42 @@ User-visible changes to Imp are recorded here.
   Anthropic-style call now includes its cache reads and writes, where before
   it was only the tokens after the last cache breakpoint.
 
+## 0.12.3 — 2026-10-10
+
+### Added
+
+- `Imp.MCP.connect(..., result_mode: :content)`: an imported tool returns
+  what the server wrote in `content` for a model, its text, or its text and
+  typed images as `:multimodal` returns them. Where that text only repeats
+  `structuredContent` as JSON, or there is no content, it returns
+  `structuredContent` as `:multimodal` does. A server that writes its text
+  for a model and keeps every field in `structuredContent` for programs, as
+  the MCP specification's own examples do, is now read as it wrote it. `Imp.MCP.call(tool, arguments,
+  result_mode: :structured)` calls the same tool with its result read in
+  another mode, for a host that reads a field of the structured result itself.
+  Existing modes are unchanged.
+- A ReActV2 call can give its own request options as `config` beside its
+  inputs, as it can its own `max_iters` and `last_request_note`. They are
+  merged over the program's `:config` for every request of that call only,
+  for example an output budget for one last request on a history. A value
+  that is not a keyword list, or that names `:tools` or `:tool_choice`, is
+  refused with `{:error, {:invalid_react_v2_config, value}}` before any model
+  call.
+- A ReActV2 prediction whose answer is a reply's text (`:answered`,
+  `:last_text`) carries that reply's `:finish_reason` in its metadata, as the
+  LM client reports it. `:length` means the provider's output limit cut the
+  answer short.
+
+### Fixed
+
+- An OpenRouter request replays each earlier step's reasoning once, as its
+  `reasoning_details`. Before, it also went out as `reasoning_content`, which
+  OpenRouter documents as the other way to pass reasoning back, not as an
+  addition. The provider counted it once, but the request carried it twice.
+  Other providers still receive `reasoning_content` as before.
+
+## 0.12.2 — 2026-10-09
+
 ### Added
 
 - A ReActV2 call can give its own `last_request_note`, as it can its own

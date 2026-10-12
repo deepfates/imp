@@ -1,12 +1,14 @@
-# Imp v0.12.1
+# Imp v0.12.3
 
 Imp is a framework for typed, optimizable language-model programs on the BEAM.
-This release lets a conversation continue when a provider repeats a tool call
-ID, and lets a host set or remove the "You are an Agent..." line in a tool
-loop's guidance. Neither changes what an existing caller receives: the ID fix
-changes only the request sent to the provider, and the new option leaves
-prompts byte-for-byte the same when it is not given. Under Imp's versioning
-rule this is a patch release.
+This release adds three things a caller opts into. An MCP tool can return
+the text its server wrote for a model while a host still reads its structured
+result (`result_mode: :content`, `Imp.MCP.call/3`). A ReActV2 call can give
+its own request options (`config`). A ReActV2 text answer says why the
+provider stopped its reply (`:finish_reason`). Calls and connections that do
+not use the new options send and receive what they did in 0.12.2, apart from
+one new metadata key on such predictions. Under Imp's versioning rule this is
+a patch release.
 
 ## Install
 
@@ -28,27 +30,40 @@ in its release definition; see [releases that use MCP or
 ACP](docs/production.md#releases-that-use-mcp-or-acp).
 Ordinary Imp startup starts no protocol endpoint.
 
-## Changes and upgrading from 0.12.0
+## Changes and upgrading from 0.12.2
 
 Under `{:imp, "~> 0.12.0"}`, run `mix deps.update imp` and commit `mix.lock`.
-No code or data migration is needed.
+No code or data migration is needed. A caller that uses any of the additions
+below should require `{:imp, "~> 0.12.3"}`, since earlier 0.12 releases do not
+have them.
 
-- **A request names each tool call once.** A provider can return the same
-  tool call ID for two calls in one conversation (seen from OpenRouter with a
-  Google model). The upstream then refused every later request that replayed
-  both with 400 `INVALID_ARGUMENT`, so the conversation could not continue.
-  `Imp.Clients.ReqLLM` now sends a repeated call under a fresh ID (`<id>_2`,
-  ...), and gives its results and the reasoning details that name it the same
-  ID. Stored histories and the text the model reads are unchanged.
-- **Added:** `Imp.Adapter.Chat`, and the JSON and XML adapters that share its
-  objective, take an `:agent_line` option: a string replaces the guidance's
-  "You are an Agent..." line and `nil` leaves it out. With `Imp.react/3`, pass
-  it as `adapter_opts: [agent_line: ...]`. Without it the line is unchanged.
+- **Added:** `Imp.MCP.connect(..., result_mode: :content)`. An imported tool
+  returns what the server wrote in `content` for a model: its text, or its
+  text and typed images as `:multimodal` returns them. Where that text only
+  repeats `structuredContent` as JSON, or there is no content, it returns
+  `structuredContent`, as `:multimodal` does. `Imp.MCP.call(tool, arguments,
+  result_mode: :structured)` calls the same tool with its result read in
+  another mode. Existing modes are unchanged.
+- **Added:** an `Imp.Predict.ReActV2` call can pass `config` beside its
+  inputs, as it can `max_iters` and `last_request_note`: request options
+  merged over the program's `:config` for every request of that call only,
+  such as an output budget for one last request on a history. A value that is
+  not a keyword list, or that names `:tools` or `:tool_choice`, is refused with
+  `{:error, {:invalid_react_v2_config, value}}` before any model call.
+- **Added:** a ReActV2 prediction whose answer is a reply's text
+  (`termination_reason: :answered` or `:last_text`) carries that reply's
+  `:finish_reason` in its metadata, as the LM client reports it (`:stop`,
+  `:length`, ...). `:length` means the provider's output limit cut the answer
+  short. The termination itself is unchanged: a cut answer is still the text.
 
-Rollback means restoring `0.12.0` in the lock; a conversation with a repeated
-tool call ID then fails again at the provider. A provider-free test replays a
-conversation with a repeated ID and checks the IDs in the request; this
-release does not establish which providers repeat IDs, or how often.
+Rollback means restoring `0.12.2` in the lock. A call that passes `config`
+then has it read as an extra input and ignored, with a warning; a caller that
+reads `:finish_reason` finds it absent; `result_mode: :content` is refused at
+connect. Provider-free tests check the request options a call sends, the
+refusal of a bad `config`, the finish reason on both kinds of text answer, and
+an HTTP MCP server read in `:content` and `:structured` modes; this release
+does not establish what any particular provider reports as a finish reason
+beyond what its LM client passes through.
 See the [changelog](CHANGELOG.md) for every change.
 
 ## Known limits

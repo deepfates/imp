@@ -39,6 +39,12 @@ defmodule Imp.Predict.ReActV2 do
       not run.
     * `:context_projection` — how many prior episodes were left out of a
       request (see below).
+    * `:finish_reason` — for a turn whose answer is a reply's text
+      (`:answered`, `:last_text`), why the provider stopped that reply, as
+      the LM client reports it in the result's provider metadata
+      (`Imp.Clients.ReqLLM`: `:stop`, `:length`, ...). `:length` means the
+      provider's output limit cut the answer short: the text is what was
+      written before it. Absent when the client reports none.
 
   `Imp.Prediction.complete?/1` is false exactly when the reason is
   `:incomplete`.
@@ -126,11 +132,15 @@ defmodule Imp.Predict.ReActV2 do
 
   ## Per-call options
 
-  A call may give `max_iters` and `last_request_note` beside its inputs,
-  under atom or string keys. Each replaces the program's own for that call
-  and is not an input field. `max_iters` is a non-negative integer and
-  `last_request_note` a string or `nil`; any other value is refused before a
-  model is called.
+  A call may give `max_iters`, `last_request_note` and `config` beside its
+  inputs, under atom or string keys. Each applies to that call only and is
+  not an input field. `max_iters` and `last_request_note` replace the
+  program's own; `max_iters` is a non-negative integer and
+  `last_request_note` a string or `nil`. `config` is a keyword list of
+  request options merged over the program's `:config` for every request of
+  the call, such as `max_tokens: 4_000`; it may not name `:tools` or
+  `:tool_choice`, which the loop chooses on each step. Any other value is
+  refused before a model is called.
 
   Together they continue a conversation the caller holds. A call with a
   `:history`, `max_iters: 0` and a note makes one request, the last request:
@@ -140,7 +150,9 @@ defmodule Imp.Predict.ReActV2 do
   a conversation it has had, as that model saw it, for instance for a summary
   of it before the history is shortened. Codex CLI and Anthropic's SDK
   compaction build that request the same way: the conversation's own
-  messages, then one instruction.
+  messages, then one instruction. The call's `config` gives that request
+  its own options, an output budget for instance, and the prediction's
+  `:finish_reason` says whether the reply was cut short by it.
 
   A request refused because the context window is full is not an
   interruption of this kind: a further request would be refused the same way,
@@ -518,8 +530,14 @@ defmodule Imp.Predict.ReActV2 do
          :ok <- validate_call_max_iters(max_iters),
          {note, inputs} <- pop_call_option(inputs, :last_request_note, react.last_request_note),
          :ok <- validate_call_note(note),
+         {config, inputs} <- pop_call_option(inputs, :config, []),
+         :ok <- validate_call_config(config),
          {:ok, history} <- coerce_history(Map.get(inputs, :history, Map.get(inputs, "history"))) do
-      react = %{react | last_request_note: note}
+      react = %{
+        react
+        | last_request_note: note,
+          react: %{react.react | config: Keyword.merge(react.react.config, config)}
+      }
 
       # ReActV2 filters inputs down to signature names before any Predict call,
       # so extra keys would vanish silently here; warn at this boundary the same
@@ -566,7 +584,7 @@ defmodule Imp.Predict.ReActV2 do
               history =
                 append_history(history, history_event(pending, prediction, calls, [], outputs))
 
-              final_prediction(outputs, history, :answered)
+              final_prediction(outputs, history, :answered, finish_reason(%{}, prediction))
 
             {:none, cause} ->
               emit_reasoning(prediction, turn)
@@ -715,7 +733,7 @@ defmodule Imp.Predict.ReActV2 do
             outputs,
             history,
             :last_text,
-            put_unexecuted(%{termination_cause: cause}, calls)
+            %{termination_cause: cause} |> put_unexecuted(calls) |> finish_reason(prediction)
           )
 
         {:error, reason, history} ->
@@ -1462,6 +1480,19 @@ defmodule Imp.Predict.ReActV2 do
     {:ok, Imp.Prediction.new(outputs, metadata: metadata)}
   end
 
+  # Why the provider stopped the reply whose text is the answer, where the LM
+  # client reports it: in the result's provider metadata (`Imp.LM.Result`'s
+  # `:req_llm` entry, which `Imp.Usage` reads usage from too).
+  defp finish_reason(metadata, prediction) do
+    provider = map_value(prediction.metadata, :req_llm) || %{}
+    maybe_put(metadata, :finish_reason, map_value(provider, :finish_reason))
+  end
+
+  defp map_value(map, key) when is_map(map),
+    do: Map.get(map, key) || Map.get(map, Atom.to_string(key))
+
+  defp map_value(_other, _key), do: nil
+
   defp incomplete_prediction(history, cause, error) do
     metadata = %{termination_cause: cause}
 
@@ -1650,6 +1681,16 @@ defmodule Imp.Predict.ReActV2 do
 
   defp validate_call_note(note) when is_binary(note) or is_nil(note), do: :ok
   defp validate_call_note(note), do: {:error, {:invalid_react_v2_last_request_note, note}}
+
+  # The loop chooses the tool roster and `tool_choice` on each step.
+  defp validate_call_config(config) when is_list(config) do
+    if Keyword.keyword?(config) and
+         not Enum.any?([:tools, :tool_choice], &Keyword.has_key?(config, &1)),
+       do: :ok,
+       else: {:error, {:invalid_react_v2_config, config}}
+  end
+
+  defp validate_call_config(config), do: {:error, {:invalid_react_v2_config, config}}
 
   defp validate_call_max_iters(max_iters) when is_integer(max_iters) and max_iters >= 0, do: :ok
 
