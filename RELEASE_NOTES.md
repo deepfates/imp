@@ -1,25 +1,26 @@
-# Imp v0.12.3
+# Imp v0.13.0
 
 Imp is a framework for typed, optimizable language-model programs on the BEAM.
-This release adds three things a caller opts into. An MCP tool can return
-the text its server wrote for a model while a host still reads its structured
-result (`result_mode: :content`, `Imp.MCP.call/3`). A ReActV2 call can give
-its own request options (`config`). A ReActV2 text answer says why the
-provider stopped its reply (`:finish_reason`). Calls and connections that do
-not use the new options send and receive what they did in 0.12.2, apart from
-one new metadata key on such predictions. Under Imp's versioning rule this is
-a patch release.
+This release changes what a tool loop's model reads. A ReActV2, ReAct or
+Avatar history keeps each input, tool call and tool result exactly as it was,
+where before anything credential-shaped in them was replaced by
+`"[REDACTED]"` on every later step. A ReActV2 step whose answer is its plain
+reply no longer presents that answer as a named output field. It also adds
+two things a host can read: when each tool result came back, and whether a
+call's input token count already includes the cached prompt. A caller's model
+reads different requests, and a host that stores histories stores different
+data, so under Imp's versioning rule this is a minor release.
 
 ## Install
 
 ```elixir
-{:imp, "~> 0.12.0"}
+{:imp, "~> 0.13.0"}
 ```
 
-`~> 0.12.0` takes later 0.12 patch releases and nothing newer. The two-part
-form, `~> 0.12`, means `>= 0.12.0 and < 1.0.0` in Mix, so `mix deps.update
+`~> 0.13.0` takes later 0.13 patch releases and nothing newer. The two-part
+form, `~> 0.13`, means `>= 0.13.0 and < 1.0.0` in Mix, so `mix deps.update
 imp` under it takes every later 0.x release, including minor releases that
-change what callers receive. Earlier install lines used the two-part form.
+change what callers receive.
 
 Every dependency comes from Hex. Use a path dependency only while developing
 against a local checkout.
@@ -30,46 +31,75 @@ in its release definition; see [releases that use MCP or
 ACP](docs/production.md#releases-that-use-mcp-or-acp).
 Ordinary Imp startup starts no protocol endpoint.
 
-## Changes and upgrading from 0.12.2
+## Changes and upgrading from 0.12
 
-Under `{:imp, "~> 0.12.0"}`, run `mix deps.update imp` and commit `mix.lock`.
-No code or data migration is needed. A caller that uses any of the additions
-below should require `{:imp, "~> 0.12.3"}`, since earlier 0.12 releases do not
-have them.
+Change the Imp dependency to `{:imp, "~> 0.13.0"}`, run `mix deps.update imp`,
+and commit `mix.lock`. No data migration is needed.
 
-- **Added:** `Imp.MCP.connect(..., result_mode: :content)`. An imported tool
-  returns what the server wrote in `content` for a model: its text, or its
-  text and typed images as `:multimodal` returns them. Where that text only
-  repeats `structuredContent` as JSON, or there is no content, it returns
-  `structuredContent`, as `:multimodal` does. `Imp.MCP.call(tool, arguments,
-  result_mode: :structured)` calls the same tool with its result read in
-  another mode. Existing modes are unchanged.
-- **Added:** an `Imp.Predict.ReActV2` call can pass `config` beside its
-  inputs, as it can `max_iters` and `last_request_note`: request options
-  merged over the program's `:config` for every request of that call only,
-  such as an output budget for one last request on a history. A value that is
-  not a keyword list, or that names `:tools` or `:tool_choice`, is refused with
-  `{:error, {:invalid_react_v2_config, value}}` before any model call.
-- **Added:** a ReActV2 prediction whose answer is a reply's text
-  (`termination_reason: :answered` or `:last_text`) carries that reply's
-  `:finish_reason` in its metadata, as the LM client reports it (`:stop`,
-  `:length`, ...). `:length` means the provider's output limit cut the answer
-  short. The termination itself is unchanged: a cut answer is still the text.
+- **Histories keep what the model read.** `Imp.Predict.ReActV2`,
+  `Imp.Predict.ReAct` and `Imp.Predict.Avatar` no longer run `Imp.Redaction`
+  over each input, tool call and tool result as they add it to the history.
+  Before, a result that only contained something credential-shaped, such as
+  a quoted `curl -H "Authorization: Bearer ..."` or a JWT under discussion,
+  was replaced whole by `"[REDACTED]"`, and the model read that placeholder
+  on every later step instead of what the tool returned. Run events,
+  telemetry, traces, `Imp.inspect_history/2` and saved artifacts still redact
+  their own copies. Migration: a host that stores a history now stores what
+  the model read. Store it privately, and use `Imp.History.redact/1` or the
+  run's events for anything shown or shipped elsewhere. A history stored
+  before this release keeps its `"[REDACTED]"` strings; the original text is
+  not recoverable from it.
+- **A plain-text ReActV2 step does not present its answer as a field.** In a
+  ReActV2 step with one unconstrained text output and natively held tools,
+  the answer is the message the model sends without a tool call. The Chat
+  adapter's system message no longer lists that output under "Your output
+  fields are:" or "The outputs to produce are:", and its agent and finish
+  lines no longer name it. The finish line reads "When the final answer is
+  ready, reply without calling a tool.", followed by the field's description
+  if it has one. Models had been writing the field's name into the reply as
+  a label, and the label became part of the answer. Parsing is unchanged, so
+  a reply written in markers is still read. Signatures with `submit`,
+  written tool calls, and the JSON and XML adapters are unchanged. A
+  signature with no instructions of its own still opens with the default
+  "Given the fields ..., produce the fields ...". Migration: a test that
+  compares that system message exactly expects the new text.
+- **Added: tool results carry when they came back.** ReActV2 records
+  `returned_at` (ISO 8601, UTC) beside each tool result in the history, and
+  the Chat adapter passes it to a `:tool_result_renderer` as
+  `%{id:, name:, returned_at:}` (`nil` for a result recorded without one,
+  such as one in a history saved by an earlier release). Nothing is shown by
+  default. A host that wants the model to know the time during a tool loop
+  renders it there. The stamp is recorded once, so every later request
+  carries the same bytes and a cached prompt prefix survives. GEPA leaves
+  these times out of what its reflection model reads. Two runs of the same
+  program no longer return equal histories.
+- **Added: usage says whether input includes cached tokens.** A call through
+  `Imp.Clients.ReqLLM`, streamed or not, carries `input_includes_cached` in
+  its `usage`. OpenAI-style usage, as OpenAI and OpenRouter report it,
+  counts cache reads inside the input tokens (`true`). Anthropic-style usage
+  counts them apart (`false`). The flag is ReqLLM's own answer, the one it
+  prices the call by, and a flag the provider's usage already carries is
+  kept. The ATIF export's `prompt_tokens` for an Anthropic-style call now
+  counts its cache reads and writes; before, it was only the tokens after
+  the last cache breakpoint. A caller that matches a usage map exactly sees
+  the new key.
 
-Rollback means restoring `0.12.2` in the lock. A call that passes `config`
-then has it read as an extra input and ignored, with a warning; a caller that
-reads `:finish_reason` finds it absent; `result_mode: :content` is refused at
-connect. Provider-free tests check the request options a call sends, the
-refusal of a bad `config`, the finish reason on both kinds of text answer, and
-an HTTP MCP server read in `:content` and `:structured` modes; this release
-does not establish what any particular provider reports as a finish reason
-beyond what its LM client passes through.
+Rollback means restoring `0.12.3` in the lock. Histories are then redacted as
+they are built again, the plain-text step lists its output field again,
+`returned_at` is no longer recorded (a renderer receives `nil`), and usage
+loses `input_includes_cached`. Provider-free tests check that
+the next request carries a tool result as the tool returned it, for each of
+the three loops, along with the exact system message of a plain-text step,
+the time a renderer receives, and the flag and ATIF prompt count for both
+usage shapes. This release does not establish how any particular model
+responds to the new system message.
 See the [changelog](CHANGELOG.md) for every change.
 
 ## Known limits
 
 - The usage map (`:usage` on the `:model_response` event, `Imp.Usage`,
-  `Imp.Prediction.get_lm_usage/1`) is ReqLLM's, unchanged. Its `:cost` and
+  `Imp.Prediction.get_lm_usage/1`) is ReqLLM's, with `input_includes_cached`
+  added. Its `:cost` and
   `:total_cost` are ReqLLM's catalog estimate, not a charge, for streamed
   and non-streamed calls alike, and OpenRouter's charge is its `"cost"`.
   Read money from `cost` and `estimated_cost`.
