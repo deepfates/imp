@@ -82,7 +82,7 @@ defmodule ReActV2StepContractTest do
       })
 
   defp agent(adapter, lm) do
-    agent = Imp.react("intent -> answer", [look()], lm: lm, adapter: adapter)
+    agent = Imp.react("intent -> answer", [look()], finish: :text, lm: lm, adapter: adapter)
     %{agent | react: %{agent.react | demos: [demo()]}}
   end
 
@@ -197,6 +197,7 @@ defmodule ReActV2StepContractTest do
   test "PlanFirst keeps its plan described" do
     agent =
       Imp.react("intent -> answer", [look()],
+        finish: :text,
         lm: lm(true, ["done."]),
         adapter: Imp.Adapter.PlanFirst
       )
@@ -221,6 +222,7 @@ defmodule ReActV2StepContractTest do
 
       agent =
         Imp.react("intent -> answer", [look()],
+          finish: :text,
           lm: lm(true, [call, unquote(reply)]),
           adapter: unquote(adapter)
         )
@@ -357,7 +359,9 @@ defmodule ReActV2StepContractTest do
     lm = %{lm | tool_calling: {model, false}}
 
     assert {:ok, prediction} =
-             Imp.call(Imp.react("intent -> answer", [look()], lm: lm), %{intent: "hi"})
+             Imp.call(Imp.react("intent -> answer", [look()], finish: :text, lm: lm), %{
+               intent: "hi"
+             })
 
     assert Imp.get(prediction, :answer) == "It holds 1."
 
@@ -398,7 +402,7 @@ defmodule ReActV2StepContractTest do
     }
 
     search = Imp.tool(:search, "Search the catalog", fn _ -> "ok" end, schema: schema)
-    agent = Imp.react("intent -> answer", [search], lm: lm(false, ["done."]))
+    agent = Imp.react("intent -> answer", [search], finish: :text, lm: lm(false, ["done."]))
     assert {:ok, _} = Imp.call(agent, %{intent: "find"})
     [{messages, _opts}] = requests()
     listing = List.last(messages).content

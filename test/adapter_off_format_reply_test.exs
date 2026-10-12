@@ -218,7 +218,9 @@ defmodule AdapterOffFormatReplyTest do
         )
 
       look = Imp.tool(:look, "Look at a thing", fn _ -> %{"seen" => [1]} end)
-      agent = Imp.react("question -> answer", [look], lm: lm, adapter: Imp.Adapter.XML)
+
+      agent =
+        Imp.react("question -> answer", [look], finish: :text, lm: lm, adapter: Imp.Adapter.XML)
 
       assert {:ok, prediction} = Imp.call(agent, %{question: "Capital of France?"})
       assert Imp.get(prediction, :answer) == "Paris."
@@ -300,7 +302,7 @@ defmodule AdapterOffFormatReplyTest do
           "Its capital is Paris."
         end)
 
-      agent = Imp.react("question -> answer", [look], lm: lm, adapter: adapter)
+      agent = Imp.react("question -> answer", [look], finish: :text, lm: lm, adapter: adapter)
       assert {:ok, prediction} = Imp.call(agent, %{question: "Capital of France?"})
       {prediction, :counters.get(counter, 1)}
     end

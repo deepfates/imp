@@ -4,6 +4,44 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Changed
+
+- Breaking: `Imp.Predict.ReActV2` ends every turn through `submit`, as DSPy's
+  ReActV2 does, whatever the signature. Since 0.5.0 a signature with one
+  unconstrained text output had no `submit` tool, and the first message
+  without a tool call was the answer (`:answered`). Measured on replayed
+  agent-loop turns (deepfates/imp#336), that ending published notes the model
+  meant to keep: a model whose own reasoning had decided to say nothing still
+  wrote a closing remark, which became the answer in 45 of 48 samples, and
+  notes written before an answer were published with it. With the `submit`
+  ending those remarks fell to 0 of 48, with no answers lost where one was
+  owed. Now a step that calls no tool is a thought: it is kept in the history
+  as the step it was, and one forced request follows, the same request with
+  that step appended, `tool_choice` naming `submit` and `reasoning_effort:
+  nil`, with nothing else added (`:forced_submit`, `termination_cause:
+  :empty_tool_calls`). Keeping the step differs from DSPy, which drops it:
+  dropped, a model that had already written its answer had to write it again
+  with reasoning off, and some of those rewrites ran to the output limit. An
+  empty answer is a `submit` of `""`. It costs about one request more when a
+  model ends in prose. Migration: pass `finish: :text` to keep the plain-text
+  ending (`:answered`, and `:last_text` for an interrupted turn) exactly as
+  before; it needs one output, a string with no constraints, and is refused
+  for any other signature. A `tool_policy` list must now name `:submit` for
+  such a signature too. A saved program loads ending with `submit` unless it
+  was saved with `finish: :text`.
+- Breaking: when the forced `submit` request comes back without a `submit`, or
+  the provider cannot force a tool, the turn is `:incomplete` by default, as
+  DSPy gives no answer there (it raises). Imp used to run a tools-disabled
+  extractor that wrote the outputs anyway (`:extracted`).
+  `termination_error.forced_submit` is `:no_submit_call` when the model
+  answered without `submit`. Migration: pass `on_ignored_submit: :extract` to
+  keep the extractor.
+- `:last_request_note` is not added to the forced `submit` after a step that
+  called no tool, which is the model ending its turn: a host message there
+  was read by models as something new that happened, and answers were lost.
+  It is still added, as a user message, before the last request of an
+  interrupted turn (`max_iters`, a failed step).
+
 ## 0.13.0 — 2026-10-12
 
 ### Added

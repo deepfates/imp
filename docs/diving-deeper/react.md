@@ -32,30 +32,55 @@ prompt cache can reuse.
 The history comes back as `prediction.metadata.history`. Pass it as the
 `history` input of the next call to continue the conversation.
 
-### 2. How a turn ends depends on the outputs
+### 2. How a turn ends: `submit`, as in DSPy
 
-A signature with **one unconstrained text output** (`ticket -> reply`) ends
-the way most tool loops end: when the model stops calling tools and writes
-text, that text is the answer. No `submit` tool is offered. This costs one
-request fewer and matches what models are trained to do.
+Every loop gets a `submit` tool whose parameters are the signature's outputs,
+as in DSPy's ReActV2, and the model ends its turn by calling it. Calling it
+with valid values ends the turn; values that do not fit the signature are
+recorded as that call's error, and the loop goes on. The name `submit` is
+reserved.
 
-**Every other signature** (several outputs, one that is not text, or one text
-output with a constraint such as an enum, a pattern or an answer shape) gets a
-`submit` tool whose parameters are the outputs, as in DSPy. Calling it with
-valid values ends the turn; values that do not fit the signature are recorded
-as that call's error, and the loop goes on. The name `submit` is reserved.
+A step that writes text and calls no tool is a thought, not an answer. It is
+kept in the history as the step it was, and one forced request follows: the
+same request with that step appended, `tool_choice` naming `submit`, and
+reasoning effort unset, as DSPy sends it. Imp adds nothing else to it. The
+model usually restates its answer in `submit`; if it still does not call
+`submit`, the turn ends `:incomplete` (section 3).
 
-The one-text-output rule has a consequence to design for: any step that
-writes text and calls no tool has answered. A model that says what it is
-about to do, instead of doing it, has given that sentence as its answer.
-A constrained output never takes that path: its allowed values are in
-`submit`'s schema, and text is not an answer to it.
+This restores DSPy's ending. From Imp 0.5 to 0.13 a signature with one
+unconstrained text output ended on plain text: the first message without a
+tool call was the answer. Measured on replayed agent-loop turns
+([#336](https://github.com/deepfates/imp/issues/336)), that ending published
+notes the model meant to keep: a model whose own reasoning had decided to say
+nothing still wrote a closing remark, and it became the answer in 45 of 48
+samples, and notes written before an answer were published with it. With the
+`submit` ending those remarks dropped to 0 of 48, with no answers lost where
+one was owed. It costs about one request more when a model ends in prose.
+
+Keeping the thought in the forced request differs from DSPy, which leaves it
+out. Left out, a model that had written its finished answer as text had to
+write it again with reasoning off, and some of those rewrites ran to the
+output limit; kept, the model restated it.
+
+#### The plain-text ending, as an option
+
+`finish: :text` keeps the plain-text ending for a host that wants it. The
+signature must have exactly one output, a string with no constraints; any
+other signature is refused when the program is built. No `submit` tool is
+offered, and when the model stops calling tools and writes text, that text is
+the answer (`:answered`), in that one request.
+
+Design for its consequence: any step that writes text and calls no tool has
+answered. A model that says what it is about to do, instead of doing it, has
+given that sentence as its answer, and so has a model that writes notes
+before its reply.
 
 The prompt says the same. When the provider holds the tools natively, the
-Chat adapter's system message for `Imp.react("intent -> answer", [look])`
-shows the input layout, no output markers to write and no output fields,
-because the answer is the plain text of the message that calls no tool. The
-answer's description, when it has one, follows the sentence that says so:
+Chat adapter's system message for
+`Imp.react("intent -> answer", [look], finish: :text)` shows the input
+layout, no output markers to write and no output fields, because the answer
+is the plain text of the message that calls no tool. The answer's
+description, when it has one, follows the sentence that says so:
 
 ```text
 --- system
@@ -83,30 +108,37 @@ change: pass `adapter_opts: [agent_line: "..."]` for your own text, or
 `agent_line: nil` to leave it out. A reply that still writes
 `[[ ## answer ## ]]` sections, as replies did before, is read as before.
 When the model writes its tool calls as text instead (an LM without native
-tool calling), and for every signature with `submit`, the step keeps the
+tool calling), and for every loop with `submit`, the step keeps the
 `[[ ## field ## ]]` layout and its `[[ ## completed ## ]]` marker.
 
-### 3. An interrupted turn gets one last request
+### 3. How a turn ends without an answer
 
-A turn is interrupted when it reaches `max_iters`, when a step's request or
-parse fails, or when a step gives neither a tool call nor an answer. Rather
-than return nothing, Imp makes one more request:
+A turn is interrupted when it reaches `max_iters`, or when a step's request
+or parse fails. Rather than return nothing, Imp makes one more request:
 
-- With `submit`, the request names `submit` as the required tool, as DSPy
-  does (`:forced_submit`). If the provider cannot honour that, a typed
-  extractor with no tools reads the history and fills the outputs
-  (`:extracted`).
-- With one text output, the request is an ordinary step, same tools, and its
+- With `submit`, the forced `submit` request above (`:forced_submit`).
+- With `finish: :text`, the request is an ordinary step, same tools, and its
   text is the answer (`:last_text`). Tool calls in it are not run; they are
   listed in `unexecuted_tool_calls`.
 
-If the last request does not produce an answer either, the turn ends
-`:incomplete`. That is still `{:ok, prediction}`, carrying the history and a
-`termination_cause`, and `Imp.Prediction.complete?/1` is false for it; a turn
-without an answer is never reported complete.
+When the forced `submit` request comes back without a `submit` (some
+providers ignore a named `tool_choice`), or the provider cannot force a tool
+at all, DSPy raises and gives nothing. Imp ends the turn `:incomplete`. That is
+still `{:ok, prediction}`, carrying the history, a `termination_cause`, and
+`termination_error.forced_submit: :no_submit_call` when the model answered
+without `submit`. `Imp.Prediction.complete?/1` is false for it; a turn without
+an answer is never reported complete.
 
-Imp adds nothing to that request unless you pass `last_request_note:`, one
-line of your own text, sent as a user message and kept in the history.
+`on_ignored_submit: :extract` asks for a guess instead: a typed extractor with
+no tools reads the history and fills the outputs (`:extracted`). That is one
+more request, and its outputs come from a model that was not asked to answer
+the turn.
+
+Imp adds nothing to the last request of an interrupted turn unless you pass
+`last_request_note:`, one line of your own text. It adds a user message before
+that request, kept in the history. It is not added to the forced `submit`
+after a step that called no tool: that step is the model ending its turn, and
+a message there reads to the model as something new that happened.
 
 A request refused because the context window is full is different. Imp first
 retries with older episodes left out of the prompt (see below); if the request
@@ -221,10 +253,38 @@ The history keeps provider reasoning data needed to continue a turn, and
 tool results in full, so store it privately. `Imp.History.redact/1` returns a
 copy safe for logs.
 
+### A text step, then `submit`
+
+A step that writes text and calls no tool is a thought. The forced request
+that follows names `submit`, and the model restates its answer there:
+
+```elixir
+lm =
+  script.([
+    %{tool_calls: [%{name: "on_call", arguments: %{"team" => "atlas"}}]},
+    %{next_thought: "Maya from atlas is looking at the duplicate charge.", tool_calls: []},
+    %{tool_calls: [%{name: "submit", arguments: %{"reply" => "Maya from atlas is looking at the duplicate charge."}}]}
+  ])
+
+reply = Imp.react(Imp.signature("ticket -> reply", "Tell the customer who is handling their ticket."), [on_call], lm: lm)
+{:ok, prediction} = Imp.call(reply, %{ticket: "We were charged twice this month."})
+
+{Imp.get(prediction, :reply), prediction.metadata.termination_reason, prediction.metadata.termination_cause}
+#=> {"Maya from atlas is looking at the duplicate charge.", :forced_submit, :empty_tool_calls}
+```
+
+The thought stays in the history as its own step, before the `submit`:
+
+```elixir
+for step <- prediction.metadata.history.messages, do: Map.get(step, :next_thought)
+#=> [nil, "Maya from atlas is looking at the duplicate charge.", nil]
+```
+
 ### A text answer
 
-A signature with one unconstrained text output asks for that field directly
-and ends when the model writes text without a tool call:
+With `finish: :text`, a signature with one unconstrained text output asks
+for that field directly and ends when the model writes text without a tool
+call:
 
 ```elixir
 lm =
@@ -233,34 +293,35 @@ lm =
     %{reply: "Maya from atlas is looking at the duplicate charge.", tool_calls: []}
   ])
 
-reply = Imp.react(Imp.signature("ticket -> reply", "Tell the customer who is handling their ticket."), [on_call], lm: lm)
+reply = Imp.react(Imp.signature("ticket -> reply", "Tell the customer who is handling their ticket."), [on_call], lm: lm, finish: :text)
 {:ok, prediction} = Imp.call(reply, %{ticket: "We were charged twice this month."})
 
 {Imp.get(prediction, :reply), prediction.metadata.termination_reason}
 #=> {"Maya from atlas is looking at the duplicate charge.", :answered}
 ```
 
-That is also how a turn ends when the model writes text instead of acting.
-Given "I can't log in after resetting my password." and instructions to look
-up who is on call before replying, `gpt-5.4-mini` called the tool and named
-Ines in five runs of six. In the sixth it wrote the tool call out as JSON
-text instead of making it, and that text was the answer. When an
-answer has to follow a tool call, give the signature a second output, so the
-turn ends only through `submit`, or end it from the tool with `finish_on:`.
+That is also how such a turn ends when the model writes text instead of
+acting. Given "I can't log in after resetting my password." and instructions
+to look up who is on call before replying, `gpt-5.4-mini` called the tool and
+named Ines in five runs of six. In the sixth it wrote the tool call out as
+JSON text instead of making it, and that text was the answer. When an answer
+has to follow a tool call, use the default ending, or end the turn from the
+tool with `finish_on:`.
 
 ### One more request on a history you hold
 
 A call can give its own `max_iters` and `last_request_note` beside its
-inputs. With a history, `max_iters: 0` and a note, the call makes one
-request, the last one: the loop's system message, its tools and the history
-as the model saw them, then the note. No tool runs, and the text the model
-writes is the answer. Codex CLI and Anthropic's SDK build a request to
-summarise a conversation the same way: the conversation's own messages, then
-one instruction.
+inputs. For a program built with `finish: :text`, a call with a history,
+`max_iters: 0` and a note makes one request, the last one: the loop's system
+message, its tools and the history as the model saw them, then the note. No
+tool runs, and the text the model writes is the answer. Codex CLI and
+Anthropic's SDK build a request to summarise a conversation the same way: the
+conversation's own messages, then one instruction. (With the default ending,
+the same call makes the forced `submit` request after the note.)
 
 ```elixir
 lm = script.([%{reply: "Maya from atlas has the duplicate charge.", tool_calls: []}])
-reply = Imp.react(Imp.signature("ticket -> reply"), [on_call], lm: lm)
+reply = Imp.react(Imp.signature("ticket -> reply"), [on_call], lm: lm, finish: :text)
 
 {:ok, summary} =
   Imp.call(reply, %{
@@ -297,13 +358,14 @@ paging = %{on_call | run: fn %{"team" => team} -> "paged #{team}" end}
 lm =
   script.([
     %{tool_calls: [%{name: "on_call", arguments: %{"team" => "harbor"}}]},
-    %{reply: "Paged.", tool_calls: []}
+    %{tool_calls: [%{name: "submit", arguments: %{"reply" => "Paged."}}]}
   ])
 
 reply = Imp.react(Imp.signature("ticket -> reply"), [on_call], lm: lm)
 {:ok, prediction} = Imp.call(reply, %{ticket: "The deploy is stuck.", tools: [paging]})
 
 for step <- prediction.metadata.history.messages, result <- step.tool_call_results,
+    result.name == "on_call",
     do: result.result
 #=> ["paged harbor"]
 ```
@@ -350,27 +412,28 @@ step wins.
 
 | Reason | Meaning |
 | --- | --- |
-| `:answered` | one text output: a step wrote the answer |
 | `:submit` | the model called `submit` with valid outputs |
 | `:finished_by_tool` | a `finish_on` function finished the turn; `finished_by_tool` names the tool |
-| `:forced_submit` | interrupted; the last request, with `submit` required, answered |
-| `:extracted` | interrupted; the provider could not require `submit`, and the extractor answered |
-| `:last_text` | interrupted; one text output, and the last request's text is the answer |
-| `:incomplete` | interrupted, and there is no answer |
+| `:forced_submit` | the forced request, with `submit` required, answered |
+| `:answered` | `finish: :text`: a step wrote the answer |
+| `:last_text` | `finish: :text`, interrupted; the last request's text is the answer |
+| `:extracted` | `on_ignored_submit: :extract`: the forced `submit` got none, and the extractor answered |
+| `:incomplete` | there is no answer |
 
-When the turn was interrupted, `termination_cause` says why:
+When the turn ended at a last request, `termination_cause` says why:
 
 | Cause | Meaning |
 | --- | --- |
 | `:max_iters` | the step budget ran out |
 | `:parse_error` | a step's reply could not be read |
 | `:prediction_error` | a step's request failed |
-| `:empty_tool_calls` | with `submit`: a step called no tool |
+| `:empty_tool_calls` | with `submit`: a step called no tool, so the model ended its turn |
 | `:context_window_exceeded` | the prompt no longer fits, even with old episodes left out |
 | `:deadline_exceeded` | the process's `Imp.Deadline` passed |
 
 For `:incomplete`, `termination_error` holds the redacted errors of the
-requests that failed.
+requests that failed, and `forced_submit: :no_submit_call` when the forced
+request was answered without `submit`.
 
 ```elixir
 lm =
@@ -386,9 +449,8 @@ lm =
 #=> {:forced_submit, :max_iters, "Maya"}
 ```
 
-An enum output keeps `submit`, so text alone does not end the turn. A model
-that only ever writes text is interrupted, the forced `submit` gets text too,
-and the turn has no answer:
+Text alone never ends the turn. A model that only ever writes text gets the
+forced `submit`; if that gets text too, the turn has no answer:
 
 ```elixir
 lm =
@@ -450,17 +512,23 @@ that design. The trajectory-based loop remains as `Imp.Predict.ReAct` for
 programs that need it.
 
 What matches DSPy's ReActV2: structured history replayed as native messages,
-several tool calls per step, a `submit` tool generated from the outputs,
-the forced `submit` when a turn is interrupted, and passing `history` back to
-continue.
+several tool calls per step, a `submit` tool generated from the outputs for
+every signature, the forced `submit` when a step calls no tool or a turn is
+interrupted, no answer when that forced request gets no `submit`, and passing
+`history` back to continue.
 
 What differs:
 
-- A signature with one text output has no `submit`; the model's text is the
-  answer (`:answered`, and `:last_text` when interrupted).
+- The step that called no tool stays in the forced `submit` request; DSPy
+  leaves it out.
+- An interrupted turn makes the forced `submit` request rather than raising
+  a step's error, and a turn with no answer is `{:ok, prediction}` with
+  `termination_reason: :incomplete` and a cause, rather than an exception.
+- `finish: :text` ends the turn on plain text instead (`:answered`, and
+  `:last_text` when interrupted).
 - `finish_on:` lets a tool end the turn (`:finished_by_tool`).
-- When the provider cannot require `submit`, an extractor fills the outputs
-  (`:extracted`); a turn with no answer is `:incomplete`, with a cause.
+- `on_ignored_submit: :extract` fills the outputs with an extractor when the
+  forced `submit` gets none (`:extracted`).
 - History, termination reason and cause are in `prediction.metadata`, not
   among the output fields.
 - On a full context window, old episodes are left out of the prompt; DSPy's

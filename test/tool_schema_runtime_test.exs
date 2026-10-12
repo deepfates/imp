@@ -65,7 +65,8 @@ defmodule ToolSchemaRuntimeTest do
         end)
       end)
 
-    react = Imp.react("question -> answer", [schema_tool(parent)], lm: lm, max_iters: 2)
+    react =
+      Imp.react("question -> answer", [schema_tool(parent)], finish: :text, lm: lm, max_iters: 2)
 
     assert {:ok, prediction} = Imp.call(react, %{question: "q"})
     assert Imp.get(prediction, :answer) == "recovered"

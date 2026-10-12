@@ -151,14 +151,18 @@ servers, credentials, and what happens when a server does not answer.
 ## ReAct
 
 `Imp.react/3` builds a tool-using agent: the model calls tools natively, one
-step per request, and the turn ends when it answers in text. A signature a
-text answer cannot fill (several outputs, or a typed one) gets a reserved
-`submit` tool whose arguments are validated against the signature instead.
+step per request, and the turn ends when it calls the reserved `submit` tool,
+whose arguments are the signature's outputs and are validated against it, as
+in DSPy. A step that writes text without a tool call is followed by one
+request that requires `submit`. A `tool_policy` list names `submit` too.
 
 ```elixir
 {:ok, script} =
   Agent.start_link(fn ->
-    [%{tool_calls: [%{name: :lookup, arguments: %{query: "capital-france"}}]}, "Paris"]
+    [
+      %{tool_calls: [%{name: :lookup, arguments: %{query: "capital-france"}}]},
+      %{tool_calls: [%{name: :submit, arguments: %{answer: "Paris"}}]}
+    ]
   end)
 
 lm =
@@ -168,7 +172,8 @@ lm =
     end
   )
 
-react = Imp.react("question -> answer", [lookup], lm: lm, max_iters: 2, tool_policy: [:lookup])
+react =
+  Imp.react("question -> answer", [lookup], lm: lm, max_iters: 2, tool_policy: [:lookup, :submit])
 {:ok, pred} = Imp.call(react, %{question: "Capital of France?"})
 Imp.get(pred, :answer)
 ```
@@ -193,7 +198,7 @@ case live_lm.(max_tokens: 180) do
         ),
         [lookup],
         lm: lm,
-        tool_policy: [:lookup],
+        tool_policy: [:lookup, :submit],
         max_iters: 4
       )
 

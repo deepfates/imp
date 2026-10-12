@@ -126,7 +126,10 @@ defmodule ReActV2StepFailureTest do
       owner = self()
 
       assert {:error, %StepError{history: failed}} =
-               Imp.react("intent -> answer", [look(owner)], lm: failing_after([@look_call]))
+               Imp.react("intent -> answer", [look(owner)],
+                 finish: :text,
+                 lm: failing_after([@look_call])
+               )
                |> Imp.call(%{intent: "hello"})
 
       step_two = :counters.new(1, [])
@@ -143,7 +146,7 @@ defmodule ReActV2StepFailureTest do
         end)
 
       assert {:ok, prediction} =
-               Imp.react("intent -> answer", [look(owner)], lm: answered_nothing)
+               Imp.react("intent -> answer", [look(owner)], finish: :text, lm: answered_nothing)
                |> Imp.call(%{intent: "hello"})
 
       assert prediction.metadata[:termination_reason] == :last_text
@@ -211,7 +214,7 @@ defmodule ReActV2StepFailureTest do
           else: {:ok, "From memory: it is there."}
       end)
 
-    program = Imp.react("intent -> answer", [look(self())], lm: lm)
+    program = Imp.react("intent -> answer", [look(self())], finish: :text, lm: lm)
 
     assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
     assert Imp.get(prediction, :answer) == "From memory: it is there."
@@ -411,6 +414,7 @@ defmodule ReActV2StepFailureTest do
 
     program =
       Imp.react("intent -> answer", [crashing],
+        finish: :text,
         lm: failing_after([@look_call, "I could not tell whether the look happened."])
       )
 

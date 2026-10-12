@@ -44,7 +44,7 @@ defmodule Imp.ReActV2ContextTest do
         req_http_options: [retry: false, max_retries: 0]
       )
 
-    program = Imp.react("intent -> answer", [], lm: lm)
+    program = Imp.react("intent -> answer", [], finish: :text, lm: lm)
 
     history =
       Enum.reduce(1..12, Imp.history(), fn n, history ->
@@ -132,7 +132,10 @@ defmodule Imp.ReActV2ContextTest do
     prior = Imp.history([%{intent: "earlier", answer: "old"}])
 
     {:ok, prediction} =
-      Imp.call(Imp.react("intent -> answer", [tool], lm: lm), %{intent: "now", history: prior})
+      Imp.call(Imp.react("intent -> answer", [tool], finish: :text, lm: lm), %{
+        intent: "now",
+        history: prior
+      })
 
     assert Imp.get(prediction, :answer) == nil
     assert prediction.metadata[:termination_reason] == :incomplete
@@ -172,7 +175,10 @@ defmodule Imp.ReActV2ContextTest do
       ])
 
     {:ok, prediction} =
-      Imp.call(Imp.react("intent -> answer", [], lm: lm), %{intent: "now", history: prior})
+      Imp.call(Imp.react("intent -> answer", [], finish: :text, lm: lm), %{
+        intent: "now",
+        history: prior
+      })
 
     assert Imp.get(prediction, :answer) == "continued"
     assert Enum.take(prediction.metadata[:history].messages, 3) == prior.messages
@@ -221,7 +227,7 @@ defmodule Imp.ReActV2ContextTest do
     prior = Imp.history([%{intent: "prior", answer: "prior-answer"}])
 
     {:ok, prediction} =
-      Imp.call(Imp.react("intent -> answer", [tool], lm: lm), %{
+      Imp.call(Imp.react("intent -> answer", [tool], finish: :text, lm: lm), %{
         intent: "current",
         history: prior
       })
@@ -242,7 +248,9 @@ defmodule Imp.ReActV2ContextTest do
          %Imp.LMError{context_window_exceeded: true, message: "instructions alone exceed window"}}
       end)
 
-    {:ok, prediction} = Imp.call(Imp.react("intent -> answer", [], lm: lm), %{intent: "now"})
+    {:ok, prediction} =
+      Imp.call(Imp.react("intent -> answer", [], finish: :text, lm: lm), %{intent: "now"})
+
     assert Imp.get(prediction, :answer) == nil
     assert prediction.metadata[:termination_reason] == :incomplete
     assert prediction.metadata[:termination_cause] == :context_window_exceeded
@@ -261,7 +269,10 @@ defmodule Imp.ReActV2ContextTest do
     prior = Imp.history(Enum.map(1..1024, &%{intent: "old #{&1}", answer: "old"}))
 
     {:ok, prediction} =
-      Imp.call(Imp.react("intent -> answer", [], lm: lm), %{intent: "now", history: prior})
+      Imp.call(Imp.react("intent -> answer", [], finish: :text, lm: lm), %{
+        intent: "now",
+        history: prior
+      })
 
     assert prediction.metadata[:history] == prior
     assert prediction.metadata[:context_projection].recovery_requests == 8
@@ -282,7 +293,10 @@ defmodule Imp.ReActV2ContextTest do
 
     assert {:error,
             %Imp.Predict.ReActV2.StepError{reason: :unrelated_provider_failure, history: history}} =
-             Imp.call(Imp.react("intent -> answer", [], lm: lm), %{intent: "now", history: prior})
+             Imp.call(Imp.react("intent -> answer", [], finish: :text, lm: lm), %{
+               intent: "now",
+               history: prior
+             })
 
     assert history == prior
 

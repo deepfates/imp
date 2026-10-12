@@ -342,7 +342,7 @@ defmodule ReasoningContinuityTest do
     assert_raise ArgumentError, fn -> String.to_existing_atom(unknown_provider) end
   end
 
-  # A one-text-output loop has no `submit`: the lookup step carries reasoning
+  # A loop that ends on text has no `submit`: the lookup step carries reasoning
   # with its tool call, and the prose answer carries reasoning with its text.
   # The saved history is then resumed by a fresh program after a JSON round
   # trip, and every recorded assistant turn keeps its reasoning on the wire.
@@ -350,7 +350,7 @@ defmodule ReasoningContinuityTest do
     {lm, counter} = scripted_lm(provider, field, value, [:lookup, :text, :text])
 
     lookup = lookup_tool()
-    program = Imp.react("question -> answer", [lookup], lm: lm, max_iters: 4)
+    program = Imp.react("question -> answer", [lookup], finish: :text, lm: lm, max_iters: 4)
 
     assert {:ok, run} =
              Imp.Run.start(program, %{question: "Look up the fixture. #{@input_token}"})
@@ -369,7 +369,7 @@ defmodule ReasoningContinuityTest do
     assert inspect(history, limit: :infinity) =~ @input_token
     refute inspect(events, limit: :infinity) =~ @input_token
 
-    restarted = Imp.react("question -> answer", [lookup], lm: lm, max_iters: 4)
+    restarted = Imp.react("question -> answer", [lookup], finish: :text, lm: lm, max_iters: 4)
 
     assert {:ok, resumed} =
              Imp.call(restarted, %{question: "Continue.", history: reload(history)})
@@ -392,7 +392,7 @@ defmodule ReasoningContinuityTest do
   end
 
   # A loop that still needs `submit` (two outputs) records the answer as a
-  # submit call. Resumed by a one-text-output loop, that call is replayed as
+  # submit call. Resumed by a loop that ends on text, that call is replayed as
   # the answer's text; the assistant turn that made it keeps its reasoning.
   defp assert_submit_continuity(provider, field, value) do
     submit = {:submit, %{"answer" => "done", "source" => "fixture"}}
@@ -408,7 +408,7 @@ defmodule ReasoningContinuityTest do
     assert_received {:wire_request, 2, continuation}
     assert_replayed(continuation, "original-call-1", field, value)
 
-    restarted = Imp.react("question -> answer", [lookup], lm: lm, max_iters: 4)
+    restarted = Imp.react("question -> answer", [lookup], finish: :text, lm: lm, max_iters: 4)
 
     assert {:ok, _resumed} =
              Imp.call(restarted, %{

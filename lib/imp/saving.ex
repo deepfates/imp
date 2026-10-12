@@ -303,6 +303,8 @@ defmodule Imp.Saving do
       "max_iters" => react.max_iters,
       "last_request_note" => react.last_request_note,
       "finish_on" => dump_finish_on(react.finish_on),
+      "finish" => Atom.to_string(react.finish),
+      "on_ignored_submit" => Atom.to_string(react.on_ignored_submit),
       "tool_policy" => dump_tool_policy(react.tool_policy, "ReActV2 tool policy")
     }
   end
@@ -631,11 +633,23 @@ defmodule Imp.Saving do
     require_keys!(state, ["type", "signature", "react", "tools", "max_iters", "tool_policy"])
     tools = load_tools!(state["tools"], "ReActV2")
     signature = Imp.Signature.load!(state["signature"])
+    finish = load_react_v2_choice!(state, "finish", [:submit, :text])
+    Imp.Predict.ReActV2.validate_text_finish!(signature, finish, "loading a ReActV2 program")
+
+    defaults = %Imp.Predict.ReActV2{}
 
     %Imp.Predict.ReActV2{
       signature: signature,
       react: require_predict!(load_state!(state["react"]), "ReActV2"),
-      tools: Imp.Predict.ReActV2.put_submit(tools, signature),
+      tools: Imp.Predict.ReActV2.put_submit(tools, finish),
+      finish: finish,
+      on_ignored_submit:
+        load_react_v2_choice!(
+          state,
+          "on_ignored_submit",
+          [:incomplete, :extract],
+          defaults.on_ignored_submit
+        ),
       # The roster is sent in the saved list's order: declared order when this
       # version saved it, name order in a 0.5.0 file, which sorted it.
       tool_order:
@@ -1271,6 +1285,21 @@ defmodule Imp.Saving do
 
   defp load_finish_on!(other),
     do: raise(ArgumentError, "invalid saved ReActV2 finish_on: #{inspect(other)}")
+
+  # A file saved before an option existed has no entry for it and loads with
+  # the option's default. A program with one unconstrained text output that an
+  # earlier version saved ended on text; it now loads ending with `submit`, as
+  # one built today does, and `finish: :text` is how to keep the text ending.
+  defp load_react_v2_choice!(state, key, allowed, default \\ :submit) do
+    case Map.get(state, key) do
+      nil ->
+        default
+
+      value ->
+        Enum.find(allowed, &(Atom.to_string(&1) == value)) ||
+          raise ArgumentError, "invalid saved ReActV2 #{key}: #{inspect(value)}"
+    end
+  end
 
   defp load_react_v2_last_request_note!(nil), do: nil
   defp load_react_v2_last_request_note!(note) when is_binary(note), do: note

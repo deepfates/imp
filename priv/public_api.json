@@ -8037,9 +8037,11 @@
       },
       "source": "lib/imp/predict/react_v2.ex",
       "struct_fields": [
+        "finish",
         "finish_on",
         "last_request_note",
         "max_iters",
+        "on_ignored_submit",
         "react",
         "signature",
         "tool_order",

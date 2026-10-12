@@ -88,7 +88,7 @@ defmodule PredictJSONFallbackRequestTest do
         ~s({"answer": "It holds 1.", "tool_calls": []})
       ])
 
-    program = Imp.react("intent -> answer", [look], lm: lm)
+    program = Imp.react("intent -> answer", [look], finish: :text, lm: lm)
     assert {:ok, prediction} = Imp.call(program, %{intent: "what is in it?"})
     assert Imp.get(prediction, :answer) == "It holds 1."
 
@@ -148,6 +148,7 @@ defmodule PredictJSONFallbackRequestTest do
 
     program =
       Imp.react("intent -> answer", [look],
+        finish: :text,
         lm: lm,
         adapter_opts: [system_renderer: fn _signature, _opts -> "You are Gregory." end]
       )

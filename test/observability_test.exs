@@ -49,7 +49,7 @@ defmodule ObservabilityTest do
     explode = Imp.tool(:explode, "explode", fn _arguments -> raise "tool exploded" end)
 
     assert {:ok, prediction} =
-             Imp.react("question -> answer", [explode], lm: lm)
+             Imp.react("question -> answer", [explode], finish: :text, lm: lm)
              |> Imp.call(%{question: "Capital of France?"})
 
     history = prediction.metadata[:history]
@@ -151,7 +151,7 @@ defmodule ObservabilityTest do
         %{store: store, retriever: retriever}
       end)
 
-    program = Imp.react("question -> answer", [connections], lm: lm)
+    program = Imp.react("question -> answer", [connections], finish: :text, lm: lm)
 
     {:ok, run} = Imp.Run.start(program, %{question: "Which connections?"})
     assert {:ok, prediction} = Task.await(run.task)

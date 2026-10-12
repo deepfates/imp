@@ -1,7 +1,7 @@
 defmodule ReActV2LastTextTest do
   use ExUnit.Case, async: true
 
-  # A signature with one text output ends every interrupted turn (the step
+  # A program that ends on text (`finish: :text`) ends every interrupted turn (the step
   # limit, a failed request) with one more request with the same tools and
   # `tool_choice: "auto"` as every step. Its text is the single text output; a
   # tool call in it is not run; what it does not say is an empty answer, not an
@@ -43,6 +43,7 @@ defmodule ReActV2LastTextTest do
 
     program =
       Imp.react("intent -> answer", [look()],
+        finish: :text,
         lm: recording_lm(owner, prose, 2),
         max_iters: 2
       )
@@ -75,6 +76,7 @@ defmodule ReActV2LastTextTest do
 
     program =
       Imp.react("intent -> answer", [look()],
+        finish: :text,
         lm: recording_lm(owner, "The thing is there."),
         max_iters: 1,
         last_request_note: note
@@ -95,6 +97,7 @@ defmodule ReActV2LastTextTest do
 
     program =
       Imp.react("intent -> answer", [look()],
+        finish: :text,
         lm: recording_lm(owner, "The thing is there."),
         max_iters: 1
       )
@@ -112,6 +115,7 @@ defmodule ReActV2LastTextTest do
 
     program =
       Imp.react("intent -> answer", [look()],
+        finish: :text,
         lm: recording_lm(owner, ""),
         max_iters: 1
       )
@@ -128,6 +132,7 @@ defmodule ReActV2LastTextTest do
 
     program =
       Imp.react("intent -> answer", [look()],
+        finish: :text,
         lm: recording_lm(owner, prose),
         max_iters: 1
       )
@@ -172,7 +177,12 @@ defmodule ReActV2LastTextTest do
         end
       )
 
-    program = Imp.react("intent -> answer", [look()], lm: lm, last_request_note: "Last one.")
+    program =
+      Imp.react("intent -> answer", [look()],
+        finish: :text,
+        lm: lm,
+        last_request_note: "Last one."
+      )
 
     assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
     assert Imp.get(prediction, :answer) == "I could not look, so from memory: it is there."
@@ -204,7 +214,7 @@ defmodule ReActV2LastTextTest do
         end
       )
 
-    program = Imp.react("intent -> answer", [look()], lm: lm)
+    program = Imp.react("intent -> answer", [look()], finish: :text, lm: lm)
 
     assert {:error,
             %Imp.Predict.ReActV2.StepError{
@@ -228,7 +238,7 @@ defmodule ReActV2LastTextTest do
         end
       )
 
-    program = Imp.react("intent -> answer", [look()], lm: lm)
+    program = Imp.react("intent -> answer", [look()], finish: :text, lm: lm)
 
     assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
     assert Imp.get(prediction, :answer) == nil
@@ -269,7 +279,7 @@ defmodule ReActV2LastTextTest do
     lm =
       Imp.req_llm("openrouter:test/model", req_module: RelayedErrorReqLLM, owner: self())
 
-    program = Imp.react("intent -> answer", [look()], lm: lm)
+    program = Imp.react("intent -> answer", [look()], finish: :text, lm: lm)
 
     assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
     assert Imp.get(prediction, :answer) == "Answered after all."
@@ -291,6 +301,7 @@ defmodule ReActV2LastTextTest do
 
     program =
       Imp.react("intent -> answer", [slow_look],
+        finish: :text,
         lm: recording_lm(owner, "never asked"),
         max_iters: 1,
         last_request_note: "Last one."
@@ -333,7 +344,7 @@ defmodule ReActV2LastTextTest do
 
     lm = recording_lm(owner, last)
 
-    program = Imp.react("intent -> answer", [look], lm: lm, max_iters: 1)
+    program = Imp.react("intent -> answer", [look], finish: :text, lm: lm, max_iters: 1)
     assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
 
     assert_received :looked
@@ -379,7 +390,7 @@ defmodule ReActV2LastTextTest do
         end
       )
 
-    program = Imp.react("intent -> answer", [identity_status], lm: lm)
+    program = Imp.react("intent -> answer", [identity_status], finish: :text, lm: lm)
     assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
 
     assert_received {:tool_choice, 2, "auto"}
@@ -407,7 +418,8 @@ defmodule ReActV2LastTextTest do
              end
            ), 5}
         ] do
-      program = Imp.react("intent -> answer", [look()], lm: lm, max_iters: max_iters)
+      program =
+        Imp.react("intent -> answer", [look()], finish: :text, lm: lm, max_iters: max_iters)
 
       # The LM that fails every request that does not say "none" leaves the
       # turn with no response, which is an error, not "none was sent".
@@ -441,7 +453,7 @@ defmodule ReActV2LastTextTest do
     tool = Imp.tool(:look, "Look at a thing", runner)
 
     dumped =
-      Imp.react("intent -> answer", [tool], last_request_note: "Answer now.")
+      Imp.react("intent -> answer", [tool], finish: :text, last_request_note: "Answer now.")
       |> Imp.dump(registry: registry)
 
     assert dumped["last_request_note"] == "Answer now."

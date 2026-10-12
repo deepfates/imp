@@ -107,7 +107,7 @@ defmodule Imp.MCPImageResultTest do
     lm =
       Imp.req_llm("openai:gpt-4-turbo", api_key: "fixture", base_url: url <> "/v1", cache: false)
 
-    program = Imp.react("intent -> answer", imported.tools, lm: lm)
+    program = Imp.react("intent -> answer", imported.tools, finish: :text, lm: lm)
     assert {:ok, prediction} = Imp.call(program, %{intent: "Read attachments"})
     assert Imp.get(prediction, :answer) == "Fixture response"
     [_, observed] = Agent.get(bodies, & &1)

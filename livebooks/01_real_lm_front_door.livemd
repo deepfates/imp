@@ -187,7 +187,7 @@ case live_lm.(max_tokens: 400) do
         ),
         [lookup],
         lm: lm,
-        tool_policy: [:lookup],
+        tool_policy: [:lookup, :submit],
         max_iters: 4
       )
 

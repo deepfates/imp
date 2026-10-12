@@ -292,7 +292,8 @@ defmodule ImpDeployment.AgentOptimization.Runner do
 
     grounded? = expected_result? and String.contains?(answer, row.account_id)
     clean? = errors == []
-    valid_final? = completed and answer != "" and termination_reason == :answered
+    valid_final? =
+      completed and answer != "" and termination_reason in [:submit, :forced_submit]
 
     score =
       if expected? do

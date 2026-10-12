@@ -41,7 +41,7 @@ defmodule ReActV2NativeReductionTest do
   defp text(messages), do: Enum.map_join(messages, "\n", &to_string(&1.content))
 
   test "the n > 1 JSON fallback of a native step describes no tool fields" do
-    step = Imp.react("intent -> answer", [look()]).react
+    step = Imp.react("intent -> answer", [look()], finish: :text).react
 
     lm =
       Imp.LM.Static.new(
@@ -72,6 +72,7 @@ defmodule ReActV2NativeReductionTest do
         ] do
       agent =
         Imp.react("intent -> answer", [look()],
+          finish: :text,
           lm: Imp.LM.Static.new(handler: handler(replies)),
           adapter: adapter,
           config: [native_json_schema: true]
@@ -97,11 +98,14 @@ defmodule ReActV2NativeReductionTest do
       %{program: program}
     end
 
+    # It ended on text when it was saved; it loads ending with `submit`, as a
+    # program built today does.
     test "leaves the tool fields out for a native LM", %{program: program} do
-      lm = Imp.LM.Static.new(handler: handler(["done."]))
+      submit = %{tool_calls: [%{name: "submit", arguments: %{answer: "done."}}]}
+      lm = Imp.LM.Static.new(handler: handler([submit]))
       assert {:ok, _} = Imp.context([lm: lm], fn -> Imp.call(program, %{intent: "hi"}) end)
       [{messages, opts}] = requests()
-      assert Enum.map(opts[:tools], & &1.function.name) == ["alpha_probe", "zeta_probe"]
+      assert Enum.map(opts[:tools], & &1.function.name) == ["alpha_probe", "zeta_probe", "submit"]
       refute text(messages) =~ "tool_calls"
       refute text(messages) =~ "whose description is"
     end
@@ -109,7 +113,7 @@ defmodule ReActV2NativeReductionTest do
     test "lists its tools for an LM that cannot call them", %{program: program} do
       lm = %TextOnlyLM{handler: handler(["done."])}
       assert {:ok, _} = Imp.context([lm: lm], fn -> Imp.call(program, %{intent: "hi"}) end)
-      [{messages, opts}] = requests()
+      [{messages, opts} | _forced_submit] = requests()
       assert opts[:tools] in [nil, []]
       assert text(messages) =~ "[[ ## tool_calls ## ]]"
       assert text(messages) =~ "alpha_probe, whose description is <desc>A</desc>."

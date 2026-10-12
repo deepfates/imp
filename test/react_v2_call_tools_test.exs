@@ -29,7 +29,11 @@ defmodule ReActV2CallToolsTest do
   end
 
   test "a call's runners are used for that call only, and the request is unchanged" do
-    program = Imp.react(@signature, [lookup(fn _ -> "from the program" end)], lm: lm(self()))
+    program =
+      Imp.react(@signature, [lookup(fn _ -> "from the program" end)],
+        finish: :text,
+        lm: lm(self())
+      )
 
     assert {:ok, prediction} =
              Imp.call(program, %{question: "hi", tools: [lookup(fn _ -> "from the call" end)]})
@@ -44,7 +48,7 @@ defmodule ReActV2CallToolsTest do
   end
 
   test "a tool the model would be shown differently is refused before any request" do
-    program = Imp.react(@signature, [lookup(fn _ -> "x" end)], lm: lm(self()))
+    program = Imp.react(@signature, [lookup(fn _ -> "x" end)], finish: :text, lm: lm(self()))
 
     renamed = Imp.tool(:search, "Look something up.", fn _ -> "y" end, schema: @schema)
     reworded = Imp.tool(:lookup, "Find it.", fn _ -> "y" end, schema: @schema)
@@ -64,7 +68,12 @@ defmodule ReActV2CallToolsTest do
   end
 
   test "the program value is unchanged, so an optimizer's copy keeps its runners" do
-    program = Imp.react(@signature, [lookup(fn _ -> "from the program" end)], lm: lm(self()))
+    program =
+      Imp.react(@signature, [lookup(fn _ -> "from the program" end)],
+        finish: :text,
+        lm: lm(self())
+      )
+
     before = program.tools
 
     assert {:ok, _} =

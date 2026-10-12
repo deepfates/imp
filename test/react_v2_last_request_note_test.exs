@@ -243,7 +243,12 @@ defmodule ReActV2LastRequestNoteTest do
         end
       )
 
-    program = Imp.react("intent -> answer", [look], lm: lm, last_request_note: "Last action.")
+    program =
+      Imp.react("intent -> answer", [look],
+        finish: :text,
+        lm: lm,
+        last_request_note: "Last action."
+      )
 
     history =
       Imp.History.new([
@@ -282,7 +287,7 @@ defmodule ReActV2LastRequestNoteTest do
 
   test "a call's note is a string or nil, refused before the model is called" do
     owner = self()
-    program = Imp.react("intent -> answer", [look()], lm: recording_lm(owner))
+    program = Imp.react("intent -> answer", [look()], finish: :text, lm: recording_lm(owner))
 
     for bad <- [7, %{text: "no"}] do
       for key <- [:last_request_note, "last_request_note"] do

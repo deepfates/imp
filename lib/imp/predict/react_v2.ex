@@ -9,16 +9,15 @@ defmodule Imp.Predict.ReActV2 do
   by default; a host that wants the model to know the time during a turn
   renders it there.
 
-  ## Which signatures get `submit`
+  ## Which loops get `submit`
 
-  A task signature with exactly one output of type `:string` and no
-  constraints has an answer that the model can write as text, so its loop
-  offers no `submit` tool. Every other signature (several outputs, one
-  output that is not text, or one text output with constraints such as an
-  `enum`, whose allowed values reach the model in `submit`'s schema) gets
-  the reserved `submit` tool, whose parameters are the signature's outputs,
-  exactly as DSPy's ReActV2 has it. The name `submit` is reserved for every
-  signature, so a user tool cannot take it.
+  Every loop offers the reserved `submit` tool, whose parameters are the
+  signature's outputs, exactly as DSPy's ReActV2 has it, and the model ends
+  its turn by calling it. The one exception is a program built with
+  `finish: :text`, whose answer is the text the model writes when it stops
+  calling tools; that option needs a signature with exactly one output, a
+  string with no constraints. The name `submit` is reserved either way, so a
+  user tool cannot take it.
 
   ## The prediction
 
@@ -29,15 +28,17 @@ defmodule Imp.Predict.ReActV2 do
     * `:history` — the turn's full `Imp.History`, to pass back as the
       `:history` input of the next call.
     * `:termination_reason` — how the turn ended (below).
-    * `:termination_cause` — present whenever the turn was interrupted: for
-      `:last_text`, `:forced_submit` and `:extracted`, the interruption that led
-      to the last request. For `:incomplete`, the same interruption, unless
-      the turn's context window was full or its `Imp.Deadline` had passed,
+    * `:termination_cause` — present whenever the turn ended at a last
+      request: for `:last_text`, `:forced_submit` and `:extracted`, what led
+      to it (`:empty_tool_calls` when the model ended its turn without
+      `submit`, otherwise the interruption). For `:incomplete`, the same
+      cause, unless the turn's context window was full or its `Imp.Deadline` had passed,
       which would refuse any further request too and so are named instead;
       `termination_error` holds the errors of the requests that failed. One of `:max_iters`, `:parse_error`, `:prediction_error`,
       `:empty_tool_calls`, `:context_window_exceeded` and `:deadline_exceeded`.
     * `:termination_error` — for `:incomplete`, the redacted errors of the
-      requests that failed.
+      requests that failed. When the forced `submit` request was answered
+      without a `submit`, its `:forced_submit` entry is `:no_submit_call`.
     * `:finished_by_tool` — the terminal tool that ended the turn.
     * `:unexecuted_tool_calls` — tool calls the last request made that were
       not run.
@@ -55,10 +56,28 @@ defmodule Imp.Predict.ReActV2 do
 
   ## How a turn ends
 
-    * `:answered` (one unconstrained text output). A step that says something and calls no
-      tool is the answer, in that one request.
-    * `:submit` (every other signature). The model calls `submit` with the
-      signature's outputs.
+  By default a turn ends as it does in DSPy's ReActV2: through `submit`. A
+  step that calls no tool is a thought, not an answer. It is kept in the
+  history as the step it was, and one forced request follows: the same
+  request with that step appended, `tool_choice` naming `submit`, and
+  `reasoning_effort: nil`, as DSPy's `_forced_submit` sends it. Imp adds
+  nothing else to it.
+
+  Imp 0.5 to 0.13 ended a turn on plain text for a signature with one
+  unconstrained text output: the message without a tool call was the
+  answer. That ending published notes the model meant to keep to itself,
+  such as a closing remark after it had decided to say nothing, and notes
+  written before an answer. Measured on replayed agent-loop turns, the
+  `submit` ending removed those remarks without losing answers that were owed
+  (deepfates/imp#336). The plain-text ending is still there, as
+  `finish: :text`.
+
+    * `:submit`. The model calls `submit` with the signature's outputs.
+    * `:forced_submit`. The model ended its turn without `submit`
+      (`termination_cause: :empty_tool_calls`), or the turn was interrupted
+      (below), and the forced request was answered with a `submit`.
+    * `:answered` (`finish: :text` only). A step that says something and
+      calls no tool is the answer, in that one request.
     * `:finished_by_tool`. `finish_on` maps a tool name to
       `fn arguments, result, inputs -> {:finish, outputs} | :continue end`. It
       runs after that tool's call executes, with the string-keyed arguments
@@ -70,11 +89,18 @@ defmodule Imp.Predict.ReActV2 do
       and a `submit` in the same step still wins. Outputs that fail validation
       are recorded as that call's result, the same error a bad `submit`
       records, and the loop continues.
-    * `:last_text`, `:forced_submit`, `:extracted`. The turn was interrupted
-      and its last request answered (below).
-    * `:incomplete`. The turn was interrupted and has no answer: its last
-      request was answered with no valid answer in it, or the turn ran out of
-      time or context window.
+    * `:last_text` (`finish: :text` only), `:extracted` (`on_ignored_submit:
+      :extract` only). The turn's last request answered (below).
+    * `:incomplete`. The turn has no answer: its forced `submit` was answered
+      with no valid `submit` in it, or the turn ran out of time or context
+      window. The caller sees that the turn did not answer rather than
+      getting a guess.
+
+  The keeping of the thought step diverges from DSPy, which leaves it out of
+  the forced request. Left out, a model that had written its finished answer
+  as text had to write it again with reasoning off, and some of those
+  rewrites ran to the output limit; kept, the model restates its answer in
+  `submit`, and the history stays true to what the model did.
 
   A turn that could not get a model response returns
   `{:error, %Imp.Predict.ReActV2.StepError{}}` rather than a prediction: its
@@ -94,20 +120,18 @@ defmodule Imp.Predict.ReActV2 do
 
   ## When a turn is interrupted
 
-  A turn is interrupted when it reaches `max_iters`, when a step's request
+  A turn is interrupted when it reaches `max_iters`, or when a step's request
   fails (`:prediction_error`, `:parse_error`) other than by the content
-  filter, or when a step of a signature
-  with `submit` calls no tool (`:empty_tool_calls`). An `enum` output is such a
-  signature: text that is not a `submit` call is `:empty_tool_calls`, never
-  an answer, and a turn with no valid `submit`, the forced one included, ends
-  `:incomplete`.
+  filter. Its last request is the forced `submit`, as after a step that
+  called no tool, with the `:last_request_note` before it when one is given.
 
-  With one unconstrained text output, a step that calls no tool and says nothing is not an
+  With `finish: :text`, a step that calls no tool and says nothing is not an
   interruption: it is an empty answer, and the turn ends there
   (`:answered`). Saying nothing is how a model declines to answer, and asking
-  it again would make declining cost a second request.
+  it again would make declining cost a second request. By default an empty
+  answer is a `submit` whose text output is `""`, which is a valid answer.
 
-  With one unconstrained text output, every interruption takes the same path: one more
+  With `finish: :text`, every interruption takes the same path: one more
   request, and its text is the answer (`:last_text`).
   The request is a step like any other: the same tools and the same
   `tool_choice: "auto"`. A provider may refuse a history of tool calls when no
@@ -122,17 +146,27 @@ defmodule Imp.Predict.ReActV2 do
   passed, no request is made and the turn is `:incomplete` with
   `termination_cause: :deadline_exceeded`.
 
-  With `submit`, an interruption forces one more request with `tool_choice`
-  naming `submit` (`:forced_submit`), as DSPy does. If a provider cannot honor
-  that tool contract, a tools-disabled typed extractor derives the task
-  outputs from the original inputs and accumulated history (`:extracted`).
+  With `submit`, the forced request names `submit` in `tool_choice`
+  (`:forced_submit`), as DSPy does. A provider that refuses a named
+  `tool_choice` is sent `"required"` with `submit` as the only tool. When the
+  forced request still gets no `submit`, or the provider cannot force a tool
+  at all, DSPy raises, and by default the turn is `:incomplete`, with
+  `termination_error.forced_submit` saying why. With `on_ignored_submit:
+  :extract`, a tools-disabled typed extractor derives the task outputs from
+  the original inputs and accumulated history instead (`:extracted`): one
+  more request, whose outputs are written by a model that was not asked to
+  answer the turn and may be a guess.
 
-  The last request says nothing about why it is being made unless
-  `:last_request_note` is given: one line of host text put in front of it as a
-  user message and kept in the returned history like any other turn. It is
-  recorded as a step that said nothing and called nothing, so it renders as
-  that user message alone, with no assistant reply after it, in the request and
-  whenever the history is passed back. Imp writes no sentence of its own.
+  The last request of an interrupted turn says nothing about why it is being
+  made unless `:last_request_note` is given. The note adds a user message:
+  one line of host text put in front of the last request and kept in the
+  returned history like any other turn. It is recorded as a step that said
+  nothing and called nothing, so it renders as that user message alone, with
+  no assistant reply after it, in the request and whenever the history is
+  passed back. It is not added to the forced `submit` after a step that called
+  no tool: that is the model ending its turn, and a host message there reads
+  to the model as something new that happened. Imp writes no sentence of its
+  own.
 
   ## Per-call options
 
@@ -149,11 +183,13 @@ defmodule Imp.Predict.ReActV2 do
   program's: the request is unchanged, and only what a call to those tools
   does is the call's. Any other value is refused before a model is called.
 
-  Together they continue a conversation the caller holds. A call with a
-  `:history`, `max_iters: 0` and a note makes one request, the last request:
-  the loop's own system message, tools and history, then the note, with
-  `tool_choice: "auto"`. No tool runs, and the reply's text is the answer
-  (`termination_reason: :last_text`). This is how a host asks a model about
+  Together they continue a conversation the caller holds. For a program
+  built with `finish: :text`, a call with a `:history`, `max_iters: 0` and a
+  note makes one request, the last request: the loop's own system message,
+  tools and history, then the note, with `tool_choice: "auto"`. No tool runs,
+  and the reply's text is the answer (`termination_reason: :last_text`).
+  (With the default ending, the same call makes the forced `submit` request
+  instead.) This is how a host asks a model about
   a conversation it has had, as that model saw it, for instance for a summary
   of it before the history is shortened. Codex CLI and Anthropic's SDK
   compaction build that request the same way: the conversation's own
@@ -166,14 +202,14 @@ defmodule Imp.Predict.ReActV2 do
   so the turn ends at once as `:incomplete` with `termination_cause:
   :context_window_exceeded` (see below).
 
-  For a single unconstrained text output, a step describes that task field
-  directly, including its description. Other signatures use `next_thought`
-  alongside the typed `submit` tool. The other step output is `tool_calls`
+  With `finish: :text`, a step describes the task's text field directly,
+  including its description. Otherwise a step uses `next_thought` alongside
+  the typed `submit` tool. The other step output is `tool_calls`
   (`agent_tool_calls` when the task text output itself is named `tool_calls`).
   The provider holds the tool roster natively. Plain text with no tool call
   fills the declared text field through the step signature's `:text_field`
-  metadata. It completes the text task in one LM call and is appended to the
-  history as its own step. A tool call the model writes as
+  metadata. Under `finish: :text` it completes the text task in one LM call;
+  either way it is appended to the history as its own step. A tool call the model writes as
   JSON rather than calling natively is accepted with `tool` for `name` and
   `args` or `parameters` for `arguments` (`Imp.Adapter.Types.ToolCall`); a map
   that names no tool at all is kept as a malformed-call observation.
@@ -199,9 +235,9 @@ defmodule Imp.Predict.ReActV2 do
   the message without a tool call is the answer. A reply in plain text, or in
   markers, is read as that field by `Imp.Adapter.Chat`. Durable step history keeps
   `next_thought` and `tool_calls` for compatibility with saved conversations;
-  adapters project them into the declared fields when rendering. A stored turn that
-  carries a one-text-output task's answer and no step outputs is replayed as
-  a step that answered in text. The name `tools` is reserved: a task
+  adapters project them into the declared fields when rendering. Under `finish: :text`, a
+  stored turn that carries the task's answer and no step outputs is replayed
+  as a step that answered in text. The name `tools` is reserved: a task
   signature cannot have a field of that name.
 
   On a recognized context-window refusal, up to eight smaller requests omit
@@ -227,6 +263,12 @@ defmodule Imp.Predict.ReActV2 do
 
   @malformed_tool_call "__imp_malformed_tool_call__"
 
+  # What a turn gets when its forced `submit` request is answered without a
+  # `submit`: `:incomplete` (no answer, as DSPy gives none) or `:extract` (the
+  # tools-disabled extractor writes the outputs). The `:on_ignored_submit`
+  # option's default, kept here so it changes in one place.
+  @default_on_ignored_submit :incomplete
+
   defstruct [
     :signature,
     :react,
@@ -235,7 +277,9 @@ defmodule Imp.Predict.ReActV2 do
     tool_order: [],
     max_iters: 20,
     tool_policy: :allow,
-    finish_on: %{}
+    finish_on: %{},
+    finish: :submit,
+    on_ignored_submit: @default_on_ignored_submit
   ]
 
   @type t :: %__MODULE__{}
@@ -282,8 +326,7 @@ defmodule Imp.Predict.ReActV2 do
       default: 20,
       doc:
         "Steps before the turn is interrupted. An interrupted turn ends with the " <>
-          "forced `submit`, or, for a signature with one unconstrained text output, one last " <>
-          "text-only request."
+          "forced `submit`, or, with `finish: :text`, one last text-only request."
     ],
     tool_policy: [
       type: {:custom, Imp.ToolPolicy, :validate, []},
@@ -294,10 +337,31 @@ defmodule Imp.Predict.ReActV2 do
       type: {:or, [:string, nil]},
       default: nil,
       doc:
-        "One line of host text put in front of the last request of an interrupted " <>
-          "turn, as a user message, and kept in the history: the last text-only " <>
-          "request for a signature with one unconstrained text output, the forced `submit` for " <>
-          "every other. `nil` says nothing; Imp writes no sentence of its own."
+        "One line of host text added as a user message before the last request of an " <>
+          "interrupted turn (the forced `submit`, or with `finish: :text` the last " <>
+          "text-only request), and kept in the history. It is not added when the model " <>
+          "ended its turn by calling no tool. `nil` adds nothing; Imp writes no sentence " <>
+          "of its own."
+    ],
+    finish: [
+      type: {:in, [:submit, :text]},
+      default: :submit,
+      doc:
+        "How the model ends a turn. `:submit` (the default, as DSPy): by calling " <>
+          "`submit`; a step that calls no tool is a thought, followed by one forced " <>
+          "`submit` request. `:text`: a step that calls no tool is the answer; the loop " <>
+          "offers no `submit`, and the signature must have exactly one output, a string " <>
+          "with no constraints. See \"How a turn ends\" above."
+    ],
+    on_ignored_submit: [
+      type: {:in, [:incomplete, :extract]},
+      default: @default_on_ignored_submit,
+      doc:
+        "What a turn gets when its forced `submit` request comes back without a " <>
+          "`submit` call, or the provider refuses a forced tool choice. `:incomplete`: " <>
+          "no answer (`termination_reason: :incomplete`), as in DSPy. `:extract`: one " <>
+          "more request, to a tools-disabled extractor that writes the outputs from the " <>
+          "inputs and the history (`termination_reason: :extracted`)."
     ],
     finish_on: [
       type: {:custom, __MODULE__, :validate_finish_on, []},
@@ -313,7 +377,7 @@ defmodule Imp.Predict.ReActV2 do
   Builds a ReAct loop over `tools` for `signature`.
 
   `tools` is a list of `Imp.Tool` values; the name `submit` is reserved. The
-  signature decides whether the loop has a `submit` tool (see the module
+  loop has a `submit` tool unless `finish: :text` is given (see the module
   documentation).
 
   ## Options
@@ -336,21 +400,23 @@ defmodule Imp.Predict.ReActV2 do
 
     reject_reserved_tools!(signature, "Imp.Predict.ReActV2.new/3")
 
-    tools = put_submit(tools, signature)
+    finish = opts[:finish]
+    validate_text_finish!(signature, finish, "Imp.Predict.ReActV2.new/3")
+    tools = put_submit(tools, finish)
 
     react_signature =
       %Imp.Signature{
         inputs:
           Enum.map(signature.inputs, &Imp.Signature.Field.optional/1) ++
             [Imp.Signature.Field.new(%{name: :history, type: :history}, :input), tools_field()],
-        outputs: step_outputs(signature),
+        outputs: step_outputs(signature, finish),
         instructions: signature.instructions,
         # A step answered in plain text, with no native tool call, is a
         # thought that called nothing. `Imp.Adapter.Chat` reads a marker-free
         # completion as the declared text field, and the calls field takes its declared
-        # default of none, which ends the turn: as the answer when the
-        # signature has one text output, and at the forced submit otherwise.
-        metadata: step_metadata(signature)
+        # default of none, which ends the turn: at the forced submit, or as
+        # the answer under `finish: :text`.
+        metadata: step_metadata(signature, finish)
       }
 
     config = Keyword.merge(opts[:config], provider_tool_config(tools, tool_order, signature))
@@ -362,7 +428,10 @@ defmodule Imp.Predict.ReActV2 do
     # plus the newest exchange, which is what a provider's prompt cache is
     # keyed on. For an LM that cannot, the roster is the `tools` input, as text.
     adapter_opts =
-      Keyword.merge(Keyword.get(opts, :adapter_opts, []), loop_adapter_opts(signature, tools))
+      Keyword.merge(
+        Keyword.get(opts, :adapter_opts, []),
+        loop_adapter_opts(signature, tools, finish)
+      )
 
     %__MODULE__{
       signature: signature,
@@ -378,30 +447,43 @@ defmodule Imp.Predict.ReActV2 do
       max_iters: opts[:max_iters],
       tool_policy: opts[:tool_policy],
       last_request_note: opts[:last_request_note],
-      finish_on: resolve_finish_on!(opts[:finish_on], tools)
+      finish_on: resolve_finish_on!(opts[:finish_on], tools),
+      finish: finish,
+      on_ignored_submit: opts[:on_ignored_submit]
     }
   end
 
   @doc false
-  # Adds the reserved `submit` tool when the signature has one. Loading a saved
-  # program goes through here too, so the rule lives in one place.
-  #
-  # Divergence from DSPy's ReActV2, which offers `submit` for every signature:
-  # a signature with one unconstrained text output gets none. Its answer is the text the
-  # model writes when it stops calling tools, which is how every other
-  # mainstream tool loop ends a turn, and a `submit` beside that would be a
-  # second way to say the same thing. DSPy needs `submit` because a signature
-  # can have several typed outputs, and those signatures still get it.
-  def put_submit(tools, signature) do
-    if single_text_output?(signature),
-      do: tools,
-      else:
-        Map.put(
-          tools,
-          :submit,
-          Imp.Tool.new(:submit, "Submit the final outputs for the task.", & &1)
-        )
+  # Adds the reserved `submit` tool, which every loop has, as in DSPy's
+  # ReActV2, unless the program ends on text (`finish: :text`), where the
+  # answer is the text the model writes when it stops calling tools and a
+  # `submit` beside it would be a second way to say the same thing. Loading a
+  # saved program goes through here too, so the rule lives in one place.
+  def put_submit(tools, :text), do: tools
+
+  def put_submit(tools, :submit),
+    do:
+      Map.put(
+        tools,
+        :submit,
+        Imp.Tool.new(:submit, "Submit the final outputs for the task.", & &1)
+      )
+
+  @doc false
+  # `finish: :text` makes the whole reply the answer, so the signature must
+  # have one output that any text fills: a string with no constraints. An
+  # `enum`, a pattern or a second output could not be filled from text alone.
+  def validate_text_finish!(signature, :text, context) do
+    unless single_text_output?(signature) do
+      raise ArgumentError,
+            "#{context}: finish: :text needs exactly one output, a string with no " <>
+              "constraints; use the default finish: :submit for this signature"
+    end
+
+    :ok
   end
+
+  def validate_text_finish!(_signature, :submit, _context), do: :ok
 
   @doc false
   def validate_finish_on(finish_on) when is_map(finish_on) do
@@ -440,9 +522,9 @@ defmodule Imp.Predict.ReActV2 do
 
   # What the loop itself tells the adapter: its guidance, and a request shape
   # that ends on the newest exchange with no response instruction.
-  defp loop_adapter_opts(signature, tools),
+  defp loop_adapter_opts(signature, tools, finish),
     do: [
-      guidance: guidance(signature, tools),
+      guidance: guidance(signature, tools, finish),
       response_instruction: false,
       omit_empty_request: true
     ]
@@ -460,7 +542,7 @@ defmodule Imp.Predict.ReActV2 do
     metadata =
       react.signature.metadata
       |> Map.drop(["text_field", "tool_calls_field", "tools_field"])
-      |> Map.merge(step_metadata(agent.signature))
+      |> Map.merge(step_metadata(agent.signature, agent.finish))
 
     # A program saved before the step had a `tools` input gets one, so it
     # describes its tools to an LM that cannot call them natively.
@@ -477,12 +559,15 @@ defmodule Imp.Predict.ReActV2 do
             provider_tool_config(agent.tools, agent.tool_order, agent.signature)
           ),
         adapter_opts:
-          Keyword.merge(react.adapter_opts, loop_adapter_opts(agent.signature, agent.tools)),
+          Keyword.merge(
+            react.adapter_opts,
+            loop_adapter_opts(agent.signature, agent.tools, agent.finish)
+          ),
         signature: %{
           react.signature
           | metadata: metadata,
             inputs: inputs,
-            outputs: step_outputs(agent.signature)
+            outputs: step_outputs(agent.signature, agent.finish)
         }
     }
 
@@ -501,7 +586,11 @@ defmodule Imp.Predict.ReActV2 do
             provider_tool_config(tools, agent.tool_order, agent.signature)
           ),
         adapter_opts:
-          Keyword.put(agent.react.adapter_opts, :guidance, guidance(agent.signature, tools))
+          Keyword.put(
+            agent.react.adapter_opts,
+            :guidance,
+            guidance(agent.signature, tools, agent.finish)
+          )
     }
 
     %{agent | tools: tools, react: react}
@@ -588,16 +677,21 @@ defmodule Imp.Predict.ReActV2 do
           # appended as this turn's history event, with the outputs when it is
           # the answer, as a `submit`'s event carries them; the pending inputs
           # it carries are then spent.
-          case parse_text(react.signature, prediction) do
+          case parse_text(react, prediction) do
             {:ok, outputs} ->
-              # The model stopped calling tools and said its answer. That is the
-              # end of the turn, and it costs no further request.
+              # `finish: :text`: the model stopped calling tools and said its
+              # answer. That is the end of the turn, and it costs no further
+              # request.
               history =
                 append_history(history, history_event(pending, prediction, calls, [], outputs))
 
               final_prediction(outputs, history, :answered, finish_reason(%{}, prediction))
 
             {:none, cause} ->
+              # The model ended its turn without `submit`. What it said is a
+              # thought, and it stays in the history as the step it was:
+              # dropped, as DSPy drops it, a finished answer would have to be
+              # written again in the forced request, with reasoning off.
               emit_reasoning(prediction, turn)
               {history, pending} = append_thought_only_step(history, pending, prediction, calls)
               interrupted(react, history, inputs, pending, cause, turn, nil, execution)
@@ -667,13 +761,13 @@ defmodule Imp.Predict.ReActV2 do
     end
   end
 
-  # The one place an interrupted turn goes: the last request for a signature
-  # with one text output, the forced submit for every other.
-  defp interrupted(react, history, inputs, pending, cause, turn, error, execution) do
-    if single_text_output?(react.signature),
-      do: last_text(react, history, pending, cause, turn, error),
-      else: forced_submit(react, history, inputs, pending, cause, turn, error, execution)
-  end
+  # The one place an interrupted turn goes: the forced submit, or under
+  # `finish: :text` the last text request.
+  defp interrupted(%{finish: :text} = react, history, _inputs, pending, cause, turn, error, _ex),
+    do: last_text(react, history, pending, cause, turn, error)
+
+  defp interrupted(react, history, inputs, pending, cause, turn, error, execution),
+    do: forced_submit(react, history, inputs, pending, cause, turn, error, execution)
 
   defp forced_submit(
          react,
@@ -685,7 +779,15 @@ defmodule Imp.Predict.ReActV2 do
          initial_error,
          execution
        ) do
-    {history, pending} = note_after_inputs(history, pending, react)
+    # A step that called no tool is the model ending its turn, not an
+    # interruption, and the forced request after it is the same request with
+    # `tool_choice` naming `submit`, as in DSPy. A host note there reads to the
+    # model as something new that happened, so it goes only before the forced
+    # request of an interruption.
+    {history, pending} =
+      if reason == :empty_tool_calls,
+        do: {history, pending},
+        else: note_after_inputs(history, pending, react)
 
     case forced_submit_prediction(react, history, pending) do
       {:ok, prediction, history} ->
@@ -705,7 +807,7 @@ defmodule Imp.Predict.ReActV2 do
         )
 
       {:extract, forced_error, history} ->
-        extract_final(react, inputs, history, reason, %{
+        ignored_submit(react, inputs, history, reason, %{
           initial: initial_error,
           forced_submit: forced_error
         })
@@ -718,7 +820,7 @@ defmodule Imp.Predict.ReActV2 do
     end
   end
 
-  # An interrupted turn of a signature with one text output. The last request
+  # An interrupted turn of a program that ends on text. The last request
   # is an ordinary step, and its text is the single text output. A tool call
   # in it is not run, and is kept out of the history, where it would replay as
   # a call with no result; the prediction names it in `unexecuted_tool_calls`
@@ -737,7 +839,7 @@ defmodule Imp.Predict.ReActV2 do
           calls = prediction |> Imp.get(:tool_calls, []) |> normalize_calls(turn)
           no_calls = %ToolCalls{tool_calls: []}
 
-          outputs = last_text_outputs(react.signature, prediction)
+          outputs = last_text_outputs(react, prediction)
           history = append_last_step(history, pending, prediction, no_calls, outputs)
 
           final_prediction(
@@ -817,10 +919,10 @@ defmodule Imp.Predict.ReActV2 do
     Map.put(metadata, :unexecuted_tool_calls, Imp.Redaction.redact(unexecuted))
   end
 
-  # Only a signature with one unconstrained text output reaches the last
-  # text request, and any text is its answer.
-  defp last_text_outputs(signature, prediction) do
-    {:ok, outputs} = parse_text(signature, prediction)
+  # Only a program that ends on text reaches the last text request, and any
+  # text is its answer.
+  defp last_text_outputs(react, prediction) do
+    {:ok, outputs} = parse_text(react, prediction)
     outputs
   end
 
@@ -898,7 +1000,11 @@ defmodule Imp.Predict.ReActV2 do
 
     if submit_calls.tool_calls == [] do
       history = append_last_step(history, pending, prediction, calls, nil)
-      extract_final(react, inputs, history, reason, initial_error)
+
+      ignored_submit(react, inputs, history, reason, initial_error, %{
+        initial: initial_error,
+        forced_submit: :no_submit_call
+      })
     else
       case execute_calls(react, submit_calls, execution, inputs) do
         {:cancel, cancel_reason} ->
@@ -953,6 +1059,37 @@ defmodule Imp.Predict.ReActV2 do
           )
     }
   end
+
+  # The forced `submit` got no `submit`: the request was answered without one,
+  # or the provider could not force a tool. DSPy raises there, and nothing is
+  # produced; by default the turn is incomplete, and the caller sees it rather
+  # than a guess. `on_ignored_submit: :extract` asks an extractor instead.
+  # `error` is what an incomplete prediction reports, `extraction_error` what
+  # the extractor's reports beside its own.
+  defp ignored_submit(react, inputs, history, reason, extraction_error \\ nil, error)
+
+  defp ignored_submit(
+         %{on_ignored_submit: :extract} = react,
+         inputs,
+         history,
+         reason,
+         nil,
+         error
+       ),
+       do: extract_final(react, inputs, history, reason, error)
+
+  defp ignored_submit(
+         %{on_ignored_submit: :extract} = react,
+         inputs,
+         history,
+         reason,
+         ex,
+         _error
+       ),
+       do: extract_final(react, inputs, history, reason, ex)
+
+  defp ignored_submit(_react, _inputs, history, reason, _extraction_error, error),
+    do: incomplete_prediction(history, reason, error)
 
   defp extract_final(react, inputs, history, reason, initial_error) do
     extractor = extraction_program(react)
@@ -1077,21 +1214,17 @@ defmodule Imp.Predict.ReActV2 do
     end
   end
 
-  # The task's one text output is also the step's text output. The loop's
-  # persisted history still uses next_thought/tool_calls; prediction and history
-  # projection below isolate that storage vocabulary from the live contract.
-  defp step_text(signature) do
-    case text_output(signature) do
-      {:text, [field]} ->
-        Imp.Signature.Field.optional(field)
+  # Under `finish: :text` the task's one text output is also the step's text
+  # output. The loop's persisted history still uses next_thought/tool_calls;
+  # prediction and history projection below isolate that storage vocabulary
+  # from the live contract.
+  defp step_text(%Imp.Signature{outputs: [field]}, :text), do: Imp.Signature.Field.optional(field)
 
-      :submit ->
-        Imp.Signature.Field.new(%{name: :next_thought, metadata: %{optional: true}}, :output)
-    end
-  end
+  defp step_text(_signature, :submit),
+    do: Imp.Signature.Field.new(%{name: :next_thought, metadata: %{optional: true}}, :output)
 
-  defp step_metadata(signature) do
-    text = step_text(signature).name
+  defp step_metadata(signature, finish) do
+    text = step_text(signature, finish).name
 
     calls =
       if Imp.FieldMap.same_name?(text, :tool_calls), do: :agent_tool_calls, else: :tool_calls
@@ -1099,9 +1232,9 @@ defmodule Imp.Predict.ReActV2 do
     %{text_field: text, tool_calls_field: calls, tools_field: :tools}
   end
 
-  defp step_outputs(signature) do
-    roles = step_metadata(signature)
-    [step_text(signature), %{tool_calls_field() | name: roles.tool_calls_field}]
+  defp step_outputs(signature, finish) do
+    roles = step_metadata(signature, finish)
+    [step_text(signature, finish), %{tool_calls_field() | name: roles.tool_calls_field}]
   end
 
   # The written form of a call, for an LM that writes its calls: the shape
@@ -1344,30 +1477,24 @@ defmodule Imp.Predict.ReActV2 do
     end
   end
 
-  # A step that stops calling tools and says something has answered, when the
-  # task declares exactly one unconstrained text output for that text to be.
-  # Several outputs, one that is not text, or one with constraints cannot be
-  # filled from text alone and take the forced submit. Any text is a valid
-  # value of an unconstrained text output, so the text is the answer as it
-  # is. A signature with `submit` has no text answer: that step is the
-  # `:empty_tool_calls` interruption.
-  defp parse_text(signature, prediction) do
-    with {:text, [%Imp.Signature.Field{name: name}]} <- text_output(signature) do
-      case Imp.get(prediction, :next_thought) do
-        text when is_binary(text) and text != "" -> {:ok, %{name => text}}
-        _nothing -> {:ok, %{name => nil}}
-      end
-    else
-      :submit -> {:none, :empty_tool_calls}
+  # Under `finish: :text`, a step that stops calling tools has answered, and
+  # its text, as it is, is the one text output (`validate_text_finish!/3`
+  # made sure any text is a valid value of it). Otherwise there is no text
+  # answer: that step ends the turn at the forced submit (`:empty_tool_calls`).
+  defp parse_text(%{finish: :text, signature: signature}, prediction) do
+    [%Imp.Signature.Field{name: name}] = signature.outputs
+
+    case Imp.get(prediction, :next_thought) do
+      text when is_binary(text) and text != "" -> {:ok, %{name => text}}
+      _nothing -> {:ok, %{name => nil}}
     end
   end
 
-  defp text_output(signature),
-    do: if(single_text_output?(signature), do: {:text, signature.outputs}, else: :submit)
+  defp parse_text(_react, _prediction), do: {:none, :empty_tool_calls}
 
-  # Text is the answer only when any text is a valid answer: a constrained
-  # string (an enum, a pattern, an answer shape) keeps `submit`, whose schema
-  # tells the model what the output accepts.
+  # Any text is a valid answer only to one string output with no
+  # constraints: a constrained string (an enum, a pattern, an answer shape)
+  # needs `submit`, whose schema tells the model what the output accepts.
   defp single_text_output?(%Imp.Signature{outputs: [%Imp.Signature.Field{} = field]}),
     do: field.type in [:string, "string"] and unconstrained?(field)
 
@@ -1576,15 +1703,15 @@ defmodule Imp.Predict.ReActV2 do
     %{full: history, boundaries: boundaries, omitted: 0, omitted_groups: 0, retries: 0}
   end
 
-  # A stored turn that carries the answer of a one-text-output task but no
+  # Under `finish: :text`, a stored turn that carries the task's answer but no
   # step outputs (a host wrote it, or it predates the loop's own events) is,
   # in the step's terms, a step that answered in text: `next_thought` is the
   # answer and it called nothing. Read that way, every adapter replays it as
   # the answer the model gave, not as step fields it never filled. Only the
   # prompt's view changes; the history the caller holds does not. A binary
   # task output named tool_calls is text, not the stored call collection.
-  defp step_turn(turn, %__MODULE__{signature: signature}) when is_map(turn) do
-    with {:text, [%Imp.Signature.Field{name: name}]} <- text_output(signature),
+  defp step_turn(turn, %__MODULE__{finish: :text, signature: signature}) when is_map(turn) do
+    with [%Imp.Signature.Field{name: name}] <- signature.outputs,
          false <- Imp.FieldMap.has_key?(turn, :next_thought),
          false <-
            Imp.FieldMap.has_key?(turn, :tool_calls) and
@@ -1766,12 +1893,12 @@ defmodule Imp.Predict.ReActV2 do
 
   # What the adapter needs to say about the loop, as data. `submit_tool` is the
   # tool that ends the turn, so a renderer never has to know its name, and nil
-  # when the signature has no `submit` and the answer is text. `outputs`
+  # under `finish: :text`, where the answer is text. `outputs`
   # are the task's output fields, so each step says what every output means;
   # otherwise their descriptions reach the model only inside `submit`'s schema.
-  defp guidance(signature, tools) do
+  defp guidance(signature, tools, finish) do
     %{
-      submit_tool: if(single_text_output?(signature), do: nil, else: :submit),
+      submit_tool: if(finish == :text, do: nil, else: :submit),
       input_names: Imp.Signature.input_names(signature),
       output_names: Imp.Signature.output_names(signature),
       outputs: signature.outputs,

@@ -25,6 +25,7 @@ defmodule ReActV2CallConfigTest do
   test "a call's own config is sent over the program's for that call only" do
     program =
       Imp.react(@signature, [],
+        finish: :text,
         lm: lm(self(), "fine"),
         config: [max_tokens: 600, temperature: 0.2]
       )
@@ -46,7 +47,11 @@ defmodule ReActV2CallConfigTest do
   end
 
   test "a text answer carries the finish reason of the reply it came from" do
-    program = Imp.react(@signature, [], lm: lm(self(), stopped("We spoke of kites and", :length)))
+    program =
+      Imp.react(@signature, [],
+        finish: :text,
+        lm: lm(self(), stopped("We spoke of kites and", :length))
+      )
 
     assert {:ok, answered} = Imp.call(program, %{question: "hi"})
     assert answered.metadata.termination_reason == :answered
@@ -65,7 +70,12 @@ defmodule ReActV2CallConfigTest do
     assert last.metadata.finish_reason == :length
     assert Imp.get(last, :answer) == "We spoke of kites and"
 
-    whole = Imp.react(@signature, [], lm: lm(self(), stopped("We spoke of kites.", :stop)))
+    whole =
+      Imp.react(@signature, [],
+        finish: :text,
+        lm: lm(self(), stopped("We spoke of kites.", :stop))
+      )
+
     assert {:ok, prediction} = Imp.call(whole, %{question: "hi"})
     assert prediction.metadata.finish_reason == :stop
   end

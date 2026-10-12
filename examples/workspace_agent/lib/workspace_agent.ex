@@ -212,7 +212,10 @@ defmodule WorkspaceAgent do
           "documentation and source over files belonging to this example application."
       )
 
+    # The instructions ask for the answer as plain text, so the agent keeps
+    # the plain-text ending rather than finishing through `submit`.
     Imp.react(signature, tools,
+      finish: :text,
       lm: lm,
       max_iters: 12,
       config: [max_tokens: 1_600, temperature: 0.0]

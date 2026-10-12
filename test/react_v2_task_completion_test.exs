@@ -18,7 +18,7 @@ defmodule ReActV2TaskCompletionTest do
         outputs: [%{name: "summary", desc: "Leave empty to say nothing."}]
       })
 
-    agent = Imp.react(signature, [])
+    agent = Imp.react(signature, [], finish: :text)
     assert [text, _calls] = agent.react.signature.outputs
     assert text.name == :summary
     assert text.desc == "Leave empty to say nothing."
@@ -47,6 +47,7 @@ defmodule ReActV2TaskCompletionTest do
 
       agent =
         Imp.react(Imp.signature(%{inputs: [:intent], outputs: [name]}), [],
+          finish: :text,
           lm: lm,
           adapter: unquote(adapter)
         )
@@ -79,6 +80,7 @@ defmodule ReActV2TaskCompletionTest do
 
     agent =
       Imp.react("intent -> tool_calls", [],
+        finish: :text,
         lm: lm,
         demos: [%{intent: "earlier", next_thought: "legacy text", tool_calls: []}]
       )
@@ -102,6 +104,7 @@ defmodule ReActV2TaskCompletionTest do
 
     agent =
       Imp.react("next_thought -> answer", [],
+        finish: :text,
         lm: lm,
         demos: [%{next_thought: "the input", answer: "the output"}]
       )
@@ -137,7 +140,7 @@ defmodule ReActV2TaskCompletionTest do
       end
     }
 
-    agent = Imp.react("intent -> tool_calls", [tool], lm: lm)
+    agent = Imp.react("intent -> tool_calls", [tool], finish: :text, lm: lm)
     assert {:ok, prediction} = Imp.call(agent, %{intent: "go"})
     assert Imp.get(prediction, :tool_calls) == "done"
     assert_received :looked
@@ -163,7 +166,7 @@ defmodule ReActV2TaskCompletionTest do
           do: Imp.LM.Static.new(handler: handler),
           else: %WrittenCallsLM{handler: handler}
 
-      agent = Imp.react("intent -> tool_calls", [], lm: lm)
+      agent = Imp.react("intent -> tool_calls", [], finish: :text, lm: lm)
 
       turn =
         if string_keys?,
@@ -196,7 +199,7 @@ defmodule ReActV2TaskCompletionTest do
         )
 
       assert {:ok, prediction} =
-               Imp.call(Imp.react("intent -> answer", [], lm: lm), %{intent: "go"})
+               Imp.call(Imp.react("intent -> answer", [], finish: :text, lm: lm), %{intent: "go"})
 
       assert Imp.get(prediction, :answer) == if(text == "", do: nil, else: text)
       assert :counters.get(counter, 1) == 1

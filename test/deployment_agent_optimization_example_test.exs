@@ -23,7 +23,11 @@ defmodule Imp.DeploymentAgentOptimizationExampleTest do
       Imp.LM.Static.new(
         handler: fn messages, _opts ->
           if List.last(messages)[:role] == :tool do
-            "Refund queued for A-104"
+            %{
+              tool_calls: [
+                %{id: "submit-1", name: "submit", arguments: %{answer: "Refund queued for A-104"}}
+              ]
+            }
           else
             %{
               next_thought: "refund the duplicate charge",
@@ -63,7 +67,7 @@ defmodule Imp.DeploymentAgentOptimizationExampleTest do
     assert {:ok, prediction} = Imp.call(updated, %{request: "Refund duplicate charge on A-104"})
     assert Imp.get(prediction, :answer) == "Refund queued for A-104"
 
-    assert prediction.metadata[:termination_reason] == :answered
+    assert prediction.metadata[:termination_reason] == :submit
     [event, _answer] = prediction.metadata[:history].messages
 
     assert Enum.any?(event.tool_call_results, fn result ->

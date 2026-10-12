@@ -261,7 +261,7 @@ defmodule Imp.HistoryTest do
     tool = Imp.tool(:retired_fetch, "retired capability", fn _ ->
       {:error, {:history_retired_capability_failure, %{outcome: "unknown"}}}
     end)
-    program = Imp.react("intent -> answer", [tool], lm: lm)
+    program = Imp.react("intent -> answer", [tool], finish: :text, lm: lm)
     {:ok, result} = Imp.call(program, %{intent: "earlier question"})
     File.write!(#{inspect(path)}, result.metadata[:history] |> Imp.History.dump() |> Jason.encode!())
     """
@@ -294,7 +294,7 @@ defmodule Imp.HistoryTest do
         do: raise("old intent missing")
       "continued"
     end)
-    program = Imp.react("intent -> answer", [], lm: lm)
+    program = Imp.react("intent -> answer", [], finish: :text, lm: lm)
     {:ok, result} = Imp.call(program, %{intent: "continue", history: history})
     "continued" = Imp.get(result, :answer)
     absent.()

@@ -60,7 +60,7 @@ defmodule Imp.Adapter.ChatWrittenHistoryTest do
   test "a ReActV2 step that answered with nothing replays with no assistant message" do
     lm = text_only_lm(["", "[[ ## next_thought ## ]]\nsecond\n\n[[ ## tool_calls ## ]]\n[]"])
     look = Imp.tool(:look, "Look at a thing", fn _ -> %{"seen" => true} end)
-    program = Imp.react("intent -> answer", [look], lm: lm)
+    program = Imp.react("intent -> answer", [look], finish: :text, lm: lm)
 
     assert {:ok, first} = Imp.call(program, %{intent: "hello"})
     assert first.metadata.termination_reason == :answered

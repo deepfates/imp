@@ -234,7 +234,11 @@ defmodule Imp.StreamedRunRecordTest do
           lm = if unquote(client) == :scripted, do: ScriptedLM.new(turns), else: req_llm(turns)
 
           program =
-            Imp.react("question -> answer", Enum.map(names, &look/1), lm: lm, max_iters: 3)
+            Imp.react("question -> answer", Enum.map(names, &look/1),
+              finish: :text,
+              lm: lm,
+              max_iters: 3
+            )
 
           run(program, provider_stream)
         end

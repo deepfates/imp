@@ -30,7 +30,21 @@ defmodule ReActV2ToolRosterTest do
     assert_received {:request, _messages, opts}
     assert roster(opts) == ["zeta_probe", "alpha_probe", "submit"]
 
-    program = Imp.react("intent -> answer", Enum.reverse(tools()), lm: recording_lm(self(), "ok"))
+    submit = %{tool_calls: [%{name: "submit", arguments: %{answer: "ok"}}]}
+
+    program =
+      Imp.react("intent -> answer", Enum.reverse(tools()), lm: recording_lm(self(), submit))
+
+    assert {:ok, _} = Imp.call(program, %{intent: "hi"})
+    assert_received {:request, _messages, opts}
+    assert roster(opts) == ["alpha_probe", "zeta_probe", "submit"]
+
+    program =
+      Imp.react("intent -> answer", Enum.reverse(tools()),
+        finish: :text,
+        lm: recording_lm(self(), "ok")
+      )
+
     assert {:ok, _} = Imp.call(program, %{intent: "hi"})
     assert_received {:request, _messages, opts}
     assert roster(opts) == ["alpha_probe", "zeta_probe"]
@@ -47,10 +61,10 @@ defmodule ReActV2ToolRosterTest do
       |> Jason.decode!()
       |> Imp.load!(registry: registry)
 
-    lm = recording_lm(self(), "ok")
+    lm = recording_lm(self(), %{tool_calls: [%{name: "submit", arguments: %{answer: "ok"}}]})
     assert {:ok, _} = Imp.context([lm: lm], fn -> Imp.call(restored, %{intent: "hi"}) end)
     assert_received {:request, _messages, opts}
-    assert roster(opts) == ["zeta_probe", "alpha_probe"]
+    assert roster(opts) == ["zeta_probe", "alpha_probe", "submit"]
 
     # A 0.5.0 file lists its tools by name, and loads in that order.
     state = program |> Imp.dump(registry: registry) |> Jason.encode!() |> Jason.decode!()
@@ -58,7 +72,7 @@ defmodule ReActV2ToolRosterTest do
     restored = Imp.load!(state, registry: registry)
     assert {:ok, _} = Imp.context([lm: lm], fn -> Imp.call(restored, %{intent: "hi"}) end)
     assert_received {:request, _messages, opts}
-    assert roster(opts) == ["alpha_probe", "zeta_probe"]
+    assert roster(opts) == ["alpha_probe", "zeta_probe", "submit"]
   end
 
   defmodule CountingLM do

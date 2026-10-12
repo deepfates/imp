@@ -32,7 +32,7 @@ defmodule ReActV2RequestShapeTest do
     do: {m[:role], m[:content], m[:tool_calls]}
 
   test "each step's request is the previous request plus the newest exchange" do
-    program = Imp.react("intent -> answer", [look()], lm: recording_lm(self(), 3))
+    program = Imp.react("intent -> answer", [look()], finish: :text, lm: recording_lm(self(), 3))
     assert {:ok, prediction} = Imp.call(program, %{intent: "hello"})
     assert Imp.get(prediction, :answer) == "ok"
 
@@ -47,7 +47,7 @@ defmodule ReActV2RequestShapeTest do
   end
 
   test "the roster goes to the provider once, natively, and never as text" do
-    program = Imp.react("intent -> answer", [look()], lm: recording_lm(self(), 2))
+    program = Imp.react("intent -> answer", [look()], finish: :text, lm: recording_lm(self(), 2))
     assert {:ok, _} = Imp.call(program, %{intent: "hello"})
 
     for {messages, opts} <- requests(2) do
@@ -62,7 +62,7 @@ defmodule ReActV2RequestShapeTest do
   end
 
   test "the loop's guidance is adapter data, said by the default system renderer" do
-    program = Imp.react("intent -> answer", [look()], lm: recording_lm(self(), 1))
+    program = Imp.react("intent -> answer", [look()], finish: :text, lm: recording_lm(self(), 1))
     assert {:ok, _} = Imp.call(program, %{intent: "hello"})
     [{[system | _], _}] = requests(1)
 
@@ -152,6 +152,7 @@ defmodule ReActV2RequestShapeTest do
 
     program =
       Imp.react("intent -> answer", [look()],
+        finish: :text,
         lm: recording_lm(self(), 2),
         adapter_opts: [system_renderer: renderer]
       )
@@ -176,7 +177,7 @@ defmodule ReActV2RequestShapeTest do
         handler: fn _messages, _opts -> "The thing holds 1, 2 and 3.\n\nThat is all." end
       )
 
-    program = Imp.react("intent -> answer", [look()], lm: lm)
+    program = Imp.react("intent -> answer", [look()], finish: :text, lm: lm)
     assert {:ok, prediction} = Imp.call(program, %{intent: "what is in it?"})
     assert Imp.get(prediction, :answer) == "The thing holds 1, 2 and 3.\n\nThat is all."
     assert prediction.metadata.termination_reason == :answered

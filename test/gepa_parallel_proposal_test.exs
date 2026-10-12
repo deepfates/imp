@@ -560,7 +560,7 @@ defmodule Imp.Optimizer.GEPA.ParallelProposalTest do
         end
       )
 
-    Imp.react("question -> answer", [lookup], lm: lm, max_iters: 3)
+    Imp.react("question -> answer", [lookup], finish: :text, lm: lm, max_iters: 3)
   end
 
   defp predict_program do

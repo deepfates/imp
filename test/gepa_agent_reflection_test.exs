@@ -76,7 +76,7 @@ defmodule Imp.Optimizer.GEPA.AgentReflectionTest do
         end
       )
 
-    Imp.react("question -> answer", [fetch], lm: lm, max_iters: 4)
+    Imp.react("question -> answer", [fetch], finish: :text, lm: lm, max_iters: 4)
   end
 
   test "the default reflection on an agent reads the whole run and the agent's tools", ctx do

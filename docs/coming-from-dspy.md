@@ -109,8 +109,9 @@ credential policy, as the security boundary.
 **Saved programs hold no secrets.** A saved program is checksummed JSON with
 no credentials; you pass the live model again when you load it.
 
-**Shared names do not promise identical control flow.** `Imp.react/3` answers
-in text for a one-text-output signature, `Ensemble` returns one prediction and
+**Shared names do not promise identical control flow.** `Imp.react/3` keeps the
+step that ended a turn without `submit` in the forced `submit` request and can
+end on plain text (`finish: :text`), `Ensemble` returns one prediction and
 isolates a failing member, and weight optimizers train through external
 workers instead of mutating an LM object. Each module's documentation says
 where it differs.

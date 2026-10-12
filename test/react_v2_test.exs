@@ -233,7 +233,7 @@ defmodule ReActV2Test do
         "BEAM"
       ])
 
-    program = Imp.react("question -> answer", [], lm: lm)
+    program = Imp.react("question -> answer", [], finish: :text, lm: lm)
 
     log =
       ExUnit.CaptureLog.capture_log(fn ->
@@ -277,7 +277,7 @@ defmodule ReActV2Test do
       ])
 
     assert {:ok, prediction} =
-             Imp.react("question -> answer", [broken], lm: lm, max_iters: 2)
+             Imp.react("question -> answer", [broken], finish: :text, lm: lm, max_iters: 2)
              |> Imp.call(%{question: "recover"})
 
     assert Imp.get(prediction, :answer) == "recovered"
@@ -491,6 +491,7 @@ defmodule ReActV2Test do
     assert {:ok, prediction} =
              Imp.react(@submit_signature, [lookup],
                lm: lm,
+               on_ignored_submit: :extract,
                max_iters: 1,
                config: [json_retries: 0]
              )
@@ -558,6 +559,7 @@ defmodule ReActV2Test do
             }} =
              Imp.react(@submit_signature, [],
                lm: lm,
+               on_ignored_submit: :extract,
                max_iters: 1,
                config: [json_retries: 0]
              )
@@ -629,7 +631,7 @@ defmodule ReActV2Test do
         )
 
       lookup = Imp.tool(:lookup, "lookup", fn _arguments -> "observed" end)
-      program = Imp.react("question -> answer", [lookup], lm: lm, max_iters: 5)
+      program = Imp.react("question -> answer", [lookup], finish: :text, lm: lm, max_iters: 5)
 
       assert {:ok, prediction} =
                Imp.call(program, Map.put(%{question: "q"}, max_iters_key, 1))
@@ -742,7 +744,7 @@ defmodule ReActV2Test do
     lm = action_lm(["continued"])
 
     assert {:ok, prediction} =
-             Imp.react("question -> answer", [], lm: lm, max_iters: 0)
+             Imp.react("question -> answer", [], finish: :text, lm: lm, max_iters: 0)
              |> Imp.call(%{question: "next", history: history})
 
     assert Imp.get(prediction, :answer) == "continued"
@@ -985,7 +987,9 @@ defmodule ReActV2Test do
       |> Imp.with_demos([demo])
       |> Imp.dump(registry: registry)
       |> Imp.load!(registry: registry)
-      |> Imp.with_lm(action_lm(["ok"]))
+      |> Imp.with_lm(
+        action_lm([%{tool_calls: [%{id: "s1", name: "submit", arguments: %{answer: "ok"}}]}])
+      )
 
     assert program.react.demos == [demo]
     assert {:ok, prediction} = Imp.call(program, %{question: "q"})
@@ -1002,7 +1006,7 @@ defmodule ReActV2Test do
     lookup = Imp.tool(:lookup, "lookup", fn _arguments -> "unused" end)
 
     assert {:ok, prediction} =
-             Imp.react("question -> answer", [lookup], lm: lm)
+             Imp.react("question -> answer", [lookup], finish: :text, lm: lm)
              |> Imp.call(%{question: "Capital of France?"})
 
     assert Imp.get(prediction, :answer) == prose
@@ -1047,11 +1051,11 @@ defmodule ReActV2Test do
     assert_received {:lm_call, _forced}
   end
 
-  # A signature with one text output has no `submit`: the roster the provider
-  # is sent names only the user's tools, and the guidance says to answer in
-  # plain text. A model that calls `submit` anyway is calling a tool that does
-  # not exist, which is an observation like any other unknown tool.
-  test "a signature with one text output is offered no submit tool" do
+  # A program that ends on text has no `submit`: the roster the provider is
+  # sent names only the user's tools, and the guidance says to answer in plain
+  # text. A model that calls `submit` anyway is calling a tool that does not
+  # exist, which is an observation like any other unknown tool.
+  test "finish: :text offers no submit tool" do
     parent = self()
 
     lm =
@@ -1064,7 +1068,7 @@ defmodule ReActV2Test do
       )
 
     lookup = Imp.tool(:lookup, "lookup", fn _arguments -> "unused" end)
-    program = Imp.react("question -> answer", [lookup], lm: lm)
+    program = Imp.react("question -> answer", [lookup], finish: :text, lm: lm)
 
     refute Map.has_key?(program.tools, :submit)
     assert program.react.adapter_opts[:guidance].submit_tool == nil
@@ -1081,10 +1085,12 @@ defmodule ReActV2Test do
     assert_received {:lm_call, opts}
     assert Enum.map(opts[:tools], & &1.function.name) == ["lookup"]
 
-    # With several outputs the same roster carries `submit`.
-    submit_program = Imp.react(@submit_signature, [lookup])
-    assert Map.has_key?(submit_program.tools, :submit)
-    assert submit_program.react.adapter_opts[:guidance].submit_tool == :submit
+    # By default the same roster carries `submit`, for this signature too.
+    for signature <- ["question -> answer", @submit_signature] do
+      submit_program = Imp.react(signature, [lookup])
+      assert Map.has_key?(submit_program.tools, :submit)
+      assert submit_program.react.adapter_opts[:guidance].submit_tool == :submit
+    end
   end
 
   # A terminal tool ends the turn with the outputs it carries, the shape
@@ -1173,6 +1179,7 @@ defmodule ReActV2Test do
 
     assert {:ok, prediction} =
              Imp.react("question -> answer", [reply],
+               finish: :text,
                lm: lm,
                finish_on: %{"reply" => fn _arguments, _result, _inputs -> :continue end}
              )
@@ -1197,6 +1204,7 @@ defmodule ReActV2Test do
 
     assert {:ok, prediction} =
              Imp.react("question -> answer", [reply],
+               finish: :text,
                lm: lm,
                finish_on: %{reply: fn _arguments, _result, _inputs -> {:finish, %{}} end}
              )
@@ -1260,7 +1268,7 @@ defmodule ReActV2Test do
         ])
 
       assert {:ok, prediction} =
-               Imp.react("question -> answer", [reply], lm: lm)
+               Imp.react("question -> answer", [reply], finish: :text, lm: lm)
                |> Imp.call(%{question: "say hello"})
 
       assert Imp.get(prediction, :answer) == "done"
@@ -1369,7 +1377,7 @@ defmodule ReActV2Test do
       )
 
     assert {:ok, prediction} =
-             Imp.react("question -> answer", [], lm: lm)
+             Imp.react("question -> answer", [], finish: :text, lm: lm)
              |> Imp.call(%{question: "Now?", history: history})
 
     assert Imp.get(prediction, :answer) == "ok"

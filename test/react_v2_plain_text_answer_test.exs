@@ -1,8 +1,8 @@
 defmodule ReActV2PlainTextAnswerTest do
   use ExUnit.Case, async: true
 
-  # A ReActV2 signature with one unconstrained text output has no `submit`:
-  # with an LM that calls tools natively, the message the model writes without
+  # A ReActV2 program built with `finish: :text` has no `submit`: with an LM
+  # that calls tools natively, the message the model writes without
   # a tool call is the answer. The system message says only that. It shows no
   # `[[ ## answer ## ]]` or `[[ ## completed ## ]]` marker to write, which
   # would be a second, different way to finish, and it lists no output field:
@@ -39,7 +39,7 @@ defmodule ReActV2PlainTextAnswerTest do
   end
 
   test "the system message of a native one-text-output step, exactly" do
-    program = Imp.react("intent -> answer", [look()], lm: lm("ok"))
+    program = Imp.react("intent -> answer", [look()], finish: :text, lm: lm("ok"))
     assert {:ok, _prediction} = Imp.call(program, %{intent: "hello"})
 
     assert system_message() ==
@@ -68,7 +68,7 @@ defmodule ReActV2PlainTextAnswerTest do
         "Be brief."
       )
 
-    program = Imp.react(signature, [look()], lm: lm("ok"))
+    program = Imp.react(signature, [look()], finish: :text, lm: lm("ok"))
     assert {:ok, _prediction} = Imp.call(program, %{intent: "hello"})
     system = system_message()
 
@@ -85,6 +85,7 @@ defmodule ReActV2PlainTextAnswerTest do
   test "a host sets the agent line through adapter options, or omits it" do
     custom =
       Imp.react("intent -> answer", [look()],
+        finish: :text,
         lm: lm("ok"),
         adapter_opts: [agent_line: "Help the user."]
       )
@@ -98,14 +99,18 @@ defmodule ReActV2PlainTextAnswerTest do
     refute system =~ "You are an Agent"
 
     omitted =
-      Imp.react("intent -> answer", [look()], lm: lm("ok"), adapter_opts: [agent_line: nil])
+      Imp.react("intent -> answer", [look()],
+        finish: :text,
+        lm: lm("ok"),
+        adapter_opts: [agent_line: nil]
+      )
 
     assert {:ok, _prediction} = Imp.call(omitted, %{intent: "hello"})
     assert system_message() =~ "`answer`.\n        Call tools when more information is needed."
   end
 
   test "a final message with no markers is the answer" do
-    program = Imp.react("intent -> answer", [look()], lm: lm("It is a cat."))
+    program = Imp.react("intent -> answer", [look()], finish: :text, lm: lm("It is a cat."))
     assert {:ok, prediction} = Imp.call(program, %{intent: "what is it?"})
     assert Imp.get(prediction, :answer) == "It is a cat."
     assert prediction.metadata.termination_reason == :answered
@@ -113,14 +118,14 @@ defmodule ReActV2PlainTextAnswerTest do
 
   test "a reply that still writes the old markers is read as before" do
     reply = "[[ ## answer ## ]]\nIt is a cat.\n\n[[ ## completed ## ]]\n"
-    program = Imp.react("intent -> answer", [look()], lm: lm(reply))
+    program = Imp.react("intent -> answer", [look()], finish: :text, lm: lm(reply))
     assert {:ok, prediction} = Imp.call(program, %{intent: "what is it?"})
     assert Imp.get(prediction, :answer) == "It is a cat."
   end
 
   test "an LM that writes its tool calls still gets the marker template" do
     reply = "[[ ## answer ## ]]\nIt is a cat.\n\n[[ ## tool_calls ## ]]\n[]"
-    program = Imp.react("intent -> answer", [look()], lm: lm(reply, false))
+    program = Imp.react("intent -> answer", [look()], finish: :text, lm: lm(reply, false))
     assert {:ok, _prediction} = Imp.call(program, %{intent: "what is it?"})
     system = system_message()
 

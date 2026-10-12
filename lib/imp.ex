@@ -247,8 +247,9 @@ defmodule Imp do
   Creates a tool-using agent: an `Imp.Predict.ReActV2` program.
 
   The model calls `tools` natively, one step per request, and the turn ends
-  when it answers in text or, for a signature a text answer cannot fill, calls
-  `submit`. See `Imp.Predict.ReActV2.new/3` for the options.
+  when it calls `submit` with the signature's outputs, as in DSPy;
+  `finish: :text` ends it on plain text instead. See
+  `Imp.Predict.ReActV2.new/3` for the options.
   `Imp.Predict.ReAct` is the earlier loop, kept for its byte-faithful
   `mode: :dspy` port of DSPy's `dspy.ReAct`.
   """
