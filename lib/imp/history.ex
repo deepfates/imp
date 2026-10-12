@@ -53,14 +53,13 @@ defmodule Imp.History do
   @doc "Returns the signature-shaped field maps in insertion order."
   def messages(%__MODULE__{messages: messages}), do: messages
 
-  @doc """
-  One turn without the time each of its tool results came back
-  (`returned_at`, recorded by `Imp.Predict.ReActV2`). That time is a fact of
-  one run rather than of the program, so what is built from a trajectory for
-  another model to read, such as an optimizer's reflection prompt, leaves it
-  out and reads the same for the same trajectory in any run. Any other value
-  is returned as it is.
-  """
+  # One turn without the time each of its tool results came back
+  # (`returned_at`, recorded by `Imp.Predict.ReActV2`). That time is a fact of
+  # one run rather than of the program, so what is built from a trajectory for
+  # another model to read, such as GEPA's reflection prompt, leaves it out and
+  # reads the same for the same trajectory in any run. Any other value is
+  # returned as it is. Internal: GEPA and the tests use it.
+  @doc false
   @spec without_return_times(term()) :: term()
   def without_return_times(%{} = turn) when not is_struct(turn) do
     Enum.reduce([:tool_call_results, "tool_call_results"], turn, fn key, turn ->

@@ -13,9 +13,9 @@ User-visible changes to Imp are recorded here.
   during a tool loop, the way some agent frameworks stamp each tool result,
   and the stamp is the same on every later request, so a cached prompt
   prefix survives. The default rendering is unchanged.
-  `Imp.History.without_return_times/1` gives a turn without those times; GEPA
-  leaves them out of what its reflection model reads, so the same trajectories
-  make the same reflection prompt in any run, a resumed one included.
+  GEPA leaves those times out of what its reflection model reads, so the same
+  trajectories make the same reflection prompt in any run, a resumed one
+  included.
 
 ## 0.12.3 — 2026-10-10
 
