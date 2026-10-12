@@ -4,6 +4,21 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Changed
+
+- A ReActV2 step with one unconstrained text output and natively held tools
+  no longer presents that output as a field. Its system message drops
+  "Your output fields are: 1. `answer` (string): …", the second copy under
+  "The outputs to produce are:", and the field's name from the agent line
+  ("Produce `answer` from …") and the finish line ("… that message is
+  `answer`."). The finish line now reads "When the final answer is ready,
+  reply without calling a tool." followed by the field's description, said
+  once. The inputs, their markers, the instructions, history and tools are
+  unchanged, and a reply in markers is still read. A field name the model
+  never writes read as a label to write: models on several providers put
+  `answer:`, `**answer**` or `[[ ## answer ## ]]` into the message itself,
+  ahead of notes and the reply, and all of it was the answer.
+
 ### Fixed
 
 - The history of `Imp.Predict.ReActV2`, `Imp.Predict.ReAct` and
