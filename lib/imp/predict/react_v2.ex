@@ -1459,30 +1459,23 @@ defmodule Imp.Predict.ReActV2 do
   defp history_event(pending, prediction, calls, results, final) do
     pending
     |> maybe_put(:next_thought, Imp.get(prediction, :next_thought))
-    |> Map.put(:tool_calls, calls)
+    |> Map.put(:tool_calls, plain_calls(calls))
     |> Map.put(:tool_call_results, results)
     |> then(fn event -> if final, do: Map.merge(event, final), else: event end)
     # The history is what the model reads on its next step and what a host
     # stores to continue the conversation, so every input, call, result and
     # reasoning block stays as it was; Run events redact their own copies.
-    |> plain()
     |> maybe_put(:reasoning_content, Map.get(prediction.metadata, :native_reasoning))
     |> maybe_put(:reasoning_details, Map.get(prediction.metadata, :reasoning_details))
   end
 
-  # An event holds plain data, as a history reloaded from `Imp.History.dump/1`
-  # does: a struct becomes its fields, while an image and an exception keep
-  # their types. No value is changed.
-  defp plain(%Imp.Adapter.Types.Image{} = image), do: image
-  defp plain(value) when is_exception(value), do: value
-  defp plain(%_{} = struct), do: struct |> Map.from_struct() |> plain()
-  defp plain(map) when is_map(map), do: Map.new(map, fn {key, value} -> {key, plain(value)} end)
-  defp plain([head | tail]), do: [plain(head) | plain(tail)]
+  # The calls are held as their fields, as a history reloaded from
+  # `Imp.History.dump/1` holds them, so a live history and a reloaded one are
+  # the same turns.
+  defp plain_calls(%ToolCalls{tool_calls: calls}),
+    do: %{tool_calls: Enum.map(calls, &Map.from_struct/1)}
 
-  defp plain(tuple) when is_tuple(tuple),
-    do: tuple |> Tuple.to_list() |> plain() |> List.to_tuple()
-
-  defp plain(value), do: value
+  defp plain_calls(calls), do: calls
 
   # The prediction's fields are the signature's outputs and nothing else, so
   # an output may take any name; how the turn went is metadata.
