@@ -1476,8 +1476,6 @@ defmodule Imp.Predict.ReActV2 do
   defp plain_calls(%ToolCalls{tool_calls: calls}),
     do: %{tool_calls: Enum.map(calls, &Map.from_struct/1)}
 
-  defp plain_calls(calls), do: calls
-
   # The prediction's fields are the signature's outputs and nothing else, so
   # an output may take any name; how the turn went is metadata.
   defp final_prediction(outputs, history, reason, metadata \\ %{}) do
