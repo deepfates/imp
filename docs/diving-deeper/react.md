@@ -280,6 +280,40 @@ why the provider stopped the reply, as the LM client reports it; `:length`
 means the budget cut it short, so a host keeping the summary can tell a whole
 one from a cut one.
 
+### One call's own tool runners
+
+A call can also give `tools`: tools the program holds, each the same in
+name, description and schema, whose runners that call uses instead of the
+program's. The model is shown exactly what the program shows it, so the
+request and its cacheable prefix are unchanged; only what a call to those
+tools does belongs to the call. A host that keeps state for one call -- what
+the call has done so far, whom it runs for -- builds that call's runners over
+it, so copies of one program value, called at once by an evaluation or
+`Imp.parallel`, never share it.
+
+```elixir
+paging = %{on_call | run: fn %{"team" => team} -> "paged #{team}" end}
+
+lm =
+  script.([
+    %{tool_calls: [%{name: "on_call", arguments: %{"team" => "harbor"}}]},
+    %{reply: "Paged.", tool_calls: []}
+  ])
+
+reply = Imp.react(Imp.signature("ticket -> reply"), [on_call], lm: lm)
+{:ok, prediction} = Imp.call(reply, %{ticket: "The deploy is stuck.", tools: [paging]})
+
+for step <- prediction.metadata.history.messages, result <- step.tool_call_results,
+    do: result.result
+#=> ["paged harbor"]
+```
+
+A tool shown any differently, or one the program does not hold, is refused
+before a request with `{:error, {:invalid_react_v2_tools, message}}`. The
+program value is not changed. Updating a program's tools for good is an
+optimizer's path, and it still refuses a changed runner: an optimizer may
+rewrite what the model reads of a tool, never what the tool does.
+
 ### Ending the turn from a tool
 
 `finish_on:` maps a tool name to a function of the call's arguments, its
