@@ -4,6 +4,17 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Fixed
+
+- The history of `Imp.Predict.ReActV2`, `Imp.Predict.ReAct` and
+  `Imp.Predict.Avatar` keeps each input, tool call and tool result as it was.
+  Before, `Imp.Redaction` ran over them as they were added, so a tool result
+  or input that only contained something credential-shaped (a quoted
+  `curl -H "Authorization: Bearer ..."`, a JWT in a discussion) was replaced
+  whole by `"[REDACTED]"`, and the model read that on every later step, as did
+  a host that stored the history and continued from it. Run events,
+  telemetry, traces and inspection still redact their own copies.
+
 ## 0.12.3 — 2026-10-10
 
 ### Added

@@ -194,8 +194,8 @@ defmodule Imp.Predict.Avatar do
 
     observation = %ActionOutput{
       tool_name: tool_name,
-      tool_input_query: Imp.Redaction.redact(action.tool_input_query),
-      tool_output: Imp.Redaction.redact(output),
+      tool_input_query: action.tool_input_query,
+      tool_output: output,
       error?: error?,
       terminal_reason: terminal_reason
     }
