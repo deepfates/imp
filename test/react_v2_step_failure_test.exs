@@ -33,6 +33,9 @@ defmodule ReActV2StepFailureTest do
     end)
   end
 
+  defp untimed(%Imp.History{messages: messages} = history),
+    do: %{history | messages: Enum.map(messages, &Imp.History.without_return_times/1)}
+
   defp unavailable,
     do: %Imp.LMError{message: "provider unavailable", status: 503, retryable: true}
 
@@ -144,7 +147,8 @@ defmodule ReActV2StepFailureTest do
                |> Imp.call(%{intent: "hello"})
 
       assert prediction.metadata[:termination_reason] == :last_text
-      assert failed == prediction.metadata[:history]
+      # The two runs differ only in when the result came back.
+      assert untimed(failed) == untimed(prediction.metadata[:history])
 
       assert [%{intent: "hello", tool_calls: calls, tool_call_results: [result]}] =
                failed.messages
