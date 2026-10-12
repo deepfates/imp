@@ -136,15 +136,18 @@ defmodule Imp.Predict.ReActV2 do
 
   ## Per-call options
 
-  A call may give `max_iters`, `last_request_note` and `config` beside its
-  inputs, under atom or string keys. Each applies to that call only and is
+  A call may give `max_iters`, `last_request_note`, `config` and `tools`
+  beside its inputs, under atom or string keys. Each applies to that call only and is
   not an input field. `max_iters` and `last_request_note` replace the
   program's own; `max_iters` is a non-negative integer and
   `last_request_note` a string or `nil`. `config` is a keyword list of
   request options merged over the program's `:config` for every request of
   the call, such as `max_tokens: 4_000`; it may not name `:tools` or
-  `:tool_choice`, which the loop chooses on each step. Any other value is
-  refused before a model is called.
+  `:tool_choice`, which the loop chooses on each step. `tools` is a list of
+  `Imp.Tool`s that the program holds, each the program's own in name,
+  description and schema, whose runners the call uses in place of the
+  program's: the request is unchanged, and only what a call to those tools
+  does is the call's. Any other value is refused before a model is called.
 
   Together they continue a conversation the caller holds. A call with a
   `:history`, `max_iters: 0` and a note makes one request, the last request:
@@ -537,10 +540,13 @@ defmodule Imp.Predict.ReActV2 do
          :ok <- validate_call_note(note),
          {config, inputs} <- pop_call_option(inputs, :config, []),
          :ok <- validate_call_config(config),
+         {tools, inputs} <- pop_call_option(inputs, :tools, []),
+         {:ok, tools} <- call_tools(react.tools, tools),
          {:ok, history} <- coerce_history(Map.get(inputs, :history, Map.get(inputs, "history"))) do
       react = %{
         react
-        | last_request_note: note,
+        | tools: tools,
+          last_request_note: note,
           react: %{react.react | config: Keyword.merge(react.react.config, config)}
       }
 
@@ -1710,6 +1716,44 @@ defmodule Imp.Predict.ReActV2 do
   end
 
   defp validate_call_config(config), do: {:error, {:invalid_react_v2_config, config}}
+
+  # A call's own runners for tools the program holds. What the model is shown
+  # of each tool -- its name, description and schema -- must be the program's,
+  # so the request, its tool roster and its cacheable prefix are the same; a
+  # tool shown any differently is refused. Only `run` is the call's. The
+  # program value is not changed: `with_tools/2`, the path an optimizer's
+  # updates take, still refuses a changed runner.
+  defp call_tools(tools, []), do: {:ok, tools}
+
+  defp call_tools(tools, given) when is_list(given) do
+    Enum.reduce_while(given, {:ok, tools}, fn
+      %Imp.Tool{} = tool, {:ok, acc} ->
+        case Imp.Tool.resolve_name(acc, tool.name) do
+          nil ->
+            {:halt, invalid_call_tools("#{tool.name} is not one of the program's tools")}
+
+          name ->
+            held = Map.fetch!(acc, name)
+
+            if tool.description == held.description and tool.schema == held.schema,
+              do: {:cont, {:ok, Map.put(acc, name, %{held | run: tool.run})}},
+              else:
+                {:halt,
+                 invalid_call_tools(
+                   "#{tool.name} must be shown to the model as the program shows it: " <>
+                     "the same description and schema"
+                 )}
+        end
+
+      other, _acc ->
+        {:halt, invalid_call_tools("expected Imp.Tool structs, got: #{inspect(other)}")}
+    end)
+  end
+
+  defp call_tools(_tools, given),
+    do: invalid_call_tools("expected a list of Imp.Tool structs, got: #{inspect(given)}")
+
+  defp invalid_call_tools(message), do: {:error, {:invalid_react_v2_tools, message}}
 
   defp validate_call_max_iters(max_iters) when is_integer(max_iters) and max_iters >= 0, do: :ok
 

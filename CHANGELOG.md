@@ -6,6 +6,15 @@ User-visible changes to Imp are recorded here.
 
 ### Added
 
+- A ReActV2 call can give `tools`: tools the program holds, the same in
+  name, description and schema, whose runners that call uses instead of the
+  program's, as it can give its own `max_iters`, `last_request_note` and
+  `config`. The request is unchanged; a tool shown differently, or one the
+  program does not hold, is refused before any request
+  (`{:error, {:invalid_react_v2_tools, message}}`). The program value is not
+  changed, and `with_tools/2`, the optimizer's path, still refuses a changed
+  runner. A host keeps per-call state in a call's runners, so copies of one
+  program called at once never share it.
 - ReActV2 records when each tool result came back, as `returned_at` (ISO 8601,
   UTC) beside the result in the history, and the Chat adapter passes it to a
   `:tool_result_renderer` in the call map (`%{id:, name:, returned_at:}`;
