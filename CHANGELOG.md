@@ -43,6 +43,16 @@ User-visible changes to Imp are recorded here.
   a host that stored the history and continued from it. Run events,
   telemetry, traces and inspection still redact their own copies.
 
+- A ReqLLM call's `usage`, streamed or not, says whether `input_tokens` already
+  counts the cached prompt, as `input_includes_cached`, which ReqLLM decides
+  when it normalizes and prices the call but leaves off the response.
+  OpenAI-style usage counts cache reads inside `prompt_tokens` (`true`);
+  Anthropic-style usage counts `cache_read_input_tokens` and
+  `cache_creation_input_tokens` apart (`false`). A flag the provider usage
+  already carries is kept. The ATIF export's `prompt_tokens` for an
+  Anthropic-style call now includes its cache reads and writes, where before
+  it was only the tokens after the last cache breakpoint.
+
 ## 0.12.3 — 2026-10-10
 
 ### Added

@@ -951,7 +951,12 @@ defmodule ReqLLMClientTest do
     assert {:ok, %{req_llm: %{cache_hit: true, usage: %{}}}} = Imp.LM.Result.metadata(hit)
 
     assert usage == %{
-             "openai/#{model}" => %{input_tokens: 3, output_tokens: 2, total_tokens: 5}
+             "openai/#{model}" => %{
+               input_tokens: 3,
+               output_tokens: 2,
+               total_tokens: 5,
+               input_includes_cached: true
+             }
            }
 
     assert_received {:req_llm_generate, ^model, _messages, _opts}
@@ -1626,7 +1631,8 @@ defmodule ReqLLMClientTest do
              "openai/gpt-test" => %{
                input_tokens: 3,
                output_tokens: 2,
-               total_tokens: 5
+               total_tokens: 5,
+               input_includes_cached: true
              }
            }
 

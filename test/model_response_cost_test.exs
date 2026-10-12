@@ -120,7 +120,7 @@ defmodule Imp.ModelResponseCostTest do
     assert response.metadata.cost == nil
     assert response.metadata.estimated_cost == nil
     refute Map.has_key?(response.metadata, :billing)
-    assert response.metadata.usage == usage
+    assert response.metadata.usage == Map.put(usage, :input_includes_cached, true)
   end
 
   # The whole path a resident's call takes: an OpenRouter-shaped body over
@@ -365,5 +365,38 @@ defmodule Imp.ModelResponseCostTest do
     usage = Imp.Optimizer.Budget.snapshot(budget)["usage"]
     assert usage["input_tokens"] == 7
     assert usage["output_tokens"] == 3
+  end
+
+  # ReqLLM's usage step leaves both shapes with `cached_tokens`; only the
+  # provider's own fields say whether `input_tokens` already counts them.
+  # Anthropic's prompt is cache reads + cache writes + `input_tokens`; OpenAI's
+  # `prompt_tokens` counts its cached tokens inside.
+  test "the ATIF prompt counts cached input once, whichever way the provider reports it" do
+    anthropic = %{
+      input_tokens: 50,
+      cache_read_input_tokens: 100_000,
+      cache_creation_input_tokens: 0,
+      cached_tokens: 100_000,
+      cache_creation_tokens: 0,
+      output_tokens: 10,
+      total_tokens: 60
+    }
+
+    openai = %{
+      input_tokens: 10_339,
+      cached_tokens: 10_318,
+      output_tokens: 10,
+      total_tokens: 10_349
+    }
+
+    for {usage, includes_cached, prompt} <- [{anthropic, false, 100_050}, {openai, true, 10_339}] do
+      {events, response} = model_response(usage)
+      assert response.metadata.usage.input_includes_cached == includes_cached
+
+      [metrics] =
+        for step <- Imp.Trajectory.to_atif(events)["steps"], step["metrics"], do: step["metrics"]
+
+      assert metrics["prompt_tokens"] == prompt
+    end
   end
 end
