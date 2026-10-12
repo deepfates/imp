@@ -4,6 +4,8 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+## 0.13.0 — 2026-10-12
+
 ### Added
 
 - A ReActV2 call can give `tools`: tools the program holds, the same in
@@ -24,7 +26,8 @@ User-visible changes to Imp are recorded here.
   prefix survives. The default rendering is unchanged.
   GEPA leaves those times out of what its reflection model reads, so the same
   trajectories make the same reflection prompt in any run, a resumed one
-  included.
+  included. Since each result carries the time it came back, two runs of the
+  same program no longer return equal histories.
 
 ### Changed
 
@@ -39,7 +42,9 @@ User-visible changes to Imp are recorded here.
   unchanged, and a reply in markers is still read. A field name the model
   never writes read as a label to write: models on several providers put
   `answer:`, `**answer**` or `[[ ## answer ## ]]` into the message itself,
-  ahead of notes and the reply, and all of it was the answer.
+  ahead of notes and the reply, and all of it was the answer. Migration: none
+  for parsing; a test that compares that system message exactly expects the
+  new text.
 
 ### Fixed
 
@@ -50,8 +55,11 @@ User-visible changes to Imp are recorded here.
   `curl -H "Authorization: Bearer ..."`, a JWT in a discussion) was replaced
   whole by `"[REDACTED]"`, and the model read that on every later step, as did
   a host that stored the history and continued from it. Run events,
-  telemetry, traces and inspection still redact their own copies.
-
+  telemetry, traces and inspection still redact their own copies. Migration:
+  a host that stores a history now stores what the model read; store it
+  privately, and pass it through `Imp.History.redact/1`, or use the run's
+  events, for anything shown or shipped elsewhere. A history stored before
+  keeps its `"[REDACTED]"` strings.
 - A ReqLLM call's `usage`, streamed or not, says whether `input_tokens` already
   counts the cached prompt, as `input_includes_cached`, which ReqLLM decides
   when it normalizes and prices the call but leaves off the response.
@@ -60,7 +68,8 @@ User-visible changes to Imp are recorded here.
   `cache_creation_input_tokens` apart (`false`). A flag the provider usage
   already carries is kept. The ATIF export's `prompt_tokens` for an
   Anthropic-style call now includes its cache reads and writes, where before
-  it was only the tokens after the last cache breakpoint.
+  it was only the tokens after the last cache breakpoint. A caller that
+  matches a usage map exactly sees the new key.
 
 ## 0.12.3 — 2026-10-10
 
