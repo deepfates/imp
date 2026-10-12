@@ -210,10 +210,11 @@ defmodule Imp.Predict.ReActV2 do
   the window, an incomplete prediction retains history and context diagnostics.
   This is lossy prompt selection, not summarization or deletion of memory.
 
-  Tool history retains provider-native reasoning text and opaque reasoning
-  details for continuation, including after `Imp.History.dump/1` and `Imp.History.load!/1`.
-  These are operational protocol data and must remain unmodified. Store history
-  privately; use redacted events or `Imp.History.redact/1` for diagnostic copies.
+  Tool history is the conversation the model reads: it keeps each input, tool
+  call and tool result as it was, and provider-native reasoning text and opaque
+  reasoning details for continuation, including after `Imp.History.dump/1` and
+  `Imp.History.load!/1`. Store history privately; use redacted events or
+  `Imp.History.redact/1` for diagnostic copies.
   """
 
   @behaviour Imp.Module
@@ -1471,15 +1472,21 @@ defmodule Imp.Predict.ReActV2 do
   defp history_event(pending, prediction, calls, results, final) do
     pending
     |> maybe_put(:next_thought, Imp.get(prediction, :next_thought))
-    |> Map.put(:tool_calls, calls)
+    |> Map.put(:tool_calls, plain_calls(calls))
     |> Map.put(:tool_call_results, results)
     |> then(fn event -> if final, do: Map.merge(event, final), else: event end)
-    |> Imp.Redaction.redact()
-    # Opaque signatures and reasoning blocks may resemble credentials. Preserve
-    # the provider's continuation state exactly; Run events redact their copies.
+    # The history is what the model reads on its next step and what a host
+    # stores to continue the conversation, so every input, call, result and
+    # reasoning block stays as it was; Run events redact their own copies.
     |> maybe_put(:reasoning_content, Map.get(prediction.metadata, :native_reasoning))
     |> maybe_put(:reasoning_details, Map.get(prediction.metadata, :reasoning_details))
   end
+
+  # The calls are held as their fields, as a history reloaded from
+  # `Imp.History.dump/1` holds them, so a live history and a reloaded one are
+  # the same turns.
+  defp plain_calls(%ToolCalls{tool_calls: calls}),
+    do: %{tool_calls: Enum.map(calls, &Map.from_struct/1)}
 
   # The prediction's fields are the signature's outputs and nothing else, so
   # an output may take any name; how the turn went is metadata.

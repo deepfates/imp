@@ -666,14 +666,14 @@ defmodule Imp.Adapter.Chat do
   # `plain_text_answer?/2`) shows only the input template: its replies carry
   # no markers, so a template asking for `[[ ## answer ## ]]` and
   # `[[ ## completed ## ]]` would contradict the guidance and the replayed
-  # turns, which are plain text.
+  # turns, which are plain text. For the same reason it lists no output
+  # fields: the answer is the message, not a field written inside it, and the
+  # guidance describes that message once (`with_guidance/5`).
   defp default_system(signature, opts) do
     if plain_text_answer?(signature, opts) do
       """
       Your input fields are:
       #{render_field_list(signature.inputs)}
-      Your output fields are:
-      #{render_field_list(signature.outputs)}
       Inputs will be structured in the following way, with the appropriate values filled in.
 
       #{render_input_template(signature)}
@@ -752,17 +752,26 @@ defmodule Imp.Adapter.Chat do
   #
   # In a plain-text loop rendered by this adapter (`plain_text_answer?/2`),
   # the reply has no fields to write the answer in, so the sentence says
-  # what is true there: the message without a tool call is the answer.
+  # what is true there: the message without a tool call is the answer. The
+  # answer is described there, by its description alone, and not as an
+  # output field with a name and a type: a field name the model never writes
+  # reads as a label to write, and models wrote it into the message
+  # (`answer:`, `**answer**`, `[[ ## answer ## ]]`) ahead of notes and reply.
   defp with_guidance(instructions, nil, _signature, _plain?, _agent_line), do: instructions
 
   defp with_guidance(instructions, %{} = guidance, signature, plain?, agent_line) do
     names = fn key -> guidance |> Map.get(key, []) |> Enum.map_join(", ", &"`#{&1}`") end
+    plain_finish? = plain? and Map.get(guidance, :submit_tool, :submit) == nil
 
     finish =
       case Map.get(guidance, :submit_tool, :submit) do
         nil when plain? ->
-          "When the final answer is ready, reply without calling a tool: " <>
-            "that message is `#{output_field(signature, meta_field(signature, :text_field)).name}`."
+          [
+            "When the final answer is ready, reply without calling a tool.",
+            field_description(output_field(signature, meta_field(signature, :text_field)))
+          ]
+          |> Enum.reject(&(&1 == ""))
+          |> Enum.join(" ")
 
         nil ->
           text_answer(signature)
@@ -779,6 +788,7 @@ defmodule Imp.Adapter.Chat do
 
     outputs =
       case Map.get(guidance, :outputs, []) do
+        _fields when plain_finish? -> nil
         [] -> nil
         fields -> "The outputs to produce are:\n" <> render_field_list(fields)
       end
@@ -798,11 +808,11 @@ defmodule Imp.Adapter.Chat do
 
   # With no finish tool in a plain-text loop, the answer is the reply
   # without a tool call, so the opening line does not say the tools
-  # produce it: they gather information and act.
+  # produce it: they gather information and act. Nor does it name the
+  # answer as an output to produce (see `with_guidance/5`).
   defp default_agent_line(guidance, plain?, names) do
     if plain? and Map.get(guidance, :submit_tool, :submit) == nil do
-      "You are an Agent. Produce #{names.(:output_names)} from #{names.(:input_names)}, " <>
-        "using the supplied tools to gather information and take actions."
+      "You are an Agent. Use the supplied tools to gather information and take actions."
     else
       "You are an Agent. Use the supplied tools to produce #{names.(:output_names)} " <>
         "from #{names.(:input_names)}."

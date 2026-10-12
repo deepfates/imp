@@ -759,7 +759,7 @@ defmodule ProductionHardeningTest do
     assert trace_text =~ "[REDACTED]"
   end
 
-  test "ReAct CodeAct and RLM traces redact tool and observation secrets" do
+  test "CodeAct and RLM traces redact tool and observation secrets" do
     secret = "Bearer abcdefghijklmnop"
 
     react_lm =
@@ -777,7 +777,9 @@ defmodule ProductionHardeningTest do
     leak = Imp.Tool.new(:leak, "leak", fn _args -> secret end)
     react = Imp.Predict.ReAct.new("question -> answer", [leak], lm: react_lm)
     assert {:ok, react_prediction} = Imp.Predict.ReAct.call(react, %{question: "q"})
-    refute inspect(react_prediction.metadata[:history]) =~ secret
+    # ReAct's history is the conversation the model reads, not a trace: it keeps
+    # the tool's result as returned (test/history_verbatim_test.exs).
+    assert inspect(react_prediction.metadata[:history]) =~ secret
 
     code_lm =
       Imp.LM.Static.new(

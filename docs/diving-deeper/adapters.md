@@ -71,7 +71,8 @@ annotations (`str`, `Literal[...]`).
 One place shows no output markers: a [ReAct](react.md) loop with one
 unconstrained text output, whose tools the provider holds natively. Its
 answer is the plain text of the message that calls no tool, so the system
-message lays out only the inputs and says so:
+message lays out only the inputs, lists no output fields, and says so, with
+the answer's description after it:
 
 ```text
 Inputs will be structured in the following way, with the appropriate values filled in.
@@ -81,7 +82,7 @@ Inputs will be structured in the following way, with the appropriate values fill
 
 In adhering to this structure, your objective is: 
         ...
-        When the final answer is ready, reply without calling a tool: that message is `answer`.
+        When the final answer is ready, reply without calling a tool.
         The available tools are: `look`.
 ```
 
