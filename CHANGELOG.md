@@ -4,6 +4,18 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Changed
+
+- The finish line of a plain-text ReActV2 step (one unconstrained text
+  output, tools held natively) now reads "When the final answer is ready,
+  write it as plain text without calling a tool.", followed by the field's
+  description as before. It read "... reply without calling a tool.":
+  "reply" is a common tool name, so for a program holding a `reply` tool the
+  sentence read as an instruction about that tool, and the same situation
+  without a text field was already worded this way. Every plain-text
+  ReActV2 prompt's system message changes, so a provider's prompt cache for
+  those programs misses once.
+
 ## 0.13.0 — 2026-10-12
 
 ### Added
