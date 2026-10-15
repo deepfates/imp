@@ -265,8 +265,9 @@ turn ends only through `submit`, or end it from the tool with `finish_on:`.
 A call can give its own `max_iters`, `last_request_note` and
 `last_request_tools` beside its inputs. With a history, `max_iters: 0` and a note, the call makes one
 request, the last one: the loop's system message, its tools and the history
-as the model saw them, then the note. No tool runs, and the text the model
-writes is the answer. Codex CLI and Anthropic's SDK build a request to
+as the model saw them, then the note. No tool runs unless `last_request_tools`
+names it (see "Acting in the last request" below; a call for a summary gives
+`last_request_tools: []`), and the text the model writes is the answer. Codex CLI and Anthropic's SDK build a request to
 summarise a conversation the same way: the conversation's own messages, then
 one instruction.
 

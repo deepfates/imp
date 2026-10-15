@@ -30,8 +30,9 @@ defmodule Imp.Predict.ReActV2 do
       `:history` input of the next call.
     * `:termination_reason` — how the turn ended (below).
     * `:termination_cause` — present whenever the turn was interrupted: for
-      `:last_text`, `:forced_submit` and `:extracted`, the interruption that led
-      to the last request. For `:incomplete`, the same interruption, unless
+      `:last_text`, `:forced_submit` and `:extracted`, and for
+      `:finished_by_tool` when a `finish_on` hook ended the turn in the last
+      request, the interruption that led to the last request. For `:incomplete`, the same interruption, unless
       the turn's context window was full or its `Imp.Deadline` had passed,
       which would refuse any further request too and so are named instead;
       `termination_error` holds the errors of the requests that failed. One of `:max_iters`, `:parse_error`, `:prediction_error`,
@@ -116,8 +117,9 @@ defmodule Imp.Predict.ReActV2 do
   that while it wants a tool can write the call as text in its own tool markup
   (seen from inkling through OpenRouter, and through DeepInfra),
   and that text would become the answer. If the model calls a tool, the call
-  is not run; the completion's text, if any, is the answer, and the calls are
-  kept in `unexecuted_tool_calls`. A completion that says nothing is an empty
+  is not run unless `:last_request_tools` names that tool (below); the
+  completion's text, if any, is the answer, and the calls not run are kept in
+  `unexecuted_tool_calls`. A completion that says nothing is an empty
   answer rather than an error. If the process's `Imp.Deadline` has already
   passed, no request is made and the turn is `:incomplete` with
   `termination_cause: :deadline_exceeded`.
@@ -619,8 +621,7 @@ defmodule Imp.Predict.ReActV2 do
          :ok <- validate_call_config(config),
          {tools, inputs} <- pop_call_option(inputs, :tools, []),
          {:ok, tools} <- call_tools(react.tools, tools),
-         {listed, inputs} <- pop_call_option(inputs, :last_request_tools, :program),
-         {:ok, last_request_tools} <- call_last_request_tools(react, listed),
+         {:ok, last_request_tools, inputs} <- call_last_request_tools(react, inputs),
          {:ok, history} <- coerce_history(Map.get(inputs, :history, Map.get(inputs, "history"))) do
       react = %{
         react
@@ -833,7 +834,9 @@ defmodule Imp.Predict.ReActV2 do
               final_prediction(outputs, history, :last_text, finish_reason(metadata, prediction))
 
             {results, _final, {tool_name, finished}} ->
-              event = history_event(pending, prediction, runnable, results, finished)
+              # The outputs are the prediction's, not the step's, as after
+              # any step a `finish_on` hook ends.
+              event = history_event(pending, prediction, runnable, results, nil)
 
               final_prediction(
                 finished,
@@ -1871,12 +1874,21 @@ defmodule Imp.Predict.ReActV2 do
   # A call's own `last_request_tools` replaces the program's, checked as the
   # program's were. A host that makes a one-request call for a summary gives
   # `[]`, so the program's listed tools cannot act in it.
-  defp call_last_request_tools(react, :program), do: {:ok, react.last_request_tools}
+  # Presence of the key, under either spelling, is what says the call gives
+  # its own list; any value it gives is checked, so none can stand for the
+  # program's.
+  defp call_last_request_tools(react, inputs) do
+    case Enum.find([:last_request_tools, "last_request_tools"], &Map.has_key?(inputs, &1)) do
+      nil ->
+        {:ok, react.last_request_tools, inputs}
 
-  defp call_last_request_tools(react, names) do
-    case resolve_last_request_tools(names, react.tools, react.signature) do
-      {:ok, resolved} -> {:ok, resolved}
-      {:error, message} -> {:error, {:invalid_react_v2_last_request_tools, message}}
+      key ->
+        inputs_left = Map.drop(inputs, [:last_request_tools, "last_request_tools"])
+
+        case resolve_last_request_tools(Map.fetch!(inputs, key), react.tools, react.signature) do
+          {:ok, resolved} -> {:ok, resolved, inputs_left}
+          {:error, message} -> {:error, {:invalid_react_v2_last_request_tools, message}}
+        end
     end
   end
 

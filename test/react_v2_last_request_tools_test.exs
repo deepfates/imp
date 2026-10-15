@@ -181,6 +181,12 @@ defmodule ReActV2LastRequestToolsTest do
     assert prediction.metadata.termination_reason == :finished_by_tool
     assert prediction.metadata.finished_by_tool == "post"
     assert prediction.metadata.termination_cause == :prediction_error
+
+    # The step is recorded as any step a hook ends is: its call and result,
+    # and not the hook's outputs.
+    last = prediction.metadata.history |> Imp.History.messages() |> List.last()
+    assert [%{id: "p1"}] = last.tool_calls.tool_calls
+    refute Map.get(last, :answer) == "summary"
   end
 
   test "the names must be tools the program holds, for a signature with a text answer" do
@@ -243,6 +249,13 @@ defmodule ReActV2LastRequestToolsTest do
     assert {:error, {:invalid_react_v2_last_request_tools, _message}} =
              Imp.call(program, %{intent: "hi", last_request_tools: :post})
 
+    # No value stands for the program's own list: one that is not a list is
+    # refused, under either spelling of the key.
+    for key <- [:last_request_tools, "last_request_tools"], value <- [:program, nil] do
+      assert {:error, {:invalid_react_v2_last_request_tools, _message}} =
+               Imp.call(program, %{:intent => "hi", key => value})
+    end
+
     with_submit = Imp.react("intent -> answer, confidence: float", tools(self()))
 
     assert {:error, {:invalid_react_v2_last_request_tools, _message}} =
@@ -263,6 +276,10 @@ defmodule ReActV2LastRequestToolsTest do
 
     older = Map.delete(dumped, "last_request_tools")
     assert Imp.load!(older, registry: registry).last_request_tools == []
+
+    assert_raise ArgumentError, ~r/invalid saved ReActV2 last_request_tools/, fn ->
+      dumped |> Map.put("last_request_tools", ["send"]) |> Imp.load!(registry: registry)
+    end
   end
 
   defp collect_events(acc) do

@@ -644,7 +644,7 @@ defmodule Imp.Saving do
       max_iters: require_non_negative_integer!(state["max_iters"], "ReActV2 max_iters"),
       last_request_note: load_react_v2_last_request_note!(state["last_request_note"]),
       finish_on: load_finish_on!(state["finish_on"]),
-      last_request_tools: load_last_request_tools!(state["last_request_tools"]),
+      last_request_tools: load_last_request_tools!(state["last_request_tools"], tools),
       tool_policy: load_tool_policy!(state["tool_policy"], "ReActV2 tool policy")
     }
     |> Imp.Predict.ReActV2.restore_loop()
@@ -1276,15 +1276,18 @@ defmodule Imp.Saving do
 
   # A file saved before the option existed has none, and runs no tool in the
   # last request, as that version did.
-  defp load_last_request_tools!(nil), do: []
+  defp load_last_request_tools!(nil, _tools), do: []
 
-  defp load_last_request_tools!(names) when is_list(names) do
-    if Enum.all?(names, &is_binary/1),
+  # Each name must be one of the loaded tools, as `ReActV2.new/3` requires.
+  defp load_last_request_tools!(names, tools) when is_list(names) do
+    held = Enum.map(Map.keys(tools), &to_string/1)
+
+    if Enum.all?(names, &(is_binary(&1) and &1 in held)),
       do: names,
       else: raise(ArgumentError, "invalid saved ReActV2 last_request_tools: #{inspect(names)}")
   end
 
-  defp load_last_request_tools!(other),
+  defp load_last_request_tools!(other, _tools),
     do: raise(ArgumentError, "invalid saved ReActV2 last_request_tools: #{inspect(other)}")
 
   defp load_react_v2_last_request_note!(nil), do: nil
