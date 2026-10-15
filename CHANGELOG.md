@@ -18,7 +18,10 @@ User-visible changes to Imp are recorded here.
   forced last request. Each name must be a tool the program holds, and a
   signature with `submit` refuses the option. The default, `[]`, changes
   nothing; saved programs carry the list, and a file saved without it loads
-  with none.
+  with none. A call may give its own `last_request_tools`, which replaces
+  the program's for that call, as `max_iters` and `last_request_note` do. A
+  one-request call (`max_iters: 0`) is a last request, so a host asking for
+  a summary gives `last_request_tools: []` and no listed tool acts in it.
 
 ## 0.13.0 — 2026-10-12
 

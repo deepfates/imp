@@ -193,6 +193,62 @@ defmodule ReActV2LastRequestToolsTest do
     end
   end
 
+  # A host asks a program for a summary of a conversation with one request,
+  # the last one. The program's listed tools must not act in it, so the call
+  # gives its own empty list.
+  test "a call's own empty list runs nothing in a one-request call" do
+    owner = self()
+
+    lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          %{
+            answer: "We posted the summary earlier.",
+            tool_calls: [%{id: "p1", name: "post", arguments: %{"text" => "recap"}}]
+          }
+        end
+      )
+
+    program =
+      Imp.react("intent -> answer", tools(owner), lm: lm, last_request_tools: [:post])
+
+    assert {:ok, prediction} =
+             Imp.call(program, %{
+               intent: "Summarise this conversation.",
+               max_iters: 0,
+               last_request_tools: []
+             })
+
+    refute_received {:posted, _}
+    assert Imp.get(prediction, :answer) == "We posted the summary earlier."
+    assert prediction.metadata.termination_reason == :last_text
+    assert [%{id: "p1", name: "post"}] = prediction.metadata.unexecuted_tool_calls
+    assert results(prediction) == []
+
+    # Without the call's own list, the program's runs.
+    assert {:ok, _prediction} =
+             Imp.call(program, %{intent: "Summarise this conversation.", max_iters: 0})
+
+    assert_received {:posted, "recap"}
+  end
+
+  test "a call's own list is checked as the program's is" do
+    program = Imp.react("intent -> answer", tools(self()))
+
+    assert {:error, {:invalid_react_v2_last_request_tools, message}} =
+             Imp.call(program, %{intent: "hi", last_request_tools: [:send]})
+
+    assert message =~ "names no tool: send"
+
+    assert {:error, {:invalid_react_v2_last_request_tools, _message}} =
+             Imp.call(program, %{intent: "hi", last_request_tools: :post})
+
+    with_submit = Imp.react("intent -> answer, confidence: float", tools(self()))
+
+    assert {:error, {:invalid_react_v2_last_request_tools, _message}} =
+             Imp.call(with_submit, %{intent: "hi", last_request_tools: [:post]})
+  end
+
   test "saving and loading carry the list, and an older file loads with none" do
     runner = fn _arguments -> "ok" end
     registry = Imp.Saving.Registry.new(post_runner: runner)

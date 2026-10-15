@@ -151,11 +151,13 @@ defmodule Imp.Predict.ReActV2 do
 
   ## Per-call options
 
-  A call may give `max_iters`, `last_request_note`, `config` and `tools`
-  beside its inputs, under atom or string keys. Each applies to that call only and is
-  not an input field. `max_iters` and `last_request_note` replace the
-  program's own; `max_iters` is a non-negative integer and
-  `last_request_note` a string or `nil`. `config` is a keyword list of
+  A call may give `max_iters`, `last_request_note`, `last_request_tools`,
+  `config` and `tools` beside its inputs, under atom or string keys. Each
+  applies to that call only and is not an input field. `max_iters`,
+  `last_request_note` and `last_request_tools` replace the program's own;
+  `max_iters` is a non-negative integer, `last_request_note` a string or
+  `nil`, and `last_request_tools` a list of tools the program holds, checked
+  as the program's own list is. `config` is a keyword list of
   request options merged over the program's `:config` for every request of
   the call, such as `max_tokens: 4_000`; it may not name `:tools` or
   `:tool_choice`, which the loop chooses on each step. `tools` is a list of
@@ -176,6 +178,11 @@ defmodule Imp.Predict.ReActV2 do
   messages, then one instruction. The call's `config` gives that request
   its own options, an output budget for instance, and the prediction's
   `:finish_reason` says whether the reply was cut short by it.
+
+  That request is a last request, so a program's `last_request_tools` run in
+  it. A summary is not the place for a program's actions: a host asking for
+  one gives `last_request_tools: []` with the call, and a call to such a tool
+  in that request is not run but listed in `unexecuted_tool_calls`.
 
   A request refused because the context window is full is not an
   interruption of this kind: a further request would be refused the same way,
@@ -453,28 +460,41 @@ defmodule Imp.Predict.ReActV2 do
   # last text request reads the list; a signature with `submit` ends an
   # interrupted turn with the forced `submit`, which runs nothing else, so a
   # list there would never be used and is refused rather than ignored.
-  defp resolve_last_request_tools!([], _tools, _signature), do: []
-
   defp resolve_last_request_tools!(names, tools, signature) do
-    unless single_text_output?(signature) do
-      raise ArgumentError,
-            "Imp.Predict.ReActV2.new/3: :last_request_tools applies only to a signature " <>
-              "with one unconstrained text output; this one ends an interrupted turn with submit"
+    case resolve_last_request_tools(names, tools, signature) do
+      {:ok, resolved} -> resolved
+      {:error, message} -> raise ArgumentError, "Imp.Predict.ReActV2.new/3: " <> message
     end
-
-    names
-    |> Enum.map(fn name ->
-      case Imp.Tool.resolve_name(tools, name) do
-        nil ->
-          raise ArgumentError,
-                "Imp.Predict.ReActV2.new/3: :last_request_tools names no tool: #{name}"
-
-        resolved ->
-          to_string(resolved)
-      end
-    end)
-    |> Enum.uniq()
   end
+
+  defp resolve_last_request_tools([], _tools, _signature), do: {:ok, []}
+
+  defp resolve_last_request_tools(names, tools, signature) when is_list(names) do
+    cond do
+      not single_text_output?(signature) ->
+        {:error,
+         ":last_request_tools applies only to a signature with one unconstrained text " <>
+           "output; this one ends an interrupted turn with submit"}
+
+      not Enum.all?(names, &(is_atom(&1) or is_binary(&1))) ->
+        {:error, ":last_request_tools expects tool names, got: #{inspect(names)}"}
+
+      true ->
+        Enum.reduce_while(names, {:ok, []}, fn name, {:ok, acc} ->
+          case Imp.Tool.resolve_name(tools, name) do
+            nil -> {:halt, {:error, ":last_request_tools names no tool: #{name}"}}
+            resolved -> {:cont, {:ok, acc ++ [to_string(resolved)]}}
+          end
+        end)
+        |> then(fn
+          {:ok, resolved} -> {:ok, Enum.uniq(resolved)}
+          error -> error
+        end)
+    end
+  end
+
+  defp resolve_last_request_tools(other, _tools, _signature),
+    do: {:error, ":last_request_tools expects a list of tool names, got: #{inspect(other)}"}
 
   # A `finish_on` key is normalized to the tool's own name the same way a model's
   # spelling of a call is, so the loop looks it up by one key. An unknown name is
@@ -599,11 +619,14 @@ defmodule Imp.Predict.ReActV2 do
          :ok <- validate_call_config(config),
          {tools, inputs} <- pop_call_option(inputs, :tools, []),
          {:ok, tools} <- call_tools(react.tools, tools),
+         {listed, inputs} <- pop_call_option(inputs, :last_request_tools, :program),
+         {:ok, last_request_tools} <- call_last_request_tools(react, listed),
          {:ok, history} <- coerce_history(Map.get(inputs, :history, Map.get(inputs, "history"))) do
       react = %{
         react
         | tools: tools,
           last_request_note: note,
+          last_request_tools: last_request_tools,
           react: %{react.react | config: Keyword.merge(react.react.config, config)}
       }
 
@@ -1844,6 +1867,18 @@ defmodule Imp.Predict.ReActV2 do
     do: invalid_call_tools("expected a list of Imp.Tool structs, got: #{inspect(given)}")
 
   defp invalid_call_tools(message), do: {:error, {:invalid_react_v2_tools, message}}
+
+  # A call's own `last_request_tools` replaces the program's, checked as the
+  # program's were. A host that makes a one-request call for a summary gives
+  # `[]`, so the program's listed tools cannot act in it.
+  defp call_last_request_tools(react, :program), do: {:ok, react.last_request_tools}
+
+  defp call_last_request_tools(react, names) do
+    case resolve_last_request_tools(names, react.tools, react.signature) do
+      {:ok, resolved} -> {:ok, resolved}
+      {:error, message} -> {:error, {:invalid_react_v2_last_request_tools, message}}
+    end
+  end
 
   defp validate_call_max_iters(max_iters) when is_integer(max_iters) and max_iters >= 0, do: :ok
 

@@ -262,8 +262,8 @@ turn ends only through `submit`, or end it from the tool with `finish_on:`.
 
 ### One more request on a history you hold
 
-A call can give its own `max_iters` and `last_request_note` beside its
-inputs. With a history, `max_iters: 0` and a note, the call makes one
+A call can give its own `max_iters`, `last_request_note` and
+`last_request_tools` beside its inputs. With a history, `max_iters: 0` and a note, the call makes one
 request, the last one: the loop's system message, its tools and the history
 as the model saw them, then the note. No tool runs, and the text the model
 writes is the answer. Codex CLI and Anthropic's SDK build a request to
@@ -366,7 +366,26 @@ pager =
 The option applies to a signature with one text output; a signature with
 `submit` ends an interrupted turn with the forced `submit`, and naming tools
 for it is refused. A listed tool also runs in a one-request call made with
-`max_iters: 0`, since that request is the last one.
+`max_iters: 0`, since that request is the last one, so a call that asks for
+a summary gives its own `last_request_tools: []`, which replaces the
+program's for that call, as its own `max_iters` and `last_request_note` do:
+
+```elixir
+lm = script.([%{reply: "Maya was paged about the double charge.", tool_calls: [%{name: "page", arguments: %{"name" => "Maya"}}]}])
+
+pager = Imp.react(Imp.signature("ticket -> reply"), [on_call, page], lm: lm, last_request_tools: [:page])
+
+{:ok, summary} =
+  Imp.call(pager, %{
+    history: prediction.metadata.history,
+    max_iters: 0,
+    last_request_note: "Summarise this ticket for the next shift.",
+    last_request_tools: []
+  })
+
+{Imp.get(summary, :reply), for(call <- summary.metadata.unexecuted_tool_calls, do: call.name)}
+#=> {"Maya was paged about the double charge.", ["page"]}
+```
 
 ### Ending the turn from a tool
 
