@@ -8039,6 +8039,7 @@
       "struct_fields": [
         "finish_on",
         "last_request_note",
+        "last_request_tools",
         "max_iters",
         "react",
         "signature",
