@@ -4,6 +4,25 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Added
+
+- ReActV2 takes `last_request_tools:`, a list of tools whose calls run in
+  the last request of an interrupted turn for a signature with one
+  unconstrained text output (`:last_text`). Those calls run as any step's
+  do, under the same tool policy and run authorization, with the same
+  events, and are recorded in the history with their results; the turn then
+  ends with the request's text as the answer. Calls to other tools are still
+  not run and are listed in `unexecuted_tool_calls`. A program that acts
+  through a tool, and reports in its text what it did, can still take that
+  action when a turn is interrupted, as DSPy's ReActV2 runs `submit` in its
+  forced last request. Each name must be a tool the program holds, and a
+  signature with `submit` refuses the option. The default, `[]`, changes
+  nothing; saved programs carry the list, and a file saved without it loads
+  with none. A call may give its own `last_request_tools`, which replaces
+  the program's for that call, as `max_iters` and `last_request_note` do. A
+  one-request call (`max_iters: 0`) is a last request, so a host asking for
+  a summary gives `last_request_tools: []` and no listed tool acts in it.
+
 ### Changed
 
 - The finish line of a plain-text ReActV2 step (one unconstrained text

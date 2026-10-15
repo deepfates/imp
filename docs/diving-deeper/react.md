@@ -98,7 +98,8 @@ than return nothing, Imp makes one more request:
   (`:extracted`).
 - With one text output, the request is an ordinary step, same tools, and its
   text is the answer (`:last_text`). Tool calls in it are not run; they are
-  listed in `unexecuted_tool_calls`.
+  listed in `unexecuted_tool_calls`, unless the tool is named in
+  `last_request_tools:` (below).
 
 If the last request does not produce an answer either, the turn ends
 `:incomplete`. That is still `{:ok, prediction}`, carrying the history and a
@@ -107,6 +108,17 @@ without an answer is never reported complete.
 
 Imp adds nothing to that request unless you pass `last_request_note:`, one
 line of your own text, sent as a user message and kept in the history.
+
+Some programs act through a tool: they publish, send or record something by
+calling it, and their text only reports what they did. For them, a turn
+interrupted by a single provider error would lose the action it was about to
+take. `last_request_tools:` names the tools whose calls the last request
+does run, as any step's calls run: under the same tool policy and
+authorization, with the same events, and recorded in the history with their
+results. The turn still ends with the request's text as the answer, and calls
+to other tools still go unrun. DSPy's ReActV2 makes the same allowance for
+its terminal tool, whose call in the forced last request runs; this lets the
+last request take the program's own final action, and nothing further.
 
 A request refused because the context window is full is different. Imp first
 retries with older episodes left out of the prompt (see below); if the request
@@ -250,11 +262,12 @@ turn ends only through `submit`, or end it from the tool with `finish_on:`.
 
 ### One more request on a history you hold
 
-A call can give its own `max_iters` and `last_request_note` beside its
-inputs. With a history, `max_iters: 0` and a note, the call makes one
+A call can give its own `max_iters`, `last_request_note` and
+`last_request_tools` beside its inputs. With a history, `max_iters: 0` and a note, the call makes one
 request, the last one: the loop's system message, its tools and the history
-as the model saw them, then the note. No tool runs, and the text the model
-writes is the answer. Codex CLI and Anthropic's SDK build a request to
+as the model saw them, then the note. No tool runs unless `last_request_tools`
+names it (see "Acting in the last request" below; a call for a summary gives
+`last_request_tools: []`), and the text the model writes is the answer. Codex CLI and Anthropic's SDK build a request to
 summarise a conversation the same way: the conversation's own messages, then
 one instruction.
 
@@ -313,6 +326,67 @@ before a request with `{:error, {:invalid_react_v2_tools, message}}`. The
 program value is not changed. Updating a program's tools for good is an
 optimizer's path, and it still refuses a changed runner: an optimizer may
 rewrite what the model reads of a tool, never what the tool does.
+
+### Acting in the last request
+
+A program whose real output is an action names the tools that take it in
+`last_request_tools:`. Here the step limit interrupts the turn, and the last
+request pages Maya and asks for another lookup; the page runs, the lookup
+does not:
+
+```elixir
+page = Imp.tool(:page, "Page an engineer.", fn %{"name" => name} -> "paged #{name}" end)
+
+lm =
+  script.([
+    %{tool_calls: [%{name: "on_call", arguments: %{"team" => "atlas"}}]},
+    %{
+      reply: "Paged Maya.",
+      tool_calls: [
+        %{name: "page", arguments: %{"name" => "Maya"}},
+        %{name: "on_call", arguments: %{"team" => "harbor"}}
+      ]
+    }
+  ])
+
+pager =
+  Imp.react(Imp.signature("ticket -> reply"), [on_call, page],
+    lm: lm,
+    max_iters: 1,
+    last_request_tools: [:page]
+  )
+
+{:ok, prediction} = Imp.call(pager, %{ticket: "We were charged twice this month."})
+
+{Imp.get(prediction, :reply), prediction.metadata.termination_reason,
+ for(step <- prediction.metadata.history.messages, result <- step.tool_call_results, do: result.result),
+ for(call <- prediction.metadata.unexecuted_tool_calls, do: call.name)}
+#=> {"Paged Maya.", :last_text, ["Maya", "paged Maya"], ["on_call"]}
+```
+
+The option applies to a signature with one text output; a signature with
+`submit` ends an interrupted turn with the forced `submit`, and naming tools
+for it is refused. A listed tool also runs in a one-request call made with
+`max_iters: 0`, since that request is the last one, so a call that asks for
+a summary gives its own `last_request_tools: []`, which replaces the
+program's for that call, as its own `max_iters` and `last_request_note` do:
+
+```elixir
+lm = script.([%{reply: "Maya was paged about the double charge.", tool_calls: [%{name: "page", arguments: %{"name" => "Maya"}}]}])
+
+pager = Imp.react(Imp.signature("ticket -> reply"), [on_call, page], lm: lm, last_request_tools: [:page])
+
+{:ok, summary} =
+  Imp.call(pager, %{
+    history: prediction.metadata.history,
+    max_iters: 0,
+    last_request_note: "Summarise this ticket for the next shift.",
+    last_request_tools: []
+  })
+
+{Imp.get(summary, :reply), for(call <- summary.metadata.unexecuted_tool_calls, do: call.name)}
+#=> {"Maya was paged about the double charge.", ["page"]}
+```
 
 ### Ending the turn from a tool
 
@@ -457,7 +531,9 @@ continue.
 What differs:
 
 - A signature with one text output has no `submit`; the model's text is the
-  answer (`:answered`, and `:last_text` when interrupted).
+  answer (`:answered`, and `:last_text` when interrupted). Its last request
+  runs no tool by default; `last_request_tools:` names the ones it may run,
+  the counterpart of DSPy executing `submit` in its forced last request.
 - `finish_on:` lets a tool end the turn (`:finished_by_tool`).
 - When the provider cannot require `submit`, an extractor fills the outputs
   (`:extracted`); a turn with no answer is `:incomplete`, with a cause.

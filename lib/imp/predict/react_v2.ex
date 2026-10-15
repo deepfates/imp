@@ -30,8 +30,9 @@ defmodule Imp.Predict.ReActV2 do
       `:history` input of the next call.
     * `:termination_reason` — how the turn ended (below).
     * `:termination_cause` — present whenever the turn was interrupted: for
-      `:last_text`, `:forced_submit` and `:extracted`, the interruption that led
-      to the last request. For `:incomplete`, the same interruption, unless
+      `:last_text`, `:forced_submit` and `:extracted`, and for
+      `:finished_by_tool` when a `finish_on` hook ended the turn in the last
+      request, the interruption that led to the last request. For `:incomplete`, the same interruption, unless
       the turn's context window was full or its `Imp.Deadline` had passed,
       which would refuse any further request too and so are named instead;
       `termination_error` holds the errors of the requests that failed. One of `:max_iters`, `:parse_error`, `:prediction_error`,
@@ -116,11 +117,27 @@ defmodule Imp.Predict.ReActV2 do
   that while it wants a tool can write the call as text in its own tool markup
   (seen from inkling through OpenRouter, and through DeepInfra),
   and that text would become the answer. If the model calls a tool, the call
-  is not run; the completion's text, if any, is the answer, and the calls are
-  kept in `unexecuted_tool_calls`. A completion that says nothing is an empty
+  is not run unless `:last_request_tools` names that tool (below); the
+  completion's text, if any, is the answer, and the calls not run are kept in
+  `unexecuted_tool_calls`. A completion that says nothing is an empty
   answer rather than an error. If the process's `Imp.Deadline` has already
   passed, no request is made and the turn is `:incomplete` with
   `termination_cause: :deadline_exceeded`.
+
+  `:last_request_tools` names tools whose calls that request does run. It is
+  for a program that acts through a tool (it publishes, sends or records
+  something) and whose text only reports what it did: an interruption, a
+  single provider error among them, would otherwise cost it the action it was
+  about to take. Calls to those tools run as a step's calls do, under the
+  same tool policy and run authorization, with the same `:tool_call` and
+  `:tool_result` events, and the request is recorded in the history with
+  their results. The turn then ends with the request's text as the answer
+  (`:last_text`); calls to any other tool are not run and are listed in
+  `unexecuted_tool_calls`. If a listed call meets a `finish_on` hook that
+  returns `{:finish, outputs}`, the turn ends with those outputs
+  (`:finished_by_tool`), as it would after any step. DSPy's ReActV2 makes
+  the same allowance for its terminal tool: the forced last request may call
+  `submit`, and that call runs. The default, `[]`, runs nothing.
 
   With `submit`, an interruption forces one more request with `tool_choice`
   naming `submit` (`:forced_submit`), as DSPy does. If a provider cannot honor
@@ -136,11 +153,13 @@ defmodule Imp.Predict.ReActV2 do
 
   ## Per-call options
 
-  A call may give `max_iters`, `last_request_note`, `config` and `tools`
-  beside its inputs, under atom or string keys. Each applies to that call only and is
-  not an input field. `max_iters` and `last_request_note` replace the
-  program's own; `max_iters` is a non-negative integer and
-  `last_request_note` a string or `nil`. `config` is a keyword list of
+  A call may give `max_iters`, `last_request_note`, `last_request_tools`,
+  `config` and `tools` beside its inputs, under atom or string keys. Each
+  applies to that call only and is not an input field. `max_iters`,
+  `last_request_note` and `last_request_tools` replace the program's own;
+  `max_iters` is a non-negative integer, `last_request_note` a string or
+  `nil`, and `last_request_tools` a list of tools the program holds, checked
+  as the program's own list is. `config` is a keyword list of
   request options merged over the program's `:config` for every request of
   the call, such as `max_tokens: 4_000`; it may not name `:tools` or
   `:tool_choice`, which the loop chooses on each step. `tools` is a list of
@@ -152,7 +171,8 @@ defmodule Imp.Predict.ReActV2 do
   Together they continue a conversation the caller holds. A call with a
   `:history`, `max_iters: 0` and a note makes one request, the last request:
   the loop's own system message, tools and history, then the note, with
-  `tool_choice: "auto"`. No tool runs, and the reply's text is the answer
+  `tool_choice: "auto"`. No tool runs, except one named in
+  `:last_request_tools`, and the reply's text is the answer
   (`termination_reason: :last_text`). This is how a host asks a model about
   a conversation it has had, as that model saw it, for instance for a summary
   of it before the history is shortened. Codex CLI and Anthropic's SDK
@@ -160,6 +180,11 @@ defmodule Imp.Predict.ReActV2 do
   messages, then one instruction. The call's `config` gives that request
   its own options, an output budget for instance, and the prediction's
   `:finish_reason` says whether the reply was cut short by it.
+
+  That request is a last request, so a program's `last_request_tools` run in
+  it. A summary is not the place for a program's actions: a host asking for
+  one gives `last_request_tools: []` with the call, and a call to such a tool
+  in that request is not run but listed in `unexecuted_tool_calls`.
 
   A request refused because the context window is full is not an
   interruption of this kind: a further request would be refused the same way,
@@ -235,7 +260,8 @@ defmodule Imp.Predict.ReActV2 do
     tool_order: [],
     max_iters: 20,
     tool_policy: :allow,
-    finish_on: %{}
+    finish_on: %{},
+    last_request_tools: []
   ]
 
   @type t :: %__MODULE__{}
@@ -283,7 +309,7 @@ defmodule Imp.Predict.ReActV2 do
       doc:
         "Steps before the turn is interrupted. An interrupted turn ends with the " <>
           "forced `submit`, or, for a signature with one unconstrained text output, one last " <>
-          "text-only request."
+          "request whose text is the answer."
     ],
     tool_policy: [
       type: {:custom, Imp.ToolPolicy, :validate, []},
@@ -295,7 +321,7 @@ defmodule Imp.Predict.ReActV2 do
       default: nil,
       doc:
         "One line of host text put in front of the last request of an interrupted " <>
-          "turn, as a user message, and kept in the history: the last text-only " <>
+          "turn, as a user message, and kept in the history: the last " <>
           "request for a signature with one unconstrained text output, the forced `submit` for " <>
           "every other. `nil` says nothing; Imp writes no sentence of its own."
     ],
@@ -306,6 +332,18 @@ defmodule Imp.Predict.ReActV2 do
         "Tools whose call ends the turn: a map from tool name to " <>
           "`fn arguments, result, inputs -> {:finish, outputs} | :continue end`. " <>
           "See \"How a turn ends\" above."
+    ],
+    last_request_tools: [
+      type: {:list, {:or, [:atom, :string]}},
+      default: [],
+      doc:
+        "Tools whose calls run in the last request of an interrupted turn, for a " <>
+          "signature with one unconstrained text output (`:last_text`). Calls to them " <>
+          "are executed and recorded as any step's calls are, and the turn then ends " <>
+          "with that request's text as the answer; calls to any other tool are not run " <>
+          "and are listed in `unexecuted_tool_calls`. For a program that acts through " <>
+          "a tool and whose text only reports what it did. Each name must be a tool " <>
+          "the program holds. See \"When a turn is interrupted\" above."
     ]
   ]
 
@@ -378,7 +416,8 @@ defmodule Imp.Predict.ReActV2 do
       max_iters: opts[:max_iters],
       tool_policy: opts[:tool_policy],
       last_request_note: opts[:last_request_note],
-      finish_on: resolve_finish_on!(opts[:finish_on], tools)
+      finish_on: resolve_finish_on!(opts[:finish_on], tools),
+      last_request_tools: resolve_last_request_tools!(opts[:last_request_tools], tools, signature)
     }
   end
 
@@ -418,6 +457,46 @@ defmodule Imp.Predict.ReActV2 do
 
   def validate_finish_on(other),
     do: {:error, "expected a map of tool name to 3-arity function, got: #{inspect(other)}"}
+
+  # Names are normalized to the tools' own, as `finish_on` keys are. Only the
+  # last text request reads the list; a signature with `submit` ends an
+  # interrupted turn with the forced `submit`, which runs nothing else, so a
+  # list there would never be used and is refused rather than ignored.
+  defp resolve_last_request_tools!(names, tools, signature) do
+    case resolve_last_request_tools(names, tools, signature) do
+      {:ok, resolved} -> resolved
+      {:error, message} -> raise ArgumentError, "Imp.Predict.ReActV2.new/3: " <> message
+    end
+  end
+
+  defp resolve_last_request_tools([], _tools, _signature), do: {:ok, []}
+
+  defp resolve_last_request_tools(names, tools, signature) when is_list(names) do
+    cond do
+      not single_text_output?(signature) ->
+        {:error,
+         ":last_request_tools applies only to a signature with one unconstrained text " <>
+           "output; this one ends an interrupted turn with submit"}
+
+      not Enum.all?(names, &(is_atom(&1) or is_binary(&1))) ->
+        {:error, ":last_request_tools expects tool names, got: #{inspect(names)}"}
+
+      true ->
+        Enum.reduce_while(names, {:ok, []}, fn name, {:ok, acc} ->
+          case Imp.Tool.resolve_name(tools, name) do
+            nil -> {:halt, {:error, ":last_request_tools names no tool: #{name}"}}
+            resolved -> {:cont, {:ok, acc ++ [to_string(resolved)]}}
+          end
+        end)
+        |> then(fn
+          {:ok, resolved} -> {:ok, Enum.uniq(resolved)}
+          error -> error
+        end)
+    end
+  end
+
+  defp resolve_last_request_tools(other, _tools, _signature),
+    do: {:error, ":last_request_tools expects a list of tool names, got: #{inspect(other)}"}
 
   # A `finish_on` key is normalized to the tool's own name the same way a model's
   # spelling of a call is, so the loop looks it up by one key. An unknown name is
@@ -542,11 +621,13 @@ defmodule Imp.Predict.ReActV2 do
          :ok <- validate_call_config(config),
          {tools, inputs} <- pop_call_option(inputs, :tools, []),
          {:ok, tools} <- call_tools(react.tools, tools),
+         {:ok, last_request_tools, inputs} <- call_last_request_tools(react, inputs),
          {:ok, history} <- coerce_history(Map.get(inputs, :history, Map.get(inputs, "history"))) do
       react = %{
         react
         | tools: tools,
           last_request_note: note,
+          last_request_tools: last_request_tools,
           react: %{react.react | config: Keyword.merge(react.react.config, config)}
       }
 
@@ -671,7 +752,7 @@ defmodule Imp.Predict.ReActV2 do
   # with one text output, the forced submit for every other.
   defp interrupted(react, history, inputs, pending, cause, turn, error, execution) do
     if single_text_output?(react.signature),
-      do: last_text(react, history, pending, cause, turn, error),
+      do: last_text(react, history, inputs, pending, cause, turn, error, execution),
       else: forced_submit(react, history, inputs, pending, cause, turn, error, execution)
   end
 
@@ -719,14 +800,17 @@ defmodule Imp.Predict.ReActV2 do
   end
 
   # An interrupted turn of a signature with one text output. The last request
-  # is an ordinary step, and its text is the single text output. A tool call
-  # in it is not run, and is kept out of the history, where it would replay as
-  # a call with no result; the prediction names it in `unexecuted_tool_calls`
-  # instead. A completion that says nothing is an empty answer: the run is
-  # over either way, and there is nothing to force.
+  # is an ordinary step, and its text is the single text output. A call to a
+  # tool in `last_request_tools` runs as any step's call does (policy,
+  # authorization, events, history), and a `finish_on` hook it meets may still
+  # end the turn with its outputs. Any other call is not run, and is kept out
+  # of the history, where it would replay as a call with no result; the
+  # prediction names it in `unexecuted_tool_calls` instead. A completion that
+  # says nothing is an empty answer: the run is over either way, and there is
+  # nothing to force.
   # A deadline that has already passed leaves no time for that request, so
   # none is made.
-  defp last_text(react, history, pending, cause, turn, initial_error) do
+  defp last_text(react, history, inputs, pending, cause, turn, initial_error, execution) do
     if deadline_passed?() do
       incomplete_prediction(history, :deadline_exceeded, initial_error)
     else
@@ -735,17 +819,32 @@ defmodule Imp.Predict.ReActV2 do
       case predict(react.react, react, history, pending) do
         {:ok, prediction, history} ->
           calls = prediction |> Imp.get(:tool_calls, []) |> normalize_calls(turn)
-          no_calls = %ToolCalls{tool_calls: []}
-
+          {runnable, unexecuted} = split_last_request_calls(react, calls)
           outputs = last_text_outputs(react.signature, prediction)
-          history = append_last_step(history, pending, prediction, no_calls, outputs)
+          metadata = %{termination_cause: cause} |> put_unexecuted(unexecuted)
 
-          final_prediction(
-            outputs,
-            history,
-            :last_text,
-            %{termination_cause: cause} |> put_unexecuted(calls) |> finish_reason(prediction)
-          )
+          # The text is the answer, not a thought, so no `:reasoning` event
+          # says it a second time.
+          case execute_calls(react, runnable, execution, inputs) do
+            {:cancel, reason} ->
+              {:error, {:execution_cancelled, reason}}
+
+            {results, _final, nil} ->
+              history = append_last_step(history, pending, prediction, runnable, outputs, results)
+              final_prediction(outputs, history, :last_text, finish_reason(metadata, prediction))
+
+            {results, _final, {tool_name, finished}} ->
+              # The outputs are the prediction's, not the step's, as after
+              # any step a `finish_on` hook ends.
+              event = history_event(pending, prediction, runnable, results, nil)
+
+              final_prediction(
+                finished,
+                append_history(history, event),
+                :finished_by_tool,
+                Map.put(metadata, :finished_by_tool, tool_name)
+              )
+          end
 
         {:error, reason, history} ->
           last_request_failed(history, cause, reason, %{
@@ -754,6 +853,23 @@ defmodule Imp.Predict.ReActV2 do
           })
       end
     end
+  end
+
+  # The last request's calls the program lets run there, and the rest.
+  defp split_last_request_calls(%{last_request_tools: []}, calls),
+    do: {%ToolCalls{tool_calls: []}, calls}
+
+  defp split_last_request_calls(react, %ToolCalls{tool_calls: calls}) do
+    {runnable, unexecuted} =
+      Enum.split_with(calls, fn call ->
+        not malformed_call?(call) and
+          case Imp.Tool.resolve_name(react.tools, call.name) do
+            nil -> false
+            name -> to_string(name) in react.last_request_tools
+          end
+      end)
+
+    {%ToolCalls{tool_calls: runnable}, %ToolCalls{tool_calls: unexecuted}}
   end
 
   # The note is the last thing the model reads. Inputs no step has spent yet
@@ -928,13 +1044,13 @@ defmodule Imp.Predict.ReActV2 do
   # The completion of the run's last request, thought and any calls, as this
   # turn's history event, with the outputs when they are the answer. A
   # completion that said nothing and called nothing adds no turn.
-  defp append_last_step(history, pending, prediction, calls, outputs) do
+  defp append_last_step(history, pending, prediction, calls, outputs, results \\ []) do
     thought = Imp.get(prediction, :next_thought)
 
     if thought in [nil, ""] and calls.tool_calls == [] do
       history
     else
-      event = history_event(pending, prediction, calls, [], outputs)
+      event = history_event(pending, prediction, calls, results, outputs)
       append_history(history, event)
     end
   end
@@ -1754,6 +1870,27 @@ defmodule Imp.Predict.ReActV2 do
     do: invalid_call_tools("expected a list of Imp.Tool structs, got: #{inspect(given)}")
 
   defp invalid_call_tools(message), do: {:error, {:invalid_react_v2_tools, message}}
+
+  # A call's own `last_request_tools` replaces the program's, checked as the
+  # program's were. A host that makes a one-request call for a summary gives
+  # `[]`, so the program's listed tools cannot act in it.
+  # Presence of the key, under either spelling, is what says the call gives
+  # its own list; any value it gives is checked, so none can stand for the
+  # program's.
+  defp call_last_request_tools(react, inputs) do
+    case Enum.find([:last_request_tools, "last_request_tools"], &Map.has_key?(inputs, &1)) do
+      nil ->
+        {:ok, react.last_request_tools, inputs}
+
+      key ->
+        inputs_left = Map.drop(inputs, [:last_request_tools, "last_request_tools"])
+
+        case resolve_last_request_tools(Map.fetch!(inputs, key), react.tools, react.signature) do
+          {:ok, resolved} -> {:ok, resolved, inputs_left}
+          {:error, message} -> {:error, {:invalid_react_v2_last_request_tools, message}}
+        end
+    end
+  end
 
   defp validate_call_max_iters(max_iters) when is_integer(max_iters) and max_iters >= 0, do: :ok
 
