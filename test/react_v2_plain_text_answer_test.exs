@@ -54,7 +54,7 @@ defmodule ReActV2PlainTextAnswerTest do
                "        Given the fields `intent`, produce the fields `answer`.\n" <>
                "        You are an Agent. Use the supplied tools to gather information and take actions.\n" <>
                "        Call tools when more information is needed.\n" <>
-               "        When the final answer is ready, reply without calling a tool.\n" <>
+               "        When the final answer is ready, write it as plain text without calling a tool.\n" <>
                "        The available tools are: `look`."
   end
 
@@ -73,7 +73,7 @@ defmodule ReActV2PlainTextAnswerTest do
     system = system_message()
 
     assert system =~
-             "        When the final answer is ready, reply without calling a tool. " <>
+             "        When the final answer is ready, write it as plain text without calling a tool. " <>
                "What you say back: all of your last message.\n"
 
     assert length(String.split(system, "What you say back")) == 2
