@@ -68,7 +68,8 @@ defmodule ReActV2RequestShapeTest do
 
     assert system.role == :system
 
-    assert system.content =~ "When the final answer is ready, reply without calling a tool."
+    assert system.content =~
+             "When the final answer is ready, write it as plain text without calling a tool."
 
     assert system.content =~ "The available tools are: `look`."
     refute system.content =~ "submit"

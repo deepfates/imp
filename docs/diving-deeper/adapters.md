@@ -82,7 +82,7 @@ Inputs will be structured in the following way, with the appropriate values fill
 
 In adhering to this structure, your objective is: 
         ...
-        When the final answer is ready, reply without calling a tool.
+        When the final answer is ready, write it as plain text without calling a tool.
         The available tools are: `look`.
 ```
 

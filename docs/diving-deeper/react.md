@@ -70,7 +70,7 @@ In adhering to this structure, your objective is:
         Given the fields `intent`, produce the fields `answer`.
         You are an Agent. Use the supplied tools to gather information and take actions.
         Call tools when more information is needed.
-        When the final answer is ready, reply without calling a tool.
+        When the final answer is ready, write it as plain text without calling a tool.
         The available tools are: `look`.
 --- user
 [[ ## intent ## ]]

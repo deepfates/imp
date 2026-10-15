@@ -767,7 +767,7 @@ defmodule Imp.Adapter.Chat do
       case Map.get(guidance, :submit_tool, :submit) do
         nil when plain? ->
           [
-            "When the final answer is ready, reply without calling a tool.",
+            "When the final answer is ready, write it as plain text without calling a tool.",
             field_description(output_field(signature, meta_field(signature, :text_field)))
           ]
           |> Enum.reject(&(&1 == ""))

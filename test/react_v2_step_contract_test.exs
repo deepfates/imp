@@ -21,7 +21,7 @@ defmodule ReActV2StepContractTest do
   end
 
   @in_field "When the final answer is ready, write it in `answer`."
-  @plain_reply "When the final answer is ready, reply without calling a tool."
+  @plain_reply "When the final answer is ready, write it as plain text without calling a tool."
   @leave_empty "When the final answer is ready, write it in `answer`, and leave `tool_calls` empty."
 
   defp look, do: Imp.tool(:look, "Look at a thing", fn _ -> %{"seen" => [1]} end)
@@ -54,7 +54,11 @@ defmodule ReActV2StepContractTest do
     refute text(messages) =~ "tool_calls"
     refute text(messages) =~ "whose description is"
     assert hd(messages).content =~ guidance
-    refute hd(messages).content =~ "plain text"
+
+    # A step whose template names the answer's field asks for it there, never
+    # also as plain text; only the plain-text step, which has no template,
+    # says plain text.
+    unless guidance == @plain_reply, do: refute(hd(messages).content =~ "plain text")
   end
 
   defp assert_text_only({messages, opts}, marker) do
