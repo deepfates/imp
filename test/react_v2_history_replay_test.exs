@@ -171,4 +171,17 @@ defmodule ReActV2HistoryReplayTest do
     assert text =~ "current reasoning"
     refute text =~ "earlier reasoning"
   end
+
+  test "a call with its own note and no inputs (a summary request) reads every passed turn as earlier" do
+    assert {:ok, _} =
+             Imp.call(program(:actions, ["Summary."]), %{
+               history: earlier(),
+               max_iters: 0,
+               last_request_note: "Summarise this conversation."
+             })
+
+    text = Enum.map_join(last_request(), "\n", &inspect/1)
+    refute text =~ "Earlier narration."
+    assert text =~ "Summarise this conversation."
+  end
 end

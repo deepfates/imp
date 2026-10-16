@@ -54,7 +54,8 @@ defmodule Imp.Predict.ReActV2 do
   text and reasoning written beside their calls, and leaves out steps that
   only wrote text; a step that carries the task's outputs (an answer) is shown
   whole. The current turn is shown whole: it starts with the call's new
-  inputs, or, on a call without them, at the last step that carries inputs.
+  inputs or its own `last_request_note`, or, on a call with neither (a resume
+  mid-turn), at the last step that carries inputs.
   DeepSeek accepts earlier turns without `reasoning_content`; Anthropic and
   Gemini do not validate reasoning on earlier turns. Some thinking APIs reject
   an earlier tool-call message without its reasoning content (Kimi-style
@@ -825,6 +826,7 @@ defmodule Imp.Predict.ReActV2 do
          {:ok, react} <- with_finish(react, finish),
          {max_iters, inputs} <- pop_max_iters(inputs, react.max_iters),
          :ok <- validate_call_max_iters(max_iters),
+         note_given? = is_binary(inputs[:last_request_note] || inputs["last_request_note"]),
          {note, inputs} <- pop_call_option(inputs, :last_request_note, react.last_request_note),
          :ok <- validate_call_note(note),
          :ok <- validate_tools_call_note(react.finish, note),
@@ -855,7 +857,12 @@ defmodule Imp.Predict.ReActV2 do
 
       run(
         react,
-        history_context(history, react.signature, react.history_replay, pending),
+        history_context(
+          history,
+          react.signature,
+          react.history_replay,
+          if(note_given?, do: :new_request, else: pending)
+        ),
         pending,
         pending,
         0,
@@ -2129,13 +2136,16 @@ defmodule Imp.Predict.ReActV2 do
   @step_words [:next_thought, :reasoning_content, :reasoning_details]
 
   # Where the current turn starts in a history passed to a call. A call with
-  # new inputs starts a turn, so every passed step is earlier. A call without
-  # them (a resume mid-turn) continues the turn the last step carrying the
+  # new inputs or its own `last_request_note` starts a turn, so every passed
+  # step is earlier. A call with neither (a resume mid-turn) continues the turn
+  # the last step carrying the
   # task's inputs opened; that step and those after it are the current turn,
   # shown whole, since a provider that keeps reasoning within a turn
   # (DeepSeek's `reasoning_content`, Anthropic's thinking blocks, Gemini's
   # thought signatures) needs it on the turn's own calls.
   defp current_turn_start(history, signature, pending) do
+    # A call that brings new inputs, or its own note (a new user message, such
+    # as a request for a summary), starts a turn: every passed step is earlier.
     if pending != %{} do
       length(history.messages)
     else

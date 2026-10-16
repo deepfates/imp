@@ -536,8 +536,9 @@ their results, and the outputs. The current turn is always shown whole, and
 the history the prediction returns keeps every step. Use it when the
 model's own narration should not become something it reads back on every
 later turn. A step that carries the task's outputs (an answer) is shown
-whole. On a call without new inputs (a resume mid-turn), the current turn
-starts at the last step that carries inputs. Some thinking APIs reject an
+whole. A call with new inputs or its own `last_request_note` starts a turn;
+on a call with neither (a resume mid-turn), the current turn starts at the
+last step that carries inputs. Some thinking APIs reject an
 earlier tool-call message without its reasoning content; check yours.
 
 ### Why a turn ended
