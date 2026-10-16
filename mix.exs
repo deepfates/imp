@@ -1,7 +1,7 @@
 defmodule Imp.MixProject do
   use Mix.Project
 
-  @version "0.14.1"
+  @version "0.15.0"
 
   def project do
     [

@@ -1,25 +1,21 @@
-# Imp v0.14.1
+# Imp v0.15.0
 
 Imp is a framework for typed, optimizable language-model programs on the BEAM.
-This release fixes how ReActV2 replays a history that crosses the two finish
-modes 0.14.0 introduced. Under `finish: :submit`, a plain-text answer recorded
-under `finish: :auto` is no longer taken for an unsent thought. Under
-`finish: :auto`, a thought-only step recorded under `finish: :submit` is
-followed by "Your message above was not sent." instead of standing as a sent
-message. It adds no options and changes no public API. A history written
-only in a plain-text loop replays byte-for-byte as in 0.14.0, and under
-`finish: :submit` only steps that carry the signature's outputs are treated
-differently. These are fixes to the opt-in `finish: :submit` that 0.14.0
-added, so under Imp's versioning rule this is a patch release.
+This release adds two ReActV2 options a caller opts into: `finish: :tools`,
+which ends a turn only through a `finish_on` tool, for a program that acts
+only through its tools, and `history_replay: :actions`, which shows earlier
+turns without the text and reasoning written beside their calls. Programs that
+use neither send byte-for-byte the requests 0.14.1 sent and save as before.
+New options make this a minor release under Imp's versioning rule.
 
 ## Install
 
 ```elixir
-{:imp, "~> 0.14.0"}
+{:imp, "~> 0.15.0"}
 ```
 
-`~> 0.14.0` takes later 0.14 patch releases and nothing newer. The two-part
-form, `~> 0.14`, means `>= 0.14.0 and < 1.0.0` in Mix, so `mix deps.update
+`~> 0.15.0` takes later 0.15 patch releases and nothing newer. The two-part
+form, `~> 0.15`, means `>= 0.15.0 and < 1.0.0` in Mix, so `mix deps.update
 imp` under it takes every later 0.x release, including minor releases that
 change what callers receive.
 
@@ -32,35 +28,39 @@ in its release definition; see [releases that use MCP or
 ACP](docs/production.md#releases-that-use-mcp-or-acp).
 Ordinary Imp startup starts no protocol endpoint.
 
-## Changes and upgrading from 0.14.0
+## Changes and upgrading from 0.14
 
-Under `{:imp, "~> 0.14.0"}`, run `mix deps.update imp` and commit `mix.lock`.
-No code or data migration is needed.
+Change the Imp dependency to `{:imp, "~> 0.15.0"}`, run `mix deps.update imp`,
+and commit `mix.lock`. No code or data migration is needed: saved programs
+without the new options load with their defaults.
 
-- **Fixed: an answer step is never a thought.** Under `finish: :submit`, a
-  step recorded under `finish: :auto` as the turn's plain-text answer (text
-  and the signature's outputs both) was treated as a thought-only step when
-  its history was passed on: the "Your message above was not sent." line
-  followed each answer that had been delivered, and models sent those
-  answers again. A step that carries the signature's outputs is an answer:
-  it gets no line, and the forced `submit` never moves it to the user side.
-  Only a step with text, no calls and no outputs is a thought.
-- **Fixed: a plain-text loop keeps roles alternating.** In a plain-text
-  ReActV2 loop (`finish: :auto`), a history written under `finish: :submit`
-  replayed each thought-only step as an assistant message, which there reads
-  as a message that was sent, often right before the answer's: two assistant
-  messages in a row. Each such step is now followed by a user message, "Your
-  message above was not sent." (the line's factual half; a plain-text loop
-  has no `submit` to name). A history written only in a plain-text loop has
-  no thought-only step, so its requests are byte-for-byte unchanged.
-- **Known gap.** Under `finish: :submit`, a forced request with nothing new
-  to ask, on a history that ends with a plain-text answer step, still ends
-  on that assistant message, since an answer is not moved. Resume with new
-  inputs or a `last_request_note`.
+- **Added: `finish: :tools`.** Only a `finish_on` tool ends a ReActV2 turn.
+  There is no `submit`; the outputs come from the `finish_on` functions. A
+  step that writes text and calls no tool is a thought, followed by one
+  ordinary step and a line naming the ending tools (`unsent_note:` replaces
+  it). Nothing is forced and no last request is made: a failed request gets
+  one more ordinary step, once per turn and not on the last allowed step; a
+  second thought in a row, a step that says nothing, the step limit or a
+  second failure ends the turn `:incomplete`, with the request's error in
+  `termination_error`, or `:deadline_exceeded` when the deadline has passed.
+  A program with `finish: :tools` needs a `finish_on` tool and refuses
+  `last_request_note` and `last_request_tools`. A call may give its own
+  `finish:` (when the task has no input of that name), so a `:tools` program
+  can ask for one text answer, such as a summary, with `finish: :auto`.
+- **Added: `history_replay: :actions`.** Earlier turns are shown as their
+  inputs, the calls with their results, and their outputs; the text and
+  reasoning written beside the calls, and steps that only wrote text, are left
+  out. The current turn is shown whole: it starts with the call's new inputs
+  or its own `last_request_note`, or, on a resume with neither, at the last
+  step that carries inputs. The returned history keeps every step. This
+  diverges from DSPy's ReActV2, which replays every step whole; the default,
+  `:trajectory`, still does. Some thinking APIs reject an earlier tool-call
+  message without its reasoning content; check your provider.
+- **Added: `unsent_note:`.** The line shown after each thought-only step, in
+  place of Imp's. A blank line is refused.
 
-Rollback means restoring `0.14.0` in the lock; mixed-mode histories then
-replay as described above before each fix. See the
-[changelog](CHANGELOG.md) for every change.
+Rollback means restoring `0.14.1` in the lock and removing the new options.
+See the [changelog](CHANGELOG.md) for every change.
 
 ## Known limits
 

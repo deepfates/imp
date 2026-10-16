@@ -4,6 +4,8 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+## 0.15.0 — 2026-10-16
+
 ### Added
 
 - ReActV2 `finish: :tools`: only a `finish_on` tool ends a turn. Text without
