@@ -67,7 +67,10 @@ Your message above was not sent. To reply, call `submit` with `answer`; to keep 
 ```
 
 That line follows every thought-only step, in later requests and on replay
-too, so each request is the previous one plus the newest exchange. With
+too, so each request is the previous one plus the newest exchange. It is
+left out after a thought the turn's extracted answer follows (that thought
+was answered), and the forced `submit`'s own last thought is shown on the
+user side instead (section 3). With
 written tool calls the request then ends, as every such request does, on
 the tool listing. The model can then do what it said it would, or submit
 what it wrote; a thought that was
@@ -156,7 +159,9 @@ If the last request does not produce an answer either, the turn ends
 `termination_cause`, and `Imp.Prediction.complete?/1` is false for it; a turn
 without an answer is never reported complete.
 
-Imp adds nothing to that request unless you pass `last_request_note:`, one
+Imp adds nothing to that request (beyond the unsent line that follows each
+earlier thought-only step under `finish: :submit`, section 2) unless you
+pass `last_request_note:`, one
 line of your own text, sent as a user message and kept in the history.
 
 Some programs act through a tool: they publish, send or record something by

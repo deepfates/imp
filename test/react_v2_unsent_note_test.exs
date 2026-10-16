@@ -107,4 +107,72 @@ defmodule ReActV2UnsentNoteTest do
     assert note == %{role: :user, content: @note}
     assert listing.role == :user and listing.content =~ "[[ ## tools ## ]]"
   end
+
+  defp shape(messages), do: Enum.map(messages, &{&1.role, to_string(&1.content)})
+
+  defp thought_step(fields, thought),
+    do:
+      Map.merge(fields, %{
+        next_thought: thought,
+        tool_calls: %Imp.Adapter.Types.ToolCalls{tool_calls: []},
+        tool_call_results: []
+      })
+
+  test "on replay, the line follows each unsent thought, and not one the extracted answer followed" do
+    # A held turn: a thought, a second one (the forced request's), the forced
+    # reply's thought, then the extracted answer, recorded as a silent step.
+    history =
+      Imp.History.new([
+        thought_step(%{ticket: "What is in the box?"}, "Let me look."),
+        thought_step(%{}, "Still looking."),
+        thought_step(%{}, "A cat, I think."),
+        %{
+          answer: "A cat.",
+          confidence: 0.5,
+          tool_calls: %Imp.Adapter.Types.ToolCalls{tool_calls: []},
+          tool_call_results: []
+        }
+      ])
+
+    program =
+      Imp.react("ticket -> answer, confidence: float", [look()],
+        lm: scripted(self(), [submit(%{"answer" => "A dog.", "confidence" => 1.0})]),
+        finish: :submit
+      )
+
+    assert {:ok, _} = Imp.call(program, %{ticket: "And now?", history: history})
+    [replayed] = requests()
+
+    assert replayed |> tl() |> shape() == [
+             {:user, "[[ ## ticket ## ]]\nWhat is in the box?"},
+             {:assistant, "Let me look."},
+             {:user, @note},
+             {:assistant, "Still looking."},
+             {:user, @note},
+             {:assistant, "A cat, I think."},
+             {:user, "[[ ## ticket ## ]]\nAnd now?"}
+           ]
+  end
+
+  test "a forced request with new inputs keeps the line after the held thought" do
+    history = Imp.History.new([thought_step(%{ticket: "What is in the box?"}, "Let me look.")])
+
+    program =
+      Imp.react("ticket -> answer, confidence: float", [look()],
+        lm: scripted(self(), [submit(%{"answer" => "A cat.", "confidence" => 1.0})]),
+        finish: :submit
+      )
+
+    assert {:ok, prediction} =
+             Imp.call(program, %{ticket: "And now?", history: history, max_iters: 0})
+
+    assert prediction.metadata.termination_reason == :forced_submit
+    [forced] = requests()
+
+    assert forced |> Enum.take(-3) |> shape() == [
+             {:assistant, "Let me look."},
+             {:user, @note},
+             {:user, "[[ ## ticket ## ]]\nAnd now?"}
+           ]
+  end
 end

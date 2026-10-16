@@ -170,7 +170,10 @@ defmodule Imp.Predict.ReActV2 do
   user message and kept in the returned history like any other turn. It is
   recorded as a step that said nothing and called nothing, so it renders as
   that user message alone, with no assistant reply after it, in the request and
-  whenever the history is passed back. Imp writes no sentence of its own.
+  whenever the history is passed back. Imp writes no sentence of its own
+  there, except that under `finish: :submit` each earlier thought-only step
+  in the history keeps the unsent note after it (see "Which signatures get
+  `submit`").
 
   ## Per-call options
 
@@ -345,7 +348,8 @@ defmodule Imp.Predict.ReActV2 do
         "One line of host text put in front of the last request of an interrupted " <>
           "turn, as a user message, and kept in the history: the last " <>
           "request for a signature with one unconstrained text output, the forced `submit` for " <>
-          "every other. `nil` says nothing; Imp writes no sentence of its own."
+          "every other. `nil` says nothing; Imp writes no sentence of its own, " <>
+          "except the unsent note after earlier thought-only steps under `finish: :submit`."
     ],
     finish_on: [
       type: {:custom, __MODULE__, :validate_finish_on, []},
@@ -1202,10 +1206,17 @@ defmodule Imp.Predict.ReActV2 do
     %{
       react.react
       | adapter_opts:
-          Keyword.update(react.react.adapter_opts, :guidance, nil, fn
-            %{} = guidance -> Map.put(guidance, :forced_submit, true)
-            other -> other
-          end),
+          case Keyword.fetch(react.react.adapter_opts, :guidance) do
+            {:ok, %{} = guidance} ->
+              Keyword.put(
+                react.react.adapter_opts,
+                :guidance,
+                Map.put(guidance, :forced_submit, true)
+              )
+
+            _none ->
+              react.react.adapter_opts
+          end,
         config:
           Keyword.merge(react.react.config,
             tools:
