@@ -2,8 +2,9 @@ defmodule ReActV2FinishSubmitTest do
   use ExUnit.Case, async: true
 
   # `finish: :submit` ends a one-text-output turn through `submit`, as DSPy's
-  # ReActV2 ends every turn: text without a tool call is a thought, and the
-  # forced `submit` follows. That forced request, for every signature with
+  # ReActV2 ends every turn: text without a tool call is a thought, not the
+  # answer (`react_v2_thought_continues_test.exs` covers what follows it). The
+  # forced `submit` request, for every signature with
   # `submit`, must not end on the model's own message, which Mistral and
   # Gemini refuse.
 
@@ -41,7 +42,7 @@ defmodule ReActV2FinishSubmitTest do
   defp submit(arguments),
     do: reply(%{tool_calls: [%{id: "s", name: "submit", arguments: arguments}]})
 
-  test "with finish: :submit, text without a tool call is a thought, and submit answers" do
+  test "with finish: :submit, text without a tool call is a thought, and the next step submits" do
     program =
       Imp.react("intent -> answer", [look()],
         lm: scripted(self(), [reply(@thought), submit(%{answer: "A cat."})]),
@@ -50,12 +51,21 @@ defmodule ReActV2FinishSubmitTest do
 
     assert {:ok, prediction} = Imp.call(program, %{intent: "What is in the box?"})
     assert Imp.get(prediction, :answer) == "A cat."
-    assert prediction.metadata.termination_reason == :forced_submit
-    assert prediction.metadata.termination_cause == :empty_tool_calls
+    assert prediction.metadata.termination_reason == :submit
+    refute Map.has_key?(prediction.metadata, :termination_cause)
 
-    [{_step, step_opts}, {_forced, forced_opts}] = requests()
+    [{_step, step_opts}, {continued, continued_opts}] = requests()
     assert Enum.map(step_opts[:tools], & &1.function.name) == ["look", "submit"]
-    assert forced_opts[:tool_choice] == %{type: "tool", name: "submit"}
+
+    # The next request is an ordinary step: every tool, nothing forced, and
+    # the thought as its last message.
+    assert Enum.map(continued_opts[:tools], & &1.function.name) == ["look", "submit"]
+    assert continued_opts[:tool_choice] == "auto"
+
+    assert List.last(continued) == %{
+             role: :user,
+             content: "[[ ## next_thought ## ]]\nNow let me look at the box."
+           }
 
     # The thought stays in the history as the model's step.
     [thought_step, _submit_step] = prediction.metadata.history.messages
