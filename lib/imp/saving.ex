@@ -303,7 +303,7 @@ defmodule Imp.Saving do
       "max_iters" => react.max_iters,
       "last_request_note" => react.last_request_note,
       "finish_on" => dump_finish_on(react.finish_on),
-      "finish" => Atom.to_string(react.finish),
+      "finish" => Atom.to_string(react.finish || :auto),
       "last_request_tools" => react.last_request_tools,
       "tool_policy" => dump_tool_policy(react.tool_policy, "ReActV2 tool policy")
     }
@@ -647,7 +647,7 @@ defmodule Imp.Saving do
       last_request_note: load_react_v2_last_request_note!(state["last_request_note"]),
       finish_on: load_finish_on!(state["finish_on"]),
       finish: finish,
-      last_request_tools: load_last_request_tools!(state["last_request_tools"], tools),
+      last_request_tools: load_last_request_tools!(state["last_request_tools"], tools, finish),
       tool_policy: load_tool_policy!(state["tool_policy"], "ReActV2 tool policy")
     }
     |> Imp.Predict.ReActV2.restore_loop()
@@ -1279,7 +1279,19 @@ defmodule Imp.Saving do
 
   # A file saved before the option existed has none, and runs no tool in the
   # last request, as that version did.
-  defp load_last_request_tools!(nil, _tools), do: []
+  defp load_last_request_tools!(nil, _tools, _finish), do: []
+  defp load_last_request_tools!([], _tools, _finish), do: []
+
+  # As `ReActV2.new/3` refuses: with `finish: :submit` an interrupted turn
+  # ends with the forced `submit`, which runs no listed tool.
+  defp load_last_request_tools!(names, _tools, :submit),
+    do:
+      raise(
+        ArgumentError,
+        "invalid saved ReActV2 last_request_tools with finish: :submit: #{inspect(names)}"
+      )
+
+  defp load_last_request_tools!(names, tools, _finish), do: load_last_request_tools!(names, tools)
 
   # Each name must be one of the loaded tools, as `ReActV2.new/3` requires.
   defp load_last_request_tools!(names, tools) when is_list(names) do

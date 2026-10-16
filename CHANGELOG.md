@@ -42,10 +42,16 @@ User-visible changes to Imp are recorded here.
   shows that thought as its last user message, under its field's marker
   (`[[ ## next_thought ## ]]`); the history still records it as the model's
   step. The "required" retry carries the same messages.
-- A provider's refusal of the forced request's named `tool_choice` is
-  recognised by any error that names `tool_choice`, so Meta's "only `auto` is
-  supported for `tool_choice`" now gets the `"required"` retry and then the
-  extractor (`:extracted`) instead of failing the call.
+- A provider's refusal of the forced request's named `tool_choice` is read
+  from the provider's response body, including the upstream error OpenRouter
+  relays under `error.metadata.raw`, and is any error there that names
+  `tool_choice` and says what is supported ("support" or "only"). Meta's
+  "only `auto` is supported for `tool_choice`" through OpenRouter, whose
+  top-level message is only "Provider returned error", and OpenRouter's "No
+  endpoints found that support the provided 'tool_choice' value" now get the
+  `"required"` retry and then the extractor (`:extracted`) instead of failing
+  the call, streamed or not. A full context window or a safety guard on that
+  request is never read as such a refusal.
 - The finish line of a plain-text ReActV2 step (one unconstrained text
   output, tools held natively) now reads "When the final answer is ready,
   write it as plain text without calling a tool.", followed by the field's

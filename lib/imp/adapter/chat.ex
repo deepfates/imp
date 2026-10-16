@@ -180,6 +180,12 @@ defmodule Imp.Adapter.Chat do
         )
     }
 
+    # With nothing new to ask, the request ends on the history. If that ends
+    # on a thought-only step, the thought becomes the last user message (see
+    # `thought_as_request/4`): before ReActV2's forced `submit`, and also when
+    # a host resumes a program with `submit` on a held history that ends that
+    # way and gives no new inputs. Either way the request must not end on the
+    # model's own message.
     {history_messages, trailing} =
       if opts[:omit_empty_request] and blank_message?(request),
         do: {thought_as_request(history_messages, signature, inputs, renderers), []},
@@ -1275,7 +1281,8 @@ defmodule Imp.Adapter.Chat do
 
   # A request with nothing new to ask ends on the history's last turn. When
   # that turn is a tool loop's step that wrote a thought and called nothing
-  # (the step before `Imp.Predict.ReActV2`'s forced `submit`), it would end
+  # (the step before `Imp.Predict.ReActV2`'s forced `submit`, or the end of a
+  # held history a host resumes without new inputs), it would end
   # the request on the model's own message, which providers refuse: Mistral
   # reads it as an assistant prefix it will not combine with function
   # calling, and Gemini refuses a request that ends on a model turn. The

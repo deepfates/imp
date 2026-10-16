@@ -1009,9 +1009,12 @@ defmodule Imp.Predict.ReActV2 do
 
     case predict(forced, react, history, pending) do
       {:error, reason, history} = error ->
-        if named_tool_choice_unsupported?(reason) do
-          # Some OpenAI-compatible endpoints implement only the string
-          # none/auto/required subset. Restrict both the provider tools and the
+        # A full context window or a safety guard refuses any request, so
+        # neither is read as a refusal of the named choice.
+        if named_tool_choice_unsupported?(reason) and
+             not Imp.Errors.context_window_exceeded?(reason) and not safety_error?(reason) do
+          # Some endpoints take only the string none/auto/required subset,
+          # and some only "auto". Restrict both the provider tools and the
           # rendered tool inventory to submit before requiring a call; using
           # "required" while other tools remain visible would not force final
           # submission.
@@ -1179,51 +1182,91 @@ defmodule Imp.Predict.ReActV2 do
   end
 
   # A provider that will not take the named `tool_choice` refuses the
-  # request with an error that names the parameter, in its own words:
-  # "supported string values are none, auto, required" (OpenAI-compatible
-  # endpoints), "only `auto` is supported for `tool_choice`" (Meta's API),
-  # "No endpoints found that support the provided 'tool_choice' value"
-  # (OpenRouter routing with `require_parameters`). Any refusal naming it is
-  # read as one, since the wording is not shared.
+  # request with an error that names the parameter and says what it does
+  # support, in its own words: "supported string values are none, auto,
+  # required" (OpenAI-compatible endpoints), "only `"auto"` is supported for
+  # `tool_choice`" (Meta's API, relayed by OpenRouter under
+  # `error.metadata.raw`), "No endpoints found that support the provided
+  # 'tool_choice' value" (OpenRouter routing with `require_parameters`). An
+  # error that names `tool_choice` for another reason, such as Anthropic's
+  # "Thinking may not be enabled when tool_choice forces tool use", is not
+  # one.
   defp named_tool_choice_unsupported?(reason) do
-    reason |> error_text() |> String.downcase() |> String.contains?("tool_choice")
+    text = reason |> refusal_text() |> String.downcase()
+
+    String.contains?(text, "tool_choice") and
+      (String.contains?(text, "support") or String.contains?(text, "only"))
   end
 
-  defp error_text(value) when is_binary(value), do: value
+  # What the provider said. For an `Imp.LMError` from ReqLLM that is the
+  # response body only: ReqLLM keeps the body's top-level message as the
+  # error's text, which OpenRouter sets to "Provider returned error" while the
+  # upstream's words sit in `error.metadata.raw`, and the error's request body
+  # names `tool_choice` on every forced request. An error with no response
+  # body (another client's, or one built by hand) is read from its message.
+  defp refusal_text(%Imp.LMError{reason: reason, message: message}) do
+    case response_bodies(reason) do
+      [] -> to_string(message)
+      bodies -> bodies |> Enum.flat_map(&body_messages/1) |> Enum.join(" ")
+    end
+  end
 
-  defp error_text(value) when is_exception(value), do: Exception.message(value)
+  defp refusal_text(value) when is_binary(value), do: value
+  defp refusal_text(value) when is_exception(value), do: Exception.message(value)
 
-  defp error_text(value) when is_map(value) do
-    [
-      :reason,
-      "reason",
-      :message,
-      "message",
-      :response_body,
-      "response_body",
-      :error,
-      "error",
-      :errors,
-      "errors"
-    ]
+  defp refusal_text(value) when is_map(value) do
+    [:reason, "reason", :message, "message", :response_body, "response_body", :error, "error"]
     |> Enum.flat_map(fn key ->
       case Map.fetch(value, key) do
-        {:ok, nested} -> [nested]
+        {:ok, nested} -> [refusal_text(nested)]
         :error -> []
       end
     end)
-    |> Enum.map_join(" ", &error_text/1)
+    |> Enum.join(" ")
   end
 
-  defp error_text(value) when is_list(value), do: Enum.map_join(value, " ", &error_text/1)
+  defp refusal_text(value) when is_list(value), do: Enum.map_join(value, " ", &refusal_text/1)
 
-  defp error_text(value) when is_tuple(value) do
-    value
-    |> Tuple.to_list()
-    |> Enum.map_join(" ", &error_text/1)
+  defp refusal_text(value) when is_tuple(value),
+    do: value |> Tuple.to_list() |> Enum.map_join(" ", &refusal_text/1)
+
+  defp refusal_text(value), do: inspect(value)
+
+  # A streamed request's error wraps the HTTP error as its `cause`, and keeps
+  # only the body's inner `error` object.
+  defp response_bodies(%ReqLLM.Error.API.Stream{cause: cause}), do: response_bodies(cause)
+
+  defp response_bodies(%ReqLLM.Error.API.Request{response_body: body}) when not is_nil(body),
+    do: [body]
+
+  defp response_bodies(_reason), do: []
+
+  defp body_messages(body) when is_binary(body) do
+    case Jason.decode(body) do
+      {:ok, decoded} -> body_messages(decoded)
+      {:error, _not_json} -> [body]
+    end
   end
 
-  defp error_text(value), do: inspect(value)
+  defp body_messages([first | _rest]), do: body_messages(first)
+  defp body_messages(%{"error" => %{} = error}), do: body_messages(error)
+  # A provider error relayed on a successful response, as the ReqLLM client
+  # builds it, carries the message itself.
+  defp body_messages(%{"error" => message}) when is_binary(message), do: [message]
+
+  defp body_messages(%{} = error) do
+    message = if is_binary(error["message"]), do: [error["message"]], else: []
+
+    raw =
+      case error["metadata"] do
+        %{"raw" => raw} when is_binary(raw) -> body_messages(raw)
+        _none -> []
+      end
+
+    message ++ raw
+  end
+
+  defp body_messages(_body), do: []
 
   # `tools` is the step's tool list, so a task field of that name would be
   # taken for it. A program saved before the name was reserved is refused on

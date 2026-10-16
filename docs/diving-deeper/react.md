@@ -104,8 +104,10 @@ parse fails, or when a step gives neither a tool call nor an answer. Rather
 than return nothing, Imp makes one more request:
 
 - With `submit`, the request names `submit` as the required tool, as DSPy
-  does (`:forced_submit`). A provider that refuses a named `tool_choice` is
-  asked again with `"required"` and `submit` as the only tool; if it refuses
+  does (`:forced_submit`). A provider that refuses a named `tool_choice`
+  (its error names `tool_choice` and says what it supports, as Meta's
+  "only `auto` is supported" does through OpenRouter) is asked again with
+  `"required"` and `submit` as the only tool; if it refuses
   that too, or answers without `submit`, a typed extractor with no tools
   reads the history and fills the outputs (`:extracted`).
 
@@ -477,7 +479,7 @@ When the turn was interrupted, `termination_cause` says why:
 | `:max_iters` | the step budget ran out |
 | `:parse_error` | a step's reply could not be read |
 | `:prediction_error` | a step's request failed |
-| `:empty_tool_calls` | with `submit` (any signature with `finish: :submit`): a step called no tool |
+| `:empty_tool_calls` | with `submit` (every signature but one unconstrained text output under `finish: :auto`): a step called no tool |
 | `:context_window_exceeded` | the prompt no longer fits, even with old episodes left out |
 | `:deadline_exceeded` | the process's `Imp.Deadline` passed |
 
