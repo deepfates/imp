@@ -68,7 +68,7 @@ defmodule ReActV2EndingSwitchTest do
     refute Enum.any?(replayed, &(to_string(&1.content) =~ @note_start))
   end
 
-  test "a submit-era thought and answer replayed in a plain-text loop are one assistant message" do
+  test "a submit-era thought replayed in a plain-text loop is followed by the line that it was not sent" do
     replies = [
       %{next_thought: "Let me think.", tool_calls: []},
       %{tool_calls: [%{id: "s1", name: "submit", arguments: %{"reply" => "It is a cat."}}]}
@@ -85,8 +85,44 @@ defmodule ReActV2EndingSwitchTest do
 
     assert shape(replayed) == [
              {:user, "[[ ## ticket ## ]]\nWhat is in the box?"},
-             {:assistant, "Let me think.\n\nIt is a cat."},
+             {:assistant, "Let me think."},
+             {:user, "Your message above was not sent."},
+             {:assistant, "It is a cat."},
              {:user, "[[ ## ticket ## ]]\nIs it awake?"}
            ]
+  end
+
+  # The requests of a conversation held only in a plain-text loop are those
+  # 0.14.0 sent: its text steps are answers, so no line is added.
+  test "a plain-text-only history replays exactly as before" do
+    {:ok, first} =
+      program([%{reply: "It is a cat.", tool_calls: []}], :auto)
+      |> Imp.call(%{ticket: "What is in the box?"})
+
+    look = %{tool_calls: [%{id: "c1", name: "look", arguments: %{}}]}
+
+    {:ok, second} =
+      program([look, %{reply: "It is asleep.", tool_calls: []}], :auto)
+      |> Imp.call(%{ticket: "Is it awake?", history: first.metadata.history})
+
+    _held = requests()
+
+    assert {:ok, _} =
+             program([%{reply: "Yes.", tool_calls: []}], :auto)
+             |> Imp.call(%{ticket: "Can I pet it?", history: second.metadata.history})
+
+    [replayed] = requests()
+
+    assert shape(replayed) == [
+             {:user, "[[ ## ticket ## ]]\nWhat is in the box?"},
+             {:assistant, "It is a cat."},
+             {:user, "[[ ## ticket ## ]]\nIs it awake?"},
+             {:assistant, ""},
+             {:tool, "a cat"},
+             {:assistant, "It is asleep."},
+             {:user, "[[ ## ticket ## ]]\nCan I pet it?"}
+           ]
+
+    refute Enum.any?(replayed, &(to_string(&1.content) =~ "not sent"))
   end
 end

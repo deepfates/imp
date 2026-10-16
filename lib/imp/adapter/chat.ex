@@ -1397,42 +1397,8 @@ defmodule Imp.Adapter.Chat do
   end
 
   defp render_history_turns(signature, turns, renderers) do
-    turns
-    |> render_history_turn_messages(signature, renderers)
-    |> join_plain_text_replies(renderers)
+    render_history_turn_messages(turns, signature, renderers)
   end
-
-  # In a plain-text loop a history written under `submit` (ReActV2 with
-  # `finish: :submit`, or before a program's ending changed) can hold a
-  # thought-only step followed by the `submit` step that answered it, which
-  # renders as the answer's text: two assistant messages in a row. Some APIs
-  # want roles to alternate, so they are one message, the thought then the
-  # answer, as a step that wrote both renders. Messages that carry calls or
-  # provider reasoning are left as they are.
-  defp join_plain_text_replies(messages, %{submit_is_text?: true}) do
-    messages
-    |> Enum.reduce([], fn
-      message, [previous | rest] = acc ->
-        if plain_assistant_text?(message) and plain_assistant_text?(previous),
-          do: [%{previous | content: join_text(previous.content, message.content)} | rest],
-          else: [message | acc]
-
-      message, [] ->
-        [message]
-    end)
-    |> Enum.reverse()
-  end
-
-  defp join_plain_text_replies(messages, _renderers), do: messages
-
-  defp plain_assistant_text?(%{role: :assistant, content: content} = message)
-       when is_binary(content) do
-    Map.get(message, :tool_calls) in [nil, []] and
-      not Map.has_key?(message, :reasoning_content) and
-      not Map.has_key?(message, :reasoning_details)
-  end
-
-  defp plain_assistant_text?(_message), do: false
 
   defp render_history_turn_messages(turns, signature, renderers) do
     turns
@@ -1471,7 +1437,9 @@ defmodule Imp.Adapter.Chat do
 
   # A loop that continues after a thought-only step (ReActV2 under
   # `finish: :submit`) says, after each such step, that its message was not
-  # sent and how to go on, as a user message: in every request and on replay,
+  # sent and how to go on, as a user message; a plain-text loop replaying a
+  # history written under `submit` says only that it was not sent, since it
+  # has no `submit` to name. Either way: in every request and on replay,
   # natively and with written tool calls alike. Two exceptions. A thought
   # that the turn's outputs follow, with no step between (ReActV2's extracted
   # answer, recorded as a silent step), was answered, so the line would be

@@ -70,7 +70,13 @@ That line follows every thought-only step, in later requests and on replay
 too, so each request is the previous one plus the newest exchange. It is
 left out after a thought the turn's extracted answer follows (that thought
 was answered), and the forced `submit`'s own last thought is shown on the
-user side instead (section 3). With
+user side instead (section 3). A step that answered in plain text, written
+while the program ended with `finish: :auto`, is an answer, not a thought,
+and gets no line. The other way round, a plain-text loop replaying a history
+written under `finish: :submit` follows each thought-only step with only
+"Your message above was not sent.", since it has no `submit` to name; a
+history written in a plain-text loop has no such step, so its requests do
+not change. With
 written tool calls the request then ends, as every such request does, on
 the tool listing. The model can then do what it said it would, or submit
 what it wrote; a thought that was
@@ -149,6 +155,11 @@ than return nothing, Imp makes one more request:
   thought as its last user message, under its field's marker, as DSPy's
   ReAct shows its trajectory; the history keeps it as the model's step.
   DSPy's ReActV2 leaves the thought out of the forced request instead.
+
+  An answer is not moved. So a forced request with nothing new to ask (no
+  inputs, no `last_request_note`) on a history that ends with a step that
+  answered in plain text, written under `finish: :auto`, still ends on that
+  assistant message. Resume such a history with new inputs or a note.
 - With one text output, the request is an ordinary step, same tools, and its
   text is the answer (`:last_text`). Tool calls in it are not run; they are
   listed in `unexecuted_tool_calls`, unless the tool is named in

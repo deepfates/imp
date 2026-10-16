@@ -2175,7 +2175,14 @@ defmodule Imp.Predict.ReActV2 do
       "to keep working, call a tool."
   end
 
-  defp unsent_note(_signature, _finish), do: nil
+  # A plain-text loop has no `submit` to name, but a history written under
+  # `finish: :submit` can hold thought-only steps; after each, the factual
+  # half of the note, so the thought does not read as a message that was
+  # sent. A history written in a plain-text loop has no such step (its text
+  # steps carry the answer), so its requests are unchanged.
+  defp unsent_note(signature, :auto) do
+    if single_text_output?(signature), do: "Your message above was not sent."
+  end
 
   defp provider_tool_config(tools, order, signature) do
     [

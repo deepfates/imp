@@ -901,11 +901,11 @@ defmodule ReActV2Test do
 
     messages = Imp.Adapter.Chat.format(signature, %{history: history}, no_submit)
 
-    # The two steps' texts are one assistant message, so roles alternate.
     assert [
              %{role: :system},
              %{role: :user},
-             %{role: :assistant, content: "trying\n\nagain\n\nRight key."},
+             %{role: :assistant, content: "trying"},
+             %{role: :assistant, content: "again\n\nRight key."},
              %{role: :user}
            ] = messages
 
