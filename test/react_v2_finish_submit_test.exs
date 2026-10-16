@@ -57,15 +57,21 @@ defmodule ReActV2FinishSubmitTest do
     [{_step, step_opts}, {continued, continued_opts}] = requests()
     assert Enum.map(step_opts[:tools], & &1.function.name) == ["look", "submit"]
 
-    # The next request is an ordinary step: every tool, nothing forced, and
-    # the thought as its last message.
+    # The next request is an ordinary step: every tool, nothing forced, the
+    # thought as the model's own message, then the line saying it was not
+    # sent.
     assert Enum.map(continued_opts[:tools], & &1.function.name) == ["look", "submit"]
     assert continued_opts[:tool_choice] == "auto"
 
-    assert List.last(continued) == %{
-             role: :user,
-             content: "[[ ## next_thought ## ]]\nNow let me look at the box."
-           }
+    assert continued |> Enum.take(-2) |> Enum.map(&Map.take(&1, [:role, :content])) == [
+             %{role: :assistant, content: "Now let me look at the box."},
+             %{
+               role: :user,
+               content:
+                 "Your message above was not sent. To reply, call `submit` with `answer`; " <>
+                   "to keep working, call a tool."
+             }
+           ]
 
     # The thought stays in the history as the model's step.
     [thought_step, _submit_step] = prediction.metadata.history.messages

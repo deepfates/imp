@@ -36,14 +36,20 @@ User-visible changes to Imp are recorded here.
 
 - Under ReActV2's `finish: :submit`, a step that writes a thought and calls
   no tool is now followed by an ordinary step (every tool,
-  `tool_choice: "auto"`, the thought shown as the request's last message when
-  the tools are held natively)
-  instead of the forced `submit`. A second thought-only step in a row, or a
-  step that says nothing or only whitespace, still forces `submit`
-  (`:empty_tool_calls`), as does `max_iters`. Once the deadline has passed,
-  no further request is sent, continued or forced. A model that announced an action can take
-  it, and a reply in the thought is usually submitted unforced, also on
-  providers that cannot force a tool. Other signatures with `submit` are
+  `tool_choice: "auto"`), in which the thought stays the model's own message
+  and a user message after it says "Your message above was not sent. To
+  reply, call `submit` with `answer`; to keep working, call a tool." (naming
+  the signature's outputs), instead of the forced `submit`. The line follows
+  every thought-only step, in later requests and on replay too, except a
+  thought the turn's extracted answer follows, and the forced `submit`'s own
+  last thought, which is shown as the request's last user message instead.
+  With written tool calls the request ends on the tool listing after it. A
+  second thought-only step in a row, or a step that says nothing or only
+  whitespace, still forces `submit` (`:empty_tool_calls`), as does
+  `max_iters`. Once the deadline has passed, no further request is sent,
+  continued or forced. A model that announced an action can take it, and a
+  reply in the thought is usually submitted unforced, also on providers that
+  cannot force a tool. Other signatures with `submit` are
   unchanged.
 - Once the process's `Imp.Deadline` has passed, ReActV2 sends no forced
   `submit`, no `"required"` retry and no extraction request (and, under

@@ -106,7 +106,8 @@ defmodule Imp.Adapter.Chat do
     history_note_renderer: [type: {:fun, 2}],
     # Loop guidance a program passes as data rather than writing into
     # `signature.instructions`: `%{submit_tool:, input_names:, output_names:,
-    # tool_names:}`.
+    # tool_names:}`, and from ReActV2 `unsent_note:` (a user message after
+    # each thought-only step) and, on its forced `submit`, `forced_submit:`.
     guidance: [type: {:or, [:map, nil]}],
     # The guidance line that tells the model it is an agent. Absent, it is
     # DSPy ReActV2's "You are an Agent. Use the supplied tools to produce
@@ -163,7 +164,10 @@ defmodule Imp.Adapter.Chat do
       tool_result: tool_result_renderer,
       history_note: Keyword.get(opts, :history_note_renderer) || (&no_history_note/2),
       submit_is_text?: submit_is_text?(Keyword.get(opts, :guidance)),
-      loop?: not is_nil(Keyword.get(opts, :guidance))
+      loop?: not is_nil(Keyword.get(opts, :guidance)),
+      unsent_note: guidance_value(Keyword.get(opts, :guidance), :unsent_note),
+      forced_submit?: guidance_value(Keyword.get(opts, :guidance), :forced_submit) == true,
+      output_names: guidance_value(Keyword.get(opts, :guidance), :output_names) || []
     }
 
     {history_messages, history_fields} = extract_history(signature, inputs, renderers)
@@ -181,11 +185,14 @@ defmodule Imp.Adapter.Chat do
     }
 
     # With nothing new to ask, the request ends on the history. If that ends
-    # on a thought-only step, the thought becomes the last user message (see
-    # `thought_as_request/4`): before ReActV2's forced `submit`, and also when
-    # a host resumes a program with `submit` on a held history that ends that
-    # way and gives no new inputs. Either way the request must not end on the
-    # model's own message.
+    # on a thought-only step shown as the model's own message, the thought
+    # becomes the last user message (see `thought_as_request/4`): before
+    # ReActV2's forced `submit` (which drops the unsent note after it), and
+    # when a host resumes a program with `submit`, but no unsent note, on a
+    # held history that ends that way and gives no new inputs. Under
+    # `finish: :submit` an ordinary request already ends on the unsent note,
+    # a user message. Either way the request does not end on the model's own
+    # message.
     {history_messages, trailing} =
       if opts[:omit_empty_request] and blank_message?(request),
         do: {thought_as_request(history_messages, signature, inputs, renderers), []},
@@ -1292,14 +1299,16 @@ defmodule Imp.Adapter.Chat do
   # history keeps the step as the model's turn. A loop whose answer is plain
   # text has no such step, and its replies are not fields.
   defp thought_as_request(messages, signature, inputs, renderers) do
+    candidate = without_forced_note(messages, renderers)
+
     with false <- renderers.submit_is_text?,
          %{role: :assistant, content: thought} = last when is_binary(thought) <-
-           List.last(messages),
+           List.last(candidate),
          false <- Map.has_key?(last, :tool_calls),
          true <- thought_only_step?(last_history_turn(signature, inputs)) do
       field = Imp.Signature.Field.new(meta_field(signature, :text_field) || :next_thought, :input)
 
-      List.replace_at(messages, -1, %{
+      List.replace_at(candidate, -1, %{
         role: :user,
         content: renderers.input_section.(field, thought)
       })
@@ -1307,6 +1316,20 @@ defmodule Imp.Adapter.Chat do
       _other -> messages
     end
   end
+
+  # The forced `submit` shows its last thought on the user side (probe 4,
+  # decisions.md), so the unsent note after it goes. It goes only when the
+  # thought is then moved, which the caller decides from the result: any
+  # other request keeps the note.
+  defp without_forced_note(messages, %{forced_submit?: true, unsent_note: note})
+       when is_binary(note) do
+    case List.last(messages) do
+      %{role: :user, content: ^note} -> Enum.drop(messages, -1)
+      _other -> messages
+    end
+  end
+
+  defp without_forced_note(messages, _renderers), do: messages
 
   # The last turn that is a step with something to show. A step that called
   # nothing and wrote nothing renders no assistant message (ReActV2 records
@@ -1364,7 +1387,8 @@ defmodule Imp.Adapter.Chat do
 
   defp render_history_turns(signature, turns, renderers) do
     turns
-    |> Enum.flat_map(fn turn ->
+    |> Enum.zip(Enum.drop(turns, 1) ++ [nil])
+    |> Enum.flat_map(fn {turn, next} ->
       turn = Imp.Example.new(turn) |> Imp.Example.to_map()
 
       messages =
@@ -1390,9 +1414,39 @@ defmodule Imp.Adapter.Chat do
             |> Enum.reject(&(is_nil(&1) or blank_message?(&1)))
         end
 
-      messages ++ history_note_messages(signature, turn, renderers.history_note)
+      messages ++
+        unsent_note_messages(turn, next, renderers) ++
+        history_note_messages(signature, turn, renderers.history_note)
     end)
   end
+
+  # A loop that continues after a thought-only step (ReActV2 under
+  # `finish: :submit`) says, after each such step, that its message was not
+  # sent and how to go on, as a user message: in every request and on replay,
+  # natively and with written tool calls alike. Two exceptions. A thought
+  # that the turn's outputs follow, with no step between (ReActV2's extracted
+  # answer, recorded as a silent step), was answered, so the line would be
+  # false. And the forced `submit`'s own last thought is shown on the user
+  # side instead (`thought_as_request/4` drops the line there).
+  defp unsent_note_messages(turn, next, renderers) do
+    note = renderers.unsent_note
+
+    if is_binary(note) and thought_only_step?(turn) and not answered_next?(next, renderers),
+      do: [%{role: :user, content: note}],
+      else: []
+  end
+
+  defp answered_next?(nil, _renderers), do: false
+
+  defp answered_next?(next, renderers) do
+    next = Imp.Example.new(next) |> Imp.Example.to_map()
+
+    silent_step?(next) and
+      Enum.any?(renderers.output_names, &(not is_nil(fetch_field(next, &1))))
+  end
+
+  defp guidance_value(%{} = guidance, key), do: Map.get(guidance, key)
+  defp guidance_value(_guidance, _key), do: nil
 
   # The note is what the model reads next after the turn it is about, so it is
   # a user message directly behind that turn's own messages. A renderer that

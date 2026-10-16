@@ -58,18 +58,32 @@ not mean as the answer: a sentence about what it will do next, or a report
 of what it just did. The text then stays in the history as the step's
 thought, and only `submit`'s argument is the answer.
 
-After such a step the loop goes on with an ordinary step: every tool,
-`tool_choice: "auto"`, and the thought shown as the request's last message
-when the tools are held natively (as in section 3; with written tool calls
-the request ends on the tool listing, after the thought). The model can
-then do what it said it would, or submit what it wrote; a thought that was
+After such a step the loop goes on with an ordinary step: every tool and
+`tool_choice: "auto"`. The thought stays the model's own message, and one
+user message follows it, naming the signature's outputs:
+
+```text
+Your message above was not sent. To reply, call `submit` with `answer`; to keep working, call a tool.
+```
+
+That line follows every thought-only step, in later requests and on replay
+too, so each request is the previous one plus the newest exchange. It is
+left out after a thought the turn's extracted answer follows (that thought
+was answered), and the forced `submit`'s own last thought is shown on the
+user side instead (section 3). With
+written tool calls the request then ends, as every such request does, on
+the tool listing. The model can then do what it said it would, or submit
+what it wrote; a thought that was
 only a closing note can be submitted as an empty answer. A second
 thought-only step in a row, or a step that says nothing, interrupts the turn
 (`:empty_tool_calls`) and the forced `submit` follows. Once the process's
-`Imp.Deadline` has passed, no further request is sent. Measured on real final steps from 11 models, most submitted the
-thought's reply on that ordinary step, unforced, Meta's models included,
-whose provider cannot force a tool; some went on with the work they had
-announced; about one in eight wrote text again. Forcing at once, as DSPy
+`Imp.Deadline` has passed, no further request is sent. Measured on real
+final steps from 11 model families, with that line after the thought no
+sample wrote text again, and replies were submitted intact, Meta's models
+included, whose provider cannot force a tool. Shown the thought back as a
+user message instead, some models took it for an echo of their own output
+and submitted nothing; given only "Your message above was not sent.", they
+asked about their status and took extra steps. Forcing at once, as DSPy
 does, took the announced action away and added a request whose failure
 lost the reply. It costs one more request whenever the model ends in prose.
 The default, `finish: :auto`, lets the signature decide as above. The
@@ -145,7 +159,9 @@ If the last request does not produce an answer either, the turn ends
 `termination_cause`, and `Imp.Prediction.complete?/1` is false for it; a turn
 without an answer is never reported complete.
 
-Imp adds nothing to that request unless you pass `last_request_note:`, one
+Imp adds nothing to that request (beyond the unsent line that follows each
+earlier thought-only step under `finish: :submit`, section 2) unless you
+pass `last_request_note:`, one
 line of your own text, sent as a user message and kept in the history.
 
 Some programs act through a tool: they publish, send or record something by
