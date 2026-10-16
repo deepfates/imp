@@ -180,8 +180,16 @@ defmodule Imp.Adapter.Chat do
         )
     }
 
-    trailing =
-      if opts[:omit_empty_request] and blank_message?(request), do: [], else: [request]
+    # With nothing new to ask, the request ends on the history. If that ends
+    # on a thought-only step, the thought becomes the last user message (see
+    # `thought_as_request/4`): before ReActV2's forced `submit`, and also when
+    # a host resumes a program with `submit` on a held history that ends that
+    # way and gives no new inputs. Either way the request must not end on the
+    # model's own message.
+    {history_messages, trailing} =
+      if opts[:omit_empty_request] and blank_message?(request),
+        do: {thought_as_request(history_messages, signature, inputs, renderers), []},
+        else: {history_messages, [request]}
 
     [
       %{
@@ -1270,6 +1278,54 @@ defmodule Imp.Adapter.Chat do
   defp default_tool_result_renderer(result, _call), do: format_tool_content(result)
 
   defp no_history_note(_signature, _turn), do: nil
+
+  # A request with nothing new to ask ends on the history's last turn. When
+  # that turn is a tool loop's step that wrote a thought and called nothing
+  # (the step before `Imp.Predict.ReActV2`'s forced `submit`, or the end of a
+  # held history a host resumes without new inputs), it would end
+  # the request on the model's own message, which providers refuse: Mistral
+  # reads it as an assistant prefix it will not combine with function
+  # calling, and Gemini refuses a request that ends on a model turn. The
+  # thought is shown instead as the last user message, under its field's
+  # marker, as DSPy's ReAct shows its trajectory in the request; the model
+  # reads what it wrote, and the request adds no words of its own. The
+  # history keeps the step as the model's turn. A loop whose answer is plain
+  # text has no such step, and its replies are not fields.
+  defp thought_as_request(messages, signature, inputs, renderers) do
+    with false <- renderers.submit_is_text?,
+         %{role: :assistant, content: thought} = last when is_binary(thought) <-
+           List.last(messages),
+         false <- Map.has_key?(last, :tool_calls),
+         true <- thought_only_step?(last_history_turn(signature, inputs)) do
+      field = Imp.Signature.Field.new(meta_field(signature, :text_field) || :next_thought, :input)
+
+      List.replace_at(messages, -1, %{
+        role: :user,
+        content: renderers.input_section.(field, thought)
+      })
+    else
+      _other -> messages
+    end
+  end
+
+  defp last_history_turn(signature, inputs) do
+    Enum.find_value(Enum.reverse(signature.inputs), fn field ->
+      case fetch_field(inputs, field.name) do
+        %Imp.History{} = history -> history |> Imp.History.messages() |> List.last()
+        _other -> nil
+      end
+    end)
+  end
+
+  defp thought_only_step?(nil), do: false
+
+  defp thought_only_step?(turn) do
+    turn = Imp.Example.new(turn) |> Imp.Example.to_map()
+
+    native_tool_history_turn?(turn) and
+      normalize_history_tool_calls(fetch_field(turn, :tool_calls)) == [] and
+      String.trim(blank_to_empty(fetch_field(turn, :next_thought))) != ""
+  end
 
   defp extract_history(signature, inputs, renderers) do
     signature.inputs

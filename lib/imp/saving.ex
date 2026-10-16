@@ -303,6 +303,7 @@ defmodule Imp.Saving do
       "max_iters" => react.max_iters,
       "last_request_note" => react.last_request_note,
       "finish_on" => dump_finish_on(react.finish_on),
+      "finish" => Atom.to_string(react.finish || :auto),
       "last_request_tools" => react.last_request_tools,
       "tool_policy" => dump_tool_policy(react.tool_policy, "ReActV2 tool policy")
     }
@@ -632,11 +633,12 @@ defmodule Imp.Saving do
     require_keys!(state, ["type", "signature", "react", "tools", "max_iters", "tool_policy"])
     tools = load_tools!(state["tools"], "ReActV2")
     signature = Imp.Signature.load!(state["signature"])
+    finish = load_react_v2_finish!(state["finish"])
 
     %Imp.Predict.ReActV2{
       signature: signature,
       react: require_predict!(load_state!(state["react"]), "ReActV2"),
-      tools: Imp.Predict.ReActV2.put_submit(tools, signature),
+      tools: Imp.Predict.ReActV2.put_submit(tools, signature, finish),
       # The roster is sent in the saved list's order: declared order when this
       # version saved it, name order in a 0.5.0 file, which sorted it.
       tool_order:
@@ -644,7 +646,8 @@ defmodule Imp.Saving do
       max_iters: require_non_negative_integer!(state["max_iters"], "ReActV2 max_iters"),
       last_request_note: load_react_v2_last_request_note!(state["last_request_note"]),
       finish_on: load_finish_on!(state["finish_on"]),
-      last_request_tools: load_last_request_tools!(state["last_request_tools"], tools),
+      finish: finish,
+      last_request_tools: load_last_request_tools!(state["last_request_tools"], tools, finish),
       tool_policy: load_tool_policy!(state["tool_policy"], "ReActV2 tool policy")
     }
     |> Imp.Predict.ReActV2.restore_loop()
@@ -1276,7 +1279,19 @@ defmodule Imp.Saving do
 
   # A file saved before the option existed has none, and runs no tool in the
   # last request, as that version did.
-  defp load_last_request_tools!(nil, _tools), do: []
+  defp load_last_request_tools!(nil, _tools, _finish), do: []
+  defp load_last_request_tools!([], _tools, _finish), do: []
+
+  # As `ReActV2.new/3` refuses: with `finish: :submit` an interrupted turn
+  # ends with the forced `submit`, which runs no listed tool.
+  defp load_last_request_tools!(names, _tools, :submit),
+    do:
+      raise(
+        ArgumentError,
+        "invalid saved ReActV2 last_request_tools with finish: :submit: #{inspect(names)}"
+      )
+
+  defp load_last_request_tools!(names, tools, _finish), do: load_last_request_tools!(names, tools)
 
   # Each name must be one of the loaded tools, as `ReActV2.new/3` requires.
   defp load_last_request_tools!(names, tools) when is_list(names) do
@@ -1289,6 +1304,15 @@ defmodule Imp.Saving do
 
   defp load_last_request_tools!(other, _tools),
     do: raise(ArgumentError, "invalid saved ReActV2 last_request_tools: #{inspect(other)}")
+
+  # A file saved before the option existed ends its turns as the signature
+  # decides, which is what `:auto` means.
+  defp load_react_v2_finish!(nil), do: :auto
+  defp load_react_v2_finish!("auto"), do: :auto
+  defp load_react_v2_finish!("submit"), do: :submit
+
+  defp load_react_v2_finish!(other),
+    do: raise(ArgumentError, "invalid saved ReActV2 finish: #{inspect(other)}")
 
   defp load_react_v2_last_request_note!(nil), do: nil
   defp load_react_v2_last_request_note!(note) when is_binary(note), do: note

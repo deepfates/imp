@@ -22,9 +22,36 @@ User-visible changes to Imp are recorded here.
   the program's for that call, as `max_iters` and `last_request_note` do. A
   one-request call (`max_iters: 0`) is a last request, so a host asking for
   a summary gives `last_request_tools: []` and no listed tool acts in it.
+- ReActV2 takes `finish: :submit`, which ends a one-unconstrained-text-output
+  turn through `submit`, as DSPy's ReActV2 ends every turn: a step that writes
+  text and calls no tool is a thought (`:empty_tool_calls`) and the forced
+  `submit` follows, so text the model did not mean as the answer (a sentence
+  about its next step, a report of what it did) is not published as one. The
+  default, `finish: :auto`, keeps the current rule, in which the signature
+  decides. `last_request_tools` is refused with `finish: :submit`, as for any
+  signature with `submit`. Saved programs carry the option; a file saved
+  without it loads with `:auto`.
 
 ### Changed
 
+- A ReActV2 forced `submit` request no longer ends on the model's own message.
+  When the step before it wrote a thought and called nothing, the thought was
+  the request's last message, as an assistant turn, and providers refuse that:
+  Mistral ("Cannot set an assistant prefix with function calling") and Gemini
+  ("Requests ending with a model turn are not supported"). The request now
+  shows that thought as its last user message, under its field's marker
+  (`[[ ## next_thought ## ]]`); the history still records it as the model's
+  step. The "required" retry carries the same messages.
+- A provider's refusal of the forced request's named `tool_choice` is read
+  from the provider's response body, including the upstream error OpenRouter
+  relays under `error.metadata.raw`, and is any error there that names
+  `tool_choice` and says what is supported ("support" or "only"). Meta's
+  "only `auto` is supported for `tool_choice`" through OpenRouter, whose
+  top-level message is only "Provider returned error", and OpenRouter's "No
+  endpoints found that support the provided 'tool_choice' value" now get the
+  `"required"` retry and then the extractor (`:extracted`) instead of failing
+  the call, streamed or not. A full context window or a safety guard on that
+  request is never read as such a refusal.
 - The finish line of a plain-text ReActV2 step (one unconstrained text
   output, tools held natively) now reads "When the final answer is ready,
   write it as plain text without calling a tool.", followed by the field's
