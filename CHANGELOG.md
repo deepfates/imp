@@ -4,6 +4,28 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Fixed
+
+- Under ReActV2's `finish: :submit`, a step that answered in plain text
+  (recorded under `finish: :auto`, text and outputs both) was taken for a
+  thought when its history was passed on: the "Your message above was not
+  sent." line followed each answer that had been delivered, and models sent
+  those answers again. A step that carries the signature's outputs is an
+  answer: it gets no line, and the forced `submit` never moves it to the
+  user side. Only a step with text, no calls and no outputs is a thought.
+- In a plain-text ReActV2 loop, a history written under `finish: :submit`
+  replayed each thought-only step as an assistant message, which there reads
+  as a message that was sent, often right before the answer's: two
+  assistant messages in a row. Each such step is now followed by a user
+  message, "Your message above was not sent." (the line's factual half; a
+  plain-text loop has no `submit` to name), so the history stays true and
+  roles alternate. A history written in a plain-text loop has no
+  thought-only step, so its requests are byte-for-byte unchanged.
+- Known gap: under `finish: :submit`, a forced request with nothing new to
+  ask on a history that ends with a plain-text answer step still ends on
+  that assistant message, since an answer is not moved. Resume with new
+  inputs or a `last_request_note`.
+
 ## 0.14.0 — 2026-10-16
 
 ### Added

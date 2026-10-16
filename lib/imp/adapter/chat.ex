@@ -1305,7 +1305,8 @@ defmodule Imp.Adapter.Chat do
          %{role: :assistant, content: thought} = last when is_binary(thought) <-
            List.last(candidate),
          false <- Map.has_key?(last, :tool_calls),
-         true <- thought_only_step?(last_history_turn(signature, inputs)) do
+         true <-
+           thought_only_step?(last_history_turn(signature, inputs), renderers.output_names) do
       field = Imp.Signature.Field.new(meta_field(signature, :text_field) || :next_thought, :input)
 
       List.replace_at(candidate, -1, %{
@@ -1360,15 +1361,25 @@ defmodule Imp.Adapter.Chat do
       String.trim(blank_to_empty(fetch_field(turn, :next_thought))) == ""
   end
 
-  defp thought_only_step?(nil), do: false
+  # A step that wrote text, called nothing and carries none of the task's
+  # outputs. A step that carries them was the answer: a plain-text loop
+  # (ReActV2 under `finish: :auto`) records its answer step that way, text
+  # and outputs both, and a history keeps it when the program's ending later
+  # changes. An answer is never a thought, so it is never followed by the
+  # unsent note nor moved to the user side.
+  defp thought_only_step?(nil, _output_names), do: false
 
-  defp thought_only_step?(turn) do
+  defp thought_only_step?(turn, output_names) do
     turn = Imp.Example.new(turn) |> Imp.Example.to_map()
 
     native_tool_history_turn?(turn) and
       normalize_history_tool_calls(fetch_field(turn, :tool_calls)) == [] and
-      String.trim(blank_to_empty(fetch_field(turn, :next_thought))) != ""
+      String.trim(blank_to_empty(fetch_field(turn, :next_thought))) != "" and
+      not carries_outputs?(turn, output_names)
   end
+
+  defp carries_outputs?(turn, output_names),
+    do: Enum.any?(output_names, &(not is_nil(fetch_field(turn, &1))))
 
   defp extract_history(signature, inputs, renderers) do
     signature.inputs
@@ -1386,6 +1397,10 @@ defmodule Imp.Adapter.Chat do
   end
 
   defp render_history_turns(signature, turns, renderers) do
+    render_history_turn_messages(turns, signature, renderers)
+  end
+
+  defp render_history_turn_messages(turns, signature, renderers) do
     turns
     |> Enum.zip(Enum.drop(turns, 1) ++ [nil])
     |> Enum.flat_map(fn {turn, next} ->
@@ -1422,7 +1437,9 @@ defmodule Imp.Adapter.Chat do
 
   # A loop that continues after a thought-only step (ReActV2 under
   # `finish: :submit`) says, after each such step, that its message was not
-  # sent and how to go on, as a user message: in every request and on replay,
+  # sent and how to go on, as a user message; a plain-text loop replaying a
+  # history written under `submit` says only that it was not sent, since it
+  # has no `submit` to name. Either way: in every request and on replay,
   # natively and with written tool calls alike. Two exceptions. A thought
   # that the turn's outputs follow, with no step between (ReActV2's extracted
   # answer, recorded as a silent step), was answered, so the line would be
@@ -1431,9 +1448,10 @@ defmodule Imp.Adapter.Chat do
   defp unsent_note_messages(turn, next, renderers) do
     note = renderers.unsent_note
 
-    if is_binary(note) and thought_only_step?(turn) and not answered_next?(next, renderers),
-      do: [%{role: :user, content: note}],
-      else: []
+    if is_binary(note) and thought_only_step?(turn, renderers.output_names) and
+         not answered_next?(next, renderers),
+       do: [%{role: :user, content: note}],
+       else: []
   end
 
   defp answered_next?(nil, _renderers), do: false
@@ -1441,8 +1459,7 @@ defmodule Imp.Adapter.Chat do
   defp answered_next?(next, renderers) do
     next = Imp.Example.new(next) |> Imp.Example.to_map()
 
-    silent_step?(next) and
-      Enum.any?(renderers.output_names, &(not is_nil(fetch_field(next, &1))))
+    silent_step?(next) and carries_outputs?(next, renderers.output_names)
   end
 
   defp guidance_value(%{} = guidance, key), do: Map.get(guidance, key)
