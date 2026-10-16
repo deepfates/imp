@@ -1,15 +1,16 @@
-# Imp v0.14.0
+# Imp v0.14.1
 
 Imp is a framework for typed, optimizable language-model programs on the BEAM.
-This release adds two ReActV2 options a caller opts into: `last_request_tools`,
-which lets an interrupted turn's last request still run named tools, and
-`finish: :submit`, which ends a plain-text turn through `submit` as DSPy's
-ReActV2 does. It also changes requests every ReActV2 program with one plain
-text output sends: the finish line is worded differently, a forced `submit`
-request no longer ends on the model's own message, and an extracted turn's
-history now holds its answer. New options and a change to what callers'
-models read and what hosts store make this a minor release under Imp's
-versioning rule.
+This release fixes how ReActV2 replays a history that crosses the two finish
+modes 0.14.0 introduced. Under `finish: :submit`, a plain-text answer recorded
+under `finish: :auto` is no longer taken for an unsent thought. Under
+`finish: :auto`, a thought-only step recorded under `finish: :submit` is
+followed by "Your message above was not sent." instead of standing as a sent
+message. It adds no options and changes no public API. A history written
+only in a plain-text loop replays byte-for-byte as in 0.14.0, and under
+`finish: :submit` only steps that carry the signature's outputs are treated
+differently. These are fixes to the opt-in `finish: :submit` that 0.14.0
+added, so under Imp's versioning rule this is a patch release.
 
 ## Install
 
@@ -31,67 +32,35 @@ in its release definition; see [releases that use MCP or
 ACP](docs/production.md#releases-that-use-mcp-or-acp).
 Ordinary Imp startup starts no protocol endpoint.
 
-## Changes and upgrading from 0.13
+## Changes and upgrading from 0.14.0
 
-Change the Imp dependency to `{:imp, "~> 0.14.0"}`, run `mix deps.update imp`,
-and commit `mix.lock`. No data migration is needed: saved programs without
-the new options load with their defaults.
+Under `{:imp, "~> 0.14.0"}`, run `mix deps.update imp` and commit `mix.lock`.
+No code or data migration is needed.
 
-- **Added: `last_request_tools`.** ReActV2 takes a list of tools whose calls
-  run in the last request of an interrupted turn, for a signature with one
-  unconstrained text output. Those calls run as any step's do, under the same
-  tool policy and run authorization, and are recorded in the history; the
-  turn then ends with the request's text as the answer. Calls to other tools
-  are listed in `unexecuted_tool_calls` and not run. A program that acts
-  through a tool and reports in text what it did can still take that action
-  when a turn is interrupted. Each name must be a tool the program holds; a
-  signature with `submit`, or `finish: :submit`, refuses the option. The
-  default, `[]`, changes nothing. A call may give its own list, which replaces
-  the program's for that call. A one-request call (`max_iters: 0`) is a last
-  request, so a host asking for a summary gives `last_request_tools: []`.
-- **Added: `finish: :submit`.** A one-unconstrained-text-output ReActV2 turn
-  can end through `submit`, as DSPy's ReActV2 ends every turn, so text the
-  model did not mean as its answer is not published as one. A step that
-  writes a thought and calls no tool is followed by an ordinary step in which
-  the thought stays the model's own message and a user message after it says
-  "Your message above was not sent. To reply, call `submit` with `answer`; to
-  keep working, call a tool." (naming the signature's outputs). A second
-  thought-only step in a row, an empty step, or `max_iters` forces `submit`.
-  The default, `finish: :auto`, keeps the current rule.
-- **Changed: the plain-text finish line.** A plain-text ReActV2 step's system
-  message now reads "When the final answer is ready, write it as plain text
-  without calling a tool." where it read "... reply without calling a
-  tool.", which a program holding a `reply` tool read as being about that
-  tool. A provider's prompt cache for those programs misses once. Migration:
-  a test that compares that system message exactly expects the new text.
-- **Changed: a forced `submit` request no longer ends on the model's
-  message.** When the step before it wrote a thought and called nothing, the
-  request ended on an assistant turn, which Mistral and Gemini refuse. The
-  request now shows that thought as its last user message under its field's
-  marker; the history still records it as the model's step. A provider's
-  refusal of the named `tool_choice`, including one OpenRouter relays, now
-  gets the `"required"` retry and then the extractor instead of failing the
-  call.
-- **Changed: an extracted turn's history holds its answer.** An `:extracted`
-  ReActV2 turn's history ends with the extracted outputs, recorded as a step
-  that called no tool. Replaying such a history shows the model nothing for
-  that step. A host that stores histories stores one more step for such
-  turns.
-- **Changed: no requests after the deadline.** Once the process's
-  `Imp.Deadline` has passed, ReActV2 sends no forced `submit`, no
-  `"required"` retry and no extraction request; the turn is `:incomplete`
-  with `termination_cause: :deadline_exceeded`.
-- **Fixed: a resume with no new inputs.** A ReActV2 call that resumes a held
-  history with no new inputs, such as `max_iters: 0` with a
-  `last_request_note`, and whose forced `submit` gets no `submit` back, now
-  gets its answer from the extractor instead of failing with
-  `{:missing_input_fields, [...]}`.
+- **Fixed: an answer step is never a thought.** Under `finish: :submit`, a
+  step recorded under `finish: :auto` as the turn's plain-text answer (text
+  and the signature's outputs both) was treated as a thought-only step when
+  its history was passed on: the "Your message above was not sent." line
+  followed each answer that had been delivered, and models sent those
+  answers again. A step that carries the signature's outputs is an answer:
+  it gets no line, and the forced `submit` never moves it to the user side.
+  Only a step with text, no calls and no outputs is a thought.
+- **Fixed: a plain-text loop keeps roles alternating.** In a plain-text
+  ReActV2 loop (`finish: :auto`), a history written under `finish: :submit`
+  replayed each thought-only step as an assistant message, which there reads
+  as a message that was sent, often right before the answer's: two assistant
+  messages in a row. Each such step is now followed by a user message, "Your
+  message above was not sent." (the line's factual half; a plain-text loop
+  has no `submit` to name). A history written only in a plain-text loop has
+  no thought-only step, so its requests are byte-for-byte unchanged.
+- **Known gap.** Under `finish: :submit`, a forced request with nothing new
+  to ask, on a history that ends with a plain-text answer step, still ends
+  on that assistant message, since an answer is not moved. Resume with new
+  inputs or a `last_request_note`.
 
-Rollback means restoring `0.13.0` in the lock. 0.13.0 loads a program
-saved with `last_request_tools` or `finish: :submit` without those options,
-so it runs with none and with `finish: :auto`.
-This release does not establish how any particular model responds to the new
-wording. See the [changelog](CHANGELOG.md) for every change.
+Rollback means restoring `0.14.0` in the lock; mixed-mode histories then
+replay as described above before each fix. See the
+[changelog](CHANGELOG.md) for every change.
 
 ## Known limits
 

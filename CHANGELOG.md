@@ -4,6 +4,8 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+## 0.14.1 — 2026-10-16
+
 ### Fixed
 
 - Under ReActV2's `finish: :submit`, a step that answered in plain text
