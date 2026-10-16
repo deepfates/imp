@@ -21,12 +21,18 @@ defmodule Imp.Predict.ReActV2 do
   signature, so a user tool cannot take it.
 
   `finish: :submit` gives the one-text-output signature `submit` too, and its
-  turn then ends as every other signature's does: a step that writes text and
-  calls no tool is a thought (`:empty_tool_calls`), and the forced `submit`
-  follows. It is for a program whose model writes text it does not mean as
-  the answer, such as a sentence about what it will do next, or a report of
-  what it did. The default, `finish: :auto`, leaves the choice to the
-  signature.
+  turn then ends only through `submit`: a step that writes text and calls no
+  tool is a thought, not the answer. It is for a program whose model writes
+  text it does not mean as the answer, such as a sentence about what it will
+  do next, or a report of what it did. Under `finish: :submit` a thought-only
+  step is followed by an ordinary step (every tool, `tool_choice: "auto"`,
+  the thought shown as the request's last message when the tools are held
+  natively), so the model can do what
+  it announced or submit what it wrote; a second thought-only step in a row,
+  or a step that says nothing, is the `:empty_tool_calls` interruption and
+  the forced `submit` follows. Every other signature with `submit` keeps
+  DSPy's ending: its first thought-only step is that interruption. The
+  default, `finish: :auto`, leaves the choice to the signature.
 
   ## The prediction
 
@@ -108,7 +114,8 @@ defmodule Imp.Predict.ReActV2 do
   A turn is interrupted when it reaches `max_iters`, when a step's request
   fails (`:prediction_error`, `:parse_error`) other than by the content
   filter, or when a step of a signature
-  with `submit` calls no tool (`:empty_tool_calls`). An `enum` output is such a
+  with `submit` calls no tool (`:empty_tool_calls`; under `finish: :submit`,
+  the second such step in a row, see above). An `enum` output is such a
   signature: text that is not a `submit` call is `:empty_tool_calls`, never
   an answer, and a turn with no valid `submit`, the forced one included, ends
   `:incomplete`.
@@ -150,9 +157,12 @@ defmodule Imp.Predict.ReActV2 do
   `submit`, and that call runs. The default, `[]`, runs nothing.
 
   With `submit`, an interruption forces one more request with `tool_choice`
-  naming `submit` (`:forced_submit`), as DSPy does. If a provider cannot honor
-  that tool contract, a tools-disabled typed extractor derives the task
-  outputs from the original inputs and accumulated history (`:extracted`).
+  naming `submit` (`:forced_submit`), as DSPy does, unless the process's
+  `Imp.Deadline` has already passed (`:incomplete`, `:deadline_exceeded`).
+  If a provider cannot honor that tool contract, a tools-disabled typed
+  extractor derives the task outputs from the original inputs and
+  accumulated history (`:extracted`), and the outputs are appended to the
+  history as a step that called no tool.
 
   The last request says nothing about why it is being made unless
   `:last_request_note` is given: one line of host text put in front of it as a
@@ -351,7 +361,9 @@ defmodule Imp.Predict.ReActV2 do
         "How the model ends its turn. `:auto` lets the signature decide: one " <>
           "unconstrained text output ends on plain text, every other signature through " <>
           "`submit`. `:submit` ends every turn through `submit`, as DSPy's ReActV2 does, " <>
-          "so a step that writes text and calls no tool is a thought, not the answer. " <>
+          "so a step that writes text and calls no tool is a thought, not the answer; " <>
+          "the next step continues with every tool, and a second such step in a row " <>
+          "forces `submit`. " <>
           "See \"Which signatures get `submit`\" above."
     ],
     last_request_tools: [
@@ -688,15 +700,19 @@ defmodule Imp.Predict.ReActV2 do
         pending,
         0,
         max_iters,
-        execution
+        execution,
+        0
       )
     end
   end
 
-  defp run(react, history, inputs, pending, turn, max_iters, execution) when turn >= max_iters,
-    do: interrupted(react, history, inputs, pending, :max_iters, turn, nil, execution)
+  # `thoughts` counts the thought-only steps since the last step that called
+  # a tool (see `continue_after_thought?/3`).
+  defp run(react, history, inputs, pending, turn, max_iters, execution, _thoughts)
+       when turn >= max_iters,
+       do: interrupted(react, history, inputs, pending, :max_iters, turn, nil, execution)
 
-  defp run(react, history, inputs, pending, turn, max_iters, execution) do
+  defp run(react, history, inputs, pending, turn, max_iters, execution, thoughts) do
     case predict(react.react, react, history, pending) do
       {:ok, prediction, history} ->
         calls = prediction |> Imp.get(:tool_calls, []) |> normalize_calls(turn)
@@ -720,7 +736,20 @@ defmodule Imp.Predict.ReActV2 do
             {:none, cause} ->
               emit_reasoning(prediction, turn)
               {history, pending} = append_thought_only_step(history, pending, prediction, calls)
-              interrupted(react, history, inputs, pending, cause, turn, nil, execution)
+
+              if continue_after_thought?(react, prediction, thoughts),
+                do:
+                  run(
+                    react,
+                    history,
+                    inputs,
+                    pending,
+                    turn + 1,
+                    max_iters,
+                    execution,
+                    thoughts + 1
+                  ),
+                else: interrupted(react, history, inputs, pending, cause, turn, nil, execution)
           end
         else
           emit_reasoning(prediction, turn)
@@ -745,7 +774,7 @@ defmodule Imp.Predict.ReActV2 do
                   })
 
                 true ->
-                  run(react, history, inputs, %{}, turn + 1, max_iters, execution)
+                  run(react, history, inputs, %{}, turn + 1, max_iters, execution, 0)
               end
           end
         end
@@ -787,6 +816,35 @@ defmodule Imp.Predict.ReActV2 do
     end
   end
 
+  # Under `finish: :submit`, a step that wrote a thought and called nothing is
+  # followed by an ordinary step, not at once by the forced `submit`: the
+  # same tools and `tool_choice: "auto"`, with the thought as the request's
+  # last message when the tools are held natively (`Imp.Adapter.Chat`'s
+  # `thought_as_request`; with written tool calls the request ends on the
+  # tool listing, after the thought). Forcing at once
+  # took every other tool away from a model that had just said what it would
+  # do next, and made a request that, if it failed, lost the reply the thought
+  # held. Measured on real final steps across 11 models (decisions.md, row of
+  # 2026-10-16), most models then called `submit` with the thought's reply, or
+  # went on with the work they had announced; about one in eight wrote text
+  # again. So one such step continues, and a second in a row is the
+  # `:empty_tool_calls` interruption, as is a step that said nothing or only
+  # whitespace (there is no thought to show, and the same request would be
+  # sent again). `max_iters` still ends the turn with the forced `submit`; a
+  # deadline that has passed sends no further request, continued or forced,
+  # and the turn ends `:incomplete` (`:deadline_exceeded`). A signature that
+  # has `submit` under `finish: :auto` keeps DSPy's ending, which forces at
+  # once.
+  @thought_steps_continued 1
+
+  defp continue_after_thought?(%{finish: :submit}, prediction, thoughts) do
+    thoughts < @thought_steps_continued and
+      String.trim(to_string(Imp.get(prediction, :next_thought) || "")) != "" and
+      not deadline_passed?()
+  end
+
+  defp continue_after_thought?(_react, _prediction, _thoughts), do: false
+
   # The one place an interrupted turn goes: the last request for a signature
   # with one text output, the forced submit for every other.
   defp interrupted(react, history, inputs, pending, cause, turn, error, execution) do
@@ -796,6 +854,34 @@ defmodule Imp.Predict.ReActV2 do
   end
 
   defp forced_submit(
+         react,
+         history,
+         inputs,
+         pending,
+         reason,
+         turn,
+         initial_error,
+         execution
+       ) do
+    # As for the last text request: a deadline that has already passed
+    # leaves no time for the forced `submit`, so none is made.
+    if deadline_passed?() do
+      incomplete_prediction(history, :deadline_exceeded, initial_error)
+    else
+      forced_submit_request(
+        react,
+        history,
+        inputs,
+        pending,
+        reason,
+        turn,
+        initial_error,
+        execution
+      )
+    end
+  end
+
+  defp forced_submit_request(
          react,
          history,
          inputs,
@@ -825,7 +911,7 @@ defmodule Imp.Predict.ReActV2 do
         )
 
       {:extract, forced_error, history} ->
-        extract_final(react, inputs, history, reason, %{
+        extract_final(react, inputs, pending, history, reason, %{
           initial: initial_error,
           forced_submit: forced_error
         })
@@ -1022,7 +1108,17 @@ defmodule Imp.Predict.ReActV2 do
           submit_only = %{react | tools: %{submit: submit}}
           fallback = forced_submit_program(submit_only, "required")
 
-          case predict(fallback, submit_only, history, pending) do
+          # No request is sent once the deadline has passed; the refusal is
+          # then the last request's failure, which names the deadline.
+          retry =
+            if deadline_passed?(),
+              do: :deadline_passed,
+              else: predict(fallback, submit_only, history, pending)
+
+          case retry do
+            :deadline_passed ->
+              error
+
             {:ok, prediction, history} ->
               {:ok, prediction, history}
 
@@ -1055,8 +1151,10 @@ defmodule Imp.Predict.ReActV2 do
     submit_calls = %ToolCalls{tool_calls: Enum.filter(calls.tool_calls, &submit?/1)}
 
     if submit_calls.tool_calls == [] do
-      history = append_last_step(history, pending, prediction, calls, nil)
-      extract_final(react, inputs, history, reason, initial_error)
+      stepped = append_last_step(history, pending, prediction, calls, nil)
+      # The step spent the pending inputs if it was recorded.
+      pending = if stepped == history, do: pending, else: %{}
+      extract_final(react, inputs, pending, stepped, reason, initial_error)
     else
       case execute_calls(react, submit_calls, execution, inputs) do
         {:cancel, cancel_reason} ->
@@ -1112,7 +1210,13 @@ defmodule Imp.Predict.ReActV2 do
     }
   end
 
-  defp extract_final(react, inputs, history, reason, initial_error) do
+  defp extract_final(react, inputs, pending, history, reason, initial_error) do
+    if deadline_passed?(),
+      do: incomplete_prediction(history, :deadline_exceeded, initial_error),
+      else: run_extractor(react, inputs, pending, history, reason, initial_error)
+  end
+
+  defp run_extractor(react, inputs, pending, history, reason, initial_error) do
     extractor = extraction_program(react)
 
     case context_call(history, fn projected ->
@@ -1126,7 +1230,18 @@ defmodule Imp.Predict.ReActV2 do
 
         case Imp.Schema.validate_fields(react.signature.outputs, final) do
           :ok ->
-            final_prediction(final, history, :extracted, %{termination_cause: reason})
+            # The outputs are recorded as what they are: produced with no tool
+            # call, after the turn's last step, with any inputs no step spent.
+            # The history then holds the turn's answer, as a `submit`'s event
+            # does, and ends the episode.
+            event =
+              pending
+              |> Map.merge(final)
+              |> Map.merge(%{tool_calls: %ToolCalls{tool_calls: []}, tool_call_results: []})
+
+            final_prediction(final, append_history(history, event), :extracted, %{
+              termination_cause: reason
+            })
 
           {:error, errors} ->
             incomplete_prediction(history, reason, %{

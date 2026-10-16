@@ -1308,13 +1308,33 @@ defmodule Imp.Adapter.Chat do
     end
   end
 
+  # The last turn that is a step with something to show. A step that called
+  # nothing and wrote nothing renders no assistant message (ReActV2 records
+  # its extracted outputs that way), so the message before it is the thought
+  # it follows. One that carries inputs renders them as a user message,
+  # which already ends the request.
   defp last_history_turn(signature, inputs) do
     Enum.find_value(Enum.reverse(signature.inputs), fn field ->
       case fetch_field(inputs, field.name) do
-        %Imp.History{} = history -> history |> Imp.History.messages() |> List.last()
-        _other -> nil
+        %Imp.History{} = history ->
+          history
+          |> Imp.History.messages()
+          |> Enum.reverse()
+          |> Enum.drop_while(&silent_step?/1)
+          |> List.first()
+
+        _other ->
+          nil
       end
     end)
+  end
+
+  defp silent_step?(turn) do
+    turn = Imp.Example.new(turn) |> Imp.Example.to_map()
+
+    native_tool_history_turn?(turn) and
+      normalize_history_tool_calls(fetch_field(turn, :tool_calls)) == [] and
+      String.trim(blank_to_empty(fetch_field(turn, :next_thought))) == ""
   end
 
   defp thought_only_step?(nil), do: false

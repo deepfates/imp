@@ -52,15 +52,28 @@ A constrained output never takes that path: its allowed values are in
 `submit`'s schema, and text is not an answer to it.
 
 **`finish: :submit`** gives the one-text-output signature `submit` as well,
-so its turn ends as DSPy's ReActV2 ends every turn: a step that writes text
-and calls no tool is a thought (`:empty_tool_calls`), and the forced
-`submit` follows (section 3). Use it when the model writes text it does not
-mean as the answer: a sentence about what it will do next, or a report of
-what it just did. The text then stays beside the calls as the step's
-thought, and only `submit`'s argument is the answer. It costs one more
-request whenever the model ends in prose, and it needs a provider that can
-force a tool, or the extractor answers. The default, `finish: :auto`, lets
-the signature decide as above. The option is saved with the program.
+so its turn ends only through `submit`: a step that writes text and calls no
+tool is a thought, not the answer. Use it when the model writes text it does
+not mean as the answer: a sentence about what it will do next, or a report
+of what it just did. The text then stays in the history as the step's
+thought, and only `submit`'s argument is the answer.
+
+After such a step the loop goes on with an ordinary step: every tool,
+`tool_choice: "auto"`, and the thought shown as the request's last message
+when the tools are held natively (as in section 3; with written tool calls
+the request ends on the tool listing, after the thought). The model can
+then do what it said it would, or submit what it wrote; a thought that was
+only a closing note can be submitted as an empty answer. A second
+thought-only step in a row, or a step that says nothing, interrupts the turn
+(`:empty_tool_calls`) and the forced `submit` follows. Once the process's
+`Imp.Deadline` has passed, no further request is sent. Measured on real final steps from 11 models, most submitted the
+thought's reply on that ordinary step, unforced, Meta's models included,
+whose provider cannot force a tool; some went on with the work they had
+announced; about one in eight wrote text again. Forcing at once, as DSPy
+does, took the announced action away and added a request whose failure
+lost the reply. It costs one more request whenever the model ends in prose.
+The default, `finish: :auto`, lets the signature decide as above. The
+option is saved with the program.
 
 The prompt says the same. When the provider holds the tools natively, the
 Chat adapter's system message for `Imp.react("intent -> answer", [look])`
@@ -104,12 +117,15 @@ parse fails, or when a step gives neither a tool call nor an answer. Rather
 than return nothing, Imp makes one more request:
 
 - With `submit`, the request names `submit` as the required tool, as DSPy
-  does (`:forced_submit`). A provider that refuses a named `tool_choice`
+  does (`:forced_submit`). If the process's `Imp.Deadline` has already
+  passed, no request is made and the turn is `:incomplete`
+  (`:deadline_exceeded`). A provider that refuses a named `tool_choice`
   (its error names `tool_choice` and says what it supports, as Meta's
   "only `auto` is supported" does through OpenRouter) is asked again with
   `"required"` and `submit` as the only tool; if it refuses
   that too, or answers without `submit`, a typed extractor with no tools
-  reads the history and fills the outputs (`:extracted`).
+  reads the history and fills the outputs (`:extracted`). The history then
+  ends with those outputs, recorded as a step that called no tool.
 
   When the step before it wrote a thought and called nothing, that thought
   is the newest thing in the history, and the request would end on the
@@ -284,12 +300,15 @@ answer has to follow a tool call, give the signature a second output, so the
 turn ends only through `submit`, or end it from the tool with `finish_on:`.
 
 Or keep the one output and pass `finish: :submit`. Text without a tool call
-is then a thought, and the turn ends through `submit`:
+is then a thought, not the answer. Here the model announces a lookup and
+forgets to make it; the next step sees what it wrote, makes the lookup, and
+ends the turn through `submit`:
 
 ```elixir
 lm =
   script.([
     %{next_thought: "Let me check who is on call for atlas.", tool_calls: []},
+    %{tool_calls: [%{name: "on_call", arguments: %{"team" => "atlas"}}]},
     %{tool_calls: [%{name: "submit", arguments: %{"reply" => "Maya from atlas is on it."}}]}
   ])
 
@@ -297,7 +316,7 @@ reply = Imp.react(Imp.signature("ticket -> reply"), [on_call], lm: lm, finish: :
 {:ok, prediction} = Imp.call(reply, %{ticket: "We were charged twice this month."})
 
 {Imp.get(prediction, :reply), prediction.metadata.termination_reason}
-#=> {"Maya from atlas is on it.", :forced_submit}
+#=> {"Maya from atlas is on it.", :submit}
 ```
 
 ### One more request on a history you hold
@@ -468,7 +487,7 @@ step wins.
 | `:submit` | the model called `submit` with valid outputs |
 | `:finished_by_tool` | a `finish_on` function finished the turn; `finished_by_tool` names the tool |
 | `:forced_submit` | interrupted; the last request, with `submit` required, answered |
-| `:extracted` | interrupted; the provider could not require `submit`, and the extractor answered |
+| `:extracted` | interrupted; the provider could not require `submit`, and the extractor answered; the history ends with its outputs |
 | `:last_text` | interrupted; one text output, and the last request's text is the answer |
 | `:incomplete` | interrupted, and there is no answer |
 
@@ -479,7 +498,7 @@ When the turn was interrupted, `termination_cause` says why:
 | `:max_iters` | the step budget ran out |
 | `:parse_error` | a step's reply could not be read |
 | `:prediction_error` | a step's request failed |
-| `:empty_tool_calls` | with `submit` (every signature but one unconstrained text output under `finish: :auto`): a step called no tool |
+| `:empty_tool_calls` | with `submit` (every signature but one unconstrained text output under `finish: :auto`): a step called no tool; under `finish: :submit`, a second such step in a row, or one that said nothing |
 | `:context_window_exceeded` | the prompt no longer fits, even with old episodes left out |
 | `:deadline_exceeded` | the process's `Imp.Deadline` passed |
 
@@ -572,7 +591,9 @@ What differs:
 
 - A signature with one text output has no `submit`; the model's text is the
   answer (`:answered`, and `:last_text` when interrupted). `finish: :submit`
-  gives it `submit`, as DSPy does. Its last request
+  gives it `submit`, as DSPy does, but a thought-only step is followed by an
+  ordinary step rather than at once by the forced `submit`, which DSPy sends
+  after every step that calls no tool. A plain-text turn's last request
   runs no tool by default; `last_request_tools:` names the ones it may run,
   the counterpart of DSPy executing `submit` in its forced last request.
 - `finish_on:` lets a tool end the turn (`:finished_by_tool`).

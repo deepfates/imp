@@ -34,6 +34,29 @@ User-visible changes to Imp are recorded here.
 
 ### Changed
 
+- Under ReActV2's `finish: :submit`, a step that writes a thought and calls
+  no tool is now followed by an ordinary step (every tool,
+  `tool_choice: "auto"`, the thought shown as the request's last message when
+  the tools are held natively)
+  instead of the forced `submit`. A second thought-only step in a row, or a
+  step that says nothing or only whitespace, still forces `submit`
+  (`:empty_tool_calls`), as does `max_iters`. Once the deadline has passed,
+  no further request is sent, continued or forced. A model that announced an action can take
+  it, and a reply in the thought is usually submitted unforced, also on
+  providers that cannot force a tool. Other signatures with `submit` are
+  unchanged.
+- Once the process's `Imp.Deadline` has passed, ReActV2 sends no forced
+  `submit`, no `"required"` retry and no extraction request (and, under
+  `finish: :submit`, no continued step); the turn is `:incomplete` with
+  `termination_cause: :deadline_exceeded`, as the last text request already
+  was. This applies to every signature with `submit`, `finish: :auto`
+  included.
+- An `:extracted` ReActV2 turn's history now ends with the extracted
+  outputs, recorded as a step that called no tool (with any inputs no step
+  spent), so the history holds the turn's answer. This applies under
+  `finish: :auto` too. Such a step shows the model nothing when the history
+  is replayed: the request still ends on the thought before it, shown as a
+  user message.
 - A ReActV2 forced `submit` request no longer ends on the model's own message.
   When the step before it wrote a thought and called nothing, the thought was
   the request's last message, as an assistant turn, and providers refuse that:
