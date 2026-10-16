@@ -4,6 +4,8 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+## 0.14.0 — 2026-10-16
+
 ### Added
 
 - ReActV2 takes `last_request_tools:`, a list of tools whose calls run in
