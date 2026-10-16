@@ -62,6 +62,18 @@ User-visible changes to Imp are recorded here.
   ReActV2 prompt's system message changes, so a provider's prompt cache for
   those programs misses once.
 
+### Fixed
+
+- A ReActV2 call that resumes a held history with no new inputs (for
+  instance `max_iters: 0` with a `last_request_note`, asking for a recap)
+  and whose forced `submit` gets no `submit` back, or cannot be forced, now
+  gets its answer from the extractor. The extractor required the task's
+  inputs, so the call failed with `{:missing_input_fields, [...]}`; it now
+  takes them as optional, as each step does, and reads them from the
+  history. Its instructions also say that the history is in order and that
+  its last messages are the current turn, so text the model just wrote is
+  not read as an earlier turn's.
+
 ## 0.13.0 — 2026-10-12
 
 ### Added

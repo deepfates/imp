@@ -1145,7 +1145,11 @@ defmodule Imp.Predict.ReActV2 do
 
   defp extraction_program(react) do
     signature = %Imp.Signature{
-      inputs: react.signature.inputs ++ [Imp.Signature.Field.new(:history, :input)],
+      # A call that resumes a held history may give no new inputs: they are
+      # in the history, as the step's own signature takes them.
+      inputs:
+        Enum.map(react.signature.inputs, &Imp.Signature.Field.optional/1) ++
+          [Imp.Signature.Field.new(:history, :input)],
       outputs: react.signature.outputs,
       instructions: extraction_instructions(react.signature.instructions)
     }
@@ -1176,7 +1180,9 @@ defmodule Imp.Predict.ReActV2 do
     Never claim that an action or verification succeeded unless `history`
     contains its successful result. If the requested outcome is not established,
     report that limitation honestly in the declared output fields. No tools are
-    available during this extraction step.
+    available during this extraction step. `history` is in order, oldest
+    first: its last messages are the current turn, and text written there was
+    written in this turn, not an earlier one.
     """
     |> String.trim()
   end
