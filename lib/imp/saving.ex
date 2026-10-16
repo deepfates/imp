@@ -307,6 +307,9 @@ defmodule Imp.Saving do
       "last_request_tools" => react.last_request_tools,
       "tool_policy" => dump_tool_policy(react.tool_policy, "ReActV2 tool policy")
     }
+    # Saved only when set, so a program that uses neither saves as before.
+    |> maybe_put_saved("unsent_note", react.unsent_note, nil)
+    |> maybe_put_saved("history_replay", react.history_replay, :trajectory)
   end
 
   defp dump_state(%Imp.Predict.CodeAct{} = code_act) do
@@ -647,9 +650,12 @@ defmodule Imp.Saving do
       last_request_note: load_react_v2_last_request_note!(state["last_request_note"]),
       finish_on: load_finish_on!(state["finish_on"]),
       finish: finish,
+      unsent_note: load_react_v2_unsent_note!(state["unsent_note"]),
+      history_replay: load_react_v2_history_replay!(state["history_replay"]),
       last_request_tools: load_last_request_tools!(state["last_request_tools"], tools, finish),
       tool_policy: load_tool_policy!(state["tool_policy"], "ReActV2 tool policy")
     }
+    |> Imp.Predict.ReActV2.validate_tools_program!("loading a ReActV2 program")
     |> Imp.Predict.ReActV2.restore_loop()
   end
 
@@ -1310,9 +1316,30 @@ defmodule Imp.Saving do
   defp load_react_v2_finish!(nil), do: :auto
   defp load_react_v2_finish!("auto"), do: :auto
   defp load_react_v2_finish!("submit"), do: :submit
+  defp load_react_v2_finish!("tools"), do: :tools
 
   defp load_react_v2_finish!(other),
     do: raise(ArgumentError, "invalid saved ReActV2 finish: #{inspect(other)}")
+
+  defp maybe_put_saved(state, _key, value, default) when value in [nil, default], do: state
+
+  defp maybe_put_saved(state, key, value, _default) when is_atom(value),
+    do: Map.put(state, key, Atom.to_string(value))
+
+  defp maybe_put_saved(state, key, value, _default), do: Map.put(state, key, value)
+
+  defp load_react_v2_unsent_note!(nil), do: nil
+  defp load_react_v2_unsent_note!(note) when is_binary(note), do: note
+
+  defp load_react_v2_unsent_note!(other),
+    do: raise(ArgumentError, "invalid saved ReActV2 unsent_note: #{inspect(other)}")
+
+  defp load_react_v2_history_replay!(nil), do: :trajectory
+  defp load_react_v2_history_replay!("trajectory"), do: :trajectory
+  defp load_react_v2_history_replay!("actions"), do: :actions
+
+  defp load_react_v2_history_replay!(other),
+    do: raise(ArgumentError, "invalid saved ReActV2 history_replay: #{inspect(other)}")
 
   defp load_react_v2_last_request_note!(nil), do: nil
   defp load_react_v2_last_request_note!(note) when is_binary(note), do: note

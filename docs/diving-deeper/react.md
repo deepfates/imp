@@ -504,6 +504,43 @@ When one step calls several finishing tools, the first in call order ends
 the turn; the others still run and are recorded, and a `submit` in the same
 step wins.
 
+**Only a tool ends the turn: `finish: :tools`.** Some programs act only
+through tools: what they say goes out through a tool, and their text is
+for nobody. With `finish: :tools`, nothing but a `finish_on` tool ends the
+turn. There is no `submit`, and the signature's outputs come from the
+`finish_on` functions. A step that writes text and calls no tool is a
+thought, as under `finish: :submit`: the next request is an ordinary step
+in which the thought stays the model's own message, followed by one line,
+by default "Your message above was not sent. To end the turn, call
+`decline` or `send`; to keep working, call a tool." Pass `unsent_note:` to
+say what ending the turn means in your program. Nothing is ever forced. A
+step whose request fails gets one more ordinary step, once per turn. A
+second thought in a row, a step that says nothing, the step limit or a
+second failure ends the turn `:incomplete`, with its `termination_cause`
+(`:deadline_exceeded` when the deadline has passed) and no further request,
+and the host decides what that means. A program built
+with `finish: :tools` needs at least one `finish_on` tool.
+
+A call may give its own `finish:`, as it gives its own `max_iters`. A
+program with `finish: :tools` that needs one text answer for one call, a
+summary of the conversation say, calls with `finish: :auto, max_iters: 0`
+and a note.
+
+**Earlier turns as actions: `history_replay: :actions`.** By default a
+history replays every earlier step whole, as DSPy's ReActV2 does: the text
+each step wrote beside its calls, its reasoning, the calls and their
+results. With `history_replay: :actions`, the steps of earlier turns lose
+the text and reasoning written beside their calls, and a step that only
+wrote text is left out; earlier turns read as their inputs, the calls with
+their results, and the outputs. The current turn is always shown whole, and
+the history the prediction returns keeps every step. Use it when the
+model's own narration should not become something it reads back on every
+later turn. A step that carries the task's outputs (an answer) is shown
+whole. A call with new inputs or its own `last_request_note` starts a turn;
+on a call with neither (a resume mid-turn), the current turn starts at the
+last step that carries inputs. Some thinking APIs reject an
+earlier tool-call message without its reasoning content; check yours.
+
 ### Why a turn ended
 
 `termination_reason` says how the turn ended:

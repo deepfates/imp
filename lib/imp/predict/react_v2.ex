@@ -35,6 +35,35 @@ defmodule Imp.Predict.ReActV2 do
   DSPy's ending: its first thought-only step is that interruption. The
   default, `finish: :auto`, leaves the choice to the signature.
 
+  `finish: :tools` is for a program that acts only through tools: its turn
+  ends only through a `finish_on` tool. There is no `submit`, and the outputs
+  come from the `finish_on` functions. A thought-only step is followed by one
+  ordinary step, as under `:submit`, with a line naming the ending tools
+  (`unsent_note:` replaces it). Nothing is forced and no last request is
+  made. A step whose request fails gets one more ordinary step, once per turn
+  (there is no last request to absorb a transient failure). A second
+  thought-only step in a row, a step that says nothing, the step limit or a
+  second failure (or a failure on the last allowed step) ends the turn
+  `:incomplete` with that cause and the request's error in
+  `termination_error`, or
+  `:deadline_exceeded` when the deadline has passed. A program with
+  `finish: :tools` needs a `finish_on` tool, and refuses `last_request_note`
+  and `last_request_tools`, which it would never use. Its context recovery
+  (a full window) has no answer steps to mark episodes, so it can only drop
+  the whole history.
+
+  `history_replay: :actions` shows the steps of earlier turns without the
+  text and reasoning written beside their calls, and leaves out steps that
+  only wrote text; a step that carries the task's outputs (an answer) is shown
+  whole. The current turn is shown whole: it starts with the call's new
+  inputs or its own `last_request_note`, or, on a call with neither (a resume
+  mid-turn), at the last step that carries inputs.
+  DeepSeek accepts earlier turns without `reasoning_content`; Anthropic and
+  Gemini do not validate reasoning on earlier turns. Some thinking APIs reject
+  an earlier tool-call message without its reasoning content (Kimi-style
+  thinking modes); Kimi K3 through OpenRouter accepted one in a probe
+  (2026-10-16), but check the provider before relying on it.
+
   ## The prediction
 
   The prediction's fields are the signature's outputs and nothing else, so an
@@ -92,7 +121,8 @@ defmodule Imp.Predict.ReActV2 do
       and its last request answered (below).
     * `:incomplete`. The turn was interrupted and has no answer: its last
       request was answered with no valid answer in it, or the turn ran out of
-      time or context window.
+      time or context window, or, under `finish: :tools`, it ended without a
+      `finish_on` tool.
 
   A turn that could not get a model response returns
   `{:error, %Imp.Predict.ReActV2.StepError{}}` rather than a prediction: its
@@ -190,7 +220,10 @@ defmodule Imp.Predict.ReActV2 do
   `Imp.Tool`s that the program holds, each the program's own in name,
   description and schema, whose runners the call uses in place of the
   program's: the request is unchanged, and only what a call to those tools
-  does is the call's. Any other value is refused before a model is called.
+  does is the call's. `finish` (`:auto`, `:submit` or `:tools`) replaces the
+  program's ending for the call, as `new/3` would build it; it is an option
+  only when the task has no input named `finish`, which is then that input.
+  Any other value is refused before a model is called.
 
   Together they continue a conversation the caller holds. A call with a
   `:history`, `max_iters: 0` and a note makes one request, the last request:
@@ -286,6 +319,8 @@ defmodule Imp.Predict.ReActV2 do
     tool_policy: :allow,
     finish_on: %{},
     finish: :auto,
+    unsent_note: nil,
+    history_replay: :trajectory,
     last_request_tools: []
   ]
 
@@ -360,7 +395,7 @@ defmodule Imp.Predict.ReActV2 do
           "See \"How a turn ends\" above."
     ],
     finish: [
-      type: {:in, [:auto, :submit]},
+      type: {:in, [:auto, :submit, :tools]},
       default: :auto,
       doc:
         "How the model ends its turn. `:auto` lets the signature decide: one " <>
@@ -368,8 +403,31 @@ defmodule Imp.Predict.ReActV2 do
           "`submit`. `:submit` ends every turn through `submit`, as DSPy's ReActV2 does, " <>
           "so a step that writes text and calls no tool is a thought, not the answer; " <>
           "the next step continues with every tool, and a second such step in a row " <>
-          "forces `submit`. " <>
+          "forces `submit`. `:tools` ends a turn only through a `finish_on` tool: text " <>
+          "without a tool call is a thought as under `:submit`, there is no `submit`, and " <>
+          "a failed request gets one more step, once per turn; a second such step in a " <>
+          "row, the step limit or a second failure ends the turn `:incomplete`, with no " <>
+          "further request. " <>
           "See \"Which signatures get `submit`\" above."
+    ],
+    unsent_note: [
+      type: {:or, [:string, nil]},
+      default: nil,
+      doc:
+        "The line shown after each thought-only step, in place of Imp's: under " <>
+          "`finish: :submit` and `:tools`, and on a plain-text loop's replay of a history " <>
+          "written under `:submit`. A blank line is refused."
+    ],
+    history_replay: [
+      type: {:in, [:trajectory, :actions]},
+      default: :trajectory,
+      doc:
+        "How the steps of earlier turns in a `history` are shown to the model. " <>
+          "`:trajectory` shows them whole, as DSPy's ReActV2 does. `:actions` leaves out " <>
+          "the text and reasoning each earlier step wrote beside its calls, and drops a " <>
+          "step that only wrote text: earlier turns read as their inputs, the calls made " <>
+          "with their results, and the outputs. The current turn is always whole, and the " <>
+          "history the prediction returns keeps everything."
     ],
     last_request_tools: [
       type: {:list, {:or, [:atom, :string]}},
@@ -411,6 +469,9 @@ defmodule Imp.Predict.ReActV2 do
     end
 
     reject_reserved_tools!(signature, "Imp.Predict.ReActV2.new/3")
+    validate_tools_finish!(opts[:finish], opts[:finish_on], "Imp.Predict.ReActV2.new/3")
+    validate_tools_last_request!(opts, "Imp.Predict.ReActV2.new/3")
+    validate_unsent_note!(opts[:unsent_note], "Imp.Predict.ReActV2.new/3")
 
     tools = put_submit(tools, signature, opts[:finish])
 
@@ -440,7 +501,7 @@ defmodule Imp.Predict.ReActV2 do
     adapter_opts =
       Keyword.merge(
         Keyword.get(opts, :adapter_opts, []),
-        loop_adapter_opts(signature, tools, opts[:finish])
+        loop_adapter_opts(signature, tools, opts[:finish], opts[:unsent_note], opts[:finish_on])
       )
 
     %__MODULE__{
@@ -459,6 +520,8 @@ defmodule Imp.Predict.ReActV2 do
       last_request_note: opts[:last_request_note],
       finish_on: resolve_finish_on!(opts[:finish_on], tools),
       finish: opts[:finish],
+      unsent_note: opts[:unsent_note],
+      history_replay: opts[:history_replay],
       last_request_tools:
         resolve_last_request_tools!(
           opts[:last_request_tools],
@@ -480,7 +543,7 @@ defmodule Imp.Predict.ReActV2 do
   # can have several typed outputs, and those signatures still get it.
   # `finish: :submit` gives that signature `submit` as well, as DSPy does.
   def put_submit(tools, signature, finish \\ :auto) do
-    if plain_text?(signature, finish),
+    if plain_text?(signature, finish) or finish == :tools,
       do: tools,
       else:
         Map.put(
@@ -489,6 +552,92 @@ defmodule Imp.Predict.ReActV2 do
           Imp.Tool.new(:submit, "Submit the final outputs for the task.", & &1)
         )
   end
+
+  # `finish: :tools` ends a turn only through a `finish_on` tool, so a loop
+  # with none could never end but by interruption.
+  defp validate_tools_finish!(:tools, finish_on, context) when finish_on == %{},
+    do:
+      raise(
+        ArgumentError,
+        "#{context}: finish: :tools needs at least one finish_on tool to end a turn"
+      )
+
+  defp validate_tools_finish!(_finish, _finish_on, _context), do: :ok
+
+  @doc false
+  # Shared with `Imp.Saving`, so a loaded program is held to the same rules.
+  def validate_tools_program!(%__MODULE__{} = react, context) do
+    validate_tools_finish!(react.finish, react.finish_on, context)
+
+    validate_tools_last_request!(
+      [
+        finish: react.finish,
+        last_request_note: react.last_request_note,
+        last_request_tools: react.last_request_tools
+      ],
+      context
+    )
+
+    validate_unsent_note!(react.unsent_note, context)
+    react
+  end
+
+  defp validate_tools_last_request!(opts, context) do
+    if opts[:finish] == :tools and
+         (is_binary(opts[:last_request_note]) or (opts[:last_request_tools] || []) != []),
+       do: raise(ArgumentError, "#{context}: " <> tools_last_request_reason())
+
+    :ok
+  end
+
+  # An empty line would be sent as an empty user message.
+  defp validate_unsent_note!(note, context) when is_binary(note) do
+    if String.trim(note) == "",
+      do: raise(ArgumentError, "#{context}: unsent_note must say something, or be left out")
+
+    :ok
+  end
+
+  defp validate_unsent_note!(_note, _context), do: :ok
+
+  # A call's own `finish`, for one call: the loop as `new/3` would build it with
+  # that ending, from the same tools and options.
+  defp with_finish(%__MODULE__{finish: finish} = react, finish), do: {:ok, react}
+
+  defp with_finish(%__MODULE__{finish_on: finish_on}, :tools) when finish_on == %{},
+    do: {:error, {:invalid_react_v2_finish, "finish: :tools needs at least one finish_on tool"}}
+
+  defp with_finish(%__MODULE__{} = react, :tools)
+       when react.last_request_tools != [] or is_binary(react.last_request_note),
+       do: {:error, {:invalid_react_v2_finish, tools_last_request_reason()}}
+
+  defp with_finish(%__MODULE__{} = react, finish) do
+    tools = react.tools |> Map.delete(:submit) |> put_submit(react.signature, finish)
+    {:ok, restore_loop(%{react | finish: finish, tools: tools})}
+  end
+
+  # `finish` is a call option unless the task has an input of that name, which
+  # is then the input, as it was before the option existed.
+  defp pop_call_finish(inputs, react) do
+    if Enum.any?(react.signature.inputs, &Imp.FieldMap.same_name?(&1.name, :finish)),
+      do: {react.finish, inputs},
+      else: pop_call_option(inputs, :finish, react.finish)
+  end
+
+  defp tools_last_request_reason,
+    do:
+      "finish: :tools makes no last request (an interrupted turn ends :incomplete), so " <>
+        "last_request_note and last_request_tools would never be used"
+
+  defp validate_tools_call_note(:tools, note) when is_binary(note),
+    do: {:error, {:invalid_react_v2_last_request_note, tools_last_request_reason()}}
+
+  defp validate_tools_call_note(_finish, _note), do: :ok
+
+  defp validate_call_finish(finish) when finish in [:auto, :submit, :tools], do: :ok
+
+  defp validate_call_finish(finish),
+    do: {:error, {:invalid_react_v2_finish, finish}}
 
   @doc false
   def validate_finish_on(finish_on) when is_map(finish_on) do
@@ -568,9 +717,9 @@ defmodule Imp.Predict.ReActV2 do
 
   # What the loop itself tells the adapter: its guidance, and a request shape
   # that ends on the newest exchange with no response instruction.
-  defp loop_adapter_opts(signature, tools, finish),
+  defp loop_adapter_opts(signature, tools, finish, unsent_note, finish_on),
     do: [
-      guidance: guidance(signature, tools, finish),
+      guidance: guidance(signature, tools, finish, unsent_note, finish_on),
       response_instruction: false,
       omit_empty_request: true
     ]
@@ -607,7 +756,13 @@ defmodule Imp.Predict.ReActV2 do
         adapter_opts:
           Keyword.merge(
             react.adapter_opts,
-            loop_adapter_opts(agent.signature, agent.tools, agent.finish)
+            loop_adapter_opts(
+              agent.signature,
+              agent.tools,
+              agent.finish,
+              agent.unsent_note,
+              agent.finish_on
+            )
           ),
         signature: %{
           react.signature
@@ -635,7 +790,7 @@ defmodule Imp.Predict.ReActV2 do
           Keyword.put(
             agent.react.adapter_opts,
             :guidance,
-            guidance(agent.signature, tools, agent.finish)
+            guidance(agent.signature, tools, agent.finish, agent.unsent_note, agent.finish_on)
           )
     }
 
@@ -669,10 +824,15 @@ defmodule Imp.Predict.ReActV2 do
 
   defp do_call(%__MODULE__{} = react, inputs, execution) do
     with {:ok, inputs} <- normalize_inputs(inputs),
+         {finish, inputs} <- pop_call_finish(inputs, react),
+         :ok <- validate_call_finish(finish),
+         {:ok, react} <- with_finish(react, finish),
          {max_iters, inputs} <- pop_max_iters(inputs, react.max_iters),
          :ok <- validate_call_max_iters(max_iters),
+         note_given? = is_binary(inputs[:last_request_note] || inputs["last_request_note"]),
          {note, inputs} <- pop_call_option(inputs, :last_request_note, react.last_request_note),
          :ok <- validate_call_note(note),
+         :ok <- validate_tools_call_note(react.finish, note),
          {config, inputs} <- pop_call_option(inputs, :config, []),
          :ok <- validate_call_config(config),
          {tools, inputs} <- pop_call_option(inputs, :tools, []),
@@ -700,19 +860,25 @@ defmodule Imp.Predict.ReActV2 do
 
       run(
         react,
-        history_context(history, react.signature),
+        history_context(
+          history,
+          react.signature,
+          react.history_replay,
+          if(note_given?, do: :new_request, else: pending)
+        ),
         pending,
         pending,
         0,
         max_iters,
         execution,
-        0
+        %{thoughts: 0, retried: false}
       )
     end
   end
 
-  # `thoughts` counts the thought-only steps since the last step that called
-  # a tool (see `continue_after_thought?/3`).
+  # `steps.thoughts` counts the thought-only steps since the last step that
+  # called a tool (see `continue_after_thought?/3`); `steps.retried` whether a
+  # `finish: :tools` turn has spent its one retry of a failed request.
   defp run(react, history, inputs, pending, turn, max_iters, execution, _thoughts)
        when turn >= max_iters,
        do: interrupted(react, history, inputs, pending, :max_iters, turn, nil, execution)
@@ -742,7 +908,7 @@ defmodule Imp.Predict.ReActV2 do
               emit_reasoning(prediction, turn)
               {history, pending} = append_thought_only_step(history, pending, prediction, calls)
 
-              if continue_after_thought?(react, prediction, thoughts),
+              if continue_after_thought?(react, prediction, thoughts.thoughts),
                 do:
                   run(
                     react,
@@ -752,7 +918,7 @@ defmodule Imp.Predict.ReActV2 do
                     turn + 1,
                     max_iters,
                     execution,
-                    thoughts + 1
+                    %{thoughts | thoughts: thoughts.thoughts + 1}
                   ),
                 else: interrupted(react, history, inputs, pending, cause, turn, nil, execution)
           end
@@ -779,7 +945,10 @@ defmodule Imp.Predict.ReActV2 do
                   })
 
                 true ->
-                  run(react, history, inputs, %{}, turn + 1, max_iters, execution, 0)
+                  run(react, history, inputs, %{}, turn + 1, max_iters, execution, %{
+                    thoughts
+                    | thoughts: 0
+                  })
               end
           end
         end
@@ -805,6 +974,17 @@ defmodule Imp.Predict.ReActV2 do
 
           match?(%Imp.LMError{content_filtered: true}, reason) ->
             step_error(history, reason)
+
+          # Under `finish: :tools` there is no last request to absorb a
+          # transient failure, so the turn gets one more ordinary step, once.
+          # A retry on the last allowed step would end at the step limit and
+          # lose the error, so the turn ends on the error there instead.
+          react.finish == :tools and not thoughts.retried and turn + 1 < max_iters and
+              not deadline_passed?() ->
+            run(react, history, inputs, pending, turn + 1, max_iters, execution, %{
+              thoughts
+              | retried: true
+            })
 
           true ->
             interrupted(
@@ -841,7 +1021,8 @@ defmodule Imp.Predict.ReActV2 do
   # once.
   @thought_steps_continued 1
 
-  defp continue_after_thought?(%{finish: :submit}, prediction, thoughts) do
+  defp continue_after_thought?(%{finish: finish}, prediction, thoughts)
+       when finish in [:submit, :tools] do
     thoughts < @thought_steps_continued and
       String.trim(to_string(Imp.get(prediction, :next_thought) || "")) != "" and
       not deadline_passed?()
@@ -851,6 +1032,23 @@ defmodule Imp.Predict.ReActV2 do
 
   # The one place an interrupted turn goes: the last request for a signature
   # with one text output, the forced submit for every other.
+  # Under `finish: :tools` nothing ends the turn but a `finish_on` tool, and
+  # nothing is forced: the turn ends `:incomplete`, with no further request,
+  # and the host decides what that means.
+  defp interrupted(
+         %{finish: :tools},
+         history,
+         _inputs,
+         _pending,
+         cause,
+         _turn,
+         error,
+         _execution
+       ) do
+    cause = if deadline_passed?(), do: :deadline_exceeded, else: cause
+    incomplete_prediction(history, cause, error)
+  end
+
   defp interrupted(react, history, inputs, pending, cause, turn, error, execution) do
     if plain_text?(react.signature, react.finish),
       do: last_text(react, history, inputs, pending, cause, turn, error, execution),
@@ -1710,6 +1908,7 @@ defmodule Imp.Predict.ReActV2 do
   # text output, unless the program asked for `finish: :submit`.
   defp plain_text?(signature, :auto), do: single_text_output?(signature)
   defp plain_text?(_signature, :submit), do: false
+  defp plain_text?(_signature, :tools), do: false
 
   # Text is the answer only when any text is a valid answer: a constrained
   # string (an enum, a pattern, an answer shape) keeps `submit`, whose schema
@@ -1901,7 +2100,7 @@ defmodule Imp.Predict.ReActV2 do
   # Full history remains the durable result. Only whole prior episode groups are
   # eligible for prompt projection; tool observations appended in this call are
   # protected even if they alone exceed the model window.
-  defp history_context(history, signature) do
+  defp history_context(history, signature, replay, pending) do
     outputs = Imp.Signature.output_names(signature)
     size = length(history.messages)
 
@@ -1919,7 +2118,91 @@ defmodule Imp.Predict.ReActV2 do
     boundaries =
       if size > 0 and List.last(boundaries) != size, do: boundaries ++ [size], else: boundaries
 
-    %{full: history, boundaries: boundaries, omitted: 0, omitted_groups: 0, retries: 0}
+    %{
+      full: history,
+      boundaries: boundaries,
+      omitted: 0,
+      omitted_groups: 0,
+      retries: 0,
+      # `history_replay: :actions`: the steps given before this call are
+      # earlier turns, shown as their actions (`actions_view/2`).
+      actions_before: if(replay == :actions, do: current_turn_start(history, signature, pending)),
+      inputs: Imp.Signature.input_names(signature),
+      outputs: outputs
+    }
+  end
+
+  # An earlier turn's step as `history_replay: :actions` shows it. A step that
+  # carries the task's outputs was the answer and is shown whole. Any other
+  # step loses the text and reasoning the model wrote beside its calls; one
+  # that called nothing keeps only the inputs it carried, and goes when it
+  # carried none. Only the request changes: the history keeps every step.
+  # Divergence from DSPy's ReActV2, whose history replays every step whole
+  # (decisions.md).
+  @step_words [:next_thought, :reasoning_content, :reasoning_details]
+
+  # Where the current turn starts in a history passed to a call. A call with
+  # new inputs or its own `last_request_note` starts a turn, so every passed
+  # step is earlier. A call with neither (a resume mid-turn) continues the turn
+  # the last step carrying the
+  # task's inputs opened; that step and those after it are the current turn,
+  # shown whole, since a provider that keeps reasoning within a turn
+  # (DeepSeek's `reasoning_content`, Anthropic's thinking blocks, Gemini's
+  # thought signatures) needs it on the turn's own calls.
+  defp current_turn_start(history, signature, pending) do
+    # A call that brings new inputs, or its own note (a new user message, such
+    # as a request for a summary), starts a turn: every passed step is earlier.
+    if pending != %{} do
+      length(history.messages)
+    else
+      inputs = Imp.Signature.input_names(signature)
+
+      history.messages
+      |> Enum.with_index()
+      |> Enum.filter(fn {step, _} -> Enum.any?(inputs, &Imp.FieldMap.has_key?(step, &1)) end)
+      |> List.last()
+      |> case do
+        {_step, index} -> index
+        nil -> 0
+      end
+    end
+  end
+
+  defp actions_view(step, context) do
+    if Enum.any?(context.outputs, &(not is_nil(Imp.FieldMap.get(step, &1)))) do
+      [step]
+    else
+      step = Enum.reduce(@step_words, step, &Imp.FieldMap.delete(&2, &1))
+
+      cond do
+        history_calls(step) != [] -> [step]
+        Enum.any?(context.inputs, &Imp.FieldMap.has_key?(step, &1)) -> [step]
+        true -> []
+      end
+    end
+  end
+
+  defp history_calls(step) do
+    case Imp.FieldMap.get(step, :tool_calls) do
+      %ToolCalls{tool_calls: calls} -> calls
+      %{tool_calls: calls} when is_list(calls) -> calls
+      %{"tool_calls" => calls} when is_list(calls) -> calls
+      calls when is_list(calls) -> calls
+      _ -> []
+    end
+  end
+
+  defp projected_messages(context) do
+    messages = Enum.drop(context.full.messages, context.omitted)
+
+    case context do
+      %{actions_before: before} when is_integer(before) ->
+        {earlier, current} = Enum.split(messages, max(before - context.omitted, 0))
+        Enum.flat_map(earlier, &actions_view(&1, context)) ++ current
+
+      _context ->
+        messages
+    end
   end
 
   # A stored turn that carries the answer of a one-text-output task but no
@@ -1951,7 +2234,7 @@ defmodule Imp.Predict.ReActV2 do
     do: %{context | full: Imp.History.append(context.full, event)}
 
   defp context_call(context, call) do
-    projected = %{context.full | messages: Enum.drop(context.full.messages, context.omitted)}
+    projected = %{context.full | messages: projected_messages(context)}
 
     case call.(projected) do
       {:ok, prediction} ->
@@ -2140,16 +2423,24 @@ defmodule Imp.Predict.ReActV2 do
   # when the signature has no `submit` and the answer is text. `outputs`
   # are the task's output fields, so each step says what every output means;
   # otherwise their descriptions reach the model only inside `submit`'s schema.
-  defp guidance(signature, tools, finish) do
+  defp guidance(signature, tools, finish, unsent_note, finish_on) do
     %{
-      submit_tool: if(plain_text?(signature, finish), do: nil, else: :submit),
+      submit_tool: if(plain_text?(signature, finish) or finish == :tools, do: nil, else: :submit),
       input_names: Imp.Signature.input_names(signature),
       output_names: Imp.Signature.output_names(signature),
       outputs: signature.outputs,
       tool_names: tools |> Map.keys() |> Enum.sort(),
-      unsent_note: unsent_note(signature, finish)
+      unsent_note: unsent_note || unsent_note(signature, finish, finish_on)
     }
+    |> maybe_put(:finish_tools, finish_tools(finish, finish_on))
   end
+
+  # The tools that end a `finish: :tools` turn, in name order, for the
+  # guidance and the default unsent note.
+  defp finish_tools(:tools, finish_on),
+    do: finish_on |> Map.keys() |> Enum.map(&to_string/1) |> Enum.sort()
+
+  defp finish_tools(_finish, _finish_on), do: nil
 
   # Under `finish: :submit` a thought-only step is followed by an ordinary
   # step, and the adapter tells the model, after that step's message, what
@@ -2162,7 +2453,9 @@ defmodule Imp.Predict.ReActV2 do
   # user message, some models took it for an echo of their own output and
   # submitted nothing; with the first sentence alone, models probed their
   # status and took extra steps.
-  defp unsent_note(signature, :submit) do
+  defp unsent_note(signature, finish, finish_on)
+
+  defp unsent_note(signature, :submit, _finish_on) do
     fields = signature |> Imp.Signature.output_names() |> Enum.map(&"`#{&1}`")
 
     with_fields =
@@ -2180,8 +2473,23 @@ defmodule Imp.Predict.ReActV2 do
   # half of the note, so the thought does not read as a message that was
   # sent. A history written in a plain-text loop has no such step (its text
   # steps carry the answer), so its requests are unchanged.
-  defp unsent_note(signature, :auto) do
+  defp unsent_note(signature, :auto, _finish_on) do
     if single_text_output?(signature), do: "Your message above was not sent."
+  end
+
+  # Under `finish: :tools` only a `finish_on` tool ends the turn, so the line
+  # names them. A host that knows what those tools mean passes its own
+  # (`:unsent_note`).
+  defp unsent_note(_signature, :tools, finish_on) do
+    "Your message above was not sent. To end the turn, call " <>
+      or_list(finish_tools(:tools, finish_on)) <> "; to keep working, call a tool."
+  end
+
+  defp or_list([one]), do: "`#{one}`"
+
+  defp or_list(names) do
+    quoted = Enum.map(names, &"`#{&1}`")
+    Enum.join(Enum.drop(quoted, -1), ", ") <> " or " <> List.last(quoted)
   end
 
   defp provider_tool_config(tools, order, signature) do
