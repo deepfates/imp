@@ -25,10 +25,11 @@ defmodule Imp.Predict.ReActV2 do
   tool is a thought, not the answer. It is for a program whose model writes
   text it does not mean as the answer, such as a sentence about what it will
   do next, or a report of what it did. Under `finish: :submit` a thought-only
-  step is followed by an ordinary step (every tool, `tool_choice: "auto"`,
-  the thought shown as the request's last message when the tools are held
-  natively), so the model can do what
-  it announced or submit what it wrote; a second thought-only step in a row,
+  step is followed by an ordinary step (every tool, `tool_choice: "auto"`),
+  in which the thought stays the model's own message and a user message
+  after it says "Your message above was not sent. To reply, call `submit`
+  with `answer`; to keep working, call a tool." (naming the signature's
+  outputs), so the model can do what it announced or submit what it wrote; a second thought-only step in a row,
   or a step that says nothing, is the `:empty_tool_calls` interruption and
   the forced `submit` follows. Every other signature with `submit` keeps
   DSPy's ending: its first thought-only step is that interruption. The
@@ -818,10 +819,9 @@ defmodule Imp.Predict.ReActV2 do
 
   # Under `finish: :submit`, a step that wrote a thought and called nothing is
   # followed by an ordinary step, not at once by the forced `submit`: the
-  # same tools and `tool_choice: "auto"`, with the thought as the request's
-  # last message when the tools are held natively (`Imp.Adapter.Chat`'s
-  # `thought_as_request`; with written tool calls the request ends on the
-  # tool listing, after the thought). Forcing at once
+  # same tools and `tool_choice: "auto"`, with the thought as the model's own
+  # message and the unsent note after it (`guidance/3`; with written tool
+  # calls the request then ends on the tool listing). Forcing at once
   # took every other tool away from a model that had just said what it would
   # do next, and made a request that, if it failed, lost the reply the thought
   # held. Measured on real final steps across 11 models (decisions.md, row of
@@ -1195,10 +1195,18 @@ defmodule Imp.Predict.ReActV2 do
     end
   end
 
+  # The forced request's guidance says so: its last thought, if the history
+  # ends on one, is shown as the request's last user message (probe 4,
+  # decisions.md row of 2026-10-16), not followed by the unsent note.
   defp forced_submit_program(react, tool_choice) do
     %{
       react.react
-      | config:
+      | adapter_opts:
+          Keyword.update(react.react.adapter_opts, :guidance, nil, fn
+            %{} = guidance -> Map.put(guidance, :forced_submit, true)
+            other -> other
+          end),
+        config:
           Keyword.merge(react.react.config,
             tools:
               react.tools
@@ -2127,9 +2135,36 @@ defmodule Imp.Predict.ReActV2 do
       input_names: Imp.Signature.input_names(signature),
       output_names: Imp.Signature.output_names(signature),
       outputs: signature.outputs,
-      tool_names: tools |> Map.keys() |> Enum.sort()
+      tool_names: tools |> Map.keys() |> Enum.sort(),
+      unsent_note: unsent_note(signature, finish)
     }
   end
+
+  # Under `finish: :submit` a thought-only step is followed by an ordinary
+  # step, and the adapter tells the model, after that step's message, what
+  # became of it and what its two ways on are. This is a fact about the step
+  # (nothing a step writes is sent; only `submit` is), so it is rendered
+  # after every thought-only step, the same in every request and on replay.
+  # Measured on real final steps across 11 model families (decisions.md, row
+  # of 2026-10-16 on the unsent note): with this line after the thought, no sample wrote text
+  # again and replies were submitted intact; with the thought shown back as a
+  # user message, some models took it for an echo of their own output and
+  # submitted nothing; with the first sentence alone, models probed their
+  # status and took extra steps.
+  defp unsent_note(signature, :submit) do
+    fields = signature |> Imp.Signature.output_names() |> Enum.map(&"`#{&1}`")
+
+    with_fields =
+      case fields do
+        [one] -> one
+        several -> Enum.join(Enum.drop(several, -1), ", ") <> " and " <> List.last(several)
+      end
+
+    "Your message above was not sent. To reply, call `submit` with #{with_fields}; " <>
+      "to keep working, call a tool."
+  end
+
+  defp unsent_note(_signature, _finish), do: nil
 
   defp provider_tool_config(tools, order, signature) do
     [

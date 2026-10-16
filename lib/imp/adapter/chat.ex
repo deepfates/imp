@@ -106,7 +106,8 @@ defmodule Imp.Adapter.Chat do
     history_note_renderer: [type: {:fun, 2}],
     # Loop guidance a program passes as data rather than writing into
     # `signature.instructions`: `%{submit_tool:, input_names:, output_names:,
-    # tool_names:}`.
+    # tool_names:}`, and from ReActV2 `unsent_note:` (a user message after
+    # each thought-only step) and, on its forced `submit`, `forced_submit:`.
     guidance: [type: {:or, [:map, nil]}],
     # The guidance line that tells the model it is an agent. Absent, it is
     # DSPy ReActV2's "You are an Agent. Use the supplied tools to produce
@@ -163,7 +164,9 @@ defmodule Imp.Adapter.Chat do
       tool_result: tool_result_renderer,
       history_note: Keyword.get(opts, :history_note_renderer) || (&no_history_note/2),
       submit_is_text?: submit_is_text?(Keyword.get(opts, :guidance)),
-      loop?: not is_nil(Keyword.get(opts, :guidance))
+      loop?: not is_nil(Keyword.get(opts, :guidance)),
+      unsent_note: guidance_value(Keyword.get(opts, :guidance), :unsent_note),
+      forced_submit?: guidance_value(Keyword.get(opts, :guidance), :forced_submit) == true
     }
 
     {history_messages, history_fields} = extract_history(signature, inputs, renderers)
@@ -1363,8 +1366,11 @@ defmodule Imp.Adapter.Chat do
   end
 
   defp render_history_turns(signature, turns, renderers) do
+    last_shown = last_shown_index(turns)
+
     turns
-    |> Enum.flat_map(fn turn ->
+    |> Enum.with_index()
+    |> Enum.flat_map(fn {turn, index} ->
       turn = Imp.Example.new(turn) |> Imp.Example.to_map()
 
       messages =
@@ -1390,9 +1396,37 @@ defmodule Imp.Adapter.Chat do
             |> Enum.reject(&(is_nil(&1) or blank_message?(&1)))
         end
 
-      messages ++ history_note_messages(signature, turn, renderers.history_note)
+      messages ++
+        unsent_note_messages(turn, index == last_shown, renderers) ++
+        history_note_messages(signature, turn, renderers.history_note)
     end)
   end
+
+  # A loop that continues after a thought-only step (ReActV2 under
+  # `finish: :submit`) says, after each such step, that its message was not
+  # sent and how to go on, as a user message: in every request and on replay,
+  # natively and with written tool calls alike. The one exception is the
+  # forced `submit`'s own last thought, which `thought_as_request/4` shows on
+  # the user side instead.
+  defp unsent_note_messages(turn, last?, renderers) do
+    note = renderers.unsent_note
+
+    if is_binary(note) and thought_only_step?(turn) and not (last? and renderers.forced_submit?),
+      do: [%{role: :user, content: note}],
+      else: []
+  end
+
+  # The index of the last turn that is not a silent step (see
+  # `last_history_turn/2`).
+  defp last_shown_index(turns) do
+    turns
+    |> Enum.with_index()
+    |> Enum.reverse()
+    |> Enum.find_value(fn {turn, index} -> if not silent_step?(turn), do: index end)
+  end
+
+  defp guidance_value(%{} = guidance, key), do: Map.get(guidance, key)
+  defp guidance_value(_guidance, _key), do: nil
 
   # The note is what the model reads next after the turn it is about, so it is
   # a user message directly behind that turn's own messages. A renderer that
