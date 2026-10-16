@@ -513,10 +513,12 @@ thought, as under `finish: :submit`: the next request is an ordinary step
 in which the thought stays the model's own message, followed by one line,
 by default "Your message above was not sent. To end the turn, call
 `decline` or `send`; to keep working, call a tool." Pass `unsent_note:` to
-say what ending the turn means in your program. Nothing is ever forced: a
+say what ending the turn means in your program. Nothing is ever forced. A
+step whose request fails gets one more ordinary step, once per turn. A
 second thought in a row, a step that says nothing, the step limit or a
-failed step ends the turn `:incomplete`, with its `termination_cause` and
-no further request, and the host decides what that means. A program built
+second failure ends the turn `:incomplete`, with its `termination_cause`
+(`:deadline_exceeded` when the deadline has passed) and no further request,
+and the host decides what that means. A program built
 with `finish: :tools` needs at least one `finish_on` tool.
 
 A call may give its own `finish:`, as it gives its own `max_iters`. A
@@ -533,7 +535,10 @@ wrote text is left out; earlier turns read as their inputs, the calls with
 their results, and the outputs. The current turn is always shown whole, and
 the history the prediction returns keeps every step. Use it when the
 model's own narration should not become something it reads back on every
-later turn.
+later turn. A step that carries the task's outputs (an answer) is shown
+whole. On a call without new inputs (a resume mid-turn), the current turn
+starts at the last step that carries inputs. Some thinking APIs reject an
+earlier tool-call message without its reasoning content; check yours.
 
 ### Why a turn ended
 

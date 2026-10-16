@@ -180,4 +180,107 @@ defmodule ReActV2FinishToolsTest do
 
     refute Map.has_key?(plain, "unsent_note") or Map.has_key?(plain, "history_replay")
   end
+
+  test "a task input named finish is the input, not the call option" do
+    program =
+      Imp.react("start, finish -> reply", [look()],
+        lm: scripted(self(), [%{reply: "Eight hours.", tool_calls: []}])
+      )
+
+    assert {:ok, prediction} = Imp.call(program, %{start: "9am", finish: "5pm"})
+    assert Imp.get(prediction, :reply) == "Eight hours."
+    [{messages, _opts}] = requests()
+    assert List.last(messages).content =~ "5pm"
+  end
+
+  test "a passed deadline ends a :tools turn :deadline_exceeded, with no further request" do
+    slow =
+      Imp.LM.Static.new(
+        handler: fn messages, opts ->
+          send(self(), {:request, messages, opts})
+          Process.sleep(30)
+          @thought
+        end
+      )
+
+    program =
+      Imp.react("ticket -> reply", [look(), send_tool(), decline()],
+        lm: slow,
+        finish: :tools,
+        finish_on: finish_on()
+      )
+
+    assert {:ok, prediction} =
+             Imp.Deadline.with_deadline(10, fn -> Imp.call(program, %{ticket: "?"}) end)
+
+    assert prediction.metadata.termination_reason == :incomplete
+    assert prediction.metadata.termination_cause == :deadline_exceeded
+  end
+
+  test "a failed request gets one more ordinary step, once per turn" do
+    {:ok, count} = Agent.start_link(fn -> 0 end)
+
+    flaky = fn replies ->
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          n = Agent.get_and_update(count, &{&1, &1 + 1})
+
+          case Enum.at(replies, n) do
+            :fail -> raise "provider down"
+            reply -> reply
+          end
+        end
+      )
+    end
+
+    program = fn replies ->
+      Agent.update(count, fn _ -> 0 end)
+
+      Imp.react("ticket -> reply", [look(), send_tool(), decline()],
+        lm: flaky.(replies),
+        finish: :tools,
+        finish_on: finish_on()
+      )
+    end
+
+    assert {:ok, prediction} = Imp.call(program.([:fail, @send]), %{ticket: "?"})
+    assert prediction.metadata.termination_reason == :finished_by_tool
+
+    assert {:ok, prediction} = Imp.call(program.([:fail, :fail, @send]), %{ticket: "?"})
+    assert prediction.metadata.termination_reason == :incomplete
+    assert Agent.get(count, & &1) == 2
+  end
+
+  test "settings :tools would never use, a blank note and a call's :tools without finish_on are refused" do
+    assert_raise ArgumentError, ~r/finish: :tools makes no last request/, fn ->
+      program([], last_request_note: "Last one.")
+    end
+
+    assert_raise ArgumentError, ~r/unsent_note must say something/, fn ->
+      program([], unsent_note: "  ")
+    end
+
+    assert {:error, {:invalid_react_v2_last_request_note, _}} =
+             Imp.call(program([]), %{ticket: "?", last_request_note: "Last one."})
+
+    plain = Imp.react("ticket -> reply", [look()], lm: scripted(self(), []))
+
+    assert {:error, {:invalid_react_v2_finish, _}} =
+             Imp.call(plain, %{ticket: "?", finish: :tools})
+
+    runner = fn _arguments -> "x" end
+    finish = fn _arguments, _result, _inputs -> {:finish, %{reply: ""}} end
+    registry = Imp.Saving.Registry.new(look_runner: runner, finish_cb: finish)
+
+    dumped =
+      Imp.react("ticket -> reply", [Imp.tool(:look, "Look", runner)],
+        finish: :tools,
+        finish_on: %{look: finish}
+      )
+      |> Imp.dump(registry: registry)
+
+    assert_raise ArgumentError, ~r/finish: :tools needs at least one finish_on tool/, fn ->
+      dumped |> Map.put("finish_on", %{}) |> Imp.load!(registry: registry)
+    end
+  end
 end

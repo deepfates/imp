@@ -650,11 +650,12 @@ defmodule Imp.Saving do
       last_request_note: load_react_v2_last_request_note!(state["last_request_note"]),
       finish_on: load_finish_on!(state["finish_on"]),
       finish: finish,
-      unsent_note: load_react_v2_last_request_note!(state["unsent_note"]),
+      unsent_note: load_react_v2_unsent_note!(state["unsent_note"]),
       history_replay: load_react_v2_history_replay!(state["history_replay"]),
       last_request_tools: load_last_request_tools!(state["last_request_tools"], tools, finish),
       tool_policy: load_tool_policy!(state["tool_policy"], "ReActV2 tool policy")
     }
+    |> Imp.Predict.ReActV2.validate_tools_program!("loading a ReActV2 program")
     |> Imp.Predict.ReActV2.restore_loop()
   end
 
@@ -1326,6 +1327,12 @@ defmodule Imp.Saving do
     do: Map.put(state, key, Atom.to_string(value))
 
   defp maybe_put_saved(state, key, value, _default), do: Map.put(state, key, value)
+
+  defp load_react_v2_unsent_note!(nil), do: nil
+  defp load_react_v2_unsent_note!(note) when is_binary(note), do: note
+
+  defp load_react_v2_unsent_note!(other),
+    do: raise(ArgumentError, "invalid saved ReActV2 unsent_note: #{inspect(other)}")
 
   defp load_react_v2_history_replay!(nil), do: :trajectory
   defp load_react_v2_history_replay!("trajectory"), do: :trajectory

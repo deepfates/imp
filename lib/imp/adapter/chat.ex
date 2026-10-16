@@ -843,7 +843,10 @@ defmodule Imp.Adapter.Chat do
   end
 
   defp default_agent_line(guidance, plain?, names) do
-    if plain? and Map.get(guidance, :submit_tool, :submit) == nil do
+    # Under `finish: :tools` the ending tools give the outputs, so the tools do
+    # not "produce" them from the inputs, with native or written calls alike.
+    if is_list(Map.get(guidance, :finish_tools)) or
+         (plain? and Map.get(guidance, :submit_tool, :submit) == nil) do
       "You are an Agent. Use the supplied tools to gather information and take actions."
     else
       "You are an Agent. Use the supplied tools to produce #{names.(:output_names)} " <>
