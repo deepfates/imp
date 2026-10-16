@@ -43,7 +43,9 @@ defmodule Imp.Predict.ReActV2 do
   made. A step whose request fails gets one more ordinary step, once per turn
   (there is no last request to absorb a transient failure). A second
   thought-only step in a row, a step that says nothing, the step limit or a
-  second failure ends the turn `:incomplete` with that cause, or
+  second failure (or a failure on the last allowed step) ends the turn
+  `:incomplete` with that cause and the request's error in
+  `termination_error`, or
   `:deadline_exceeded` when the deadline has passed. A program with
   `finish: :tools` needs a `finish_on` tool, and refuses `last_request_note`
   and `last_request_tools`, which it would never use. Its context recovery
@@ -60,7 +62,7 @@ defmodule Imp.Predict.ReActV2 do
   Gemini do not validate reasoning on earlier turns. Some thinking APIs reject
   an earlier tool-call message without its reasoning content (Kimi-style
   thinking modes); Kimi K3 through OpenRouter accepted one in a probe
-  (2026-10-17), but check the provider before relying on it.
+  (2026-10-16), but check the provider before relying on it.
 
   ## The prediction
 
@@ -403,8 +405,9 @@ defmodule Imp.Predict.ReActV2 do
           "the next step continues with every tool, and a second such step in a row " <>
           "forces `submit`. `:tools` ends a turn only through a `finish_on` tool: text " <>
           "without a tool call is a thought as under `:submit`, there is no `submit`, and " <>
-          "a second such step in a row, the step limit or a failed step ends the turn " <>
-          "`:incomplete`, with no further request. " <>
+          "a failed request gets one more step, once per turn; a second such step in a " <>
+          "row, the step limit or a second failure ends the turn `:incomplete`, with no " <>
+          "further request. " <>
           "See \"Which signatures get `submit`\" above."
     ],
     unsent_note: [
@@ -974,7 +977,10 @@ defmodule Imp.Predict.ReActV2 do
 
           # Under `finish: :tools` there is no last request to absorb a
           # transient failure, so the turn gets one more ordinary step, once.
-          react.finish == :tools and not thoughts.retried and not deadline_passed?() ->
+          # A retry on the last allowed step would end at the step limit and
+          # lose the error, so the turn ends on the error there instead.
+          react.finish == :tools and not thoughts.retried and turn + 1 < max_iters and
+              not deadline_passed?() ->
             run(react, history, inputs, pending, turn + 1, max_iters, execution, %{
               thoughts
               | retried: true

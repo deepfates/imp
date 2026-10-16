@@ -8,9 +8,11 @@ User-visible changes to Imp are recorded here.
 
 - ReActV2 `finish: :tools`: only a `finish_on` tool ends a turn. Text without
   a tool call is a thought, followed by one ordinary step and a line naming
-  the ending tools; a second thought in a row, an empty step, the step limit
-  or a failed step ends the turn `:incomplete`, with no further request and
-  nothing forced. `unsent_note:` replaces that line. A call may give its own
+  the ending tools. A failed request gets one more ordinary step, once per
+  turn (not on the last allowed step). A second thought in a row, an empty
+  step, the step limit or a second failure ends the turn `:incomplete`, with
+  no further request and nothing forced; a passed deadline ends it
+  `:deadline_exceeded`. `unsent_note:` replaces that line. A call may give its own
   `finish:`.
 - ReActV2 `history_replay: :actions`: earlier turns are shown as their
   inputs, calls with results, and outputs, without the text and reasoning

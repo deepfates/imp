@@ -283,4 +283,32 @@ defmodule ReActV2FinishToolsTest do
       dumped |> Map.put("finish_on", %{}) |> Imp.load!(registry: registry)
     end
   end
+
+  test "a failure on the last allowed step ends the turn on the error, not the step limit" do
+    {:ok, count} = Agent.start_link(fn -> 0 end)
+
+    lm =
+      Imp.LM.Static.new(
+        handler: fn _messages, _opts ->
+          case Agent.get_and_update(count, &{&1, &1 + 1}) do
+            0 -> @look
+            _ -> raise "provider down"
+          end
+        end
+      )
+
+    program =
+      Imp.react("ticket -> reply", [look(), send_tool(), decline()],
+        lm: lm,
+        finish: :tools,
+        finish_on: finish_on(),
+        max_iters: 2
+      )
+
+    assert {:ok, prediction} = Imp.call(program, %{ticket: "?"})
+    assert prediction.metadata.termination_reason == :incomplete
+    assert prediction.metadata.termination_cause == :prediction_error
+    assert prediction.metadata.termination_error
+    assert Agent.get(count, & &1) == 2
+  end
 end
