@@ -111,4 +111,92 @@ defmodule ReActV2ThoughtContinuesTest do
     assert last.reply == "A cat."
     assert last.tool_calls.tool_calls == []
   end
+
+  test "a thought of only whitespace is not continued: the same request would be sent again" do
+    assert {:ok, prediction} = call([%{next_thought: "  \n ", tool_calls: []}, @submit])
+    assert prediction.metadata.termination_reason == :forced_submit
+    assert tool_choices() == ["auto", %{type: "tool", name: "submit"}]
+  end
+
+  test "resuming after an extracted turn does not end on the model's turn" do
+    replies = [
+      @thought,
+      @thought,
+      %{next_thought: "A cat, I think.", tool_calls: []},
+      %{reasoning: "The model said so.", reply: "A cat."},
+      @submit
+    ]
+
+    lm = scripted(self(), replies)
+    program = Imp.react("ticket -> reply", [look()], lm: lm, finish: :submit)
+    assert {:ok, extracted} = Imp.call(program, %{ticket: "What is in the box?"})
+    assert extracted.metadata.termination_reason == :extracted
+    _first_turn = tool_choices()
+
+    assert {:ok, _resumed} =
+             Imp.call(program, %{history: extracted.metadata.history, max_iters: 0})
+
+    assert_received {:request, messages, _opts}
+    assert List.last(messages).role != :assistant
+  end
+
+  # The process's deadline passes during the request named first; no request
+  # after it is sent, and the turn ends without an answer.
+  @slow 20
+  @refusal {:error,
+            %Imp.LMError{
+              status: 400,
+              message:
+                "Invalid value for 'tool_choice': supported string values are none, auto, required"
+            }}
+
+  for {name, signature, finish, replies} <- [
+        {"the continued step", "ticket -> reply", :submit, [:slow_thought]},
+        {"the required retry", "ticket -> reply, confidence: float", :auto,
+         [:thought, :slow_refusal]},
+        {"the extractor", "ticket -> reply, confidence: float", :auto, [:thought, :slow_thought]}
+      ] do
+    @signature signature
+    @finish finish
+    @replies replies
+
+    test "a deadline that passes before #{name} sends no request" do
+      owner = self()
+      {:ok, agent} = Agent.start_link(fn -> @replies end)
+
+      lm =
+        Imp.LM.Static.new(
+          handler: fn _messages, opts ->
+            send(owner, {:request, [], opts})
+
+            case Agent.get_and_update(agent, fn
+                   [next | rest] -> {next, rest}
+                   [] -> {:unexpected, []}
+                 end) do
+              :thought ->
+                @thought
+
+              :slow_thought ->
+                Process.sleep(@slow)
+                @thought
+
+              :slow_refusal ->
+                Process.sleep(@slow)
+                @refusal
+            end
+          end
+        )
+
+      program = Imp.react(@signature, [look()], lm: lm, finish: @finish)
+
+      assert {:ok, prediction} =
+               Imp.Deadline.with_deadline(10, fn ->
+                 Imp.call(program, %{ticket: "What is in the box?"})
+               end)
+
+      assert prediction.metadata.termination_reason == :incomplete
+      assert prediction.metadata.termination_cause == :deadline_exceeded
+      assert length(tool_choices()) == length(@replies)
+    end
+  end
 end

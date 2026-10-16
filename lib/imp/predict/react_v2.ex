@@ -26,7 +26,8 @@ defmodule Imp.Predict.ReActV2 do
   text it does not mean as the answer, such as a sentence about what it will
   do next, or a report of what it did. Under `finish: :submit` a thought-only
   step is followed by an ordinary step (every tool, `tool_choice: "auto"`,
-  the thought shown as the request's last message), so the model can do what
+  the thought shown as the request's last message when the tools are held
+  natively), so the model can do what
   it announced or submit what it wrote; a second thought-only step in a row,
   or a step that says nothing, is the `:empty_tool_calls` interruption and
   the forced `submit` follows. Every other signature with `submit` keeps
@@ -818,23 +819,28 @@ defmodule Imp.Predict.ReActV2 do
   # Under `finish: :submit`, a step that wrote a thought and called nothing is
   # followed by an ordinary step, not at once by the forced `submit`: the
   # same tools and `tool_choice: "auto"`, with the thought as the request's
-  # last message (`Imp.Adapter.Chat`'s `thought_as_request`). Forcing at once
+  # last message when the tools are held natively (`Imp.Adapter.Chat`'s
+  # `thought_as_request`; with written tool calls the request ends on the
+  # tool listing, after the thought). Forcing at once
   # took every other tool away from a model that had just said what it would
   # do next, and made a request that, if it failed, lost the reply the thought
   # held. Measured on real final steps across 11 models (decisions.md, row of
   # 2026-10-16), most models then called `submit` with the thought's reply, or
   # went on with the work they had announced; about one in eight wrote text
   # again. So one such step continues, and a second in a row is the
-  # `:empty_tool_calls` interruption, as is a step that said nothing (there
-  # is no thought to show, and the same request would be sent again).
-  # `max_iters` and the deadline still end the turn as before. A signature that
+  # `:empty_tool_calls` interruption, as is a step that said nothing or only
+  # whitespace (there is no thought to show, and the same request would be
+  # sent again). `max_iters` still ends the turn with the forced `submit`; a
+  # deadline that has passed sends no further request, continued or forced,
+  # and the turn ends `:incomplete` (`:deadline_exceeded`). A signature that
   # has `submit` under `finish: :auto` keeps DSPy's ending, which forces at
   # once.
   @thought_steps_continued 1
 
   defp continue_after_thought?(%{finish: :submit}, prediction, thoughts) do
     thoughts < @thought_steps_continued and
-      Imp.get(prediction, :next_thought) not in [nil, ""]
+      String.trim(to_string(Imp.get(prediction, :next_thought) || "")) != "" and
+      not deadline_passed?()
   end
 
   defp continue_after_thought?(_react, _prediction, _thoughts), do: false
@@ -1102,7 +1108,17 @@ defmodule Imp.Predict.ReActV2 do
           submit_only = %{react | tools: %{submit: submit}}
           fallback = forced_submit_program(submit_only, "required")
 
-          case predict(fallback, submit_only, history, pending) do
+          # No request is sent once the deadline has passed; the refusal is
+          # then the last request's failure, which names the deadline.
+          retry =
+            if deadline_passed?(),
+              do: :deadline_passed,
+              else: predict(fallback, submit_only, history, pending)
+
+          case retry do
+            :deadline_passed ->
+              error
+
             {:ok, prediction, history} ->
               {:ok, prediction, history}
 
@@ -1195,6 +1211,12 @@ defmodule Imp.Predict.ReActV2 do
   end
 
   defp extract_final(react, inputs, pending, history, reason, initial_error) do
+    if deadline_passed?(),
+      do: incomplete_prediction(history, :deadline_exceeded, initial_error),
+      else: run_extractor(react, inputs, pending, history, reason, initial_error)
+  end
+
+  defp run_extractor(react, inputs, pending, history, reason, initial_error) do
     extractor = extraction_program(react)
 
     case context_call(history, fn projected ->

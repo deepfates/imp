@@ -60,11 +60,13 @@ thought, and only `submit`'s argument is the answer.
 
 After such a step the loop goes on with an ordinary step: every tool,
 `tool_choice: "auto"`, and the thought shown as the request's last message
-(as in section 3). The model can then do what it said it would, or submit
-what it wrote; a thought that was only a closing note can be submitted as an
-empty answer. A second thought-only step in a row, or a step that says
-nothing, interrupts the turn (`:empty_tool_calls`) and the forced `submit`
-follows. Measured on real final steps from 11 models, most submitted the
+when the tools are held natively (as in section 3; with written tool calls
+the request ends on the tool listing, after the thought). The model can
+then do what it said it would, or submit what it wrote; a thought that was
+only a closing note can be submitted as an empty answer. A second
+thought-only step in a row, or a step that says nothing, interrupts the turn
+(`:empty_tool_calls`) and the forced `submit` follows. Once the process's
+`Imp.Deadline` has passed, no further request is sent. Measured on real final steps from 11 models, most submitted the
 thought's reply on that ordinary step, unforced, Meta's models included,
 whose provider cannot force a tool; some went on with the work they had
 announced; about one in eight wrote text again. Forcing at once, as DSPy
@@ -298,12 +300,15 @@ answer has to follow a tool call, give the signature a second output, so the
 turn ends only through `submit`, or end it from the tool with `finish_on:`.
 
 Or keep the one output and pass `finish: :submit`. Text without a tool call
-is then a thought; the next step sees it and ends the turn through `submit`:
+is then a thought, not the answer. Here the model announces a lookup and
+forgets to make it; the next step sees what it wrote, makes the lookup, and
+ends the turn through `submit`:
 
 ```elixir
 lm =
   script.([
     %{next_thought: "Let me check who is on call for atlas.", tool_calls: []},
+    %{tool_calls: [%{name: "on_call", arguments: %{"team" => "atlas"}}]},
     %{tool_calls: [%{name: "submit", arguments: %{"reply" => "Maya from atlas is on it."}}]}
   ])
 
