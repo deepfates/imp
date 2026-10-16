@@ -8039,6 +8039,7 @@
       "struct_fields": [
         "finish",
         "finish_on",
+        "history_replay",
         "last_request_note",
         "last_request_tools",
         "max_iters",
@@ -8046,7 +8047,8 @@
         "signature",
         "tool_order",
         "tool_policy",
-        "tools"
+        "tools",
+        "unsent_note"
       ],
       "types": [
         {

@@ -777,10 +777,17 @@ defmodule Imp.Adapter.Chat do
   defp with_guidance(instructions, %{} = guidance, signature, plain?, agent_line) do
     names = fn key -> guidance |> Map.get(key, []) |> Enum.map_join(", ", &"`#{&1}`") end
     plain_finish? = plain? and Map.get(guidance, :submit_tool, :submit) == nil
+    finish_tools = Map.get(guidance, :finish_tools)
 
     finish =
-      case Map.get(guidance, :submit_tool, :submit) do
-        nil when plain? ->
+      case {Map.get(guidance, :finish_tools), Map.get(guidance, :submit_tool, :submit)} do
+        # `finish: :tools`: only these tools end the turn, and what the model
+        # writes without one is not sent (`Imp.Predict.ReActV2`).
+        {[_ | _] = tools, _submit} ->
+          "The turn ends only when you call " <>
+            or_names(tools) <> ". Text you write is not sent."
+
+        {_tools, nil} when plain? ->
           [
             "When the final answer is ready, write it as plain text without calling a tool.",
             field_description(output_field(signature, meta_field(signature, :text_field)))
@@ -788,10 +795,10 @@ defmodule Imp.Adapter.Chat do
           |> Enum.reject(&(&1 == ""))
           |> Enum.join(" ")
 
-        nil ->
+        {_tools, nil} ->
           text_answer(signature)
 
-        tool ->
+        {_tools, tool} ->
           "When the final answer is ready, call `#{tool}` with #{names.(:output_names)}."
       end
 
@@ -804,6 +811,9 @@ defmodule Imp.Adapter.Chat do
     outputs =
       case Map.get(guidance, :outputs, []) do
         _fields when plain_finish? -> nil
+        # Under `finish: :tools` the tools that end the turn give its outputs;
+        # the model writes none.
+        _fields when is_list(finish_tools) -> nil
         [] -> nil
         fields -> "The outputs to produce are:\n" <> render_field_list(fields)
       end
@@ -825,6 +835,13 @@ defmodule Imp.Adapter.Chat do
   # without a tool call, so the opening line does not say the tools
   # produce it: they gather information and act. Nor does it name the
   # answer as an output to produce (see `with_guidance/5`).
+  defp or_names([one]), do: "`#{one}`"
+
+  defp or_names(names) do
+    quoted = Enum.map(names, &"`#{&1}`")
+    Enum.join(Enum.drop(quoted, -1), ", ") <> " or " <> List.last(quoted)
+  end
+
   defp default_agent_line(guidance, plain?, names) do
     if plain? and Map.get(guidance, :submit_tool, :submit) == nil do
       "You are an Agent. Use the supplied tools to gather information and take actions."
