@@ -1305,7 +1305,8 @@ defmodule Imp.Adapter.Chat do
          %{role: :assistant, content: thought} = last when is_binary(thought) <-
            List.last(candidate),
          false <- Map.has_key?(last, :tool_calls),
-         true <- thought_only_step?(last_history_turn(signature, inputs)) do
+         true <-
+           thought_only_step?(last_history_turn(signature, inputs), renderers.output_names) do
       field = Imp.Signature.Field.new(meta_field(signature, :text_field) || :next_thought, :input)
 
       List.replace_at(candidate, -1, %{
@@ -1360,15 +1361,25 @@ defmodule Imp.Adapter.Chat do
       String.trim(blank_to_empty(fetch_field(turn, :next_thought))) == ""
   end
 
-  defp thought_only_step?(nil), do: false
+  # A step that wrote text, called nothing and carries none of the task's
+  # outputs. A step that carries them was the answer: a plain-text loop
+  # (ReActV2 under `finish: :auto`) records its answer step that way, text
+  # and outputs both, and a history keeps it when the program's ending later
+  # changes. An answer is never a thought, so it is never followed by the
+  # unsent note nor moved to the user side.
+  defp thought_only_step?(nil, _output_names), do: false
 
-  defp thought_only_step?(turn) do
+  defp thought_only_step?(turn, output_names) do
     turn = Imp.Example.new(turn) |> Imp.Example.to_map()
 
     native_tool_history_turn?(turn) and
       normalize_history_tool_calls(fetch_field(turn, :tool_calls)) == [] and
-      String.trim(blank_to_empty(fetch_field(turn, :next_thought))) != ""
+      String.trim(blank_to_empty(fetch_field(turn, :next_thought))) != "" and
+      not carries_outputs?(turn, output_names)
   end
+
+  defp carries_outputs?(turn, output_names),
+    do: Enum.any?(output_names, &(not is_nil(fetch_field(turn, &1))))
 
   defp extract_history(signature, inputs, renderers) do
     signature.inputs
@@ -1386,6 +1397,44 @@ defmodule Imp.Adapter.Chat do
   end
 
   defp render_history_turns(signature, turns, renderers) do
+    turns
+    |> render_history_turn_messages(signature, renderers)
+    |> join_plain_text_replies(renderers)
+  end
+
+  # In a plain-text loop a history written under `submit` (ReActV2 with
+  # `finish: :submit`, or before a program's ending changed) can hold a
+  # thought-only step followed by the `submit` step that answered it, which
+  # renders as the answer's text: two assistant messages in a row. Some APIs
+  # want roles to alternate, so they are one message, the thought then the
+  # answer, as a step that wrote both renders. Messages that carry calls or
+  # provider reasoning are left as they are.
+  defp join_plain_text_replies(messages, %{submit_is_text?: true}) do
+    messages
+    |> Enum.reduce([], fn
+      message, [previous | rest] = acc ->
+        if plain_assistant_text?(message) and plain_assistant_text?(previous),
+          do: [%{previous | content: join_text(previous.content, message.content)} | rest],
+          else: [message | acc]
+
+      message, [] ->
+        [message]
+    end)
+    |> Enum.reverse()
+  end
+
+  defp join_plain_text_replies(messages, _renderers), do: messages
+
+  defp plain_assistant_text?(%{role: :assistant, content: content} = message)
+       when is_binary(content) do
+    Map.get(message, :tool_calls) in [nil, []] and
+      not Map.has_key?(message, :reasoning_content) and
+      not Map.has_key?(message, :reasoning_details)
+  end
+
+  defp plain_assistant_text?(_message), do: false
+
+  defp render_history_turn_messages(turns, signature, renderers) do
     turns
     |> Enum.zip(Enum.drop(turns, 1) ++ [nil])
     |> Enum.flat_map(fn {turn, next} ->
@@ -1431,9 +1480,10 @@ defmodule Imp.Adapter.Chat do
   defp unsent_note_messages(turn, next, renderers) do
     note = renderers.unsent_note
 
-    if is_binary(note) and thought_only_step?(turn) and not answered_next?(next, renderers),
-      do: [%{role: :user, content: note}],
-      else: []
+    if is_binary(note) and thought_only_step?(turn, renderers.output_names) and
+         not answered_next?(next, renderers),
+       do: [%{role: :user, content: note}],
+       else: []
   end
 
   defp answered_next?(nil, _renderers), do: false
@@ -1441,8 +1491,7 @@ defmodule Imp.Adapter.Chat do
   defp answered_next?(next, renderers) do
     next = Imp.Example.new(next) |> Imp.Example.to_map()
 
-    silent_step?(next) and
-      Enum.any?(renderers.output_names, &(not is_nil(fetch_field(next, &1))))
+    silent_step?(next) and carries_outputs?(next, renderers.output_names)
   end
 
   defp guidance_value(%{} = guidance, key), do: Map.get(guidance, key)
