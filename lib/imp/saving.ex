@@ -303,6 +303,7 @@ defmodule Imp.Saving do
       "max_iters" => react.max_iters,
       "last_request_note" => react.last_request_note,
       "finish_on" => dump_finish_on(react.finish_on),
+      "finish" => Atom.to_string(react.finish),
       "last_request_tools" => react.last_request_tools,
       "tool_policy" => dump_tool_policy(react.tool_policy, "ReActV2 tool policy")
     }
@@ -632,11 +633,12 @@ defmodule Imp.Saving do
     require_keys!(state, ["type", "signature", "react", "tools", "max_iters", "tool_policy"])
     tools = load_tools!(state["tools"], "ReActV2")
     signature = Imp.Signature.load!(state["signature"])
+    finish = load_react_v2_finish!(state["finish"])
 
     %Imp.Predict.ReActV2{
       signature: signature,
       react: require_predict!(load_state!(state["react"]), "ReActV2"),
-      tools: Imp.Predict.ReActV2.put_submit(tools, signature),
+      tools: Imp.Predict.ReActV2.put_submit(tools, signature, finish),
       # The roster is sent in the saved list's order: declared order when this
       # version saved it, name order in a 0.5.0 file, which sorted it.
       tool_order:
@@ -644,6 +646,7 @@ defmodule Imp.Saving do
       max_iters: require_non_negative_integer!(state["max_iters"], "ReActV2 max_iters"),
       last_request_note: load_react_v2_last_request_note!(state["last_request_note"]),
       finish_on: load_finish_on!(state["finish_on"]),
+      finish: finish,
       last_request_tools: load_last_request_tools!(state["last_request_tools"], tools),
       tool_policy: load_tool_policy!(state["tool_policy"], "ReActV2 tool policy")
     }
@@ -1289,6 +1292,15 @@ defmodule Imp.Saving do
 
   defp load_last_request_tools!(other, _tools),
     do: raise(ArgumentError, "invalid saved ReActV2 last_request_tools: #{inspect(other)}")
+
+  # A file saved before the option existed ends its turns as the signature
+  # decides, which is what `:auto` means.
+  defp load_react_v2_finish!(nil), do: :auto
+  defp load_react_v2_finish!("auto"), do: :auto
+  defp load_react_v2_finish!("submit"), do: :submit
+
+  defp load_react_v2_finish!(other),
+    do: raise(ArgumentError, "invalid saved ReActV2 finish: #{inspect(other)}")
 
   defp load_react_v2_last_request_note!(nil), do: nil
   defp load_react_v2_last_request_note!(note) when is_binary(note), do: note
