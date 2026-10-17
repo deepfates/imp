@@ -4,6 +4,8 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+## 0.16.1 — 2026-10-17
+
 ### Fixed
 
 - ReActV2 under `finish: :submit` or `finish: :tools` replays a stored turn
