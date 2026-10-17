@@ -148,8 +148,8 @@ defmodule Imp.Predict.ReActV2 do
   with `submit` calls no tool (`:empty_tool_calls`; under `finish: :submit`,
   the second such step in a row, see above). An `enum` output is such a
   signature: text that is not a `submit` call is `:empty_tool_calls`, never
-  an answer, and a turn with no valid `submit`, the forced one included, ends
-  `:incomplete`.
+  an answer, and a turn with no valid `submit`, the forced one and the
+  extraction after it included, ends `:incomplete`.
 
   With one unconstrained text output, a step that calls no tool and says nothing is not an
   interruption: it is an empty answer, and the turn ends there
@@ -190,10 +190,14 @@ defmodule Imp.Predict.ReActV2 do
   With `submit`, an interruption forces one more request with `tool_choice`
   naming `submit` (`:forced_submit`), as DSPy does, unless the process's
   `Imp.Deadline` has already passed (`:incomplete`, `:deadline_exceeded`).
-  If a provider cannot honor that tool contract, a tools-disabled typed
-  extractor derives the task outputs from the original inputs and
-  accumulated history (`:extracted`), and the outputs are appended to the
-  history as a step that called no tool.
+  If a provider cannot honor that tool contract, or the forced request
+  calls no `submit`, or calls it with arguments that fail validation (some
+  models, made to call a tool by name, write its arguments in their
+  reasoning and call it empty), a tools-disabled typed extractor derives the
+  task outputs from the original inputs and accumulated history
+  (`:extracted`), and the outputs are appended to the history as a step that
+  called no tool. An invalid forced call stays in the history before them,
+  with its error as its result.
 
   The last request says nothing about why it is being made unless
   `:last_request_note` is given: one line of host text put in front of it as a
@@ -1366,9 +1370,13 @@ defmodule Imp.Predict.ReActV2 do
           event = history_event(pending, prediction, submit_calls, results, final)
           history = append_history(history, event)
 
+          # A forced `submit` whose arguments fail validation (an empty
+          # `submit({})`, say, from a model that wrote the arguments in its
+          # reasoning) takes the path of a missing call: the extractor, with
+          # the call and its error in the history it reads.
           if final,
             do: final_prediction(final, history, :forced_submit, %{termination_cause: reason}),
-            else: incomplete_prediction(history, reason, initial_error)
+            else: extract_final(react, inputs, %{}, history, reason, initial_error)
       end
     end
   end

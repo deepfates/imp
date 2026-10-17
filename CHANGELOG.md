@@ -4,6 +4,14 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Fixed
+
+- A ReActV2 forced `submit` whose arguments fail validation, such as an
+  empty `submit({})` from a model that wrote the arguments in its reasoning,
+  now goes to the typed extractor, as a forced request with no `submit` call
+  already did, and ends `:extracted` instead of `:incomplete` with no
+  outputs. The invalid call and its error stay in the history.
+
 ## 0.15.0 — 2026-10-16
 
 ### Added
