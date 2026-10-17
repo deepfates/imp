@@ -18,6 +18,31 @@ User-visible changes to Imp are recorded here.
   attempts. `waits` must not be empty. Streamed requests are not sent again.
   Off unless given.
 
+### Changed
+
+- OpenRouter bring-your-own-key billing moved into the ReqLLM client.
+  `Imp.Clients.ReqLLM` records the charge it resolves as `:charge` in its
+  `req_llm` response metadata (the fee plus the upstream charge on a BYOK
+  call, otherwise the usage `"cost"`; dropped on a cache hit), and
+  `Imp.Core` reads `LMResponse.cost` from that `:charge`, which is final when
+  present, `nil` included, and otherwise from metadata `:cost`. `Imp.Core` no
+  longer reads usage `"cost"` or `"is_byok"`: an LM client other than ReqLLM,
+  or a hand-built response envelope, must report its charge as `:cost` in its
+  metadata (or `req_llm.charge`), or its cost is `nil`.
+
+### Fixed
+
+- A ReActV2 forced `submit` whose arguments fail validation, such as an
+  empty `submit({})` from a model that wrote the arguments in its reasoning,
+  now goes to the typed extractor, as a forced request with no `submit` call
+  already did, and ends `:extracted` instead of `:incomplete` with no
+  outputs. The invalid call and its error stay in the history. If that
+  extraction request fails with an LM error, the call now returns
+  `{:error, %Imp.Predict.ReActV2.StepError{}}`, as it does after a missing
+  call, where it returned `{:ok, prediction}` ending `:incomplete`. A forced
+  `submit` the tool policy refuses is not extracted and still ends
+  `:incomplete`.
+
 ## 0.15.0 — 2026-10-16
 
 ### Added

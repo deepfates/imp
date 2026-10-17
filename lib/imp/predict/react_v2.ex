@@ -148,8 +148,8 @@ defmodule Imp.Predict.ReActV2 do
   with `submit` calls no tool (`:empty_tool_calls`; under `finish: :submit`,
   the second such step in a row, see above). An `enum` output is such a
   signature: text that is not a `submit` call is `:empty_tool_calls`, never
-  an answer, and a turn with no valid `submit`, the forced one included, ends
-  `:incomplete`.
+  an answer, and a turn with no valid `submit`, the forced one and the
+  extraction after it included, ends `:incomplete`.
 
   With one unconstrained text output, a step that calls no tool and says nothing is not an
   interruption: it is an empty answer, and the turn ends there
@@ -190,10 +190,16 @@ defmodule Imp.Predict.ReActV2 do
   With `submit`, an interruption forces one more request with `tool_choice`
   naming `submit` (`:forced_submit`), as DSPy does, unless the process's
   `Imp.Deadline` has already passed (`:incomplete`, `:deadline_exceeded`).
-  If a provider cannot honor that tool contract, a tools-disabled typed
-  extractor derives the task outputs from the original inputs and
-  accumulated history (`:extracted`), and the outputs are appended to the
-  history as a step that called no tool.
+  If a provider cannot honor that tool contract, or the forced request
+  calls no `submit`, or calls it with arguments that fail validation (some
+  models, made to call a tool by name, write its arguments in their
+  reasoning and call it empty), a tools-disabled typed extractor derives the
+  task outputs from the original inputs and accumulated history
+  (`:extracted`), and the outputs are appended to the history as a step that
+  called no tool. An invalid forced call stays in the history before them,
+  with its error as its result. A forced `submit` the tool policy refuses is
+  not sent to the extractor, which no policy checks: the turn ends
+  `:incomplete`.
 
   The last request says nothing about why it is being made unless
   `:last_request_note` is given: one line of host text put in front of it as a
@@ -1366,12 +1372,46 @@ defmodule Imp.Predict.ReActV2 do
           event = history_event(pending, prediction, submit_calls, results, final)
           history = append_history(history, event)
 
-          if final,
-            do: final_prediction(final, history, :forced_submit, %{termination_cause: reason}),
-            else: incomplete_prediction(history, reason, initial_error)
+          # A forced `submit` whose arguments fail validation (an empty
+          # `submit({})`, say, from a model that wrote the arguments in its
+          # reasoning) takes the path of a missing call: the extractor, with
+          # the call and its error in the history it reads. A `submit` the
+          # tool policy refused is not a malformed answer: its outputs were
+          # refused, and the extractor, which no policy checks, would write
+          # them anyway, so that turn stays `:incomplete`.
+          cond do
+            final ->
+              final_prediction(final, history, :forced_submit, %{termination_cause: reason})
+
+            Enum.all?(results, &invalid_submit_arguments?/1) ->
+              extract_final(react, inputs, %{}, history, reason, initial_error)
+
+            true ->
+              incomplete_prediction(history, reason, initial_error)
+          end
       end
     end
   end
+
+  # The errors `Imp.Tool.validate_input/2` and `validate_submit/2` give a
+  # `submit` call whose arguments do not fit the signature. Every other error
+  # (a policy's denial or failure, an operational safety error) is a refusal.
+  defp invalid_submit_arguments?(%{error: true, result: {:error, reason}}),
+    do: invalid_submit_reason?(reason)
+
+  defp invalid_submit_arguments?(_result), do: false
+
+  defp invalid_submit_reason?({kind, _detail})
+       when kind in [
+              :missing_required,
+              :schema_validation,
+              :missing_output_fields,
+              :invalid_submit_outputs,
+              :invalid_submit_arguments
+            ],
+       do: true
+
+  defp invalid_submit_reason?(_reason), do: false
 
   defp append_thought_only_step(history, pending, prediction, calls) do
     case Imp.get(prediction, :next_thought) do
