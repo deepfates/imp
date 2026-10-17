@@ -12,8 +12,11 @@ User-visible changes to Imp are recorded here.
   wait in turn. Under a deadline the last wait repeats while it leaves
   `reserve` (60 s by default) of the deadline; without one, the list is the
   bound. Each attempt is its own `:model_request` and `:model_response`, and a
-  failed response followed by another attempt carries `retry_in_ms`. Streamed
-  requests are not sent again. Off unless given.
+  failed response followed by another attempt carries `retry_in_ms`. A
+  provider's `retry-after` longer than the wait is waited instead. Only the
+  outermost request retries, so an LM that wraps an LM does not multiply the
+  attempts. `waits` must not be empty. Streamed requests are not sent again.
+  Off unless given.
 
 ## 0.15.0 — 2026-10-16
 

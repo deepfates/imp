@@ -124,11 +124,13 @@ defmodule Imp.Run do
       type: :keyword_list,
       keys: [
         waits: [
-          type: {:list, :pos_integer},
+          type: {:custom, __MODULE__, :validate_waits, []},
           required: true,
           doc:
-            "Milliseconds to wait before each further attempt, in order. With a " <>
-              "deadline, the last wait repeats; without one, the list is the bound."
+            "Milliseconds to wait before each further attempt, in order, at least " <>
+              "one. With a deadline, the last wait repeats; without one, the list is " <>
+              "the bound. A provider's `retry-after` that asks for longer is waited " <>
+              "instead. To send nothing again, leave the option out."
         ],
         reserve: [
           type: :non_neg_integer,
@@ -144,7 +146,12 @@ defmodule Imp.Run do
           "connection that failed). Each attempt is recorded as its own " <>
           "`:model_request` and `:model_response`, and a failed response that is " <>
           "followed by another attempt carries `retry_in_ms` in its metadata. A " <>
-          "streamed request is not sent again. When absent, nothing is sent again."
+          "streamed request is not sent again, and a request made inside another " <>
+          "request (an LM that wraps an LM) is sent again only by the outermost. " <>
+          "An attempt that timed out may have been finished and billed by the " <>
+          "provider without a response to record; without a deadline capping each " <>
+          "attempt that is more likely, and a retry can then be billed twice. When " <>
+          "absent, nothing is sent again."
     ],
     max_event_bytes: [
       type: @bound,
@@ -292,6 +299,16 @@ defmodule Imp.Run do
       result
     end)
   end
+
+  @doc false
+  def validate_waits([_ | _] = waits) do
+    if Enum.all?(waits, &(is_integer(&1) and &1 > 0)),
+      do: {:ok, waits},
+      else: {:error, "expected a non-empty list of positive integers, got: #{inspect(waits)}"}
+  end
+
+  def validate_waits(other),
+    do: {:error, "expected a non-empty list of positive integers, got: #{inspect(other)}"}
 
   @doc false
   def validate_admission({_pool, limit} = admission) when is_integer(limit) and limit > 0,

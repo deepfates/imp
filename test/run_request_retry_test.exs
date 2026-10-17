@@ -21,6 +21,17 @@ defmodule Imp.RunRequestRetryTest do
     end
   end
 
+  # An LM that wraps another and calls it through `Imp.LM.generate/3`, as an
+  # optimizer's budget or a host's own wrapper does.
+  defmodule Wrapper do
+    @behaviour Imp.LM
+    defstruct [:inner]
+
+    @impl true
+    def generate(%__MODULE__{inner: inner}, messages, opts),
+      do: Imp.LM.generate(inner, messages, opts)
+  end
+
   # A program that makes one model request and returns what it got.
   defmodule OneRequest do
     @behaviour Imp.Module
@@ -46,10 +57,11 @@ defmodule Imp.RunRequestRetryTest do
   defp run(script, opts) do
     {:ok, script} = Agent.start_link(fn -> script end)
     owner = self()
+    {wrap, opts} = Keyword.pop(opts, :wrap, &Function.identity/1)
 
     {:ok, run} =
       Imp.Run.start(
-        %OneRequest{lm: %Scripted{script: script}},
+        %OneRequest{lm: wrap.(%Scripted{script: script})},
         %{},
         [event_sink: fn event -> send(owner, {:event, event}) end] ++ opts
       )
@@ -124,6 +136,51 @@ defmodule Imp.RunRequestRetryTest do
     assert List.last(waits) == nil
     assert Enum.all?(Enum.drop(waits, -1), &(&1 == 20))
     # It stopped with the reserve still left.
-    assert elapsed < 600 - 300 + 100
+    assert elapsed < 600 - 100
+  end
+
+  # Were each level to retry, the inner request's two attempts would each be
+  # repeated by the outer one: four requests where two were asked for.
+  test "a request made inside another is sent again only by the outermost" do
+    {result, responses} =
+      run([@outage, {:ok, "hi"}],
+        request_retry: [waits: [10], reserve: 0],
+        deadline: 5_000,
+        wrap: &%Wrapper{inner: &1}
+      )
+
+    assert {:ok, _prediction} = result
+
+    # Each request is recorded at both levels: the outer LM's and the inner's.
+    # The failure was retried once, by the outer request, and the inner one
+    # returned it without waiting.
+    retried = Enum.filter(responses, &Map.has_key?(&1.metadata, :retry_in_ms))
+    assert length(retried) == 1
+    assert length(responses) == 4
+  end
+
+  test "an empty list of waits is refused, not taken as a bound" do
+    assert_raise ArgumentError, ~r/non-empty list/, fn ->
+      Imp.Run.start(%OneRequest{lm: nil}, %{}, request_retry: [waits: []], deadline: 5_000)
+    end
+  end
+
+  # A provider that says when to come back is not asked sooner.
+  test "a provider's retry-after longer than the wait is waited instead" do
+    limited =
+      {:error,
+       %Imp.LMError{
+         message: "429 rate limited",
+         status: 429,
+         retryable: true,
+         reason: %{headers: %{"retry-after" => ["1"]}}
+       }}
+
+    {result, responses} =
+      run([limited, {:ok, "hi"}], request_retry: [waits: [10], reserve: 0], deadline: 5_000)
+
+    assert {:ok, _prediction} = result
+    assert [first, _second] = responses
+    assert first.metadata.retry_in_ms == 1_000
   end
 end

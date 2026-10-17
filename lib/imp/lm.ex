@@ -172,7 +172,16 @@ defmodule Imp.LM do
   its `:model_request` and its `:model_response`; the failed response of an
   attempt that is followed by another carries `retry_in_ms`, the wait, in its
   metadata, so a reader of the run sees the failure, the wait and the next
-  attempt. The caller sees only the last attempt's result.
+  attempt. The caller sees only the last attempt's result. A provider's
+  `retry-after` longer than the run's wait is waited instead. Only the
+  outermost request retries: an LM that calls `Imp.LM.generate/3` inside its
+  own `generate/3` has its inner request's failure returned to it, and its own
+  request sent again.
+
+  A timed-out attempt may have been finished, and billed, by the provider
+  with no response to record, so a retry after one can be billed twice
+  without the record showing it. Under a deadline each attempt is capped to
+  the time left, which bounds that; without one it is more likely.
   """
   def request(lm, %Imp.Core.LMRequest{} = request), do: request(lm, request, 0)
 
@@ -180,8 +189,26 @@ defmodule Imp.LM do
     {:error, {:invalid_lm_request, request}}
   end
 
+  # A request made while another is in flight in this process is a wrapper
+  # LM's inner one (an optimizer's budget, a rollout LM, a host's own wrapper
+  # calling `generate/3` inside `generate/3`). Only the outermost waits and
+  # sends again: were each level to retry, k retries would become (k+1)^2
+  # attempts, and the waits would multiply with them.
+  @in_flight {__MODULE__, :request_in_flight}
+
   defp request(lm, request, retries) do
-    case record(lm, request, &dispatch_request(lm, &1), &retry_wait(&1, retries)) do
+    outermost? = not Process.get(@in_flight, false)
+    retry = if outermost?, do: &retry_wait(&1, retries), else: fn _error -> nil end
+
+    result =
+      try do
+        if outermost?, do: Process.put(@in_flight, true)
+        record(lm, request, &dispatch_request(lm, &1), retry)
+      after
+        if outermost?, do: Process.delete(@in_flight)
+      end
+
+    case result do
       {:retry, wait} ->
         Process.sleep(wait)
         request(lm, request, retries + 1)
@@ -202,15 +229,21 @@ defmodule Imp.LM do
          [_ | _] = policy <- Imp.Run.request_retry() do
       waits = Keyword.fetch!(policy, :waits)
 
+      # A provider that says how long to wait is waited for at least that long.
+      at_least = fn
+        nil -> nil
+        wait -> max(wait, Imp.Clients.ReqLLMBatch.retry_after_ms(error) || 0)
+      end
+
       case Imp.Deadline.remaining(Imp.Deadline.current()) do
         # No deadline: the list is the bound, so the run cannot wait forever.
         :infinity ->
-          Enum.at(waits, retries)
+          at_least.(Enum.at(waits, retries))
 
         # A deadline: the last wait repeats while the deadline leaves room for
         # it and for what the run does after the request answers.
         remaining ->
-          wait = Enum.at(waits, retries) || List.last(waits)
+          wait = at_least.(Enum.at(waits, retries) || List.last(waits))
           if remaining - wait >= Keyword.get(policy, :reserve, 60_000), do: wait
       end
     else
