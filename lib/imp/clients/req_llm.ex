@@ -2007,15 +2007,10 @@ defmodule Imp.Clients.ReqLLM do
   # Any other usage reports its `"cost"`, or `nil` when the provider reported
   # none. Callers always store the figure as `:charge`.
   @doc false
-  @spec resolve_openrouter_charge(term(), term()) :: {:resolved, term()}
-  def resolve_openrouter_charge(_model, %{"is_byok" => true} = usage) do
-    {:resolved, openrouter_byok_charge(usage)}
-  end
-
-  def resolve_openrouter_charge(_model, usage), do: {:resolved, wire_cost(usage)}
-
-  defp wire_cost(%{"cost" => cost}), do: cost
-  defp wire_cost(_usage), do: nil
+  @spec charge(term()) :: term()
+  def charge(%{"is_byok" => true} = usage), do: openrouter_byok_charge(usage)
+  def charge(%{"cost" => cost}), do: cost
+  def charge(_usage), do: nil
 
   defp openrouter_byok_charge(usage) do
     fee = Map.get(usage, "cost")
@@ -2035,7 +2030,7 @@ defmodule Imp.Clients.ReqLLM do
     logprobs = sanitize_logprobs(map_value(provider_meta, :logprobs))
     usage = sanitize_usage(ReqLLM.Response.usage(response))
 
-    {:resolved, charge} = resolve_openrouter_charge(model_spec, usage)
+    charge = charge(usage)
 
     %{
       provider: provider_name(model_spec),

@@ -207,7 +207,7 @@ defmodule Imp.ModelResponseCostTest do
       raw = %{
         __imp_lm_output__: "pong",
         __imp_lm_metadata__: %{
-          req_llm: %{usage: %{:cost => %{@breakdown | total: total}, "cost" => total}}
+          req_llm: %{usage: %{:cost => %{@breakdown | total: total}}, charge: total}
         }
       }
 
@@ -228,28 +228,21 @@ defmodule Imp.ModelResponseCostTest do
     assert response.billing == nil
   end
 
-  # A raw envelope carries no charge the client resolved. On a
-  # bring-your-own-key usage `"cost"` is only the fee, upstream figure or
-  # not, so the charge is unknown rather than that lower number.
-  test "a raw byok envelope with no resolved charge has no cost" do
+  # A raw envelope carries no charge the client resolved. Core reads `:charge`
+  # and then metadata `:cost`, never usage `"cost"`, so a fee or a wire figure
+  # left only on the usage map is unknown rather than that lower number.
+  test "a raw envelope with no resolved charge has no cost" do
     for usage <- [
+          %{"cost" => 0.0001, cost: @breakdown},
           %{
-            "is_byok" => true,
             "cost" => 0.0001,
             "cost_details" => %{"upstream_inference_cost" => 0.002},
             cost: @breakdown
           },
-          %{"is_byok" => true, "cost" => 0.0001, cost: @breakdown},
           %{
             "is_byok" => true,
             "cost" => 0.0001,
-            "cost_details" => %{},
-            cost: @breakdown
-          },
-          %{
-            "is_byok" => true,
-            "cost" => 0.0001,
-            "cost_details" => %{"upstream_inference_cost" => nil},
+            "cost_details" => %{"upstream_inference_cost" => 0.002},
             cost: @breakdown
           }
         ] do
@@ -273,7 +266,7 @@ defmodule Imp.ModelResponseCostTest do
     for reported <- ["free", %{total: "free"}, %{total: nil}, -0.5, %{total: -0.5}] do
       raw = %{
         __imp_lm_output__: "pong",
-        __imp_lm_metadata__: %{req_llm: %{usage: %{:cost => reported, "cost" => reported}}}
+        __imp_lm_metadata__: %{req_llm: %{usage: %{:cost => reported}, charge: reported}}
       }
 
       assert {:ok, response} = Imp.Core.response(raw)

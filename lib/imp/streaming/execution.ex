@@ -224,7 +224,7 @@ defmodule Imp.Streaming.Execution do
 
     # A stream never passes through response metadata. Record the same
     # charge the client would, so the recorded response reads that one figure.
-    {:resolved, charge} = Imp.Clients.ReqLLM.resolve_openrouter_charge(model, usage)
+    charge = Imp.Clients.ReqLLM.charge(usage)
 
     req_llm = %{
       provider: provider,
