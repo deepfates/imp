@@ -331,8 +331,15 @@ defmodule Imp.Clients.ReqLLMBatch do
     half + :rand.uniform(half + 1) - 1
   end
 
+  @doc false
+  # The provider's `retry-after` on a failed request, in milliseconds, or
+  # `nil`; `Imp.LM.request/2` reads it for a run's `request_retry:`.
+  def retry_after_ms(error),
+    do: retry_after(error, %{utc_now: &DateTime.utc_now/0})
+
   # The provider's `retry-after`, in milliseconds, from the failure's HTTP
   # headers: `Imp.LMError` keeps ReqLLM's error, which keeps the response's.
+  defp retry_after({:error, reason}, clock), do: retry_after(reason, clock)
   defp retry_after(%Imp.LMError{reason: reason}, clock), do: retry_after(reason, clock)
 
   defp retry_after(%{headers: headers}, clock) when is_map(headers) or is_list(headers) do

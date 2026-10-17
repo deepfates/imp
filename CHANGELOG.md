@@ -4,18 +4,19 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
-### Fixed
+### Added
 
-- A ReActV2 forced `submit` whose arguments fail validation, such as an
-  empty `submit({})` from a model that wrote the arguments in its reasoning,
-  now goes to the typed extractor, as a forced request with no `submit` call
-  already did, and ends `:extracted` instead of `:incomplete` with no
-  outputs. The invalid call and its error stay in the history. If that
-  extraction request fails with an LM error, the call now returns
-  `{:error, %Imp.Predict.ReActV2.StepError{}}`, as it does after a missing
-  call, where it returned `{:ok, prediction}` ending `:incomplete`. A forced
-  `submit` the tool policy refuses is not extracted and still ends
-  `:incomplete`.
+- `Imp.Run.start/3` `request_retry: [waits: [...], reserve: ms]`: a model
+  request that fails with an error `Imp.Errors.retryable?/1` accepts (408,
+  425, 429, 5xx, a failed connection) is sent again in the same run after each
+  wait in turn. Under a deadline the last wait repeats while it leaves
+  `reserve` (60 s by default) of the deadline; without one, the list is the
+  bound. Each attempt is its own `:model_request` and `:model_response`, and a
+  failed response followed by another attempt carries `retry_in_ms`. A
+  provider's `retry-after` longer than the wait is waited instead. Only the
+  outermost request retries, so an LM that wraps an LM does not multiply the
+  attempts. `waits` must not be empty. Streamed requests are not sent again.
+  Off unless given.
 
 ### Changed
 
@@ -28,6 +29,19 @@ User-visible changes to Imp are recorded here.
   longer reads usage `"cost"` or `"is_byok"`: an LM client other than ReqLLM,
   or a hand-built response envelope, must report its charge as `:cost` in its
   metadata (or `req_llm.charge`), or its cost is `nil`.
+
+### Fixed
+
+- A ReActV2 forced `submit` whose arguments fail validation, such as an
+  empty `submit({})` from a model that wrote the arguments in its reasoning,
+  now goes to the typed extractor, as a forced request with no `submit` call
+  already did, and ends `:extracted` instead of `:incomplete` with no
+  outputs. The invalid call and its error stay in the history. If that
+  extraction request fails with an LM error, the call now returns
+  `{:error, %Imp.Predict.ReActV2.StepError{}}`, as it does after a missing
+  call, where it returned `{:ok, prediction}` ending `:incomplete`. A forced
+  `submit` the tool policy refuses is not extracted and still ends
+  `:incomplete`.
 
 ## 0.15.0 — 2026-10-16
 

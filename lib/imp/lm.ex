@@ -162,12 +162,93 @@ defmodule Imp.LM do
 
   def legacy_result({:error, _reason} = error), do: error
 
-  @doc "Executes one provider-neutral LM request and returns a normalized response."
-  def request(lm, %Imp.Core.LMRequest{} = request),
-    do: record(lm, request, &dispatch_request(lm, &1))
+  @doc """
+  Executes one provider-neutral LM request and returns a normalized response.
+
+  Inside an `Imp.Run` started with `request_retry:`, a request that fails with
+  an error `Imp.Errors.retryable?/1` accepts is sent again after the run's next
+  wait, while the run's `Imp.Deadline` leaves the wait and its `reserve`
+  (`Imp.Run.start/3`). Each attempt is a model call of its own on the record,
+  its `:model_request` and its `:model_response`; the failed response of an
+  attempt that is followed by another carries `retry_in_ms`, the wait, in its
+  metadata, so a reader of the run sees the failure, the wait and the next
+  attempt. The caller sees only the last attempt's result. A provider's
+  `retry-after` longer than the run's wait is waited instead. Only the
+  outermost request retries: an LM that calls `Imp.LM.generate/3` inside its
+  own `generate/3` has its inner request's failure returned to it, and its own
+  request sent again.
+
+  A timed-out attempt may have been finished, and billed, by the provider
+  with no response to record, so a retry after one can be billed twice
+  without the record showing it. Under a deadline each attempt is capped to
+  the time left, which bounds that; without one it is more likely.
+  """
+  def request(lm, %Imp.Core.LMRequest{} = request), do: request(lm, request, 0)
 
   def request(_lm, request) do
     {:error, {:invalid_lm_request, request}}
+  end
+
+  # A request made while another is in flight in this process is a wrapper
+  # LM's inner one (an optimizer's budget, a rollout LM, a host's own wrapper
+  # calling `generate/3` inside `generate/3`). Only the outermost waits and
+  # sends again: were each level to retry, k retries would become (k+1)^2
+  # attempts, and the waits would multiply with them.
+  @in_flight {__MODULE__, :request_in_flight}
+
+  defp request(lm, request, retries) do
+    outermost? = not Process.get(@in_flight, false)
+    retry = if outermost?, do: &retry_wait(&1, retries), else: fn _error -> nil end
+
+    result =
+      try do
+        if outermost?, do: Process.put(@in_flight, true)
+        record(lm, request, &dispatch_request(lm, &1), retry)
+      after
+        if outermost?, do: Process.delete(@in_flight)
+      end
+
+    case result do
+      {:retry, wait} ->
+        Process.sleep(wait)
+        request(lm, request, retries + 1)
+
+      result ->
+        result
+    end
+  end
+
+  # How long to wait before sending a request that failed with `error` again,
+  # after `retries` earlier retries, or `nil` to return the failure. A provider
+  # that answered "try later", or did not answer at all, may answer a minute
+  # later, when Imp's other retries (ReqLLM's own, a loop's one more step) are
+  # all within a second or two of the failure. The wait is the run's to give:
+  # outside a run, or in one started without `request_retry:`, nothing waits.
+  defp retry_wait(error, retries) do
+    with true <- Imp.Errors.retryable?(error),
+         [_ | _] = policy <- Imp.Run.request_retry() do
+      waits = Keyword.fetch!(policy, :waits)
+
+      # A provider that says how long to wait is waited for at least that long.
+      at_least = fn
+        nil -> nil
+        wait -> max(wait, Imp.Clients.ReqLLMBatch.retry_after_ms(error) || 0)
+      end
+
+      case Imp.Deadline.remaining(Imp.Deadline.current()) do
+        # No deadline: the list is the bound, so the run cannot wait forever.
+        :infinity ->
+          at_least.(Enum.at(waits, retries))
+
+        # A deadline: the last wait repeats while the deadline leaves room for
+        # it and for what the run does after the request answers.
+        remaining ->
+          wait = at_least.(Enum.at(waits, retries) || List.last(waits))
+          if remaining - wait >= Keyword.get(policy, :reserve, 60_000), do: wait
+      end
+    else
+      _ -> nil
+    end
   end
 
   @doc false
@@ -182,7 +263,13 @@ defmodule Imp.LM do
   @spec record(t(), Imp.Core.LMRequest.t(), (Imp.Core.LMRequest.t() -> dispatched)) :: result
         when result: {:ok, Imp.Core.LMResponse.t()} | {:error, term()},
              dispatched: result | {:error, term(), Imp.Core.LMResponse.t()}
-  def record(lm, %Imp.Core.LMRequest{} = request, dispatch) when is_function(dispatch, 1) do
+  def record(lm, %Imp.Core.LMRequest{} = request, dispatch) when is_function(dispatch, 1),
+    do: record(lm, request, dispatch, fn _error -> nil end)
+
+  # `retry` answers, for a failed request, how long to wait before sending it
+  # again, or `nil`. When it answers a wait, the failure is recorded with it as
+  # `retry_in_ms` and `{:retry, wait}` is returned instead of the failure.
+  defp record(lm, request, dispatch, retry) do
     if Imp.Run.context() do
       call_id = Imp.Run.new_event_id("model")
       {messages, options} = Imp.Core.request_parts(request)
@@ -217,45 +304,58 @@ defmodule Imp.LM do
 
       result = perform_request(lm, request, dispatch)
 
-      case result do
-        {:ok, response} ->
-          Imp.Run.emit(:model_response,
-            output: response.outputs,
-            metadata:
-              maybe_put_billing(
-                %{
-                  model_call_id: call_id,
-                  model: request.config.model,
-                  usage: response.usage,
-                  cost: response.cost,
-                  estimated_cost: response.estimated_cost,
-                  response: response.metadata
-                },
-                response.billing
-              )
-          )
+      wait =
+        case result do
+          {:ok, response} ->
+            Imp.Run.emit(:model_response,
+              output: response.outputs,
+              metadata:
+                maybe_put_billing(
+                  %{
+                    model_call_id: call_id,
+                    model: request.config.model,
+                    usage: response.usage,
+                    cost: response.cost,
+                    estimated_cost: response.estimated_cost,
+                    response: response.metadata
+                  },
+                  response.billing
+                )
+            )
 
-        {:error, error, partial} ->
-          Imp.Run.emit(:model_response,
-            error: error,
-            metadata:
-              maybe_put_billing(
+            nil
+
+          {:error, error, partial} ->
+            wait = retry.(error)
+
+            Imp.Run.emit(:model_response,
+              error: error,
+              metadata:
                 %{
                   model_call_id: call_id,
                   model: request.config.model,
                   usage: partial.usage,
                   cost: partial.cost,
                   estimated_cost: partial.estimated_cost
-                },
-                partial.billing
-              )
-          )
+                }
+                |> maybe_put_billing(partial.billing)
+                |> maybe_put_retry(wait)
+            )
 
-        {:error, error} ->
-          Imp.Run.emit(:model_response, error: error, metadata: %{model_call_id: call_id})
-      end
+            wait
 
-      caller_result(result)
+          {:error, error} ->
+            wait = retry.(error)
+
+            Imp.Run.emit(:model_response,
+              error: error,
+              metadata: maybe_put_retry(%{model_call_id: call_id}, wait)
+            )
+
+            wait
+        end
+
+      if wait, do: {:retry, wait}, else: caller_result(result)
     else
       lm |> perform_request(request, dispatch) |> caller_result()
     end
@@ -293,6 +393,9 @@ defmodule Imp.LM do
 
   defp maybe_put_purpose(metadata, %{purpose: purpose}), do: Map.put(metadata, :purpose, purpose)
   defp maybe_put_purpose(metadata, _request_metadata), do: metadata
+
+  defp maybe_put_retry(metadata, nil), do: metadata
+  defp maybe_put_retry(metadata, wait), do: Map.put(metadata, :retry_in_ms, wait)
 
   defp maybe_put_billing(metadata, nil), do: metadata
   defp maybe_put_billing(metadata, billing), do: Map.put(metadata, :billing, billing)
