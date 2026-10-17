@@ -207,7 +207,7 @@ defmodule Imp.ModelResponseCostTest do
       raw = %{
         __imp_lm_output__: "pong",
         __imp_lm_metadata__: %{
-          req_llm: %{usage: %{:cost => %{@breakdown | total: total}, "cost" => total}}
+          req_llm: %{usage: %{:cost => %{@breakdown | total: total}}, charge: total}
         }
       }
 
@@ -228,34 +228,24 @@ defmodule Imp.ModelResponseCostTest do
     assert response.billing == nil
   end
 
-  # With the caller's own provider key, OpenRouter's "cost" is its fee only,
-  # and the provider's own charge is reported beside it.
-  test "an OpenRouter call on the caller's own key costs the fee plus the upstream charge" do
-    raw = %{
-      __imp_lm_output__: "pong",
-      __imp_lm_metadata__: %{
-        req_llm: %{
-          usage: %{
+  # A raw envelope carries no charge the client resolved. Core reads `:charge`
+  # and then metadata `:cost`, never usage `"cost"`, so a fee or a wire figure
+  # left only on the usage map is unknown rather than that lower number.
+  test "a raw envelope with no resolved charge has no cost" do
+    for usage <- [
+          %{"cost" => 0.0001, cost: @breakdown},
+          %{
+            "cost" => 0.0001,
+            "cost_details" => %{"upstream_inference_cost" => 0.002},
+            cost: @breakdown
+          },
+          %{
             "is_byok" => true,
             "cost" => 0.0001,
             "cost_details" => %{"upstream_inference_cost" => 0.002},
             cost: @breakdown
           }
-        }
-      }
-    }
-
-    assert {:ok, response} = Imp.Core.response(raw)
-    assert_in_delta response.cost, 0.0021, 1.0e-12
-    assert response.estimated_cost == 0.001858
-  end
-
-  test "an OpenRouter call on the caller's own key with no upstream charge has no cost" do
-    for details <- [nil, %{}, %{"upstream_inference_cost" => nil}] do
-      usage =
-        %{"is_byok" => true, "cost" => 0.0001, cost: @breakdown}
-        |> then(&if(details, do: Map.put(&1, "cost_details", details), else: &1))
-
+        ] do
       raw = %{__imp_lm_output__: "pong", __imp_lm_metadata__: %{req_llm: %{usage: usage}}}
 
       assert {:ok, response} = Imp.Core.response(raw)
@@ -276,7 +266,7 @@ defmodule Imp.ModelResponseCostTest do
     for reported <- ["free", %{total: "free"}, %{total: nil}, -0.5, %{total: -0.5}] do
       raw = %{
         __imp_lm_output__: "pong",
-        __imp_lm_metadata__: %{req_llm: %{usage: %{:cost => reported, "cost" => reported}}}
+        __imp_lm_metadata__: %{req_llm: %{usage: %{:cost => reported}, charge: reported}}
       }
 
       assert {:ok, response} = Imp.Core.response(raw)
