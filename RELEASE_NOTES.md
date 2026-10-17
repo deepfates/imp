@@ -1,21 +1,22 @@
-# Imp v0.15.0
+# Imp v0.16.0
 
 Imp is a framework for typed, optimizable language-model programs on the BEAM.
-This release adds two ReActV2 options a caller opts into: `finish: :tools`,
-which ends a turn only through a `finish_on` tool, for a program that acts
-only through its tools, and `history_replay: :actions`, which shows earlier
-turns without the text and reasoning written beside their calls. Programs that
-use neither send byte-for-byte the requests 0.14.1 sent and save as before.
-New options make this a minor release under Imp's versioning rule.
+This release adds `request_retry:` to `Imp.Run.start/3`, which sends a model
+request the provider failed in a way that may pass again in the same run, after
+a wait. It also changes two things a caller may rely on: an LM client other
+than ReqLLM reports its charge as metadata `:cost`, because `Imp.Core` no longer
+reads it from the usage map; and a ReActV2 forced `submit` with invalid
+arguments goes to the extractor. A new option and changed behaviour make this
+a minor release under Imp's versioning rule.
 
 ## Install
 
 ```elixir
-{:imp, "~> 0.15.0"}
+{:imp, "~> 0.16.0"}
 ```
 
-`~> 0.15.0` takes later 0.15 patch releases and nothing newer. The two-part
-form, `~> 0.15`, means `>= 0.15.0 and < 1.0.0` in Mix, so `mix deps.update
+`~> 0.16.0` takes later 0.16 patch releases and nothing newer. The two-part
+form, `~> 0.16`, means `>= 0.16.0 and < 1.0.0` in Mix, so `mix deps.update
 imp` under it takes every later 0.x release, including minor releases that
 change what callers receive.
 
@@ -28,38 +29,43 @@ in its release definition; see [releases that use MCP or
 ACP](docs/production.md#releases-that-use-mcp-or-acp).
 Ordinary Imp startup starts no protocol endpoint.
 
-## Changes and upgrading from 0.14
+## Changes and upgrading from 0.15
 
-Change the Imp dependency to `{:imp, "~> 0.15.0"}`, run `mix deps.update imp`,
-and commit `mix.lock`. No code or data migration is needed: saved programs
-without the new options load with their defaults.
+Change the Imp dependency to `{:imp, "~> 0.16.0"}`, run `mix deps.update imp`,
+and commit `mix.lock`. No data migration is needed. Check the second item if
+you use an LM client of your own, or build response envelopes by hand.
 
-- **Added: `finish: :tools`.** Only a `finish_on` tool ends a ReActV2 turn.
-  There is no `submit`; the outputs come from the `finish_on` functions. A
-  step that writes text and calls no tool is a thought, followed by one
-  ordinary step and a line naming the ending tools (`unsent_note:` replaces
-  it). Nothing is forced and no last request is made: a failed request gets
-  one more ordinary step, once per turn and not on the last allowed step; a
-  second thought in a row, a step that says nothing, the step limit or a
-  second failure ends the turn `:incomplete`, with the request's error in
-  `termination_error`, or `:deadline_exceeded` when the deadline has passed.
-  A program with `finish: :tools` needs a `finish_on` tool and refuses
-  `last_request_note` and `last_request_tools`. A call may give its own
-  `finish:` (when the task has no input of that name), so a `:tools` program
-  can ask for one text answer, such as a summary, with `finish: :auto`.
-- **Added: `history_replay: :actions`.** Earlier turns are shown as their
-  inputs, the calls with their results, and their outputs; the text and
-  reasoning written beside the calls, and steps that only wrote text, are left
-  out. The current turn is shown whole: it starts with the call's new inputs
-  or its own `last_request_note`, or, on a resume with neither, at the last
-  step that carries inputs. The returned history keeps every step. This
-  diverges from DSPy's ReActV2, which replays every step whole; the default,
-  `:trajectory`, still does. Some thinking APIs reject an earlier tool-call
-  message without its reasoning content; check your provider.
-- **Added: `unsent_note:`.** The line shown after each thought-only step, in
-  place of Imp's. A blank line is refused.
+- **Added: `request_retry:` on `Imp.Run.start/3`.** `request_retry: [waits:
+  [ms, ...], reserve: ms]` sends a model request that failed with an error
+  `Imp.Errors.retryable?/1` accepts (408, 425, 429, 5xx, a failed connection)
+  again inside `Imp.LM.request/2`, after each wait in turn. Under a deadline
+  the last wait repeats while it leaves `reserve` (60 s by default) of the
+  deadline; without one, the list is the bound. A provider's `retry-after`
+  longer than the wait is waited instead. Each attempt is its own
+  `:model_request` and `:model_response`, and a failed response followed by
+  another attempt carries `retry_in_ms`. Only the outermost request in a
+  process retries, so an LM that wraps an LM does not multiply attempts.
+  Streamed requests are not sent again. `waits` must not be empty. Off unless
+  given. A timed-out attempt may have been finished and billed by the
+  provider without a response to record, so a retry can be billed twice;
+  under a deadline each attempt is capped to the time left.
+- **Changed: where a call's charge is read.** OpenRouter bring-your-own-key
+  billing moved into `Imp.Clients.ReqLLM`, which records the charge it
+  resolves as `:charge` in its `req_llm` response metadata. `Imp.Core` reads
+  `LMResponse.cost` from that `:charge` (final when present, `nil` included),
+  and otherwise from metadata `:cost`; it no longer reads usage `"cost"` or
+  `"is_byok"`. An LM client other than ReqLLM, or a hand-built response
+  envelope, must report its charge as `:cost` in its metadata (or
+  `req_llm.charge`), or its cost is `nil`.
+- **Fixed: a forced `submit` with invalid arguments is extracted.** A ReActV2
+  forced `submit` whose arguments fail validation now goes to the typed
+  extractor and ends `:extracted`, where it ended `:incomplete` with no
+  outputs. If that extraction request fails with an LM error, the call
+  returns `{:error, %Imp.Predict.ReActV2.StepError{}}`, where it returned
+  `{:ok, prediction}` ending `:incomplete`. A forced `submit` the tool policy
+  refuses still ends `:incomplete`.
 
-Rollback means restoring `0.14.1` in the lock and removing the new options.
+Rollback means restoring `0.15.0` in the lock and removing `request_retry:`.
 See the [changelog](CHANGELOG.md) for every change.
 
 ## Known limits

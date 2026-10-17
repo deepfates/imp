@@ -4,6 +4,8 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+## 0.16.0 — 2026-10-17
+
 ### Added
 
 - `Imp.Run.start/3` `request_retry: [waits: [...], reserve: ms]`: a model
