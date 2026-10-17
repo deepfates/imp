@@ -4,6 +4,17 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Added
+
+- `Imp.Run.start/3` `request_retry: [waits: [...], reserve: ms]`: a model
+  request that fails with an error `Imp.Errors.retryable?/1` accepts (408,
+  425, 429, 5xx, a failed connection) is sent again in the same run after each
+  wait in turn. Under a deadline the last wait repeats while it leaves
+  `reserve` (60 s by default) of the deadline; without one, the list is the
+  bound. Each attempt is its own `:model_request` and `:model_response`, and a
+  failed response followed by another attempt carries `retry_in_ms`. Streamed
+  requests are not sent again. Off unless given.
+
 ## 0.15.0 — 2026-10-16
 
 ### Added

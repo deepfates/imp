@@ -120,6 +120,32 @@ defmodule Imp.Run do
           "milliseconds. It is capped by the caller's own deadline. When absent, " <>
           "the run inherits the caller's deadline, if any."
     ],
+    request_retry: [
+      type: :keyword_list,
+      keys: [
+        waits: [
+          type: {:list, :pos_integer},
+          required: true,
+          doc:
+            "Milliseconds to wait before each further attempt, in order. With a " <>
+              "deadline, the last wait repeats; without one, the list is the bound."
+        ],
+        reserve: [
+          type: :non_neg_integer,
+          default: 60_000,
+          doc:
+            "Milliseconds of the run's deadline a wait must leave untouched; a wait " <>
+              "that would leave less is not taken, and the failure is returned."
+        ]
+      ],
+      doc:
+        "Sends a model request again, in the same run, after it fails with an " <>
+          "error `Imp.Errors.retryable?/1` accepts (a 408, 425, 429 or 5xx, or a " <>
+          "connection that failed). Each attempt is recorded as its own " <>
+          "`:model_request` and `:model_response`, and a failed response that is " <>
+          "followed by another attempt carries `retry_in_ms` in its metadata. A " <>
+          "streamed request is not sent again. When absent, nothing is sent again."
+    ],
     max_event_bytes: [
       type: @bound,
       default: 65_536,
@@ -205,6 +231,7 @@ defmodule Imp.Run do
              owner: self(),
              id: id,
              event_sink: event_sink,
+             request_retry: opts[:request_retry],
              limits:
                Map.new(Keyword.take(opts, [:max_events, :max_event_bytes, :max_snapshot_bytes]))
            ) do
@@ -428,6 +455,18 @@ defmodule Imp.Run do
   def context, do: Process.get(@context_key)
 
   @doc false
+  # The run's `request_retry:` option (`start/3`), or `nil` outside a run or
+  # when it was not given. `Imp.LM.request/2` asks only after a request fails.
+  def request_retry do
+    case context() do
+      control when is_pid(control) -> Control.request_retry(control)
+      nil -> nil
+    end
+  catch
+    :exit, _reason -> nil
+  end
+
+  @doc false
   def with_context(control, fun) when is_pid(control) and is_function(fun, 0) do
     previous = Process.get(@context_key, :unset)
     Process.put(@context_key, control)
@@ -586,6 +625,7 @@ defmodule Imp.Run.Control do
   def events(pid), do: GenServer.call(pid, :events)
   def emit(pid, kind, attrs), do: GenServer.call(pid, {:emit, kind, attrs})
   def first_seen?(pid, key), do: GenServer.call(pid, {:first_seen, key})
+  def request_retry(pid), do: GenServer.call(pid, :request_retry)
   # A registration can reach a control that has already ended: a cancel
   # releases the control as soon as the task is down, while a process the run
   # started may still be registering. The control answers a register in the
@@ -654,6 +694,7 @@ defmodule Imp.Run.Control do
     {:ok,
      %{
        id: Keyword.fetch!(opts, :id),
+       request_retry: Keyword.get(opts, :request_retry),
        delivery: delivery,
        progress: progress,
        reported: 0,
@@ -677,6 +718,8 @@ defmodule Imp.Run.Control do
   def handle_call({:emit, kind, attrs}, _from, state) do
     {:reply, :ok, record(state, kind, attrs)}
   end
+
+  def handle_call(:request_retry, _from, state), do: {:reply, state.request_retry, state}
 
   def handle_call(:events, _from, state) do
     events = Enum.reverse(state.events)
