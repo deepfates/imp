@@ -2245,15 +2245,19 @@ defmodule Imp.Predict.ReActV2 do
     end
   end
 
-  # A stored turn that carries the answer of a one-text-output task but no
-  # step outputs (a host wrote it, or it predates the loop's own events) is,
-  # in the step's terms, a step that answered in text: `next_thought` is the
-  # answer and it called nothing. Read that way, every adapter replays it as
-  # the answer the model gave, not as step fields it never filled. Only the
-  # prompt's view changes; the history the caller holds does not. A binary
-  # task output named tool_calls is text, not the stored call collection.
-  defp step_turn(turn, %__MODULE__{signature: signature, finish: finish}) when is_map(turn) do
-    with {:text, [%Imp.Signature.Field{name: name}]} <- text_output(signature, finish),
+  # A stored turn that carries the answer of a one-output task but no step
+  # outputs (a host wrote it, or it predates the loop's own events) is, in the
+  # step's terms, a step that answered in text: `next_thought` is the answer
+  # and it called nothing. Read that way, every adapter replays it as the
+  # answer the model gave, not as step fields it never filled. So it is under
+  # every ending: under `finish: :submit` or `:tools` the turn carries the
+  # task's output, so it is an answer, never a thought, as a plain-text
+  # loop's answer step replayed there is. Without this it showed only its
+  # inputs. Only the prompt's view changes; the history the caller holds
+  # does not. A binary task output named tool_calls is text, not the stored
+  # call collection.
+  defp step_turn(turn, %__MODULE__{signature: signature}) when is_map(turn) do
+    with %Imp.Signature{outputs: [%Imp.Signature.Field{name: name}]} <- signature,
          false <- Imp.FieldMap.has_key?(turn, :next_thought),
          false <-
            Imp.FieldMap.has_key?(turn, :tool_calls) and

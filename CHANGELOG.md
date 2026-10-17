@@ -4,6 +4,19 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Fixed
+
+- ReActV2 under `finish: :submit` or `finish: :tools` replays a stored turn
+  that carries the task's inputs and its one output, and no step of the
+  loop's own (a turn a host wrote, such as a recap that stands in for the
+  earlier conversation), as the model's message holding that output, as
+  `finish: :auto` always has. Since 0.14.0 it replayed only the turn's
+  inputs, under either history replay, so the model read the event and not
+  the answer stored with it. The history the caller holds is unchanged, and
+  no other turn's replay changes. A one-output signature whose output is
+  constrained or not a string under `finish: :auto` gets the same replay
+  when the stored value is a string.
+
 ## 0.16.0 — 2026-10-17
 
 ### Added
