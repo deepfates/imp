@@ -1,13 +1,13 @@
-# Imp v0.16.0
+# Imp v0.16.1
 
 Imp is a framework for typed, optimizable language-model programs on the BEAM.
-This release adds `request_retry:` to `Imp.Run.start/3`, which sends a model
-request the provider failed in a way that may pass again in the same run, after
-a wait. It also changes two things a caller may rely on: an LM client other
-than ReqLLM reports its charge as metadata `:cost`, because `Imp.Core` no longer
-reads it from the usage map; and a ReActV2 forced `submit` with invalid
-arguments goes to the extractor. A new option and changed behaviour make this
-a minor release under Imp's versioning rule.
+This release fixes how ReActV2 replays a history turn that a host stored with
+the task's inputs and its answer, and no step of the loop's own. Under
+`finish: :submit` and `finish: :tools`, since 0.14.0, such a turn replayed only
+its inputs: the model read the event and not the answer stored with it. It now
+replays as the model's message holding that answer, as it always has under
+`finish: :auto`. It adds no options and changes no public API, so under Imp's
+versioning rule this is a patch release.
 
 ## Install
 
@@ -29,44 +29,29 @@ in its release definition; see [releases that use MCP or
 ACP](docs/production.md#releases-that-use-mcp-or-acp).
 Ordinary Imp startup starts no protocol endpoint.
 
-## Changes and upgrading from 0.15
+## Changes and upgrading from 0.16.0
 
-Change the Imp dependency to `{:imp, "~> 0.16.0"}`, run `mix deps.update imp`,
-and commit `mix.lock`. No data migration is needed. Check the second item if
-you use an LM client of your own, or build response envelopes by hand.
+Under `{:imp, "~> 0.16.0"}`, run `mix deps.update imp` and commit `mix.lock`.
+No code or data migration is needed.
 
-- **Added: `request_retry:` on `Imp.Run.start/3`.** `request_retry: [waits:
-  [ms, ...], reserve: ms]` sends a model request that failed with an error
-  `Imp.Errors.retryable?/1` accepts (408, 425, 429, 5xx, a failed connection)
-  again inside `Imp.LM.request/2`, after each wait in turn. Under a deadline
-  the last wait repeats while it leaves `reserve` (60 s by default) of the
-  deadline; without one, the list is the bound. A provider's `retry-after`
-  longer than the wait is waited instead. Each attempt is its own
-  `:model_request` and `:model_response`, and a failed response followed by
-  another attempt carries `retry_in_ms`. Only the outermost request in a
-  process retries, so an LM that wraps an LM does not multiply attempts.
-  Streamed requests are not sent again. `waits` must not be empty. Off unless
-  given. A timed-out attempt may have been finished and billed by the
-  provider without a response to record, so a retry can be billed twice;
-  under a deadline each attempt is capped to the time left.
-- **Changed: where a call's charge is read.** OpenRouter bring-your-own-key
-  billing moved into `Imp.Clients.ReqLLM`, which records the charge it
-  resolves as `:charge` in its `req_llm` response metadata. `Imp.Core` reads
-  `LMResponse.cost` from that `:charge` (final when present, `nil` included),
-  and otherwise from metadata `:cost`; it no longer reads usage `"cost"` or
-  `"is_byok"`. An LM client other than ReqLLM, or a hand-built response
-  envelope, must report its charge as `:cost` in its metadata (or
-  `req_llm.charge`), or its cost is `nil`.
-- **Fixed: a forced `submit` with invalid arguments is extracted.** A ReActV2
-  forced `submit` whose arguments fail validation now goes to the typed
-  extractor and ends `:extracted`, where it ended `:incomplete` with no
-  outputs. If that extraction request fails with an LM error, the call
-  returns `{:error, %Imp.Predict.ReActV2.StepError{}}`, where it returned
-  `{:ok, prediction}` ending `:incomplete`. A forced `submit` the tool policy
-  refuses still ends `:incomplete`.
+- **Fixed: a stored answer turn replays its answer under every ending.**
+  ReActV2 reads a stored turn that carries the inputs and the one output of
+  the task, and neither `next_thought` nor `tool_calls`, as a step that
+  answered in text. Since 0.14.0 it did so only when the program ended in
+  plain text (`finish: :auto`); under `finish: :submit` and `:tools`, with
+  either `history_replay`, the request held the turn's inputs as a user
+  message and no assistant message after them. A host that writes such a
+  turn, for example a recap standing in for the earlier conversation, had
+  its content left out of every request. The turn now replays as one
+  assistant message holding the answer, with no "not sent" line after it,
+  since it carries the task's output. Turns the loop writes itself are
+  unchanged, and the history the caller holds is unchanged. Under
+  `finish: :auto`, a one-output signature whose output is constrained or not
+  typed string gets the same replay when the stored value is a string.
 
-Rollback means restoring `0.15.0` in the lock and removing `request_retry:`.
-See the [changelog](CHANGELOG.md) for every change.
+Rollback means restoring `0.16.0` in the lock; such turns then replay their
+inputs alone again under `finish: :submit` and `:tools`. See the
+[changelog](CHANGELOG.md) for every change.
 
 ## Known limits
 
