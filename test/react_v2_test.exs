@@ -394,6 +394,50 @@ defmodule ReActV2Test do
     end
   end
 
+  # A refused `submit` is not a malformed one: the extractor, which no policy
+  # checks, must not write the outputs the policy refused.
+  test "a forced submit the tool policy refuses ends incomplete, with no extraction" do
+    parent = self()
+
+    lm =
+      action_lm(
+        [
+          %{next_thought: "ready", tool_calls: []},
+          %{
+            tool_calls: [
+              %{id: "forced", name: "submit", arguments: %{answer: "Secret", confidence: 1.0}}
+            ]
+          },
+          %{reasoning: "from the history", answer: "Secret", confidence: 1.0}
+        ],
+        parent
+      )
+
+    policy = fn
+      name, arguments when name in [:submit, "submit"] ->
+        if arguments["answer"] == "Secret", do: {:deny, :secret}, else: :allow
+
+      _name, _arguments ->
+        :allow
+    end
+
+    assert {:ok, prediction} =
+             Imp.react(@submit_signature, [], lm: lm, tool_policy: policy)
+             |> Imp.call(%{question: "Capital of France?"})
+
+    assert prediction.metadata[:termination_reason] == :incomplete
+    assert Imp.get(prediction, :answer) == nil
+    refute Imp.Prediction.complete?(prediction)
+
+    assert_received {:lm_call, _step_opts}
+    assert_received {:lm_call, _forced_opts}
+    refute_received {:lm_call, _extraction_opts}
+
+    %Imp.History{messages: messages} = prediction.metadata[:history]
+    forced = List.last(messages)
+    assert [%{result: {:error, {:tool_denied, _name, :secret}}}] = forced.tool_call_results
+  end
+
   test "a forced submit on an OpenRouter client with a configured effort still runs" do
     # The live failure: a host's client carried an effort, ReAct's forced
     # submit named `reasoning_effort: nil` for that one call, and the client

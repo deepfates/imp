@@ -197,7 +197,9 @@ defmodule Imp.Predict.ReActV2 do
   task outputs from the original inputs and accumulated history
   (`:extracted`), and the outputs are appended to the history as a step that
   called no tool. An invalid forced call stays in the history before them,
-  with its error as its result.
+  with its error as its result. A forced `submit` the tool policy refuses is
+  not sent to the extractor, which no policy checks: the turn ends
+  `:incomplete`.
 
   The last request says nothing about why it is being made unless
   `:last_request_note` is given: one line of host text put in front of it as a
@@ -1373,13 +1375,43 @@ defmodule Imp.Predict.ReActV2 do
           # A forced `submit` whose arguments fail validation (an empty
           # `submit({})`, say, from a model that wrote the arguments in its
           # reasoning) takes the path of a missing call: the extractor, with
-          # the call and its error in the history it reads.
-          if final,
-            do: final_prediction(final, history, :forced_submit, %{termination_cause: reason}),
-            else: extract_final(react, inputs, %{}, history, reason, initial_error)
+          # the call and its error in the history it reads. A `submit` the
+          # tool policy refused is not a malformed answer: its outputs were
+          # refused, and the extractor, which no policy checks, would write
+          # them anyway, so that turn stays `:incomplete`.
+          cond do
+            final ->
+              final_prediction(final, history, :forced_submit, %{termination_cause: reason})
+
+            Enum.all?(results, &invalid_submit_arguments?/1) ->
+              extract_final(react, inputs, %{}, history, reason, initial_error)
+
+            true ->
+              incomplete_prediction(history, reason, initial_error)
+          end
       end
     end
   end
+
+  # The errors `Imp.Tool.validate_input/2` and `validate_submit/2` give a
+  # `submit` call whose arguments do not fit the signature. Every other error
+  # (a policy's denial or failure, an operational safety error) is a refusal.
+  defp invalid_submit_arguments?(%{error: true, result: {:error, reason}}),
+    do: invalid_submit_reason?(reason)
+
+  defp invalid_submit_arguments?(_result), do: false
+
+  defp invalid_submit_reason?({kind, _detail})
+       when kind in [
+              :missing_required,
+              :schema_validation,
+              :missing_output_fields,
+              :invalid_submit_outputs,
+              :invalid_submit_arguments
+            ],
+       do: true
+
+  defp invalid_submit_reason?(_reason), do: false
 
   defp append_thought_only_step(history, pending, prediction, calls) do
     case Imp.get(prediction, :next_thought) do
