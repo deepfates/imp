@@ -341,6 +341,103 @@ defmodule ReActV2Test do
     assert Keyword.get(forced_opts, :reasoning_effort) == nil
   end
 
+  # Some models, made to call `submit` by name, write its arguments in their
+  # reasoning and call it with none, or with arguments that do not validate.
+  # Such a call is kept in the history, and the extractor derives the outputs,
+  # as it does when the forced request calls nothing.
+  for {label, arguments} <- [
+        {"empty arguments", %{}},
+        {"an argument of the wrong type", %{answer: "Paris", confidence: "very"}}
+      ] do
+    test "a forced submit with #{label} goes to the extractor" do
+      parent = self()
+
+      lm =
+        action_lm(
+          [
+            %{next_thought: "ready", tool_calls: []},
+            %{
+              tool_calls: [
+                %{id: "forced", name: "submit", arguments: unquote(Macro.escape(arguments))}
+              ]
+            },
+            %{reasoning: "from the history", answer: "Paris", confidence: 0.9}
+          ],
+          parent
+        )
+
+      assert {:ok, prediction} =
+               Imp.react(@submit_signature, [], lm: lm)
+               |> Imp.call(%{question: "Capital of France?"})
+
+      assert prediction.metadata[:termination_reason] == :extracted
+      assert prediction.metadata[:termination_cause] == :empty_tool_calls
+      assert Imp.get(prediction, :answer) == "Paris"
+      assert Imp.get(prediction, :confidence) == 0.9
+      assert Imp.Prediction.complete?(prediction)
+
+      assert_received {:lm_call, _step_opts}
+      assert_received {:lm_call, forced_opts}
+      assert forced_opts[:tool_choice] == %{type: "tool", name: "submit"}
+      assert_received {:lm_call, extraction_opts}
+      assert extraction_opts[:tools] in [nil, []]
+
+      # The invalid call and its error stay in the history, followed by the
+      # extracted outputs as a step that called no tool.
+      %Imp.History{messages: messages} = prediction.metadata[:history]
+      [extracted, forced | _] = Enum.reverse(messages)
+      assert [%{name: "submit"}] = forced.tool_calls.tool_calls
+      assert [%{error: error}] = forced.tool_call_results
+      assert error
+      assert extracted.tool_calls.tool_calls == []
+      assert extracted.answer == "Paris"
+    end
+  end
+
+  # A refused `submit` is not a malformed one: the extractor, which no policy
+  # checks, must not write the outputs the policy refused.
+  test "a forced submit the tool policy refuses ends incomplete, with no extraction" do
+    parent = self()
+
+    lm =
+      action_lm(
+        [
+          %{next_thought: "ready", tool_calls: []},
+          %{
+            tool_calls: [
+              %{id: "forced", name: "submit", arguments: %{answer: "Secret", confidence: 1.0}}
+            ]
+          },
+          %{reasoning: "from the history", answer: "Secret", confidence: 1.0}
+        ],
+        parent
+      )
+
+    policy = fn
+      name, arguments when name in [:submit, "submit"] ->
+        if arguments["answer"] == "Secret", do: {:deny, :secret}, else: :allow
+
+      _name, _arguments ->
+        :allow
+    end
+
+    assert {:ok, prediction} =
+             Imp.react(@submit_signature, [], lm: lm, tool_policy: policy)
+             |> Imp.call(%{question: "Capital of France?"})
+
+    assert prediction.metadata[:termination_reason] == :incomplete
+    assert Imp.get(prediction, :answer) == nil
+    refute Imp.Prediction.complete?(prediction)
+
+    assert_received {:lm_call, _step_opts}
+    assert_received {:lm_call, _forced_opts}
+    refute_received {:lm_call, _extraction_opts}
+
+    %Imp.History{messages: messages} = prediction.metadata[:history]
+    forced = List.last(messages)
+    assert [%{result: {:error, {:tool_denied, _name, :secret}}}] = forced.tool_call_results
+  end
+
   test "a forced submit on an OpenRouter client with a configured effort still runs" do
     # The live failure: a host's client carried an effort, ReAct's forced
     # submit named `reasoning_effort: nil` for that one call, and the client
