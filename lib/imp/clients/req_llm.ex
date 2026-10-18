@@ -1253,6 +1253,7 @@ defmodule Imp.Clients.ReqLLM do
           content,
           Map.get(message, :tool_calls) || Map.get(message, "tool_calls")
         )
+        |> put_participant_name(message)
         |> preserve_reasoning(message, openrouter?)
 
       # Messages that went through a JSON round trip (ReqLLMBatch checkpoints,
@@ -1265,12 +1266,23 @@ defmodule Imp.Clients.ReqLLM do
           content,
           Map.get(message, "tool_calls") || Map.get(message, :tool_calls)
         )
+        |> put_participant_name(message)
         |> preserve_reasoning(message, openrouter?)
 
       other ->
         ReqLLM.Context.user(inspect(other))
     end)
     |> unique_tool_call_ids()
+  end
+
+  # A message may carry an optional participant `name` (OpenAI chat format).
+  # It is copied onto the ReqLLM message only when present, so providers whose
+  # encoders do not know the field never see it.
+  defp put_participant_name(%ReqLLM.Message{} = req_message, message) do
+    case Map.get(message, :name) || Map.get(message, "name") do
+      name when is_binary(name) and name != "" -> %{req_message | name: name}
+      _absent -> req_message
+    end
   end
 
   # A tool result names its call by ID, so the IDs in one request must be

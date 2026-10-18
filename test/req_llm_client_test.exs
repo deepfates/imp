@@ -1344,6 +1344,53 @@ defmodule ReqLLMClientTest do
     assert filename == Path.basename(path)
   end
 
+  # The OpenAI chat format lets a message name its participant. A name given on
+  # an Imp message, under an atom or string key, reaches the ReqLLM message and
+  # the OpenAI-compatible wire body; a message without one carries no `name`.
+  test "a message's participant name is sent only when the message has one" do
+    lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: TextStub)
+
+    messages = [
+      %{role: "user", content: "hi", name: "alice"},
+      %{"role" => "assistant", "content" => "hello", "name" => "imp_1"},
+      %{role: :user, content: "unnamed"}
+    ]
+
+    assert {:ok, _prediction} = Imp.LM.generate(lm, messages)
+
+    assert_received {:req_llm_generate, "openai:gpt-test", req_messages, _opts}
+    assert Enum.map(req_messages, & &1.name) == ["alice", "imp_1", nil]
+
+    wire =
+      ReqLLM.Provider.Defaults.encode_context_to_openai_format(
+        ReqLLM.Context.new(req_messages),
+        "gpt-test"
+      )
+
+    assert [first, second, third] = wire.messages
+    assert first.name == "alice"
+    assert second.name == "imp_1"
+    refute Map.has_key?(third, :name)
+  end
+
+  test "a streamed predictor sends the request's user_name as the message name" do
+    lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: TextStub, cache: false)
+    program = Imp.predict("question -> answer", lm: lm)
+
+    assert {:ok, _prediction} =
+             Imp.Streaming.collect(program, %{question: "pong", user_name: "alice"},
+               provider_stream: true
+             )
+
+    assert_received {:req_llm_stream, "openai:gpt-test",
+                     [
+                       %ReqLLM.Message{role: :system, name: nil},
+                       %ReqLLM.Message{role: :user} = user
+                     ], _opts}
+
+    assert user.name == "alice"
+  end
+
   test "ReqLLM receives original multimodal bytes and pre-uploaded file identity" do
     lm = Imp.req_llm("openai:gpt-test", test_pid: self(), req_module: TextStub)
 

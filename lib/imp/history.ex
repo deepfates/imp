@@ -11,6 +11,8 @@ defmodule Imp.History do
   The Chat adapter renders each turn as prior user/assistant messages by
   splitting the fields according to the active signature, which keeps a history
   serializable and independent of any one provider's chat message schema.
+  A turn may also carry `:user_name` and `:assistant_name` to give its
+  messages a participant name; see "Naming messages" in `Imp.Adapter.Chat`.
 
       iex> history =
       ...>   Imp.History.new()

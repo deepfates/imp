@@ -534,7 +534,9 @@ defmodule Imp.Predict do
   defp fetch_input(inputs, name), do: Imp.FieldMap.get(inputs, name)
 
   defp validate_inputs(signature, inputs) do
-    :ok = warn_extra_inputs(signature, inputs)
+    # `:user_name` names the request message (see `Imp.Adapter.Chat`); it is
+    # message metadata, not an ignored field.
+    :ok = warn_extra_inputs(signature, inputs, [:user_name])
     :ok = warn_type_mismatches(signature, inputs)
 
     required =
