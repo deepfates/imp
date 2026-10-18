@@ -14,9 +14,11 @@ User-visible changes to Imp are recorded here.
   history turn names its messages with `:user_name` and `:assistant_name`
   beside its fields, and the request inputs name the final user message with
   `:user_name`. These keys are never rendered as fields, `Imp.Predict` does not
-  warn about `:user_name` as an extra input, and a signature that declares a
-  field of either name keeps it as an ordinary field. See "Naming messages" in
-  `Imp.Adapter.Chat`.
+  warn about `:user_name` as an extra input when its adapter builds messages
+  this way (Chat, JSON, XML, PlanFirst), and a signature that declares a field
+  of either name keeps it as an ordinary field. Many upstreams accept `name`
+  without showing it to the model, so identity that matters belongs in the
+  content too. See "Naming messages" in `Imp.Adapter.Chat`.
 
 ## 0.16.1 — 2026-10-17
 

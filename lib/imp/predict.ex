@@ -135,7 +135,7 @@ defmodule Imp.Predict do
          adapter <- resolve_adapter(predict),
          {:ok, inputs} <- normalize_inputs(inputs),
          inputs = apply_input_defaults(predict.signature, inputs),
-         :ok <- validate_inputs(predict.signature, inputs),
+         :ok <- validate_inputs(predict.signature, inputs, adapter),
          {:ok, request_signature, request_config, reasoning_fields} <-
            prepare_native_reasoning(predict.signature, lm, predict.config),
          {format_signature, request_config} =
@@ -533,10 +533,20 @@ defmodule Imp.Predict do
 
   defp fetch_input(inputs, name), do: Imp.FieldMap.get(inputs, name)
 
-  defp validate_inputs(signature, inputs) do
-    # `:user_name` names the request message (see `Imp.Adapter.Chat`); it is
-    # message metadata, not an ignored field.
-    :ok = warn_extra_inputs(signature, inputs, [:user_name])
+  # Adapters that build their messages with `Imp.Adapter.Chat`'s assembly read
+  # a request's `:user_name` as the user message's participant name (see
+  # "Naming messages" there); any other adapter ignores it, so the warning
+  # stays.
+  @message_naming_adapters [
+    Imp.Adapter.Chat,
+    Imp.Adapter.JSON,
+    Imp.Adapter.XML,
+    Imp.Adapter.PlanFirst
+  ]
+
+  defp validate_inputs(signature, inputs, adapter) do
+    except = if adapter in @message_naming_adapters, do: [:user_name], else: []
+    :ok = warn_extra_inputs(signature, inputs, except)
     :ok = warn_type_mismatches(signature, inputs)
 
     required =
