@@ -4,6 +4,20 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Added
+
+- Messages can carry a participant `name` (the OpenAI chat format's optional
+  `name`). `Imp.Clients.ReqLLM` now sends a message's `name` (atom or string
+  key) to the provider; before, it was dropped. A message without one goes out
+  as before, and a provider whose format has no such field does not receive
+  it. With `Imp.Adapter.Chat` (and the JSON and XML adapters built on it), a
+  history turn names its messages with `:user_name` and `:assistant_name`
+  beside its fields, and the request inputs name the final user message with
+  `:user_name`. These keys are never rendered as fields, `Imp.Predict` does not
+  warn about `:user_name` as an extra input, and a signature that declares a
+  field of either name keeps it as an ordinary field. See "Naming messages" in
+  `Imp.Adapter.Chat`.
+
 ## 0.16.1 — 2026-10-17
 
 ### Fixed

@@ -46,6 +46,31 @@ defmodule Imp.Adapter.Chat do
   so the record the loop keeps is unchanged. Options outside that list
   are ignored; anything that is not a keyword list raises `ArgumentError`.
 
+  ## Naming messages
+
+  A message can carry a participant `name` (the OpenAI chat format's optional
+  `name`, which providers expect to match `^[a-zA-Z0-9_-]{1,64}$`). A history
+  turn names its own messages with two keys beside its fields: `:user_name`
+  for the turn's user message and `:assistant_name` for its assistant message.
+  The request inputs name the final user message with `:user_name`:
+
+      history =
+        Imp.History.new([
+          %{question: "Who won?", answer: "Blue team.", user_name: "alice"},
+          %{question: "By how much?", answer: "Two points.", user_name: "bob"}
+        ])
+
+      Imp.Predict.call(predict, %{question: "Rematch?", history: history, user_name: "alice"})
+
+  These keys are message metadata: they are never rendered as fields, a
+  message is named only when the key holds a non-empty string, and the name is
+  passed through as given (a provider that rejects a malformed name says so).
+  Notes and tool results are never named. A signature that declares a field
+  called `user_name` or `assistant_name` keeps it as an ordinary field. The
+  ReqLLM client copies the name onto the message it sends; a provider whose
+  format has no such field (Anthropic's Messages API) does not receive it, and
+  a message without a name goes out exactly as before.
+
   ## Extending the default rendering
 
   A renderer runs for whichever adapter formats the request, which is not
@@ -183,6 +208,8 @@ defmodule Imp.Adapter.Chat do
           render_response_instruction(signature, response_instruction?)
         )
     }
+
+    request = put_message_name(request, signature, inputs, :user_name)
 
     # With nothing new to ask, the request ends on the history. If that ends
     # on a thought-only step shown as the model's own message, the thought
@@ -1436,15 +1463,22 @@ defmodule Imp.Adapter.Chat do
 
           true ->
             [
-              %{
-                role: :user,
-                content:
-                  render_inputs(signature, turn,
-                    skip: history_input_fields(signature),
-                    section_renderer: renderers.input_section
-                  )
-              },
-              recorded_reply(signature, turn, renderers.output)
+              put_message_name(
+                %{
+                  role: :user,
+                  content:
+                    render_inputs(signature, turn,
+                      skip: history_input_fields(signature),
+                      section_renderer: renderers.input_section
+                    )
+                },
+                signature,
+                turn,
+                :user_name
+              ),
+              signature
+              |> recorded_reply(turn, renderers.output)
+              |> put_message_name(signature, turn, :assistant_name)
             ]
             |> Enum.reject(&(is_nil(&1) or blank_message?(&1)))
         end
@@ -1523,14 +1557,20 @@ defmodule Imp.Adapter.Chat do
 
     results = List.wrap(fetch_field(turn, :tool_call_results))
 
-    user = %{
-      role: :user,
-      content:
-        render_inputs(signature, turn,
-          skip: history_input_fields(signature),
-          section_renderer: renderers.input_section
-        )
-    }
+    user =
+      put_message_name(
+        %{
+          role: :user,
+          content:
+            render_inputs(signature, turn,
+              skip: history_input_fields(signature),
+              section_renderer: renderers.input_section
+            )
+        },
+        signature,
+        turn,
+        :user_name
+      )
 
     step =
       turn
@@ -1574,6 +1614,8 @@ defmodule Imp.Adapter.Chat do
       if calls == [] and not recorded_output?(signature, turn),
         do: nil,
         else: recorded_reply(signature, step, renderers.output)
+
+    assistant = put_message_name(assistant, signature, turn, :assistant_name)
 
     Enum.reject([user, assistant | result_messages], &(is_nil(&1) or blank_message?(&1)))
   end
@@ -1626,14 +1668,20 @@ defmodule Imp.Adapter.Chat do
 
     tool_result_renderer = renderers.tool_result
 
-    user = %{
-      role: :user,
-      content:
-        render_inputs(signature, turn,
-          skip: history_input_fields(signature),
-          section_renderer: renderers.input_section
-        )
-    }
+    user =
+      put_message_name(
+        %{
+          role: :user,
+          content:
+            render_inputs(signature, turn,
+              skip: history_input_fields(signature),
+              section_renderer: renderers.input_section
+            )
+        },
+        signature,
+        turn,
+        :user_name
+      )
 
     # A tool loop's step records its text as `next_thought`, beside the
     # outputs a `submit` call carried. Any other predictor that names a
@@ -1658,12 +1706,14 @@ defmodule Imp.Adapter.Chat do
         else: %{role: :assistant, content: thought, tool_calls: calls}
 
     assistant =
-      Enum.reduce([:reasoning_content, :reasoning_details], base, fn field, message ->
+      [:reasoning_content, :reasoning_details]
+      |> Enum.reduce(base, fn field, message ->
         case fetch_field(turn, field) do
           nil -> message
           value -> Map.put(message, field, value)
         end
       end)
+      |> put_message_name(signature, turn, :assistant_name)
 
     rendered_results =
       Enum.map(results, fn result ->
@@ -1690,9 +1740,21 @@ defmodule Imp.Adapter.Chat do
 
     answered =
       cond do
-        is_nil(answer) -> []
-        calls == [] -> []
-        true -> [%{role: :assistant, content: answer}]
+        is_nil(answer) ->
+          []
+
+        calls == [] ->
+          []
+
+        true ->
+          [
+            put_message_name(
+              %{role: :assistant, content: answer},
+              signature,
+              turn,
+              :assistant_name
+            )
+          ]
       end
 
     assistant =
@@ -1855,6 +1917,24 @@ defmodule Imp.Adapter.Chat do
     |> Enum.filter(&(&1.type == :history or Imp.FieldMap.same_name?(&1.name, :history)))
     |> Enum.map(& &1.name)
     |> MapSet.new()
+  end
+
+  # A turn's (or the request's) `:user_name` and `:assistant_name` keys name
+  # its user and assistant messages: the participant `name` of the OpenAI chat
+  # format. They are message metadata, never rendered as fields, and a message
+  # is named only when the key holds a non-empty string. A signature that
+  # declares a field of that name keeps it as a field, so the key never means
+  # two things at once.
+  defp put_message_name(nil, _signature, _source, _key), do: nil
+
+  defp put_message_name(message, signature, source, key) do
+    declared? =
+      Enum.any?(signature.inputs ++ signature.outputs, &Imp.FieldMap.same_name?(&1.name, key))
+
+    case if(declared?, do: nil, else: fetch_field(source, key)) do
+      name when is_binary(name) and name != "" -> Map.put(message, :name, name)
+      _absent -> message
+    end
   end
 
   defp blank_message?(%{content: content}) when is_binary(content), do: String.trim(content) == ""
