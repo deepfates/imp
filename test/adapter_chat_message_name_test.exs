@@ -111,4 +111,28 @@ defmodule Imp.Adapter.ChatMessageNameTest do
     refute log =~ "not in signature"
     assert_received {:messages, [%{role: :system}, %{role: :user, name: "alice"}]}
   end
+
+  defmodule PlainAdapter do
+    @behaviour Imp.Adapter
+
+    @impl true
+    def format(_signature, inputs, _opts),
+      do: [%{role: :user, content: Map.fetch!(inputs, :question)}]
+
+    @impl true
+    def parse(signature, raw, opts), do: Imp.Adapter.Chat.parse(signature, raw, opts)
+  end
+
+  test "an adapter that does not name messages still warns about user_name" do
+    lm = Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "hello"} end)
+    program = Imp.predict("question -> answer", lm: lm, adapter: PlainAdapter)
+
+    log =
+      capture_log(fn ->
+        assert {:ok, _prediction} = Imp.call(program, %{question: "hi", user_name: "alice"})
+      end)
+
+    assert log =~ "not in signature"
+    assert log =~ "user_name"
+  end
 end

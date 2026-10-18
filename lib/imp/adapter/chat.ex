@@ -71,6 +71,12 @@ defmodule Imp.Adapter.Chat do
   format has no such field (Anthropic's Messages API) does not receive it, and
   a message without a name goes out exactly as before.
 
+  A name that reaches the provider is not always shown to the model. Many
+  upstreams accept the field and drop it, among them Google's, DeepSeek's,
+  Kimi's, Mistral's and Grok's, and open-weight models served through hosts
+  such as DeepInfra, whose chat templates have no place for it. When the model
+  must know who is speaking, say so in the message content as well.
+
   ## Extending the default rendering
 
   A renderer runs for whichever adapter formats the request, which is not
