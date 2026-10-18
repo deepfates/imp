@@ -62,9 +62,9 @@ inputs, now sends it.
   open-weight models served through hosts such as DeepInfra. When the model
   must know who is speaking, say so in the content too.
 
-Rollback means restoring `{:imp, "~> 0.16.0"}` and `0.16.1` in the lock; names are then dropped again
-and `:user_name` in the inputs warns as an extra input. See the
-[changelog](CHANGELOG.md) for every change.
+Rollback means restoring `{:imp, "~> 0.16.0"}` and `0.16.1` in the lock;
+names are then dropped again and `:user_name` in the inputs warns as an
+extra input. See the [changelog](CHANGELOG.md) for every change.
 
 ## Known limits
 
