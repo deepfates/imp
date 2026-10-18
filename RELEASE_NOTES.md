@@ -1,20 +1,21 @@
-# Imp v0.16.2
+# Imp v0.17.0
 
 Imp is a framework for typed, optimizable language-model programs on the BEAM.
 This release sends a chat message's participant `name` (the OpenAI chat
 format's optional `name`) to the provider, where Imp used to drop it, and lets
 a program name the messages of its history turns and its request. A message
 without a name is sent exactly as before, so no caller that does not name
-messages sees any change. Under Imp's versioning rule this is a patch release.
+messages sees any change. The new input keys are public API a caller can rely
+on, so under Imp's versioning rule this is a minor release.
 
 ## Install
 
 ```elixir
-{:imp, "~> 0.16.0"}
+{:imp, "~> 0.17.0"}
 ```
 
-`~> 0.16.0` takes later 0.16 patch releases and nothing newer. The two-part
-form, `~> 0.16`, means `>= 0.16.0 and < 1.0.0` in Mix, so `mix deps.update
+`~> 0.17.0` takes later 0.17 patch releases and nothing newer. The two-part
+form, `~> 0.17`, means `>= 0.17.0 and < 1.0.0` in Mix, so `mix deps.update
 imp` under it takes every later 0.x release, including minor releases that
 change what callers receive.
 
@@ -29,8 +30,10 @@ Ordinary Imp startup starts no protocol endpoint.
 
 ## Changes and upgrading from 0.16.1
 
-Under `{:imp, "~> 0.16.0"}`, run `mix deps.update imp` and commit `mix.lock`.
-No code or data migration is needed.
+Change the Imp dependency to `{:imp, "~> 0.17.0"}`, run `mix deps.update imp`,
+and commit `mix.lock`. No code or data migration is needed. A program that
+already puts `name` on a message it gives `Imp.LM`, or `:user_name` in its
+inputs, now sends it.
 
 - **Added: participant names reach the provider.** `Imp.Clients.ReqLLM`
   copies a message's `name` (atom or string key) onto the message it sends,
@@ -59,7 +62,7 @@ No code or data migration is needed.
   open-weight models served through hosts such as DeepInfra. When the model
   must know who is speaking, say so in the content too.
 
-Rollback means restoring `0.16.1` in the lock; names are then dropped again
+Rollback means restoring `{:imp, "~> 0.16.0"}` and `0.16.1` in the lock; names are then dropped again
 and `:user_name` in the inputs warns as an extra input. See the
 [changelog](CHANGELOG.md) for every change.
 

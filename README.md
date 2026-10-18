@@ -145,7 +145,7 @@ text or JSON you can score, such as an agent's tool descriptions.
 ## Install
 
 ```elixir
-{:imp, "~> 0.16.0"}
+{:imp, "~> 0.17.0"}
 ```
 
 Imp needs Elixir 1.19 or later and a C and C++ compiler, for the native code
@@ -162,7 +162,7 @@ large-scale benchmarking. Bug reports and pull requests are welcome.
 - [Getting started](docs/getting-started/index.md) builds one program step by
   step, from the first call to a supervised server, with real scores.
 - [Coming from DSPy](docs/coming-from-dspy.md) maps DSPy's names to Imp's.
-- [Tutorials](https://github.com/deepfates/imp/tree/v0.16.2/livebooks) are Livebook notebooks
+- [Tutorials](https://github.com/deepfates/imp/tree/v0.17.0/livebooks) are Livebook notebooks
   you can run offline or with a key.
 - The [cheatsheet](docs/cheatsheet.cheatmd) has the common calls on one page.
 
