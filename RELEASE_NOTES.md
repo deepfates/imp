@@ -1,13 +1,11 @@
-# Imp v0.16.1
+# Imp v0.16.2
 
 Imp is a framework for typed, optimizable language-model programs on the BEAM.
-This release fixes how ReActV2 replays a history turn that a host stored with
-the task's inputs and its answer, and no step of the loop's own. Under
-`finish: :submit` and `finish: :tools`, since 0.14.0, such a turn replayed only
-its inputs: the model read the event and not the answer stored with it. It now
-replays as the model's message holding that answer, as it always has under
-`finish: :auto`. It adds no options and changes no public API, so under Imp's
-versioning rule this is a patch release.
+This release sends a chat message's participant `name` (the OpenAI chat
+format's optional `name`) to the provider, where Imp used to drop it, and lets
+a program name the messages of its history turns and its request. A message
+without a name is sent exactly as before, so no caller that does not name
+messages sees any change. Under Imp's versioning rule this is a patch release.
 
 ## Install
 
@@ -29,28 +27,40 @@ in its release definition; see [releases that use MCP or
 ACP](docs/production.md#releases-that-use-mcp-or-acp).
 Ordinary Imp startup starts no protocol endpoint.
 
-## Changes and upgrading from 0.16.0
+## Changes and upgrading from 0.16.1
 
 Under `{:imp, "~> 0.16.0"}`, run `mix deps.update imp` and commit `mix.lock`.
 No code or data migration is needed.
 
-- **Fixed: a stored answer turn replays its answer under every ending.**
-  ReActV2 reads a stored turn that carries the inputs and the one output of
-  the task, and neither `next_thought` nor `tool_calls`, as a step that
-  answered in text. Since 0.14.0 it did so only when the program ended in
-  plain text (`finish: :auto`); under `finish: :submit` and `:tools`, with
-  either `history_replay`, the request held the turn's inputs as a user
-  message and no assistant message after them. A host that writes such a
-  turn, for example a recap standing in for the earlier conversation, had
-  its content left out of every request. The turn now replays as one
-  assistant message holding the answer, with no "not sent" line after it,
-  since it carries the task's output. Turns the loop writes itself are
-  unchanged, and the history the caller holds is unchanged. Under
-  `finish: :auto`, a one-output signature whose output is constrained or not
-  typed string gets the same replay when the stored value is a string.
+- **Added: participant names reach the provider.** `Imp.Clients.ReqLLM`
+  copies a message's `name` (atom or string key) onto the message it sends,
+  for generated, streamed and batched requests. Before, `Imp.LM.generate(lm,
+  [%{role: "user", content: "hi", name: "alice"}])` went out with no `name`.
+  A provider whose format has no such field, such as Anthropic's Messages
+  API, does not receive it.
+- **Added: naming messages through the adapters.** With `Imp.Adapter.Chat`,
+  and the JSON, XML and PlanFirst adapters built on it, a history turn names
+  its user message with `:user_name` and its assistant message with
+  `:assistant_name`, beside its fields, and the request inputs name the final
+  user message with `:user_name`:
 
-Rollback means restoring `0.16.0` in the lock; such turns then replay their
-inputs alone again under `finish: :submit` and `:tools`. See the
+  ```elixir
+  history = Imp.History.new([%{question: "Who won?", answer: "Blue.", user_name: "alice"}])
+  Imp.call(predict, %{question: "Rematch?", history: history, user_name: "bob"})
+  ```
+
+  The keys are never rendered as fields, and tool results and notes are
+  never named. A signature that declares a field called `user_name` or
+  `assistant_name` keeps it as an ordinary field. `Imp.Predict` does not warn
+  about `:user_name` as an extra input under those adapters. ReActV2 names
+  the turns of a history it is given, but not its request message.
+- **Not every model sees the name.** Many upstreams accept `name` and drop
+  it, among them Google's, DeepSeek's, Kimi's, Mistral's and Grok's, and
+  open-weight models served through hosts such as DeepInfra. When the model
+  must know who is speaking, say so in the content too.
+
+Rollback means restoring `0.16.1` in the lock; names are then dropped again
+and `:user_name` in the inputs warns as an extra input. See the
 [changelog](CHANGELOG.md) for every change.
 
 ## Known limits

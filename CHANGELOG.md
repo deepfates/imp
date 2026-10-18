@@ -4,6 +4,8 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+## 0.16.2 — 2026-10-18
+
 ### Added
 
 - Messages can carry a participant `name` (the OpenAI chat format's optional
