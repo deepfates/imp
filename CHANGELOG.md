@@ -15,6 +15,11 @@ User-visible changes to Imp are recorded here.
   too, and the cookie rule inside a string also catches a prefixed name
   (`_myapp_session=`).
 
+- `Imp.MCP.Trust` no longer crashes, and logs no error with a stack trace,
+  when an MCP connection ends while the VM is shutting down. The application
+  controller refuses to change configuration then, and there is nothing left
+  to untrust.
+
 ## 0.17.0 — 2026-10-18
 
 ### Added
