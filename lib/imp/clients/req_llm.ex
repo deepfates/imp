@@ -41,13 +41,18 @@ defmodule Imp.Clients.ReqLLM do
 
   A non-streamed call waits up to `:receive_timeout` for the provider's
   answer, 10 minutes unless the client or the call sets it, and no longer
-  than the `Imp.Deadline` left. ReqLLM's own retries are off: an attempt
-  whose connection closed or was refused is sent again at once, and one the
-  provider answered 429 or 529 after its `retry-after` (or a second), up to
-  `:max_retries` times (3 unless set; `0`, or `retry: false` in
-  `:req_http_options`, sends nothing again). A timed-out attempt is not sent
-  again. Inside an `Imp.Run` each resend is a `:model_resend` event naming the
-  call's `model_call_id`.
+  than the `Imp.Deadline` left. ReqLLM's own retries are off, for streamed
+  and non-streamed calls alike: an attempt whose connection closed or was
+  refused is sent again at once, and one the provider answered 429 or 529
+  after its `retry-after` (or a second), up to `:max_retries` times (3 unless
+  set; `0`, or `retry: false` in `:req_http_options`, sends nothing again).
+  A timed-out attempt is not sent again, nor one whose `retry-after` is over
+  a minute, nor, under a deadline, one that would have less than 5 seconds
+  left after its wait: the call returns the failure it got. A stream is
+  opened again only before its first chunk, and not after its connection
+  closed, since the provider may already have been working on it. Inside an
+  `Imp.Run` each resend is a `:model_resend` event naming the call's
+  `model_call_id`.
 
   `stream/3` ends with exactly one terminal event. A provider stream that runs
   to its end closes with `done: true` and the metadata the provider reported
@@ -87,6 +92,18 @@ defmodule Imp.Clients.ReqLLM do
 
   # ReqLLM's own number of resends (`ReqLLM.Step.Retry`).
   @default_transport_resends 3
+
+  # The longest `retry-after` the client waits before sending a call again
+  # (see `resend_wait/1`): a minute, `Imp.Clients.ReqLLMBatch`'s default
+  # `:max_retry_wait`. A provider asking for longer is saying more than a
+  # brief overload, and a call that silently sleeps for it, up to three
+  # times, looks hung; the 429 goes to the caller instead.
+  @max_resend_wait 60_000
+
+  # Under a deadline, the least time an attempt sent again after a wait must
+  # have left once the wait is over. A model's first byte alone often takes a second or more,
+  # so an attempt with less than this would mostly end as a timeout.
+  @resend_reserve 5_000
 
   require Logger
 
@@ -513,22 +530,35 @@ defmodule Imp.Clients.ReqLLM do
   # `retry-after`, or a second. A timed-out attempt is not sent again here: the
   # provider may have done, and billed, the work with no answer to show for
   # it. A run's `request_retry:` may send it again, as a model call of its
-  # own. Under a deadline, a wait that would outlast it is not taken.
-  defp resend_wait(%Imp.LMError{status: status} = error) do
-    wait =
-      cond do
-        status in [429, 529] -> Imp.Clients.ReqLLMBatch.retry_after_ms(error) || 1_000
-        is_nil(status) and transport_reason(error.reason) in [:closed, :econnrefused] -> 0
-        true -> nil
-      end
-
-    case {wait, Imp.Deadline.remaining(Imp.Deadline.current())} do
+  # own.
+  #
+  # A provider that asks for a wait longer than `@max_resend_wait` is not
+  # waited for here, deadline or none: the 429 is returned, and the run's
+  # `request_retry:` or the caller decides whether to wait that long. Under a
+  # deadline, an attempt that must wait first is sent again only if the wait
+  # leaves it `@resend_reserve` to answer; one sent with less would most
+  # likely end as a timeout, which hides the 429 that was the call's real
+  # failure. One sent at once (a closed or refused connection) takes nothing
+  # from the time left by waiting, and is sent while any is left.
+  defp resend_wait(%Imp.LMError{} = error) do
+    case {failure_wait(error), Imp.Deadline.remaining(Imp.Deadline.current())} do
       {nil, _remaining} -> nil
+      {wait, _remaining} when wait > @max_resend_wait -> nil
       {wait, :infinity} -> wait
-      {wait, remaining} when wait < remaining -> wait
-      _outlasts_deadline -> nil
+      {0, remaining} when remaining > 0 -> 0
+      {wait, remaining} when remaining - wait >= @resend_reserve -> wait
+      _no_time_to_answer -> nil
     end
   end
+
+  defp failure_wait(%Imp.LMError{status: status} = error) when status in [429, 529],
+    do: Imp.Clients.ReqLLMBatch.retry_after_ms(error) || 1_000
+
+  defp failure_wait(%Imp.LMError{status: nil, reason: reason}) do
+    if transport_reason(reason) in [:closed, :econnrefused], do: 0
+  end
+
+  defp failure_wait(_error), do: nil
 
   defp send_generate(lm, messages, opts) do
     provider = model_provider(lm.model)
@@ -620,6 +650,10 @@ defmodule Imp.Clients.ReqLLM do
 
   defp lm_error(reason, provider), do: lm_error(reason, retryable?(reason), provider)
 
+  # An error this client already made (a stream that failed to open) is
+  # returned as it is, not wrapped in another.
+  defp lm_error(%Imp.LMError{} = error, _retryable, _provider), do: error
+
   defp lm_error(reason, retryable, provider) do
     stripped = only_retry_after_header(reason)
 
@@ -641,6 +675,10 @@ defmodule Imp.Clients.ReqLLM do
   defp content_filtered?(_reason), do: false
 
   defp status(%{status: status}) when is_integer(status), do: status
+
+  # A stream that failed before its first byte wraps the HTTP error it got
+  # (`ReqLLM.Streaming`), so a streamed 429 is a 429 like a non-streamed one.
+  defp status(%ReqLLM.Error.API.Stream{cause: cause}) when not is_nil(cause), do: status(cause)
   defp status(_reason), do: nil
 
   # One rule for `retryable` (see `Imp.LMError`): a status that says try
@@ -695,8 +733,9 @@ defmodule Imp.Clients.ReqLLM do
        when module in [Req.HTTPError, Finch.Error],
        do: :pool_not_available
 
-  defp transport_reason(%ReqLLM.Error.API.Request{cause: cause}) when not is_nil(cause),
-    do: transport_reason(cause)
+  defp transport_reason(%module{cause: cause})
+       when module in [ReqLLM.Error.API.Request, ReqLLM.Error.API.Stream] and not is_nil(cause),
+       do: transport_reason(cause)
 
   defp transport_reason(_reason), do: nil
 
@@ -912,13 +951,15 @@ defmodule Imp.Clients.ReqLLM do
     {input_envelope, opts} = Keyword.pop(opts, :input_envelope)
     enforce_input_envelope!(messages, input_envelope)
 
-    opts =
+    {resends, opts} =
       opts
       |> normalize_opts()
       |> normalize_stream_cache()
       |> normalize_provider_profile_opts(lm.model)
+      |> enforce_explicit_no_retry()
+      |> transport_resends()
 
-    normalize_stream(lm, messages, opts)
+    normalize_stream(lm, messages, opts, resends)
   end
 
   # Imp's public boolean controls the Imp response cache. ReqLLM's :cache
@@ -939,7 +980,6 @@ defmodule Imp.Clients.ReqLLM do
       |> encode_openrouter_reasoning(lm.model)
       |> atomize_reasoning_effort()
       |> cap_transport_timeouts()
-      |> enforce_explicit_no_retry()
 
     open_provider_stream(lm, messages, opts)
   end
@@ -2505,53 +2545,64 @@ defmodule Imp.Clients.ReqLLM do
 
   defp from_stream_chunk(_chunk), do: []
 
-  defp normalize_stream(lm, messages, opts) do
+  defp normalize_stream(lm, messages, opts, resends) do
     Stream.resource(
-      fn -> open_stream(lm, messages, opts) end,
+      fn -> open_stream(lm, messages, opts, resends) end,
       &next_stream_chunk/1,
       &cleanup_stream(&1, lm)
     )
   end
 
-  defp open_stream(lm, messages, opts) do
+  defp open_stream(lm, messages, opts, resends) do
     Imp.Telemetry.execute([:imp, :lm, :stream, :start], %{system_time: System.system_time()}, %{
       lm: redact_lm(lm)
     })
 
+    open_attempt(%{lm: lm, messages: messages, opts: opts, resends: resends}, 1)
+  end
+
+  # One attempt at the provider stream. The call's own parts are kept in the
+  # state so that an attempt that fails before its first chunk can be made
+  # again (`fail_or_resend/2`); each attempt's timeouts are capped to the
+  # deadline left when it starts.
+  defp open_attempt(call, attempt) do
+    %{lm: lm, messages: messages, opts: opts} = call
+
+    base = %{
+      call: call,
+      attempt: attempt,
+      attempt_started: System.monotonic_time(:millisecond),
+      response: nil,
+      resume: nil,
+      continuation: nil,
+      started?: false,
+      completed?: false,
+      failed?: false,
+      terminal_error: nil,
+      metadata: %{},
+      provider: model_provider(lm.model)
+    }
+
     case safe_stream(lm, messages, opts) do
       {:ok, %ReqLLM.StreamResponse{} = response} ->
-        %{
-          response: response,
-          resume: fn -> suspend_stream(response.stream) end,
-          continuation: nil,
-          started?: false,
-          completed?: false,
-          failed?: false,
-          terminal_error: nil,
-          metadata: %{},
-          provider: model_provider(lm.model)
-        }
+        %{base | response: response, resume: fn -> suspend_stream(response.stream) end}
 
       {:error, reason} ->
-        %{
-          response: nil,
-          resume: nil,
-          continuation: nil,
-          started?: false,
-          completed?: false,
-          failed?: true,
-          terminal_error: reason,
-          metadata: %{},
-          provider: model_provider(lm.model)
-        }
+        %{base | failed?: true, terminal_error: reason}
     end
   end
 
   defp next_stream_chunk(%{completed?: true} = state), do: {:halt, state}
 
   defp next_stream_chunk(%{terminal_error: reason} = state) when not is_nil(reason) do
-    {[%Imp.Streaming.Messages.StreamResponse{chunk: {:error, reason}, done: true}],
-     %{state | completed?: true, terminal_error: nil}}
+    case fail_or_resend(%{state | terminal_error: nil}, reason) do
+      :failed ->
+        {[%Imp.Streaming.Messages.StreamResponse{chunk: {:error, reason}, done: true}],
+         %{state | completed?: true, terminal_error: nil}}
+
+      {:resent, next} ->
+        next
+    end
   end
 
   defp next_stream_chunk(state) do
@@ -2578,10 +2629,64 @@ defmodule Imp.Clients.ReqLLM do
         finish_stream(%{state | continuation: nil, started?: true})
     end
   rescue
-    error -> stream_failure(state, error)
+    error -> resend_or_stream_failure(state, error)
   catch
-    kind, reason -> stream_failure(state, {kind, reason})
+    kind, reason -> resend_or_stream_failure(state, {kind, reason})
   end
+
+  defp resend_or_stream_failure(state, error) do
+    case fail_or_resend(state, error) do
+      :failed -> stream_failure(state, error)
+      {:resent, next} -> next
+    end
+  end
+
+  # An attempt that failed before the provider stream's first chunk may be
+  # sent again: the caller has received nothing from it, so nothing is
+  # repeated. ReqLLM's own streaming retries are off (`transport_resends/1`),
+  # so each resend is made here and, inside an `Imp.Run`, recorded as a
+  # `:model_resend` event. Once a chunk has arrived the stream is never
+  # opened again: the provider is answering, and a new request would be
+  # billed again and repeat what the caller already has.
+  #
+  # Only failures that show the provider did no work are sent again: a
+  # refused connection, which never reached it, and a 429 or 529, which it
+  # answered before doing any. A closed stream is not, unlike a closed
+  # non-streamed call. ReqLLM does not tell its caller whether the response
+  # had begun before the close, and a provider working on a long answer
+  # sends bytes that make no chunk (OpenRouter's `: OPENROUTER PROCESSING`
+  # keepalives) for as long as it works, so the close may come after work
+  # the provider bills. ReqLLM's own streaming retry refused to resend once
+  # any bytes had come; with no way to see the bytes, Imp refuses every
+  # close. The failure goes to the caller, and a run's `request_retry:` may
+  # send it again as a model call of its own, on the record.
+  defp fail_or_resend(%{started?: false, attempt: attempt, call: call} = state, error)
+       when attempt <= call.resends do
+    reason = lm_error(error, true, state.provider)
+    closed? = is_nil(reason.status) and transport_reason(reason.reason) == :closed
+
+    case if(closed?, do: nil, else: resend_wait(reason)) do
+      nil ->
+        :failed
+
+      wait ->
+        Imp.Run.emit(:model_resend,
+          error: reason,
+          metadata: %{
+            model_call_id: Imp.LM.model_call_id(),
+            attempt: attempt,
+            elapsed_ms: System.monotonic_time(:millisecond) - state.attempt_started,
+            retry_in_ms: wait
+          }
+        )
+
+        if state.response, do: cancel_provider_stream(state.response.cancel)
+        Process.sleep(wait)
+        {:resent, next_stream_chunk(open_attempt(call, attempt + 1))}
+    end
+  end
+
+  defp fail_or_resend(_state, _error), do: :failed
 
   # The end of the provider stream closes with one terminal event carrying
   # the metadata accumulated along the way. A stream whose metadata reports an

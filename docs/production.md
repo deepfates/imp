@@ -144,8 +144,14 @@ A model call has three layers of time limit:
    times (`max_retries:` on the client, `0` for none), when its connection
    closed or was refused, at once, or when the provider answered 429 or 529,
    after its `retry-after`. A timed-out attempt is not sent again: the
-   provider may have done and billed the work. Inside a run each resend is a
-   `:model_resend` event on the call, so the record shows every request sent.
+   provider may have done and billed the work. Nor is one whose
+   `retry-after` is over a minute, or, under a deadline, one that would have
+   less than 5 seconds left after the wait; the call fails with the 429. A
+   provider stream is opened again only before its first chunk, and not
+   after its connection closed: a provider may send keepalive bytes while it
+   works, so the close may come after billed work. Inside a run
+   each resend is a `:model_resend` event on the call, streamed or not, so
+   the record shows every request sent.
 3. **The whole call.** Inside `Imp.Deadline.with_deadline/2`, every model
    request made through ReqLLM is cut to the time left, retries included,
    and so is every request made in `Imp.parallel/3` workers and runs; a ReAct agent

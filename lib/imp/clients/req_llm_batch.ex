@@ -353,6 +353,8 @@ defmodule Imp.Clients.ReqLLMBatch do
     end)
   end
 
+  # A failed stream wraps the HTTP error, headers and all, as its cause.
+  defp retry_after(%{cause: cause}, clock) when not is_nil(cause), do: retry_after(cause, clock)
   defp retry_after(_reason, _clock), do: nil
 
   defp parse_retry_after([value | _rest], clock) when is_binary(value) do
