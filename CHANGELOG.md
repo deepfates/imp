@@ -54,6 +54,31 @@ User-visible changes to Imp are recorded here.
   each resend is recorded as a new `:model_resend` event naming the call's
   `model_call_id`, the attempt, how long it took and the wait.
 
+- A streamed `Imp.Clients.ReqLLM` call (`Imp.stream/3` with
+  `provider_stream: true`) is now sent again the same way as a non-streamed
+  one. ReqLLM's streaming retries had stayed on: an attempt that failed
+  before its first byte (a closed or refused connection, a 429)
+  was sent again up to three times with no `:model_resend` event, so one
+  `:model_request` could stand for four requests. ReqLLM's streaming retries
+  are now off; Imp opens the stream again itself, only before its first
+  chunk, never after a timeout, and records each resend as a
+  `:model_resend` event. A streamed failure that wraps an HTTP error now
+  carries its status (`%Imp.LMError{status: 429}`), and its `retry-after`
+  is read like a non-streamed one's.
+
+- A call through `Imp.Clients.ReqLLM`, streamed or not, no longer sleeps for
+  a `retry-after` over a minute before sending again, which with no deadline
+  could leave a call waiting three times as long as the provider asked: it
+  fails with the 429, and a run's `request_retry:` or the caller decides
+  whether to wait. Under a deadline, an attempt is sent again only if at
+  least 5 seconds would be left after the wait; with less, the call fails
+  with the 429 it got rather than a timeout of an attempt with no time to
+  answer.
+
+- `Imp.Clients.ReqLLMBatch.req_llm_dispatcher/2` calls also get the
+  10-minute default `receive_timeout` above when neither the client nor the
+  call options set one (before, ReqLLM's 30 seconds).
+
 - `Imp.MCP.Trust` no longer crashes, and logs no error with a stack trace,
   when an MCP connection ends while the VM is shutting down. The application
   controller refuses to change configuration then, and there is nothing left
