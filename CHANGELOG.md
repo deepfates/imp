@@ -15,6 +15,11 @@ User-visible changes to Imp are recorded here.
   parses to something other than an object (a JSON array is a list). A call
   replayed in a request still keeps the string the request carried there.
 
+- `Imp.MCP.Trust` no longer crashes, and logs no error with a stack trace,
+  when an MCP connection ends while the VM is shutting down. The application
+  controller refuses to change configuration then, and there is nothing left
+  to untrust.
+
 ## 0.17.0 — 2026-10-18
 
 ### Added
