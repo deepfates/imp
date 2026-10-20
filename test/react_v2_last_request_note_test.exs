@@ -64,7 +64,9 @@ defmodule ReActV2LastRequestNoteTest do
     assert List.last(user_contents(forced)) =~ note
 
     history = prediction.metadata.history
-    assert Enum.any?(Imp.History.messages(history), &(Map.get(&1, :intent) == note))
+    assert Enum.any?(Imp.History.messages(history), &(Map.get(&1, :last_request_note) == note))
+    refute Enum.any?(Imp.History.messages(history), &(Map.get(&1, :intent) == note))
+    refute Enum.any?(forced, &(to_string(&1[:content]) =~ "[[ ## intent ## ]]\n" <> note))
 
     # omit_empty_request: the forced request carries no new pending inputs, so
     # there is no blank user message after the note turn.
@@ -273,10 +275,11 @@ defmodule ReActV2LastRequestNoteTest do
     assert [_look] = opts[:tools]
 
     # The conversation as the model saw it, the call's note last, and not the
-    # program's own.
+    # program's own. The note is its own text, not under the `intent` marker,
+    # where it would read as a new intent.
     assert [:system, :user, :assistant, :tool, :user] == Enum.map(messages, & &1.role)
     assert Enum.at(messages, 3).content =~ "a cat"
-    assert List.last(messages).content =~ note
+    assert List.last(messages).content == note
     refute Enum.any?(messages, &(to_string(&1.content) =~ "Last action."))
   end
 

@@ -204,9 +204,11 @@ defmodule Imp.Predict.ReActV2 do
   The last request says nothing about why it is being made unless
   `:last_request_note` is given: one line of host text put in front of it as a
   user message and kept in the returned history like any other turn. It is
-  recorded as a step that said nothing and called nothing, so it renders as
-  that user message alone, with no assistant reply after it, in the request and
-  whenever the history is passed back. Imp writes no sentence of its own
+  recorded as a step that said nothing and called nothing, with the text
+  under its own `:last_request_note` key. It renders as that text, under no
+  input's marker (where it would read as a new value of that input), and with
+  no assistant reply after it, in the request and whenever the history is
+  passed back. Imp writes no sentence of its own
   there, except that under `finish: :submit` each earlier thought-only step
   in the history keeps the unsent note after it (see "Which signatures get
   `submit`").
@@ -1275,15 +1277,20 @@ defmodule Imp.Predict.ReActV2 do
 
   # The note is what the model is told, so it goes into the durable history
   # rather than into one request: the record of the run carries it, and the
-  # prompt renders it as the last user message before the last request.
-  defp append_note(history, signature, text) when is_binary(text) and text != "" do
-    case Imp.Signature.input_names(signature) do
-      [first | _rest] -> append_user_turn(history, %{first => text})
-      [] -> history
-    end
-  end
+  # prompt renders it as the last user message before the last request. It is
+  # kept under its own key, not an input's, so the adapter shows it as plain
+  # text rather than as a new value of that input.
+  defp append_note(history, _signature, text) when is_binary(text) and text != "",
+    do: append_user_turn(history, %{last_request_note: text})
 
   defp append_note(history, _signature, _none), do: history
+
+  # A step the user side of the conversation wrote: one carrying task inputs,
+  # or a host's note.
+  defp user_step?(step, inputs) do
+    Enum.any?(inputs, &Imp.FieldMap.has_key?(step, &1)) or
+      Imp.FieldMap.has_key?(step, :last_request_note)
+  end
 
   # A turn the loop records with only a user side (the note, or inputs no step
   # spent) is a step event that called nothing and said nothing. The chat
@@ -2175,8 +2182,8 @@ defmodule Imp.Predict.ReActV2 do
   # An earlier turn's step as `history_replay: :actions` shows it. A step that
   # carries the task's outputs was the answer and is shown whole. Any other
   # step loses the text and reasoning the model wrote beside its calls; one
-  # that called nothing keeps only the inputs it carried, and goes when it
-  # carried none. Only the request changes: the history keeps every step.
+  # that called nothing keeps only the inputs or note it carried, and goes
+  # when it carried neither. Only the request changes: the history keeps every step.
   # Divergence from DSPy's ReActV2, whose history replays every step whole
   # (decisions.md).
   @step_words [:next_thought, :reasoning_content, :reasoning_details]
@@ -2199,7 +2206,7 @@ defmodule Imp.Predict.ReActV2 do
 
       history.messages
       |> Enum.with_index()
-      |> Enum.filter(fn {step, _} -> Enum.any?(inputs, &Imp.FieldMap.has_key?(step, &1)) end)
+      |> Enum.filter(fn {step, _} -> user_step?(step, inputs) end)
       |> List.last()
       |> case do
         {_step, index} -> index
@@ -2216,7 +2223,7 @@ defmodule Imp.Predict.ReActV2 do
 
       cond do
         history_calls(step) != [] -> [step]
-        Enum.any?(context.inputs, &Imp.FieldMap.has_key?(step, &1)) -> [step]
+        user_step?(step, context.inputs) -> [step]
         true -> []
       end
     end

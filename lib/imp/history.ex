@@ -13,6 +13,8 @@ defmodule Imp.History do
   serializable and independent of any one provider's chat message schema.
   A turn may also carry `:user_name` and `:assistant_name` to give its
   messages a participant name; see "Naming messages" in `Imp.Adapter.Chat`.
+  A turn that `Imp.Predict.ReActV2` records for a `:last_request_note` carries
+  the note under that key, and it renders as plain text, not as a field.
 
       iex> history =
       ...>   Imp.History.new()

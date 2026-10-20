@@ -87,7 +87,10 @@ defmodule ReActV2ResumeExtractTest do
       [written, request] = Enum.take(extraction, -2)
       assert {written.role, written.content} == {:assistant, @recap}
       assert request.role == :user
-      assert Enum.at(extraction, -3).content =~ @note
+      # The note is its own user message, not a value under the `ticket`
+      # marker, and the request after it starts on its instruction.
+      assert Enum.at(extraction, -3) == %{role: :user, content: @note}
+      assert request.content =~ ~r/\ARespond with /
     end
   end
 
