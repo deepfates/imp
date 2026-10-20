@@ -334,7 +334,7 @@ defmodule Imp.RedactionTest do
     assert Imp.Redaction.credential_key?("providerAuth")
     assert Imp.Redaction.credential_key?(:provider_bearer)
     assert Imp.Redaction.credential_key?("providerSessionKey")
-    refute Imp.Redaction.credential_key?("providerSession")
+    assert Imp.Redaction.credential_key?("providerSession")
 
     Enum.each(
       [
@@ -358,24 +358,49 @@ defmodule Imp.RedactionTest do
            }
   end
 
-  # A field called `session` usually holds an id or a conversation, not a
-  # secret; a session credential is named for what it is.
-  test "a session field survives redaction and a session token does not" do
+  # A field called `session` holds a cookie value as often as an id or a
+  # conversation, so its value decides: a string that looks like a token is
+  # redacted, an id, a UUID, a map or a list is kept.
+  test "a session field is redacted when it holds a token and kept otherwise" do
+    flask = "eyJ1c2VyIjo0Mn0.ZxYz.sig"
+    phoenix = "SFMyNTY.g3QAAAABbQAAAAd1c2VyX2lkYQ.Xk2Pq9vY7cN4"
+
     input = %{
-      session: "abc-123",
-      chat_session: %{id: "chat-7", turns: 3},
-      session_token: "CANARY_SESSION_TOKEN_77e1a",
-      session_key: "CANARY_SESSION_KEY_0b9c2"
+      :session => flask,
+      "user_session" => phoenix,
+      :chat_session => %{id: "chat-7", turns: 3},
+      :session_token => "CANARY_SESSION_TOKEN_77e1a",
+      :session_key => "short"
     }
 
     assert Imp.Redaction.redact(input) == %{
-             session: "abc-123",
-             chat_session: %{id: "chat-7", turns: 3},
-             session_token: "[REDACTED]",
-             session_key: "[REDACTED]"
+             :session => "[REDACTED]",
+             "user_session" => "[REDACTED]",
+             :chat_session => %{id: "chat-7", turns: 3},
+             :session_token => "[REDACTED]",
+             :session_key => "[REDACTED]"
            }
 
+    kept = %{
+      session: "abc-123",
+      conversation: %{session: %{id: "abc-123", messages: ["hi"]}},
+      sessionId: "abc-123",
+      userSession: "6f1c2a7e-3b4d-4e5f-8a9b-0c1d2e3f4a5b",
+      chat_session: "a long conversation title"
+    }
+
+    assert Imp.Redaction.redact(kept) == kept
+    assert Imp.Redaction.redact([{"session", "abc-123"}]) == [{"session", "abc-123"}]
+    assert Imp.Redaction.redact([{"session", flask}]) == [{"session", "[REDACTED]"}]
+    assert Imp.Redaction.drop_credentials(%{session: "abc-123"}) == %{session: "abc-123"}
+    assert Imp.Redaction.drop_credentials(%{session: phoenix, model: "m"}) == %{model: "m"}
+  end
+
+  test "a session cookie is redacted in a string, also under a prefixed name" do
     assert Imp.Redaction.redact("session=F4keSessionF4ke") == "[REDACTED]"
+    assert Imp.Redaction.redact("Cookie: _myapp_session=F4keSessionF4ke; path=/") == "[REDACTED]"
+    assert Imp.Redaction.redact("cookie: a=1; my.app-session=F4keSessionF4ke") == "[REDACTED]"
+    assert Imp.Redaction.redact("the session = good") == "the session = good"
   end
 
   test "redacts credential boundaries recursively without redacting semantic IDs or paths" do
