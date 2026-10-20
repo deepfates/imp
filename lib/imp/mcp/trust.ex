@@ -132,6 +132,17 @@ defmodule Imp.MCP.Trust do
         _unset -> [trusted_origins: origins]
       end
 
+    put_security(security)
+  end
+
+  # While the VM stops, the application controller answers every call with
+  # `{:error, :terminating}`, so `:application.set_env/4` exits with
+  # `:terminating`. A connection that ends during that shutdown still sends
+  # this process a `:DOWN`. There is no policy left to update by then, so that
+  # exit is not an error and must not crash this process with a logged trace.
+  defp put_security(security) do
     Application.put_env(:ex_mcp, :security, security)
+  catch
+    :exit, :terminating -> :ok
   end
 end
