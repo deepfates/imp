@@ -11,7 +11,8 @@ User-visible changes to Imp are recorded here.
   field often holds an id or a conversation, which now survives in events,
   traces and reports. It is still redacted when it holds a string that looks
   like a token: 16 or more characters once surrounding whitespace is trimmed,
-  none inside, not a UUID; or bytes that are not UTF-8. So a short id, a
+  none inside, not a UUID; or bytes that are not UTF-8. A charlist or an
+  iolist is judged as the string it spells. So a short id, a
   UUID, a title or a map is kept, but a longer id without spaces (a ULID, a
   hex id) is still redacted: nothing tells it apart from a server-side
   session cookie, which is an opaque random string of the same shape.

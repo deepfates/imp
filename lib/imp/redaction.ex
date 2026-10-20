@@ -288,7 +288,35 @@ defmodule Imp.Redaction do
     end
   end
 
+  # A charlist or an iolist with characters in it is text, judged as the
+  # string it spells; one that spells no valid text is redacted, as bytes that
+  # are not UTF-8 are. A list of strings or maps is a list of values (ids,
+  # turns), each walked on its own.
+  defp session_token_value?(value) when is_list(value) do
+    if holds_char?(value) do
+      case chardata_to_binary(value) do
+        {:ok, text} -> session_token_value?(text)
+        :not_text -> false
+        :invalid -> true
+      end
+    else
+      false
+    end
+  end
+
   defp session_token_value?(_value), do: false
+
+  defp holds_char?([head | tail]), do: holds_char?(head) or holds_char?(tail)
+  defp holds_char?(value), do: is_integer(value)
+
+  defp chardata_to_binary(value) do
+    case :unicode.characters_to_binary(value) do
+      text when is_binary(text) -> {:ok, text}
+      _error_or_incomplete -> :invalid
+    end
+  rescue
+    ArgumentError -> :not_text
+  end
 
   @doc false
   def validate_keys(keys) when is_list(keys) do

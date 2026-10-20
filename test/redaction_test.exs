@@ -415,6 +415,24 @@ defmodule Imp.RedactionTest do
     end
 
     assert Imp.Redaction.drop_credentials(%{session: rails <> "\n", model: "m"}) == %{model: "m"}
+
+    # Text held as a charlist or an iolist is judged as the string it spells.
+    for value <- [
+          ~c"eyJ1c2VyIjo0Mn0.ZxYz.signature12",
+          [~c"eyJ1c2VyIjo0Mn0", ".ZxYz" | ".signature12"],
+          [0x110000 | ~c"aaaaaaaaaaaaaaaaaaaa"]
+        ] do
+      assert Imp.Redaction.redact(%{session: value}) == %{session: "[REDACTED]"},
+             "kept #{inspect(value)}"
+    end
+
+    assert Imp.Redaction.drop_credentials(%{session: ~c"abc123def456ghi789--sig42", model: "m"}) ==
+             %{model: "m"}
+
+    for value <- [~c"abc-123", [3, 5], ["chat-1", "chat-2", "chat-3"], [%{id: "chat-1"}]] do
+      assert Imp.Redaction.redact(%{session: value}) == %{session: value}
+    end
+
     assert Imp.Redaction.redact(%{session: "  abc-123\n"}) == %{session: "  abc-123\n"}
   end
 
