@@ -38,8 +38,8 @@ User-visible changes to Imp are recorded here.
   second pool place under `async_max_workers: 1` when it is read by a row
   with `timeout: :infinity` nested inside another Imp task or row (the
   default for `Imp.Evaluate`), or by an `Imp.Predict.Avatar` tool. Only a
-  row with a timeout lent its place to the stream before; now every process
-  working on a place its holder waits for does. A stream whose reader is killed, such as a row that timed out, now
+  row with a timeout lent its place to the stream before; now every Imp
+  process that was lent a place lends it on. A stream whose reader is killed, such as a row that timed out, now
   stops its program too; before, the program kept running, and calling the
   model, after the row had given its place back.
 
