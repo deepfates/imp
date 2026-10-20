@@ -195,6 +195,7 @@ defmodule Imp.LM do
   # sends again: were each level to retry, k retries would become (k+1)^2
   # attempts, and the waits would multiply with them.
   @in_flight {__MODULE__, :request_in_flight}
+  @model_call_id {__MODULE__, :model_call_id}
 
   defp request(lm, request, retries) do
     outermost? = not Process.get(@in_flight, false)
@@ -302,7 +303,16 @@ defmodule Imp.LM do
           )
       )
 
-      result = perform_request(lm, request, dispatch)
+      previous_call_id = Process.put(@model_call_id, call_id)
+
+      result =
+        try do
+          perform_request(lm, request, dispatch)
+        after
+          if previous_call_id,
+            do: Process.put(@model_call_id, previous_call_id),
+            else: Process.delete(@model_call_id)
+        end
 
       wait =
         case result do
@@ -360,6 +370,11 @@ defmodule Imp.LM do
       lm |> perform_request(request, dispatch) |> caller_result()
     end
   end
+
+  @doc false
+  # The `model_call_id` of the model call this process is making inside an
+  # `Imp.Run`, or `nil`; a client's own events about the call name it.
+  def model_call_id, do: Process.get(@model_call_id)
 
   defp caller_result({:error, reason, %Imp.Core.LMResponse{}}), do: {:error, reason}
   defp caller_result(result), do: result

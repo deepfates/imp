@@ -540,6 +540,10 @@ defmodule Imp.Run.Event do
       run's lifecycle. Exactly one of the last three ends a run;
       `:run_finished` carries the program's prediction as its `output`.
     * `:model_request`, `:model_response` — one `Imp.LM.request/2` call.
+    * `:model_resend` — an attempt at a model call that failed and that the
+      client sends again before the call's `:model_response`, such as a
+      connection that closed or a 429; `metadata.model_call_id` names the
+      call, `attempt` counts from 1 and `retry_in_ms` is the wait.
     * `:tools_sent` — the tool definitions a request sent, once per run per
       distinct roster.
     * `:tool_call`, `:tool_result` — one tool call a ReActV2 or RLM loop
@@ -562,6 +566,7 @@ defmodule Imp.Run.Event do
     :run_cancelled,
     :model_request,
     :model_response,
+    :model_resend,
     :tools_sent,
     :tool_call,
     :tool_result,
@@ -578,6 +583,7 @@ defmodule Imp.Run.Event do
           | :run_cancelled
           | :model_request
           | :model_response
+          | :model_resend
           | :tools_sent
           | :tool_call
           | :tool_result
