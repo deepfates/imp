@@ -178,6 +178,37 @@ defmodule Imp.TrajectoryTest do
     assert Enum.at(table, 1)["content"] == "[REDACTED]"
   end
 
+  test "positions reveal nothing about a secret redaction removed" do
+    # Two requests that differ only in the key they carry: once redacted they
+    # read the same, so they share positions, and a reader cannot tell whether
+    # the key changed.
+    system = %{role: :system, content: "instructions"}
+
+    events =
+      [%Imp.Run.Event{run_id: "r", sequence: 0, kind: :run_started, input: %{}}] ++
+        Enum.flat_map(Enum.with_index(["AAAA", "BBBB"]), fn {tail, i} ->
+          [
+            %Imp.Run.Event{
+              run_id: "r",
+              sequence: 2 * i + 1,
+              kind: :model_request,
+              input: [system, %{role: :user, content: "key sk-test-secret-1234567890#{tail}"}]
+            },
+            %Imp.Run.Event{run_id: "r", sequence: 2 * i + 2, kind: :model_response, output: "ok"}
+          ]
+        end) ++
+        [%Imp.Run.Event{run_id: "r", sequence: 5, kind: :run_finished, output: %{}}]
+
+    doc = Imp.Trajectory.to_atif(events)
+
+    assert Enum.map(doc["extra"]["model_requests"], & &1["message_ids"]) == [[0, 1], [0, 1]]
+
+    assert doc["extra"]["model_messages"] == [
+             %{"role" => "system", "content" => "instructions"},
+             %{"role" => "user", "content" => "[REDACTED]"}
+           ]
+  end
+
   test "a model request whose input is not a list of messages keeps it as it was" do
     events = [
       %Imp.Run.Event{run_id: "r", sequence: 0, kind: :run_started, input: %{}},

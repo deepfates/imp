@@ -38,7 +38,11 @@ defmodule Imp.Trajectory do
   it, and each entry of `extra.model_requests` (in request order, with its
   `metadata`) names the messages it sent, in order, as `message_ids`:
   positions in `extra.model_messages`, counted from 0. A request sent exactly
-  `Enum.map(message_ids, &Enum.at(model_messages, &1))`. A request whose
+  the messages at its `message_ids`, in order (read them through a tuple,
+  `elem(List.to_tuple(model_messages), id)`, as `Enum.at/2` on each id is
+  quadratic on a long run). Messages are told apart as the document shows
+  them, after redaction, so two that differed only in a redacted secret share
+  one position. A request whose
   input was not a list of messages keeps it as `messages` instead. Listing
   each request's messages in full made the document, and the redaction over
   it, grow as the number of requests times the length of the history.
@@ -136,11 +140,14 @@ defmodule Imp.Trajectory do
   # Each request's messages as positions in one list of the distinct messages
   # the run sent. A request usually repeats every message of the one before it
   # and adds a few, so each message is kept, redacted and encoded once.
-  # Messages are told apart as terms, before redaction: two that differ are
-  # kept apart even if redaction makes them read the same.
+  # Messages are told apart as the export shows them, redacted and JSON-safe:
+  # two that differ only in a secret redaction removed share one position, so
+  # the positions say nothing about the secrets that the text no longer shows.
+  # Each distinct raw message is redacted once, and later copies are found by
+  # the raw term.
   defp index_messages(requests) do
-    {requests, {_ids, _count, messages}} =
-      Enum.map_reduce(requests, {%{}, 0, []}, fn
+    {requests, {_raw, _shown, _count, messages}} =
+      Enum.map_reduce(requests, {%{}, %{}, 0, []}, fn
         %{messages: list} = request, acc when is_list(list) ->
           {ids, acc} = Enum.map_reduce(list, acc, &message_id/2)
           {request |> Map.delete(:messages) |> Map.put(:message_ids, ids), acc}
@@ -152,10 +159,23 @@ defmodule Imp.Trajectory do
     {Enum.reverse(messages), requests}
   end
 
-  defp message_id(message, {ids, count, messages} = acc) do
-    case ids do
-      %{^message => id} -> {id, acc}
-      _ -> {count, {Map.put(ids, message, count), count + 1, [message | messages]}}
+  defp message_id(message, {raw, shown, count, messages} = acc) do
+    case raw do
+      %{^message => id} ->
+        {id, acc}
+
+      _ ->
+        safe = message |> Imp.Redaction.redact() |> Imp.Observability.Inspection.json_safe()
+
+        case shown do
+          %{^safe => id} ->
+            {id, {Map.put(raw, message, id), shown, count, messages}}
+
+          _ ->
+            {count,
+             {Map.put(raw, message, count), Map.put(shown, safe, count), count + 1,
+              [safe | messages]}}
+        end
     end
   end
 
