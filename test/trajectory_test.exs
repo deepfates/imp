@@ -120,6 +120,53 @@ defmodule Imp.TrajectoryTest do
       do: File.write!(path, Jason.encode!(document, pretty: true))
   end
 
+  defmodule UnparsedArgumentsLM do
+    # Sends a tool call whose arguments are not JSON, as a model that cut its
+    # arguments short does, then answers.
+    defstruct [:owner]
+
+    def generate(%__MODULE__{}, messages, _opts) do
+      step = Enum.count(messages, &(Map.get(&1, :role) in [:assistant, "assistant"]))
+
+      output =
+        case step do
+          0 ->
+            %{text: "", tool_calls: [%{id: "c1", name: "lookup", arguments: ~s({"query": "be)}]}
+
+          _ ->
+            %{text: "", tool_calls: [%{id: "s1", name: "submit", arguments: %{answer: "BEAM"}}]}
+        end
+
+      {:ok, %{__imp_lm_output__: output, __imp_lm_metadata__: %{}}}
+    end
+  end
+
+  # A model's arguments that are not a JSON object are what it did: the export
+  # keeps the call, with empty arguments and what it sent as `raw_arguments`,
+  # rather than refusing the whole run.
+  test "a tool call whose arguments are not a JSON object is exported with its raw arguments" do
+    lookup = Imp.tool(:lookup, "look up", fn _ -> "found" end)
+    program = Imp.react("question -> answer", [lookup], lm: %UnparsedArgumentsLM{})
+
+    {:ok, run} = Imp.Run.start(program, %{question: "runtime?"})
+    assert {:ok, _} = Task.await(run.task)
+    events = Imp.Run.events(run)
+    Imp.Run.stop(run)
+
+    assert %{input: ~s({"query": "be)} = Enum.find(events, &(&1.kind == :tool_call))
+
+    document = Imp.Trajectory.to_atif(events)
+    calls = Enum.flat_map(document["steps"], &Map.get(&1, "tool_calls", []))
+    lookup_call = Enum.find(calls, &(&1["function_name"] == "lookup"))
+    assert lookup_call["arguments"] == %{}
+    assert lookup_call["extra"]["raw_arguments"] == ~s({"query": "be)
+    assert lookup_call["extra"]["native_tool_call_id"] == "c1"
+
+    # The same call read back from a store, where its input is plain JSON.
+    stored = Enum.map(events, &Imp.Run.Event.to_map/1)
+    assert Imp.Trajectory.to_atif(stored)["steps"] == document["steps"]
+  end
+
   test "cancelled unfinished calls remain unknown instead of inventing a result" do
     events = [
       %Imp.Run.Event{
