@@ -4,6 +4,19 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Fixed
+
+- A ReActV2 `last_request_note` is rendered as its own plain user message.
+  Before, it was stored under the signature's first input field and rendered
+  under that input's marker (`[[ ## ticket ## ]]`), so the model read it as a
+  new value of that input. The history turn now keeps it under its own
+  `:last_request_note` key, which `Imp.Adapter.Chat` (and the JSON and XML
+  adapters) render as plain text after the turn's inputs. A history saved
+  before this keeps its note under the input and renders as it did.
+- A request message with no inputs to render (a resume that gives none, the
+  extractor on such a resume) starts on "Respond with ...", without a blank
+  line in front of it.
+
 ## 0.17.0 — 2026-10-18
 
 ### Added

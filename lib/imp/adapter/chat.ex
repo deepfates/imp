@@ -1057,6 +1057,9 @@ defmodule Imp.Adapter.Chat do
   end
 
   defp append_content(content, ""), do: content
+  # Nothing rendered before the instruction: it starts the message, with no
+  # blank line in front of it.
+  defp append_content("", suffix), do: String.trim_leading(suffix)
   defp append_content(content, suffix) when is_binary(content), do: content <> suffix
 
   defp append_content(content, suffix) when is_list(content),
@@ -1472,11 +1475,7 @@ defmodule Imp.Adapter.Chat do
               put_message_name(
                 %{
                   role: :user,
-                  content:
-                    render_inputs(signature, turn,
-                      skip: history_input_fields(signature),
-                      section_renderer: renderers.input_section
-                    )
+                  content: turn_user_content(signature, turn, renderers)
                 },
                 signature,
                 turn,
@@ -1567,11 +1566,7 @@ defmodule Imp.Adapter.Chat do
       put_message_name(
         %{
           role: :user,
-          content:
-            render_inputs(signature, turn,
-              skip: history_input_fields(signature),
-              section_renderer: renderers.input_section
-            )
+          content: turn_user_content(signature, turn, renderers)
         },
         signature,
         turn,
@@ -1678,11 +1673,7 @@ defmodule Imp.Adapter.Chat do
       put_message_name(
         %{
           role: :user,
-          content:
-            render_inputs(signature, turn,
-              skip: history_input_fields(signature),
-              section_renderer: renderers.input_section
-            )
+          content: turn_user_content(signature, turn, renderers)
         },
         signature,
         turn,
@@ -1917,6 +1908,39 @@ defmodule Imp.Adapter.Chat do
 
     %{signature | inputs: inputs}
   end
+
+  # A history turn's user message: its input fields under their markers, then
+  # the `:last_request_note` it carries, as plain text. The note is ReActV2's
+  # line about why a request is made; under an input's marker it would read
+  # as a new value of that input. A signature that declares a field of that
+  # name keeps it as a field.
+  defp turn_user_content(signature, turn, renderers) do
+    inputs =
+      render_inputs(signature, turn,
+        skip: history_input_fields(signature),
+        section_renderer: renderers.input_section
+      )
+
+    case turn_note(signature, turn) do
+      nil -> inputs
+      note -> join_content(inputs, note)
+    end
+  end
+
+  defp turn_note(signature, turn) do
+    declared? = Enum.any?(signature.inputs, &Imp.FieldMap.same_name?(&1.name, :last_request_note))
+
+    case if(declared?, do: nil, else: fetch_field(turn, :last_request_note)) do
+      note when is_binary(note) and note != "" -> note
+      _none -> nil
+    end
+  end
+
+  defp join_content("", text), do: text
+  defp join_content(content, text) when is_binary(content), do: content <> "\n\n" <> text
+
+  defp join_content(content, text) when is_list(content),
+    do: merge_adjacent_text_parts(content ++ ["\n\n", text])
 
   defp history_input_fields(signature) do
     signature.inputs
