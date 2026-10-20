@@ -147,7 +147,9 @@ A model call has three layers of time limit:
    provider may have done and billed the work. Nor is one whose
    `retry-after` is over a minute, or, under a deadline, one that would have
    less than 5 seconds left after the wait; the call fails with the 429. A
-   provider stream is opened again only before its first chunk. Inside a run
+   provider stream is opened again only before its first chunk, and not
+   after its connection closed: a provider may send keepalive bytes while it
+   works, so the close may come after billed work. Inside a run
    each resend is a `:model_resend` event on the call, streamed or not, so
    the record shows every request sent.
 3. **The whole call.** Inside `Imp.Deadline.with_deadline/2`, every model

@@ -17,6 +17,14 @@ defmodule Imp.ReqLLMStreamResendTest do
     end
   end
 
+  # A stream that fails to open at all, as a refused connection.
+  defmodule RefusedStub do
+    def stream_text(_model, _messages, opts) do
+      send(Keyword.fetch!(opts, :test_pid), :opened)
+      {:error, %Req.TransportError{reason: :econnrefused}}
+    end
+  end
+
   defmodule Collecting do
     @behaviour Imp.Module
     defstruct [:program, provider_stream: true, deadline: :infinity]
@@ -34,8 +42,8 @@ defmodule Imp.ReqLLMStreamResendTest do
   # A raw listener that accepts every connection and answers the nth request
   # with `respond.(n)`: `:hang` reads the request and never answers, `:close`
   # reads it and closes the connection, `{:status, status, headers}` answers
-  # that status with an empty JSON error body, and `:ok` answers a complete
-  # OpenAI-style event stream.
+  # that status with an empty JSON error body, `:ok` answers a complete
+  # OpenAI-style event stream and `:ok_json` a complete non-streamed answer.
   defp listener(respond) do
     owner = self()
     {:ok, listen} = :gen_tcp.listen(0, [:binary, active: false, reuseaddr: true])
@@ -67,6 +75,21 @@ defmodule Imp.ReqLLMStreamResendTest do
       :close ->
         :gen_tcp.close(socket)
 
+      # A provider at work: the response has begun with a keepalive comment,
+      # which makes no chunk, and then the connection drops.
+      :keepalive_then_close ->
+        comment = ": OPENROUTER PROCESSING\n\n"
+
+        :gen_tcp.send(
+          socket,
+          "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\n" <>
+            "transfer-encoding: chunked\r\n\r\n" <>
+            Integer.to_string(byte_size(comment), 16) <> "\r\n" <> comment <> "\r\n"
+        )
+
+        Process.sleep(150)
+        :gen_tcp.close(socket)
+
       {:status, status, headers} ->
         body = ~s({"error":{"message":"rate limited"}})
 
@@ -77,6 +100,26 @@ defmodule Imp.ReqLLMStreamResendTest do
           socket,
           "HTTP/1.1 #{status} Error\r\ncontent-type: application/json\r\n" <>
             head <> "content-length: #{byte_size(body)}\r\nconnection: close\r\n\r\n" <> body
+        )
+
+        Process.sleep(200)
+        :gen_tcp.close(socket)
+
+      :ok_json ->
+        body =
+          Jason.encode!(%{
+            id: "c1",
+            object: "chat.completion",
+            model: "example/model",
+            choices: [
+              %{index: 0, message: %{role: "assistant", content: @answer}, finish_reason: "stop"}
+            ]
+          })
+
+        :gen_tcp.send(
+          socket,
+          "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\n" <>
+            "content-length: #{byte_size(body)}\r\nconnection: close\r\n\r\n" <> body
         )
 
         Process.sleep(200)
@@ -127,13 +170,17 @@ defmodule Imp.ReqLLMStreamResendTest do
   end
 
   defp run_once(base_url, lm_opts, call_opts \\ []) do
-    owner = self()
-
     lm =
       Imp.req_llm(
         %{provider: :openrouter, id: "example/model"},
         [api_key: "test", base_url: base_url, cache: false] ++ lm_opts
       )
+
+    run_once_with(lm, call_opts)
+  end
+
+  defp run_once_with(lm, call_opts \\ []) do
+    owner = self()
 
     program = "question -> answer" |> Imp.signature("Answer.") |> Imp.predict(lm: lm)
 
@@ -167,6 +214,14 @@ defmodule Imp.ReqLLMStreamResendTest do
 
   defp kinds(events), do: Enum.map(events, & &1.kind)
 
+  # A base URL nothing listens on, so every connection is refused.
+  defp refused_url do
+    {:ok, listen} = :gen_tcp.listen(0, [])
+    {:ok, port} = :inet.port(listen)
+    :gen_tcp.close(listen)
+    "http://127.0.0.1:#{port}/api/v1"
+  end
+
   test "a stream is opened with ReqLLM's retries off" do
     lm =
       Imp.req_llm(%{provider: :openrouter, id: "example/model"},
@@ -190,11 +245,10 @@ defmodule Imp.ReqLLMStreamResendTest do
   end
 
   test "each streamed attempt sent again is its own :model_resend event on the call" do
-    {_elapsed, result, events, requests} =
-      run_once(listener(fn _n -> :close end), receive_timeout: 1_000, max_retries: 2)
+    {_elapsed, result, events, _requests} =
+      run_once(refused_url(), receive_timeout: 1_000, max_retries: 2)
 
     assert {:error, _reason} = result
-    assert requests == 3
 
     assert kinds(events) == [
              :run_started,
@@ -239,11 +293,41 @@ defmodule Imp.ReqLLMStreamResendTest do
   end
 
   test "max_retries: 0 opens a failed stream once" do
-    {_elapsed, _result, events, requests} =
-      run_once(listener(fn _n -> :close end), receive_timeout: 1_000, max_retries: 0)
+    {_elapsed, _result, events, _requests} =
+      run_once(refused_url(), receive_timeout: 1_000, max_retries: 0)
 
-    assert requests == 1
     refute :model_resend in kinds(events)
+  end
+
+  # ReqLLM does not say whether a closed stream's response had begun, and a
+  # provider at work sends keepalive bytes that make no chunk, so a closed
+  # stream may follow billed work: it is not opened again.
+  for mode <- [:close, :keepalive_then_close] do
+    test "a stream whose connection closes is not opened again (#{mode})" do
+      {_elapsed, result, events, requests} =
+        run_once(listener(fn _n -> unquote(mode) end), receive_timeout: 2_000, max_retries: 2)
+
+      assert {:error, _reason} = result
+      assert requests == 1
+      refute :model_resend in kinds(events)
+    end
+  end
+
+  test "a stream that fails to open is sent again, and its error is recorded once" do
+    lm =
+      Imp.req_llm(%{provider: :openrouter, id: "example/model"},
+        test_pid: self(),
+        req_module: RefusedStub,
+        max_retries: 1
+      )
+
+    {_elapsed, result, events, _requests} = run_once_with(lm)
+
+    assert {:error, %Imp.LMError{}} = result
+    assert_received :opened
+    assert_received :opened
+    assert [resend] = Enum.filter(events, &(&1.kind == :model_resend))
+    assert %Imp.LMError{reason: %Req.TransportError{reason: :econnrefused}} = resend.error
   end
 
   # A provider asking for an hour is not waited for, by either kind of call:
@@ -282,6 +366,29 @@ defmodule Imp.ReqLLMStreamResendTest do
       assert {:error, %Imp.LMError{status: 429}} = result
       assert requests == 1
       refute :model_resend in kinds(events)
+    end
+  end
+
+  # An attempt sent again at once takes nothing from a deadline by waiting,
+  # so a short deadline does not stop it.
+  for {provider_stream, first} <- [{true, :rate_limited}, {false, :rate_limited}, {false, :close}] do
+    test "under a short deadline an attempt is still sent again at once (stream: #{provider_stream}, #{first})" do
+      respond = fn
+        1 when unquote(first) == :close -> :close
+        1 -> {:status, 429, [{"retry-after", "0"}]}
+        _n -> if unquote(provider_stream), do: :ok, else: :ok_json
+      end
+
+      {_elapsed, result, events, requests} =
+        run_once(listener(respond), [receive_timeout: 2_000],
+          provider_stream: unquote(provider_stream),
+          deadline: 4_000
+        )
+
+      assert {:ok, prediction} = result
+      assert Imp.get(prediction, :answer) == "Paris"
+      assert requests == 2
+      assert :model_resend in kinds(events)
     end
   end
 end
