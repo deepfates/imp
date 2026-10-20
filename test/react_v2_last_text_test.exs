@@ -311,7 +311,11 @@ defmodule ReActV2LastTextTest do
 
     # The note is what the model would have been told; no request, no note.
     history = prediction.metadata[:history]
-    refute Enum.any?(Imp.History.messages(history), &(Map.get(&1, :last_request_note) == "Last one."))
+
+    refute Enum.any?(
+             Imp.History.messages(history),
+             &(Map.get(&1, :last_request_note) == "Last one.")
+           )
   end
 
   # A call the model makes on the last request is not run and is not replayed
