@@ -21,6 +21,12 @@ defmodule Imp.Trajectory do
       `extra.output`.
     * A tool call no model response asked for, such as one a host dispatches
       itself, is a step of its own with `llm_call_count: 0`.
+    * A call whose arguments are not a JSON object keeps empty `arguments`
+      and the rest in `extra.raw_arguments`. For a dispatched call that is
+      its `:tool_call` event's input: the text the model sent when it does
+      not parse, or the decoded value when it parses to something else (a
+      JSON array is a list). A call replayed in a request keeps the string
+      the request carried.
     * `agent.tool_definitions` holds every tool roster the run sent (from
       `:tools_sent`), `agent.model_name` the model when every request used the
       same one, and `final_metrics` the run's token and cost totals where
@@ -198,15 +204,21 @@ defmodule Imp.Trajectory do
     unless is_binary(event.tool_call_id) and not is_nil(event.tool_name),
       do: raise(ArgumentError, "tool call requires its native identity and name")
 
-    unless is_map(event.input) or is_nil(event.input) or truncated?(event),
-      do: raise(ArgumentError, "tool arguments must be a captured map")
+    # Arguments that are not an object are what the model did, and the call is
+    # kept: its arguments are empty and the event's input (the text when it did
+    # not parse, `normalize_arguments/1`'s decoded value when it parsed to
+    # something else) is `extra.raw_arguments`, as `context_call/1` keeps a
+    # replayed call's string.
+    {arguments, raw} = captured_arguments(event)
 
     call = %{
       tool_call_id: "#{event.run_id}:#{event.sequence}",
       function_name: to_string(event.tool_name),
-      arguments: event.input || %{},
+      arguments: arguments,
       extra:
-        Map.merge(origin(event), %{native_tool_call_id: event.tool_call_id, outcome: :unknown})
+        origin(event)
+        |> Map.merge(%{native_tool_call_id: event.tool_call_id, outcome: :unknown})
+        |> maybe_put(:raw_arguments, raw)
     }
 
     cond do
@@ -619,6 +631,13 @@ defmodule Imp.Trajectory do
       event_timestamp: event.timestamp,
       component: event.component
     }
+
+  defp captured_arguments(%Event{input: input}) when is_map(input), do: {input, nil}
+  defp captured_arguments(%Event{input: nil}), do: {%{}, nil}
+
+  defp captured_arguments(%Event{input: raw} = event) do
+    if truncated?(event), do: {%{}, nil}, else: {%{}, raw}
+  end
 
   defp truncated?(event), do: get(get(event.metadata, :capture) || %{}, :truncated) == true
 
