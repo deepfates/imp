@@ -6,6 +6,43 @@ User-visible changes to Imp are recorded here.
 
 ### Fixed
 
+- `Imp.Redaction` no longer redacts every value under a key named
+  `session`, or ending in `_session` (`chat_session`, `userSession`). Such a
+  field often holds an id or a conversation, which now survives in events,
+  traces and reports. It is still redacted when it holds a string that looks
+  like a token: 16 or more characters once surrounding whitespace is trimmed,
+  none inside, not a UUID; or bytes that are not UTF-8. A charlist or an
+  iolist is judged as the string it spells. So a short id, a
+  UUID, a title or a map is kept, but a longer id without spaces (a ULID, a
+  hex id) is still redacted: nothing tells it apart from a server-side
+  session cookie, which is an opaque random string of the same shape.
+  `session_token` stays redacted and `session_key` is now redacted too.
+
+  Inside a string, the session cookie rule now also catches a prefixed name
+  (`_myapp_session=`, `rack.session=`), a percent-encoded value (Rails,
+  Laravel, Rack), the cookies Django, Java, PHP, Express and ASP.NET use
+  (`sessionid`, `JSESSIONID`, `PHPSESSID`, `connect.sid`,
+  `ASP.NET_SessionId`), and a Phoenix signed or encrypted cookie or token
+  (`SFMyNTY.`, `QTEyOEdDTQ.`). A command-line flag (`--session=nightly`) is
+  not taken for a cookie.
+
+- A row's per-row `:timeout` (evaluation, optimizer trajectories, SIMBA,
+  Search, RLM, BootstrapFinetune, the GEPA adapter, `Imp.parallel/3`) counts
+  from when the row has a place in Imp's task pool, not from when its task
+  was spawned. Before, a row queued behind other Imp work on the node could
+  be killed with `{:task_exit, :timeout}` without having run. A row that
+  runs past its timeout once it has a place is still killed, with the same
+  result as before.
+
+- `Imp.Trajectory.to_atif/2` no longer refuses a run in which the model sent
+  a tool call whose arguments were not a JSON object. It raised
+  `ArgumentError` ("tool arguments must be a captured map"), so the one run
+  that most needs reading could not be exported at all. The call is now kept
+  with empty `arguments` and its recorded input in `extra.raw_arguments`: the
+  text the model sent when it does not parse, or the decoded value when it
+  parses to something other than an object (a JSON array is a list). A call
+  replayed in a request still keeps the string the request carried there.
+
 - A non-streamed `Imp.Clients.ReqLLM` call with no deadline and no
   `receive_timeout:` waited 30 seconds for the provider (ReqLLM's default),
   and ReqLLM's retry step sent a timed-out request again up to three times,

@@ -122,7 +122,7 @@ defmodule Imp.Optimizer.ArtifactTest do
       api_key: "CANARY_ARTIFACT_ATOM_API_KEY_7e31d",
       authorization: "CANARY_ARTIFACT_ATOM_AUTHORIZATION_51bc9",
       provider_auth: "CANARY_ARTIFACT_PROVIDER_AUTH_f208a",
-      provider_session: "CANARY_ARTIFACT_PROVIDER_SESSION_9d14e"
+      provider_session_token: "CANARY_ARTIFACT_PROVIDER_SESSION_9d14e"
     }
 
     report =
@@ -153,7 +153,10 @@ defmodule Imp.Optimizer.ArtifactTest do
 
     artifact =
       Artifact.new(candidate, [],
-        provenance: %{providerSession: canaries.provider_session, owner: "retained-owner"}
+        provenance: %{
+          providerSessionToken: canaries.provider_session_token,
+          owner: "retained-owner"
+        }
       )
 
     assert artifact["payload"]["security"]["credentials_absent"]

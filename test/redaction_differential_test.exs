@@ -544,16 +544,16 @@ defmodule Imp.RedactionDifferentialTest do
   end
 
   # A table of rows whose first column holds credential names reads as pairs,
-  # as it did before: the value beside `token` and `session` is redacted.
+  # as it did before: the value beside `token` and `password` is redacted.
   test "a demo answer that is a table of rows is redacted as the previous rules did" do
-    table = [["token", "the"], ["session", "keynote"]]
+    table = [["token", "the"], ["password", "keynote"]]
     demo = Imp.example(text: "the keynote", answer: table)
     program = %{Imp.Predict.new(Imp.Signature.new("text -> answer")) | demos: [demo]}
 
     loaded =
       program |> Imp.Saving.dump() |> Jason.encode!() |> Jason.decode!() |> Imp.Saving.load!()
 
-    redacted = [["token", "[REDACTED]"], ["session", "[REDACTED]"]]
+    redacted = [["token", "[REDACTED]"], ["password", "[REDACTED]"]]
     assert MainRedaction.redact(%{answer: table}) == %{answer: redacted}
     assert Imp.Example.get(hd(loaded.demos), :answer) == redacted
   end
