@@ -4,6 +4,17 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Fixed
+
+- When a full context window makes ReActV2 leave earlier episodes out of a
+  request, the request now says so: it starts with a user message such as
+  "2 earlier exchanges in this conversation are left out of this request, to
+  fit the context window." Before, the model read what was left as the whole
+  conversation. The message is the Chat adapter's history note for a turn
+  carrying `:omitted_episodes`, which only the request holds, never the
+  history. A host's `:history_note_renderer` can word it; returning nil for
+  that turn keeps Imp's wording and `""` leaves it out.
+
 ## 0.17.0 — 2026-10-18
 
 ### Added

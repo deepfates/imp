@@ -43,7 +43,12 @@ defmodule Imp.Adapter.Chat do
   messages, and its text becomes one user message right after them — the next
   thing the model reads. A note is data about the turn (the answer was not
   delivered, the account's allowance ran out), not a rewrite of what happened,
-  so the record the loop keeps is unchanged. Options outside that list
+  so the record the loop keeps is unchanged. A turn carrying
+  `:omitted_episodes` (a count) stands for earlier exchanges left out of the
+  request; `Imp.Predict.ReActV2` puts one first when a full context window
+  makes it drop episodes. Imp's default note for it says how many were left
+  out. A host renderer that returns nil for it gets that default; `""` leaves
+  it out. Options outside that list
   are ignored; anything that is not a keyword list raises `ArgumentError`.
 
   ## Naming messages
@@ -193,7 +198,7 @@ defmodule Imp.Adapter.Chat do
       output: output_renderer,
       input_section: input_renderer,
       tool_result: tool_result_renderer,
-      history_note: Keyword.get(opts, :history_note_renderer) || (&no_history_note/2),
+      history_note: history_note_renderer(Keyword.get(opts, :history_note_renderer)),
       submit_is_text?: submit_is_text?(Keyword.get(opts, :guidance)),
       loop?: not is_nil(Keyword.get(opts, :guidance)),
       unsent_note: guidance_value(Keyword.get(opts, :guidance), :unsent_note),
@@ -1337,7 +1342,35 @@ defmodule Imp.Adapter.Chat do
 
   defp default_tool_result_renderer(result, _call), do: format_tool_content(result)
 
-  defp no_history_note(_signature, _turn), do: nil
+  # Imp's own history note: a turn that stands for earlier exchanges left out
+  # of the request (`Imp.Predict.ReActV2` on a full context window) says how
+  # many. A host's renderer is asked first; when it returns nil for such a
+  # turn, Imp's wording is used, and `""` leaves it out.
+  defp history_note_renderer(nil), do: &default_history_note/2
+
+  defp history_note_renderer(renderer) do
+    fn signature, turn ->
+      case renderer.(signature, turn) do
+        nil -> default_history_note(signature, turn)
+        note -> note
+      end
+    end
+  end
+
+  defp default_history_note(_signature, turn) do
+    case fetch_field(turn, :omitted_episodes) do
+      1 ->
+        "One earlier exchange in this conversation is left out of this request, " <>
+          "to fit the context window."
+
+      n when is_integer(n) and n > 1 ->
+        "#{n} earlier exchanges in this conversation are left out of this request, " <>
+          "to fit the context window."
+
+      _other ->
+        nil
+    end
+  end
 
   # A request with nothing new to ask ends on the history's last turn. When
   # that turn is a tool loop's step that wrote a thought and called nothing

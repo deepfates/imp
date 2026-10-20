@@ -297,7 +297,10 @@ defmodule Imp.Predict.ReActV2 do
   Completed signature outputs delimit episodes; a trailing unfinished prior
   group is kept together. Current-call tool observations are never omitted or
   replayed. Omission counts appear in `:context_projection` and native
-  `:context_projected` events. If the current call and instructions alone exceed
+  `:context_projected` events, and the request itself starts with a user
+  message saying how many earlier exchanges were left out (the Chat adapter's
+  history note for a turn carrying `:omitted_episodes`; a host's
+  `:history_note_renderer` can word it differently). If the current call and instructions alone exceed
   the window, an incomplete prediction retains history and context diagnostics.
   This is lossy prompt selection, not summarization or deletion of memory.
 
@@ -2235,15 +2238,34 @@ defmodule Imp.Predict.ReActV2 do
   defp projected_messages(context) do
     messages = Enum.drop(context.full.messages, context.omitted)
 
-    case context do
-      %{actions_before: before} when is_integer(before) ->
-        {earlier, current} = Enum.split(messages, max(before - context.omitted, 0))
-        Enum.flat_map(earlier, &actions_view(&1, context)) ++ current
+    messages =
+      case context do
+        %{actions_before: before} when is_integer(before) ->
+          {earlier, current} = Enum.split(messages, max(before - context.omitted, 0))
+          Enum.flat_map(earlier, &actions_view(&1, context)) ++ current
 
-      _context ->
-        messages
-    end
+        _context ->
+          messages
+      end
+
+    omission_turn(context) ++ messages
   end
+
+  # When earlier episodes are left out, the request says so before what is
+  # shown, or the model reads what is left as the whole conversation. The
+  # turn is a silent step that carries the count; the adapter's history note
+  # (`:history_note_renderer`, with Imp's wording by default) is what the
+  # model reads. Only the request has it, never the history.
+  defp omission_turn(%{omitted: 0}), do: []
+
+  defp omission_turn(context),
+    do: [
+      %{
+        omitted_episodes: context.omitted_groups,
+        tool_calls: %ToolCalls{tool_calls: []},
+        tool_call_results: []
+      }
+    ]
 
   # A stored turn that carries the answer of a one-output task but no step
   # outputs (a host wrote it, or it predates the loop's own events) is, in the
