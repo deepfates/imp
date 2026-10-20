@@ -4,11 +4,11 @@ defmodule ReqLLMClientTest do
   @credential_canaries [
     auth: "CANARY_AUTH",
     bearer: "CANARY_BEARER",
-    session: "CANARY_SESSION",
+    session_key: "CANARY_SESSION_KEY",
     provider_auth: "CANARY_PROVIDER_AUTH",
     providerAuth: "CANARY_PROVIDER_CAMEL_AUTH",
     provider_bearer: "CANARY_PROVIDER_BEARER",
-    providerSession: "CANARY_PROVIDER_CAMEL_SESSION",
+    providerSessionKey: "CANARY_PROVIDER_CAMEL_SESSION_KEY",
     api_key: "CANARY_API_KEY",
     authorization: "CANARY_AUTHORIZATION",
     proxy_authorization: "CANARY_PROXY_AUTHORIZATION",

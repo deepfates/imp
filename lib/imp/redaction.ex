@@ -29,6 +29,7 @@ defmodule Imp.Redaction do
     :refresh_token,
     :id_token,
     :session_token,
+    :session_key,
     :password,
     :secret,
     :access_token,
@@ -65,6 +66,7 @@ defmodule Imp.Redaction do
     ["id", "token"],
     ["session"],
     ["session", "token"],
+    ["session", "key"],
     ["access", "token"],
     ["access", "key"],
     ["access", "key", "id"],
@@ -245,7 +247,75 @@ defmodule Imp.Redaction do
 
   @doc false
   def credential_entry?(key, value) do
-    credential_key?(key) and not semantic_schema_descriptor?(value)
+    credential_key?(key) and not semantic_schema_descriptor?(value) and
+      (not session_only_key?(key) or session_token_value?(value))
+  end
+
+  # A field named `session` (`session`, `chat_session`, `userSession`) holds a
+  # cookie value as often as it holds an id or a whole conversation, so its
+  # value decides: a string that looks like a token (16 or more characters
+  # once surrounding whitespace is trimmed, none inside, not a UUID) is
+  # redacted, and an id, a map or a list is kept. Bytes that are not UTF-8
+  # are redacted: they are no id or text. A shorter id is kept; a longer
+  # whitespace-free id (a ULID, a hex digest) is redacted, since nothing
+  # tells it apart from a server-side session cookie. A credential named for
+  # what it is (`session_token`, `session_key`) is redacted whatever it
+  # holds.
+  defp session_only_key?(key) when is_atom(key) or is_binary(key),
+    do: List.last(key_tokens(key)) == "session"
+
+  defp session_only_key?(key) when is_map(key) do
+    names = key |> tagged_key_names() |> Enum.filter(&credential_key?/1)
+    names != [] and Enum.all?(names, &session_only_key?/1)
+  end
+
+  defp session_only_key?(_key), do: false
+
+  @uuid ~r/\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/i
+
+  # The marker counts as a token, so `drop_credentials/1`, which redacts
+  # before it drops, removes a session token rather than keeping its marker.
+  defp session_token_value?("[REDACTED]"), do: true
+
+  defp session_token_value?(value) when is_binary(value) do
+    if String.valid?(value) do
+      value = String.trim(value)
+
+      String.length(value) >= 16 and not String.match?(value, ~r/\s/u) and
+        not String.match?(value, @uuid)
+    else
+      true
+    end
+  end
+
+  # A charlist or an iolist with characters in it is text, judged as the
+  # string it spells; one that spells no valid text is redacted, as bytes that
+  # are not UTF-8 are. A list of strings or maps is a list of values (ids,
+  # turns), each walked on its own.
+  defp session_token_value?(value) when is_list(value) do
+    if holds_char?(value) do
+      case chardata_to_binary(value) do
+        {:ok, text} -> session_token_value?(text)
+        :not_text -> false
+        :invalid -> true
+      end
+    else
+      false
+    end
+  end
+
+  defp session_token_value?(_value), do: false
+
+  defp holds_char?([head | tail]), do: holds_char?(head) or holds_char?(tail)
+  defp holds_char?(value), do: is_integer(value)
+
+  defp chardata_to_binary(value) do
+    case :unicode.characters_to_binary(value) do
+      text when is_binary(text) -> {:ok, text}
+      _error_or_incomplete -> :invalid
+    end
+  rescue
+    ArgumentError -> :not_text
   end
 
   @doc false
@@ -290,7 +360,11 @@ defmodule Imp.Redaction do
       one of 16 or more characters with a digit in it wherever it ends (a
       token without a digit, followed by more text, reads as prose: `Bearer
       token-based-auth`, `Bearer authentication is ...`); or a `Basic` credential that ends the string;
-    * a `session=` value, or a long hex value assigned to a credential name
+    * a session cookie: a `session=` value, also under a prefixed name
+      (`_myapp_session=`, `rack.session=`) or a framework's own (`sessionid`,
+      `JSESSIONID`, `PHPSESSID`, `connect.sid`, `ASP.NET_SessionId`), or a
+      Phoenix signed or encrypted cookie (`SFMyNTY.`, `QTEyOEdDTQ.`);
+    * a long hex value assigned to a credential name
       (`token=<hex>`, `api_key: <hex>`);
     * a URL with a password in its user info, or a signed URL's signature or
       security token (`X-Amz-Signature`, `X-Amz-Security-Token`,
@@ -595,7 +669,9 @@ defmodule Imp.Redaction do
 
   defp redacted_entry?(key, value, keys) do
     redacted_key?(key, keys) and
-      (keys != @default_redact_keys or not semantic_schema_descriptor?(value))
+      (keys != @default_redact_keys or
+         (not semantic_schema_descriptor?(value) and
+            (not session_only_key?(key) or session_token_value?(value))))
   end
 
   defp valid_key?(key), do: is_atom(key) or is_binary(key)
@@ -951,7 +1027,14 @@ defmodule Imp.Redaction do
       ~r/(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\./,
       ~r/(*NO_START_OPT)(?:\A|[\s:;,"'=({\[])Bearer[ \t]+(?:[A-Za-z0-9._~+\/-]{12,}={0,2}(?=\z|["'`}\]),;])|(?=[A-Za-z._~+\/-]*[0-9])[A-Za-z0-9._~+\/-]{16,}={0,2}(?![A-Za-z0-9._~+\/=-]))/i,
       {:basic, ~r/(*NO_START_OPT)(?:\A|[\s:;,])Basic[ \t]+([A-Za-z0-9+\/]+={0,2})\z/i},
-      ~r/(?:\A|[?&;,\s])session\s*=\s*[A-Za-z0-9._~+\/-]{8,}={0,2}(?=\z|[?&;,\s])/i,
+      # A session cookie: a name ending in `session` (`session`,
+      # `_myapp_session`, `rack.session`) or a framework's own name, and a
+      # value, percent-encoded or not. A name starts with a letter, a digit,
+      # `_` or `.`, so a command-line flag (`--session=nightly`) is no cookie.
+      ~r/(?:\A|[?&;,\s])(?:(?:[A-Za-z0-9_.][A-Za-z0-9_.-]*)?session|sessionid|jsessionid|phpsessid|connect\.sid|asp\.net_sessionid)\s*=\s*[A-Za-z0-9._~+\/%-]{8,}={0,2}(?=\z|[?&;,\s])/i,
+      # Phoenix signed (`SFMyNTY.`, HS256) and encrypted (`QTEyOEdDTQ.`,
+      # A128GCM) cookies and tokens: an algorithm, a payload and a signature.
+      ~r/(?<![A-Za-z0-9_-])(?:SFMyNTY|QTEyOEdDTQ)\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/,
       # Long hex strings alone are not credentials: Imp passes SHA-1 and
       # SHA-256 digests around as cache keys and git identities. One is a
       # credential in an explicit assignment (`token=<hex>`, `secret: <hex>`),
