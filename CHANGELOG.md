@@ -26,6 +26,18 @@ User-visible changes to Imp are recorded here.
 
 ### Fixed
 
+- `Imp.Redaction` redacts a framework's session cookie held under its cookie
+  name as a map or keyword key, as in a parsed cookie jar
+  (`%{"JSESSIONID" => ...}`). Before, only the string form
+  (`JSESSIONID=...`) was redacted, and the key form reached traces, saved
+  programs and cache keys. `JSESSIONID`, `PHPSESSID`, `connect.sid` and
+  `ASP.NET_SessionId`, in any case and after a prefix (`__Host-JSESSIONID`),
+  are redacted whatever they hold: the value under these names is the
+  cookie. `sessionid` (Django's cookie, but also a common name for an
+  ordinary id) is judged by its value as `session` is: a token-shaped string
+  is redacted, a short id, a UUID or a map is kept. `session_id` and
+  `sessionId` are ids and are kept, as before.
+
 - `Imp.Redaction` no longer redacts every value under a key named
   `session`, or ending in `_session` (`chat_session`, `userSession`). Such a
   field often holds an id or a conversation, which now survives in events,

@@ -82,6 +82,11 @@ defmodule Imp.Redaction do
     ["credential"],
     ["credentials"]
   ]
+  # The cookies Java, PHP, Express and ASP.NET issue for a server-side
+  # session. Under these names a value is always that cookie, a bearer
+  # credential, whatever it looks like. Matched on the key with case and
+  # punctuation removed, also after a prefix (`__Host-JSESSIONID`).
+  @session_cookie_key_names ~w(jsessionid phpsessid connectsid aspnetsessionid)
   @schema_descriptor_keys MapSet.new(~w(
     $defs $ref additionalProperties allOf anyOf definitions description exclusiveMaximum
     exclusiveMinimum format items maxItems maxLength maxProperties maximum minItems minLength
@@ -124,8 +129,12 @@ defmodule Imp.Redaction do
   def credential_key?(key) when is_atom(key) or is_binary(key) do
     tokens = key_tokens(key)
 
-    MapSet.member?(@credential_key_names, normalize_key(key)) or
-      Enum.any?(@credential_key_suffixes, &token_suffix?(tokens, &1))
+    normalized = normalize_key(key)
+
+    MapSet.member?(@credential_key_names, normalized) or
+      Enum.any?(@credential_key_suffixes, &token_suffix?(tokens, &1)) or
+      List.last(tokens) == "sessionid" or
+      String.ends_with?(normalized, @session_cookie_key_names)
   end
 
   def credential_key?(key) when is_map(key) do
@@ -258,11 +267,19 @@ defmodule Imp.Redaction do
   # redacted, and an id, a map or a list is kept. Bytes that are not UTF-8
   # are redacted: they are no id or text. A shorter id is kept; a longer
   # whitespace-free id (a ULID, a hex digest) is redacted, since nothing
-  # tells it apart from a server-side session cookie. A credential named for
-  # what it is (`session_token`, `session_key`) is redacted whatever it
-  # holds.
-  defp session_only_key?(key) when is_atom(key) or is_binary(key),
-    do: List.last(key_tokens(key)) == "session"
+  # tells it apart from a server-side session cookie. Django's cookie name,
+  # `sessionid` as one word, is judged the same way: it is also a common name
+  # for an ordinary id. `session_id` and `sessionId` are ids and are not
+  # judged at all, as `session_id=` in a string is no cookie. A credential
+  # named for what it is (`session_token`, `session_key`) or a framework's
+  # own cookie name (`JSESSIONID`, `PHPSESSID`, `connect.sid`,
+  # `ASP.NET_SessionId`) is redacted whatever it holds.
+  defp session_only_key?(key) when is_atom(key) or is_binary(key) do
+    normalized = normalize_key(key)
+
+    List.last(key_tokens(key)) in ["session", "sessionid"] and
+      not String.ends_with?(normalized, @session_cookie_key_names)
+  end
 
   defp session_only_key?(key) when is_map(key) do
     names = key |> tagged_key_names() |> Enum.filter(&credential_key?/1)
@@ -339,7 +356,11 @@ defmodule Imp.Redaction do
 
   Key matching is intentionally conservative around common credential names:
   exact keys plus token-delimited or camel-case provider prefixes such as
-  `:openai_api_key` are redacted.
+  `:openai_api_key` are redacted. A framework's session cookie name as a key
+  (`JSESSIONID`, `PHPSESSID`, `connect.sid`, `ASP.NET_SessionId`, as in a
+  parsed cookie jar) is redacted whatever it holds. A key named `session`
+  (`chat_session`) or `sessionid` is redacted only when it holds a string that
+  looks like a token; an id, a UUID or a map under it is kept.
 
   A string that holds a credential is replaced whole: a credential is rarely
   alone, and the text beside a recognized one (the rest of an env dump, a
