@@ -162,6 +162,20 @@ defmodule Imp.TrajectoryTest do
     assert lookup_call["extra"]["raw_arguments"] == ~s({"query": "be)
     assert lookup_call["extra"]["native_tool_call_id"] == "c1"
 
+    # JSON that parses to something other than an object is recorded decoded,
+    # and kept as recorded.
+    listed = %Imp.Run.Event{
+      run_id: "l",
+      sequence: 0,
+      kind: :tool_call,
+      tool_call_id: "c2",
+      tool_name: :lookup,
+      input: Imp.Tool.normalize_arguments("[1, 2]")
+    }
+
+    [step] = Imp.Trajectory.to_atif([listed])["steps"]
+    assert [%{"arguments" => %{}, "extra" => %{"raw_arguments" => [1, 2]}}] = step["tool_calls"]
+
     # The same call read back from a store, where its input is plain JSON.
     stored = Enum.map(events, &Imp.Run.Event.to_map/1)
     assert Imp.Trajectory.to_atif(stored)["steps"] == document["steps"]

@@ -7,12 +7,13 @@ User-visible changes to Imp are recorded here.
 ### Fixed
 
 - `Imp.Trajectory.to_atif/2` no longer refuses a run in which the model sent
-  a tool call whose arguments were not a JSON object (text that does not
-  parse, or a JSON array). It raised `ArgumentError` ("tool arguments must be
-  a captured map"), so the one run that most needs reading could not be
-  exported at all. The call is now kept as the model made it: empty
-  `arguments`, and what it sent in `extra.raw_arguments`, as a call replayed
-  in a request was already read.
+  a tool call whose arguments were not a JSON object. It raised
+  `ArgumentError` ("tool arguments must be a captured map"), so the one run
+  that most needs reading could not be exported at all. The call is now kept
+  with empty `arguments` and its recorded input in `extra.raw_arguments`: the
+  text the model sent when it does not parse, or the decoded value when it
+  parses to something other than an object (a JSON array is a list). A call
+  replayed in a request still keeps the string the request carried there.
 
 ## 0.17.0 — 2026-10-18
 
