@@ -20,8 +20,8 @@ User-visible changes to Imp are recorded here.
   before it, so the full lists made the document, and the redaction over it,
   grow as the number of requests times the length of the history. On a
   synthetic 65-request run whose requests sent 27 MB in all, `to_atif` alone
-  took 4.2 s and now takes 0.33 s; the encoded document went from 29 MB to
-  2.2 MB. A reader of `extra.model_requests[n]["messages"]` reads
+  (not the host's own reads before it) took 4.2 s and now takes 0.41 s; the
+  encoded document went from 29 MB to 2.2 MB. A reader of `extra.model_requests[n]["messages"]` reads
   `message_ids` through `extra.model_messages` instead.
 
 ### Fixed
