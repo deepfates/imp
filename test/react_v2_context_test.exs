@@ -185,6 +185,91 @@ defmodule Imp.ReActV2ContextTest do
     assert prediction.metadata[:context_projection].omitted_prior_entries == 3
   end
 
+  # The model reads its history as the whole conversation unless told
+  # otherwise, so a request that leaves episodes out says how many, through
+  # the adapter's history note, and one that leaves nothing out says nothing.
+  test "a request that leaves earlier episodes out says so, first, and one that does not is silent" do
+    {:ok, requests} = Agent.start_link(fn -> [] end)
+
+    lm =
+      Imp.Test.FunLM.new(fn messages, _ ->
+        n = Agent.get_and_update(requests, fn seen -> {length(seen), seen ++ [messages]} end)
+
+        if n == 0,
+          do: {:error, %Imp.LMError{context_window_exceeded: true, message: "limit"}},
+          else: {:ok, "continued"}
+      end)
+
+    prior =
+      Imp.history([
+        %{intent: "one", answer: "first"},
+        %{intent: "two", answer: "second"},
+        %{intent: "three", answer: "third"}
+      ])
+
+    {:ok, prediction} =
+      Imp.call(Imp.react("intent -> answer", [], lm: lm), %{intent: "now", history: prior})
+
+    assert prediction.metadata[:context_projection].omitted_prior_groups == 2
+    [full, reduced] = Agent.get(requests, & &1)
+
+    refute Enum.any?(full, &(to_string(&1.content) =~ "left out"))
+
+    # The system message, then the note, then what is shown.
+    assert [%{role: :system}, %{role: :user, content: note}, %{role: :user, content: shown} | _] =
+             reduced
+
+    assert note ==
+             "2 earlier exchanges in this conversation are left out of this request, " <>
+               "to fit the context window."
+
+    assert shown =~ "three"
+    refute inspect(reduced) =~ "first"
+
+    # Only the request carries it: the history is the conversation as it was.
+    refute inspect(prediction.metadata[:history]) =~ "left out"
+    refute Enum.any?(prediction.metadata[:history].messages, &Map.has_key?(&1, :omitted_episodes))
+  end
+
+  test "a host's history note renderer words the omission, and nil keeps Imp's" do
+    for {renderer, expected} <- [
+          {fn _sig, turn ->
+             if n = Map.get(turn, :omitted_episodes), do: "(#{n} older turns not shown)"
+           end, "(2 older turns not shown)"},
+          {fn _sig, _turn -> nil end,
+           "2 earlier exchanges in this conversation are left out of this request, " <>
+             "to fit the context window."}
+        ] do
+      {:ok, requests} = Agent.start_link(fn -> [] end)
+
+      lm =
+        Imp.Test.FunLM.new(fn messages, _ ->
+          n = Agent.get_and_update(requests, fn seen -> {length(seen), seen ++ [messages]} end)
+
+          if n == 0,
+            do: {:error, %Imp.LMError{context_window_exceeded: true, message: "limit"}},
+            else: {:ok, "continued"}
+        end)
+
+      prior =
+        Imp.history([
+          %{intent: "one", answer: "first"},
+          %{intent: "two", answer: "second"},
+          %{intent: "three", answer: "third"}
+        ])
+
+      program =
+        Imp.react("intent -> answer", [],
+          lm: lm,
+          adapter_opts: [history_note_renderer: renderer]
+        )
+
+      {:ok, _prediction} = Imp.call(program, %{intent: "now", history: prior})
+      [_full, reduced] = Agent.get(requests, & &1)
+      assert Enum.at(reduced, 1) == %{role: :user, content: expected}
+    end
+  end
+
   test "a successful smaller retry preserves the current effect and never executes it again" do
     {:ok, state} = Agent.start_link(fn -> %{calls: 0, effects: 0} end)
 
