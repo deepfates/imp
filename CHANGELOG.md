@@ -15,6 +15,15 @@ User-visible changes to Imp are recorded here.
   too, and the cookie rule inside a string also catches a prefixed name
   (`_myapp_session=`).
 
+- `Imp.Trajectory.to_atif/2` no longer refuses a run in which the model sent
+  a tool call whose arguments were not a JSON object. It raised
+  `ArgumentError` ("tool arguments must be a captured map"), so the one run
+  that most needs reading could not be exported at all. The call is now kept
+  with empty `arguments` and its recorded input in `extra.raw_arguments`: the
+  text the model sent when it does not parse, or the decoded value when it
+  parses to something other than an object (a JSON array is a list). A call
+  replayed in a request still keeps the string the request carried there.
+
 - `Imp.MCP.Trust` no longer crashes, and logs no error with a stack trace,
   when an MCP connection ends while the VM is shutting down. The application
   controller refuses to change configuration then, and there is nothing left
