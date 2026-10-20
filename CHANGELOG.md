@@ -4,6 +4,26 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Changed
+
+- `Imp.Trajectory.to_atif/2` no longer lists every model request's messages
+  in full. `extra.model_messages` holds each distinct message the run sent
+  once, redacted and JSON-safe, and each entry of `extra.model_requests` names
+  the messages it sent, in order, as `message_ids` (positions in
+  `extra.model_messages`, from 0) in place of `messages`. Request N sent the
+  messages at its `message_ids`, in order, exactly as the full list had them;
+  read them through a tuple (`elem(List.to_tuple(model_messages), id)`), since
+  `Enum.at/2` per id is quadratic on a long run. Messages are told apart after
+  redaction, so two that differed only in a redacted secret share one
+  position and the positions reveal nothing redaction removed. A request whose
+  input was not a list keeps it as `messages`. A request repeats the history
+  before it, so the full lists made the document, and the redaction over it,
+  grow as the number of requests times the length of the history. On a
+  synthetic 65-request run whose requests sent 27 MB in all, `to_atif` alone
+  (not the host's own reads before it) took 4.2 s and now takes 0.41 s; the
+  encoded document went from 29 MB to 2.2 MB. A reader of `extra.model_requests[n]["messages"]` reads
+  `message_ids` through `extra.model_messages` instead.
+
 ### Fixed
 
 - `Imp.Redaction` no longer redacts every value under a key named

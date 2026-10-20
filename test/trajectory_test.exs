@@ -120,6 +120,114 @@ defmodule Imp.TrajectoryTest do
       do: File.write!(path, Jason.encode!(document, pretty: true))
   end
 
+  test "each model request is kept whole, with every message it shares with another kept once" do
+    secret = "sk-test-secret-1234567890"
+    system = %{role: :system, content: "instructions"}
+    question = %{role: :user, content: "question, key #{secret}"}
+    call = %{role: :assistant, content: "", tool_calls: [%{id: "c1", name: "lookup"}]}
+    result = %{role: :tool, content: "found", tool_call_id: "c1"}
+    note = %{role: :user, content: "a note added later"}
+
+    # The second request repeats the first and adds to it; the third leaves a
+    # message of the second out, as a request that shortens its history does.
+    inputs = [
+      [system, question],
+      [system, question, call, result],
+      [system, call, result, note, note]
+    ]
+
+    events =
+      [%Imp.Run.Event{run_id: "r", sequence: 0, kind: :run_started, input: %{}}] ++
+        Enum.flat_map(Enum.with_index(inputs), fn {input, i} ->
+          [
+            %Imp.Run.Event{
+              run_id: "r",
+              sequence: 2 * i + 1,
+              kind: :model_request,
+              input: input,
+              metadata: %{call: i}
+            },
+            %Imp.Run.Event{run_id: "r", sequence: 2 * i + 2, kind: :model_response, output: "ok"}
+          ]
+        end) ++
+        [%Imp.Run.Event{run_id: "r", sequence: 7, kind: :run_finished, output: %{}}]
+
+    doc = events |> Enum.map(&Imp.Run.Event.to_map/1) |> Imp.Trajectory.to_atif()
+    table = doc["extra"]["model_messages"]
+    requests = doc["extra"]["model_requests"]
+
+    assert length(table) == 5
+    assert Enum.map(requests, & &1["message_ids"]) == [[0, 1], [0, 1, 2, 3], [0, 2, 3, 4, 4]]
+
+    assert Enum.map(requests, & &1["metadata"]) == [
+             %{"call" => 0},
+             %{"call" => 1},
+             %{"call" => 2}
+           ]
+
+    refute Enum.any?(requests, &Map.has_key?(&1, "messages"))
+
+    # What each request sent, rebuilt from the table, is that request's input
+    # as the document carries any value: redacted and JSON-safe.
+    for {request, input} <- Enum.zip(requests, inputs) do
+      assert Enum.map(request["message_ids"], &Enum.at(table, &1)) ==
+               input |> Imp.Redaction.redact() |> Imp.Observability.Inspection.json_safe()
+    end
+
+    refute Jason.encode!(doc) =~ secret
+    assert Enum.at(table, 1)["content"] == "[REDACTED]"
+  end
+
+  test "positions reveal nothing about a secret redaction removed" do
+    # Two requests that differ only in the key they carry: once redacted they
+    # read the same, so they share positions, and a reader cannot tell whether
+    # the key changed.
+    system = %{role: :system, content: "instructions"}
+
+    events =
+      [%Imp.Run.Event{run_id: "r", sequence: 0, kind: :run_started, input: %{}}] ++
+        Enum.flat_map(Enum.with_index(["AAAA", "BBBB"]), fn {tail, i} ->
+          [
+            %Imp.Run.Event{
+              run_id: "r",
+              sequence: 2 * i + 1,
+              kind: :model_request,
+              input: [system, %{role: :user, content: "key sk-test-secret-1234567890#{tail}"}]
+            },
+            %Imp.Run.Event{run_id: "r", sequence: 2 * i + 2, kind: :model_response, output: "ok"}
+          ]
+        end) ++
+        [%Imp.Run.Event{run_id: "r", sequence: 5, kind: :run_finished, output: %{}}]
+
+    doc = Imp.Trajectory.to_atif(events)
+
+    assert Enum.map(doc["extra"]["model_requests"], & &1["message_ids"]) == [[0, 1], [0, 1]]
+
+    assert doc["extra"]["model_messages"] == [
+             %{"role" => "system", "content" => "instructions"},
+             %{"role" => "user", "content" => "[REDACTED]"}
+           ]
+  end
+
+  test "a model request whose input is not a list of messages keeps it as it was" do
+    events = [
+      %Imp.Run.Event{run_id: "r", sequence: 0, kind: :run_started, input: %{}},
+      %Imp.Run.Event{
+        run_id: "r",
+        sequence: 1,
+        kind: :model_request,
+        input: "[truncated]",
+        metadata: %{capture: %{truncated: true}}
+      },
+      %Imp.Run.Event{run_id: "r", sequence: 2, kind: :run_finished, output: %{}}
+    ]
+
+    doc = Imp.Trajectory.to_atif(events)
+    assert doc["extra"]["model_messages"] == []
+    assert [%{"messages" => "[truncated]"} = request] = doc["extra"]["model_requests"]
+    refute Map.has_key?(request, "message_ids")
+  end
+
   defmodule UnparsedArgumentsLM do
     # Sends a tool call whose arguments are not JSON, as a model that cut its
     # arguments short does, then answers.
