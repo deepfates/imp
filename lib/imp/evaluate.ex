@@ -208,7 +208,9 @@ defmodule Imp.Evaluate do
   it is logged loudly and the row carries `{:evaluation_task_exit, :timeout}`
   with a `nil` prediction, so a killed call stays distinguishable from a wrong
   answer. A finite `:timeout` is enforced at every concurrency level,
-  including the default `num_threads: 1`.
+  including the default `num_threads: 1`. It counts the row's own running
+  time, from when it has a place in Imp's task pool; a row waiting for a
+  place (other Imp work on the node holds them all) is not timed.
 
   When `:max_errors` is reached the evaluation halts LOUDLY by raising
   `Imp.EvaluationCancelledError`, mirroring DSPy's `ParallelExecutor`

@@ -4,6 +4,16 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Fixed
+
+- A row's per-row `:timeout` (evaluation, optimizer trajectories, SIMBA,
+  Search, RLM, BootstrapFinetune, the GEPA adapter, `Imp.parallel/3`) counts
+  from when the row has a place in Imp's task pool, not from when its task
+  was spawned. Before, a row queued behind other Imp work on the node could
+  be killed with `{:task_exit, :timeout}` without having run. A row that
+  runs past its timeout once it has a place is still killed, with the same
+  result as before.
+
 ## 0.17.0 — 2026-10-18
 
 ### Added

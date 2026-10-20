@@ -35,7 +35,9 @@ optimizer fan-out and runs, takes a place in one pool per node, sized by the
 waits its turn instead of failing. Provider rate limits and memory are
 per-node, so the bound is too. Fan-out that Imp runs inside one of its own
 tasks uses that task's place, so nested work cannot deadlock the pool, even
-with a limit of one.
+with a limit of one. A row's `:timeout` (in evaluation, optimizers and
+`Imp.parallel/3`) counts from when the row has its place, so waiting for one
+never times a row out.
 
 ### 3. A host can name its own pools
 

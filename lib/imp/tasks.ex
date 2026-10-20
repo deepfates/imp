@@ -196,6 +196,8 @@ defmodule Imp.Tasks do
   # The pool every task joins unless its caller names another.
   @machine_pool {__MODULE__, :machine}
 
+  @row_timed_out :"$imp_tasks_row_timed_out"
+
   @async_stream_option_schema [
     max_concurrency: [type: :pos_integer],
     ordered: [type: :boolean],
@@ -334,23 +336,47 @@ defmodule Imp.Tasks do
     opts =
       Keyword.update(opts, :max_concurrency, stream_max_workers, &min(&1, stream_max_workers))
 
+    # The row's `:timeout` counts from when it has a place in the pool, not
+    # from its spawn: `Task.async_stream` starts its clock at the spawn, so
+    # a row that waited for a place was killed without ever having run. The
+    # stream itself waits without a limit, and the row times itself (see
+    # `run_timed/3`).
+    {timeout, opts} = Keyword.pop(opts, :timeout, 5_000)
+    {on_timeout, opts} = Keyword.pop(opts, :on_timeout, :exit)
+    zip? = Keyword.get(opts, :zip_input_on_exit, false)
+    opts = Keyword.put(opts, :timeout, :infinity)
+
     wrapped = fn item ->
+      timed = fn -> run_timed(fn -> fun.(item) end, item, timeout) end
+
       case borrowed do
         {token, lease_owner} ->
           if direct_task_caller?(@supervisor, enumerator) and
                @admission.owned_by?(token, lease_owner) do
-            run_borrowed(context, token, lease_owner, fn -> fun.(item) end)
+            run_borrowed(context, token, lease_owner, timed)
           else
-            run_admitted(context, max_workers, fn -> fun.(item) end)
+            run_admitted(context, max_workers, timed)
           end
 
         nil ->
-          run_admitted(context, max_workers, fn -> fun.(item) end)
+          run_admitted(context, max_workers, timed)
       end
     end
 
     ensure_runtime!()
-    Task.Supervisor.async_stream(@supervisor, enumerable, wrapped, opts)
+
+    @supervisor
+    |> Task.Supervisor.async_stream(enumerable, wrapped, opts)
+    |> Stream.map(fn
+      {:ok, {@row_timed_out, item}} ->
+        case on_timeout do
+          :kill_task -> if zip?, do: {:exit, {item, :timeout}}, else: {:exit, :timeout}
+          :exit -> exit({:timeout, {Task.Supervised, :stream, [timeout]}})
+        end
+
+      result ->
+        result
+    end)
   end
 
   def async_stream(_enumerable, fun, _opts) do
@@ -441,6 +467,30 @@ defmodule Imp.Tasks do
 
   defp run_borrowed(context, token, owner, fun) do
     with_admission(token, owner, fn -> with_runtime_context(context, fun) end)
+  end
+
+  # A stream row with a place, run against its own `:timeout`. The work runs
+  # in a task linked to this one, on this one's place and context, so a crash
+  # ends this row as it did before; at the timeout the work is killed and the
+  # row reports it, which `async_stream/3` turns into `Task.async_stream`'s
+  # own timeout result. Killing this process from a timer instead would take
+  # the stream's caller down with it, since stream tasks are linked to it.
+  defp run_timed(fun, _item, :infinity), do: fun.()
+
+  defp run_timed(fun, item, timeout) do
+    {token, owner} = current_admission()
+    context = capture_context(Imp.Settings.snapshot())
+
+    task =
+      Task.Supervisor.async(@unlinked_supervisor, fn ->
+        with_admission(token, owner, fn -> with_runtime_context(context, fun) end)
+      end)
+
+    case Task.yield(task, timeout) || Task.shutdown(task, :brutal_kill) do
+      {:ok, value} -> value
+      {:exit, reason} -> exit(reason)
+      nil -> {@row_timed_out, item}
+    end
   end
 
   @doc false
