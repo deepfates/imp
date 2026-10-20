@@ -14,6 +14,10 @@ User-visible changes to Imp are recorded here.
   `reasoning_details`; it is now sent once, as `reasoning_details`, which
   OpenRouter documents as the preserved form. The same recognition applies
   to OpenRouter's output-limit omission and `openrouter_reasoning_wire:`.
+- A step whose reasoning details all came from another provider (a direct
+  Google, Anthropic or OpenAI run) and is replayed to OpenRouter now sends
+  its reasoning text. ReqLLM's OpenRouter encoder skips such details, and
+  before, the text was dropped too, so the step went out with no reasoning.
 
 ## 0.17.0 — 2026-10-18
 

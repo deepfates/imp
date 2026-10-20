@@ -1142,7 +1142,7 @@ defmodule Imp.Clients.ReqLLM do
   defp openrouter_model?({:openrouter, opts}) when is_list(opts), do: true
 
   defp openrouter_model?(model) when is_binary(model),
-    do: String.starts_with?(model, "openrouter:") or String.ends_with?(model, "@openrouter")
+    do: match?({:ok, {:openrouter, _id}}, LLMDB.Spec.parse_spec(model))
 
   defp openrouter_model?(_model), do: false
 
@@ -1375,16 +1375,10 @@ defmodule Imp.Clients.ReqLLM do
 
     text = map_value(source, :reasoning_content)
 
-    cond do
-      Enum.any?(message.reasoning_details || [], fn detail ->
-        match?(%ReqLLM.Message.ReasoningDetails{provider: :anthropic}, detail)
-      end) ->
-        # ReqLLM encodes Anthropic's signed/redacted blocks from the details.
-        # Adding their text as a thinking content part duplicates the block on
-        # tool turns and produces an unsigned continuation.
-        %{message | content: without_thinking(message.content)}
+    details = message.reasoning_details || []
 
-      openrouter? and (message.reasoning_details || []) != [] ->
+    cond do
+      openrouter? and Enum.any?(details, &openrouter_sends_detail?/1) ->
         # OpenRouter takes reasoning back in one of two ways: the
         # `reasoning_details` blocks, or the plain `reasoning` text, for which
         # `reasoning_content` is an alias
@@ -1395,20 +1389,44 @@ defmodule Imp.Clients.ReqLLM do
         # would send the reasoning twice.
         %{message | content: without_thinking(message.content)}
 
-      is_binary(text) and text != "" ->
-        %{
-          message
-          | content: [
-              ReqLLM.Message.ContentPart.thinking(text) | without_thinking(message.content)
-            ]
-        }
+      openrouter? ->
+        # ReqLLM's OpenRouter encoder skips every detail another provider
+        # recorded (a step from a direct Google or Anthropic run), so the text
+        # is the only reasoning that can go back.
+        with_thinking(message, text)
+
+      Enum.any?(details, &match?(%ReqLLM.Message.ReasoningDetails{provider: :anthropic}, &1)) ->
+        # ReqLLM encodes Anthropic's signed/redacted blocks from the details.
+        # Adding their text as a thinking content part duplicates the block on
+        # tool turns and produces an unsigned continuation.
+        %{message | content: without_thinking(message.content)}
 
       true ->
-        message
+        with_thinking(message, text)
     end
   end
 
   defp preserve_reasoning(message, _source, _openrouter?), do: message
+
+  defp with_thinking(message, text) when is_binary(text) and text != "" do
+    %{
+      message
+      | content: [ReqLLM.Message.ContentPart.thinking(text) | without_thinking(message.content)]
+    }
+  end
+
+  defp with_thinking(message, _text), do: message
+
+  # The details ReqLLM's OpenRouter encoder writes to the request: its own, as
+  # a struct or as a decoded map, and a raw wire block that names no provider.
+  defp openrouter_sends_detail?(%ReqLLM.Message.ReasoningDetails{provider: provider}),
+    do: provider == :openrouter
+
+  defp openrouter_sends_detail?(%{"provider" => provider}) when is_binary(provider),
+    do: provider == "openrouter"
+
+  defp openrouter_sends_detail?(%{"type" => _type}), do: true
+  defp openrouter_sends_detail?(_detail), do: false
 
   defp without_thinking(content), do: Enum.reject(content, &match?(%{type: :thinking}, &1))
 
