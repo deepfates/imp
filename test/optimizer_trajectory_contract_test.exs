@@ -141,7 +141,7 @@ defmodule Imp.Optimizer.TrajectoryContractTest do
 
   test "serialization redacts credential tuple and keyword pairs without changing tuple shape" do
     authorization = "CANARY_TRAJECTORY_TUPLE_AUTHORIZATION_31b7c"
-    session = "CANARY_TRAJECTORY_KEYWORD_SESSION_a024e"
+    session_token = "CANARY_TRAJECTORY_KEYWORD_SESSION_a024e"
 
     trajectory =
       Trajectory.project(:evaluation, %{
@@ -151,7 +151,7 @@ defmodule Imp.Optimizer.TrajectoryContractTest do
         score: 1.0,
         trace: [
           {"authorization", authorization},
-          [session: session],
+          [session_token: session_token],
           {:status, {"request_id", "request-42"}},
           {:ordinary, 7, "retained"}
         ]
@@ -161,13 +161,13 @@ defmodule Imp.Optimizer.TrajectoryContractTest do
     encoded = Jason.encode!(wire)
 
     refute encoded =~ authorization
-    refute encoded =~ session
+    refute encoded =~ session_token
 
     assert {:ok, restored} = Trajectory.load(wire)
 
     assert restored.trace == [
              {"authorization", "[REDACTED]"},
-             [session: "[REDACTED]"],
+             [session_token: "[REDACTED]"],
              {:status, {"request_id", "request-42"}},
              {:ordinary, 7, "retained"}
            ]

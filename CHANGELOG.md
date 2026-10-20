@@ -4,6 +4,15 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Fixed
+
+- `Imp.Redaction` no longer treats a key named `session`, or ending in
+  `_session` (`chat_session`, `user_session`), as a credential. Such fields
+  usually hold an id or a conversation, and they now survive in events,
+  traces and reports. `session_token` stays redacted, `session_key` is now
+  redacted too, and a `session=` assignment inside a string is still caught
+  by the string rules.
+
 ## 0.17.0 — 2026-10-18
 
 ### Added

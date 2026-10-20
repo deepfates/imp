@@ -6,7 +6,7 @@ defmodule Imp.RedactionTest do
   @credential_canaries [
     auth: "CANARY_BARE_AUTH_7f913",
     bearer: "CANARY_BARE_BEARER_4c286",
-    session: "CANARY_BARE_SESSION_91a42",
+    session_key: "CANARY_SESSION_KEY_91a42",
     api_key: "CANARY_API_KEY_2dd71",
     authorization: "CANARY_AUTHORIZATION_8ab35",
     proxy_authorization: "CANARY_PROXY_AUTHORIZATION_61ee4",
@@ -333,7 +333,8 @@ defmodule Imp.RedactionTest do
     assert Imp.Redaction.credential_key?(:provider_auth)
     assert Imp.Redaction.credential_key?("providerAuth")
     assert Imp.Redaction.credential_key?(:provider_bearer)
-    assert Imp.Redaction.credential_key?("providerSession")
+    assert Imp.Redaction.credential_key?("providerSessionKey")
+    refute Imp.Redaction.credential_key?("providerSession")
 
     Enum.each(
       [
@@ -355,6 +356,26 @@ defmodule Imp.RedactionTest do
     assert Imp.Redaction.redact(%{access_key_id: "AKIAINLINEPLAINTEXT"}) == %{
              access_key_id: "[REDACTED]"
            }
+  end
+
+  # A field called `session` usually holds an id or a conversation, not a
+  # secret; a session credential is named for what it is.
+  test "a session field survives redaction and a session token does not" do
+    input = %{
+      session: "abc-123",
+      chat_session: %{id: "chat-7", turns: 3},
+      session_token: "CANARY_SESSION_TOKEN_77e1a",
+      session_key: "CANARY_SESSION_KEY_0b9c2"
+    }
+
+    assert Imp.Redaction.redact(input) == %{
+             session: "abc-123",
+             chat_session: %{id: "chat-7", turns: 3},
+             session_token: "[REDACTED]",
+             session_key: "[REDACTED]"
+           }
+
+    assert Imp.Redaction.redact("session=F4keSessionF4ke") == "[REDACTED]"
   end
 
   test "redacts credential boundaries recursively without redacting semantic IDs or paths" do
