@@ -135,6 +135,85 @@ defmodule ReasoningContinuityTest do
       %{"role" => "tool", "content" => "found", "tool_calls" => [%{"id" => "call_1"}]}
     ]
 
+    # Every form of OpenRouter model spec ReqLLM accepts.
+    for spec <- [
+          "openrouter:fixture/model",
+          "fixture/model@openrouter",
+          {:openrouter, "fixture/model", []},
+          {:openrouter, id: "fixture/model"},
+          %{provider: :openrouter, id: "fixture/model"}
+        ] do
+      lm =
+        Imp.req_llm(spec,
+          api_key: "fixture",
+          cache: false,
+          req_http_options: [plug: plug, retry: false]
+        )
+
+      assert {:ok, _} = Imp.Clients.ReqLLM.generate(lm, messages, [])
+      assert_received {:wire, body}
+      assert length(String.split(body, reasoning)) - 1 == 1, "sent twice for #{inspect(spec)}"
+
+      %{"messages" => [_user, step, _result]} = JSON.decode!(body)
+      assert [%{"type" => "reasoning.text", "text" => ^reasoning}] = step["reasoning_details"]
+      refute Map.has_key?(step, "reasoning_content")
+    end
+  end
+
+  # ReqLLM's OpenRouter encoder sends only OpenRouter's own details. A step
+  # recorded from a direct Google or Anthropic run and replayed to OpenRouter
+  # sends its reasoning as text; a step with details from both sends the
+  # OpenRouter ones, once.
+  test "a step with another provider's reasoning details replays its text to OpenRouter" do
+    test = self()
+
+    plug = fn conn ->
+      {:ok, body, conn} = Plug.Conn.read_body(conn)
+      send(test, {:wire, body})
+
+      Plug.Conn.send_resp(
+        conn,
+        200,
+        JSON.encode!(%{
+          "id" => "r",
+          "model" => "fixture/model",
+          "choices" => [
+            %{
+              "index" => 0,
+              "message" => %{"role" => "assistant", "content" => "done"},
+              "finish_reason" => "stop"
+            }
+          ]
+        })
+      )
+    end
+
+    reasoning = "Check the timeline before replying."
+
+    google = %{
+      "provider" => "google",
+      "format" => "google-gemini-v1",
+      "index" => 0,
+      "text" => reasoning,
+      "signature" => "c2lnbmF0dXJl"
+    }
+
+    anthropic = %{
+      "provider" => "anthropic",
+      "format" => "anthropic-claude-v1",
+      "index" => 0,
+      "text" => reasoning,
+      "signature" => "c2lnbmVk"
+    }
+
+    openrouter = %{
+      "provider" => "openrouter",
+      "format" => "unknown",
+      "index" => 0,
+      "text" => reasoning,
+      "provider_data" => %{"type" => "reasoning.text"}
+    }
+
     lm =
       Imp.req_llm("openrouter:fixture/model",
         api_key: "fixture",
@@ -142,11 +221,33 @@ defmodule ReasoningContinuityTest do
         req_http_options: [plug: plug, retry: false]
       )
 
-    assert {:ok, _} = Imp.Clients.ReqLLM.generate(lm, messages, [])
-    assert_received {:wire, body}
-    assert length(String.split(body, reasoning)) - 1 == 1
+    replay = fn details ->
+      messages = [
+        %{"role" => "user", "content" => "look around"},
+        %{
+          "role" => "assistant",
+          "content" => "",
+          "tool_calls" => [%{"id" => "call_1", "name" => "lookup", "arguments" => %{}}],
+          "reasoning_content" => reasoning,
+          "reasoning_details" => details
+        },
+        %{"role" => "tool", "content" => "found", "tool_calls" => [%{"id" => "call_1"}]}
+      ]
 
-    %{"messages" => [_user, step, _result]} = JSON.decode!(body)
+      assert {:ok, _} = Imp.Clients.ReqLLM.generate(lm, messages, [])
+      assert_received {:wire, body}
+      assert length(String.split(body, reasoning)) - 1 == 1, "for #{inspect(details)}"
+      %{"messages" => [_user, step, _result]} = JSON.decode!(body)
+      step
+    end
+
+    for details <- [[google], [anthropic], [google, anthropic]] do
+      step = replay.(details)
+      assert step["reasoning_content"] == reasoning
+      refute Map.has_key?(step, "reasoning_details")
+    end
+
+    step = replay.([google, openrouter])
     assert [%{"type" => "reasoning.text", "text" => ^reasoning}] = step["reasoning_details"]
     refute Map.has_key?(step, "reasoning_content")
   end

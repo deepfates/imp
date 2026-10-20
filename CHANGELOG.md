@@ -6,6 +6,20 @@ User-visible changes to Imp are recorded here.
 
 ### Fixed
 
+- `Imp.Clients.ReqLLM` recognises an OpenRouter model in every spec form
+  ReqLLM accepts (`"id@openrouter"`, `{:openrouter, id, opts}`,
+  `{:openrouter, id: id}`, a string-keyed map), not only `"openrouter:id"`
+  and a model map or struct. With the other forms, a replayed assistant step
+  carried its reasoning twice, in `reasoning_content` and
+  `reasoning_details`; it is now sent once, as `reasoning_details`, which
+  OpenRouter documents as the preserved form. The same recognition applies
+  to OpenRouter's output-limit omission and `openrouter_reasoning_wire:`.
+
+- A step whose reasoning details all came from another provider (a direct
+  Google, Anthropic or OpenAI run) and is replayed to OpenRouter now sends
+  its reasoning text. ReqLLM's OpenRouter encoder skips such details, and
+  before, the text was dropped too, so the step went out with no reasoning.
+
 - `Imp.Trajectory.to_atif/2` no longer refuses a run in which the model sent
   a tool call whose arguments were not a JSON object. It raised
   `ArgumentError` ("tool arguments must be a captured map"), so the one run
