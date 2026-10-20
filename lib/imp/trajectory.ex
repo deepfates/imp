@@ -32,7 +32,16 @@ defmodule Imp.Trajectory do
       same one, and `final_metrics` the run's token and cost totals where
       every response reported them.
 
-  Every model request is also listed whole in `extra.model_requests`.
+  Every model request is also kept whole, without repeating the history it
+  shares with the requests before it. `extra.model_messages` lists each
+  distinct message the run sent once, in the order the requests first sent
+  it, and each entry of `extra.model_requests` (in request order, with its
+  `metadata`) names the messages it sent, in order, as `message_ids`:
+  positions in `extra.model_messages`, counted from 0. A request sent exactly
+  `Enum.map(message_ids, &Enum.at(model_messages, &1))`. A request whose
+  input was not a list of messages keeps it as `messages` instead. Listing
+  each request's messages in full made the document, and the redaction over
+  it, grow as the number of requests times the length of the history.
   Lifecycle events and capture gaps become entries in `extra.diagnostics`
   rather than dialogue steps. A loop's `:reasoning` event is the visible
   thought a step wrote, which the response already carries, so it is kept on
@@ -102,6 +111,8 @@ defmodule Imp.Trajectory do
           steps
       end
 
+    {model_messages, model_requests} = index_messages(Enum.reverse(state.requests))
+
     %{
       schema_version: "ATIF-v1.8",
       session_id: first.run_id,
@@ -112,13 +123,40 @@ defmodule Imp.Trajectory do
       final_metrics: final_metrics(events, length(steps)),
       extra: %{
         terminal_event: if(terminal, do: terminal.kind, else: :unknown),
-        model_requests: Enum.reverse(state.requests),
+        model_messages: model_messages,
+        model_requests: model_requests,
         diagnostics: state.diagnostics,
         capture: "Native Imp execution observations"
       }
     }
     |> Imp.Redaction.redact()
     |> Imp.Observability.Inspection.json_safe()
+  end
+
+  # Each request's messages as positions in one list of the distinct messages
+  # the run sent. A request usually repeats every message of the one before it
+  # and adds a few, so each message is kept, redacted and encoded once.
+  # Messages are told apart as terms, before redaction: two that differ are
+  # kept apart even if redaction makes them read the same.
+  defp index_messages(requests) do
+    {requests, {_ids, _count, messages}} =
+      Enum.map_reduce(requests, {%{}, 0, []}, fn
+        %{messages: list} = request, acc when is_list(list) ->
+          {ids, acc} = Enum.map_reduce(list, acc, &message_id/2)
+          {request |> Map.delete(:messages) |> Map.put(:message_ids, ids), acc}
+
+        request, acc ->
+          {request, acc}
+      end)
+
+    {Enum.reverse(messages), requests}
+  end
+
+  defp message_id(message, {ids, count, messages} = acc) do
+    case ids do
+      %{^message => id} -> {id, acc}
+      _ -> {count, {Map.put(ids, message, count), count + 1, [message | messages]}}
+    end
   end
 
   defp project(%Event{kind: :model_request} = event, state) do
