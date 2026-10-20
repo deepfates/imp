@@ -43,6 +43,17 @@ User-visible changes to Imp are recorded here.
   parses to something other than an object (a JSON array is a list). A call
   replayed in a request still keeps the string the request carried there.
 
+- A non-streamed `Imp.Clients.ReqLLM` call with no deadline and no
+  `receive_timeout:` waited 30 seconds for the provider (ReqLLM's default),
+  and ReqLLM's retry step sent a timed-out request again up to three times,
+  out of sight of the run's record: one `:model_request` stood for four
+  requests sent. The call now waits up to 10 minutes by default. Imp sends a
+  failed attempt again itself, with ReqLLM's retries off: a closed or refused
+  connection at once and a 429 or 529 after its `retry-after`, up to
+  `max_retries:` (3) times, never one that timed out. Inside an `Imp.Run`
+  each resend is recorded as a new `:model_resend` event naming the call's
+  `model_call_id`, the attempt, how long it took and the wait.
+
 - `Imp.MCP.Trust` no longer crashes, and logs no error with a stack trace,
   when an MCP connection ends while the VM is shutting down. The application
   controller refuses to change configuration then, and there is nothing left

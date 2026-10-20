@@ -136,11 +136,16 @@ pools and cancellation.
 A model call has three layers of time limit:
 
 1. **One attempt.** `receive_timeout:` on the client bounds how long one HTTP
-   attempt waits for the provider. Defaults vary by provider and model, from
-   30 seconds to several minutes for reasoning models, so set it.
-2. **Retries.** ReqLLM retries a dropped or timed-out connection up to three
-   times, immediately (`max_retries:` on the client). A model call changes
-   nothing outside, so a retry is safe, but it multiplies the worst case.
+   attempt waits for the provider. A non-streamed call through
+   `Imp.Clients.ReqLLM` that sets none waits up to 10 minutes, since a
+   reasoning model can take minutes to write its answer; set it to the
+   longest answer you expect.
+2. **Resends.** `Imp.Clients.ReqLLM` sends an attempt again, up to three
+   times (`max_retries:` on the client, `0` for none), when its connection
+   closed or was refused, at once, or when the provider answered 429 or 529,
+   after its `retry-after`. A timed-out attempt is not sent again: the
+   provider may have done and billed the work. Inside a run each resend is a
+   `:model_resend` event on the call, so the record shows every request sent.
 3. **The whole call.** Inside `Imp.Deadline.with_deadline/2`, every model
    request made through ReqLLM is cut to the time left, retries included,
    and so is every request made in `Imp.parallel/3` workers and runs; a ReAct agent

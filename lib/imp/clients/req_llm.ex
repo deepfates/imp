@@ -39,6 +39,16 @@ defmodule Imp.Clients.ReqLLM do
   are still recorded, on the call's failed `:model_response` event and in
   `Imp.Usage`.
 
+  A non-streamed call waits up to `:receive_timeout` for the provider's
+  answer, 10 minutes unless the client or the call sets it, and no longer
+  than the `Imp.Deadline` left. ReqLLM's own retries are off: an attempt
+  whose connection closed or was refused is sent again at once, and one the
+  provider answered 429 or 529 after its `retry-after` (or a second), up to
+  `:max_retries` times (3 unless set; `0`, or `retry: false` in
+  `:req_http_options`, sends nothing again). A timed-out attempt is not sent
+  again. Inside an `Imp.Run` each resend is a `:model_resend` event naming the
+  call's `model_call_id`.
+
   `stream/3` ends with exactly one terminal event. A provider stream that runs
   to its end closes with `done: true` and the metadata the provider reported
   along the way: usage (with any `"cost"` the provider charged), model and
@@ -67,6 +77,16 @@ defmodule Imp.Clients.ReqLLM do
   """
 
   @behaviour Imp.LM
+
+  # A non-streamed call waits for its whole answer, which a reasoning model
+  # can take minutes to write, so ReqLLM's 30 s default cut long calls short.
+  # Ten minutes is longer than a completion usually takes and still ends a
+  # call to a provider that never answers. `:receive_timeout` (or `:timeout`)
+  # on the client or the call sets another bound; a deadline caps it.
+  @default_receive_timeout 600_000
+
+  # ReqLLM's own number of resends (`ReqLLM.Step.Retry`).
+  @default_transport_resends 3
 
   require Logger
 
@@ -405,17 +425,109 @@ defmodule Imp.Clients.ReqLLM do
   # this client refuses raises `ArgumentError` like every other option error,
   # and only what happens once the request is made is an `Imp.LMError`.
   defp do_generate_uncached(lm, messages, opts) do
+    {resends, opts} = opts |> enforce_explicit_no_retry() |> transport_resends()
+
     opts =
       opts
       |> preserve_openrouter_output_omission(lm.model)
       |> encode_openrouter_reasoning(lm.model)
       |> atomize_reasoning_effort()
+      |> Keyword.put_new(:receive_timeout, @default_receive_timeout)
+
+    send_attempts(lm, messages, opts, resends, 1)
+  end
+
+  # Imp sends a failed call again itself rather than through ReqLLM's retry
+  # step (`ReqLLM.Step.Retry`), which resends inside the transport where no
+  # run event sees it: a run's record showed one request when four were sent.
+  # Every attempt is made with ReqLLM's retries off, and each one that is sent
+  # again is recorded as a `:model_resend` event on the call. Each attempt's
+  # timeouts are capped to the deadline left when it starts.
+  defp send_attempts(lm, messages, opts, resends, attempt) do
+    started = System.monotonic_time(:millisecond)
+
+    attempt_opts =
+      opts
       |> cap_transport_timeouts()
       |> bind_to_caller()
       |> keep_error_headers()
-      |> enforce_explicit_no_retry()
 
-    send_generate(lm, messages, opts)
+    result = send_generate(lm, messages, attempt_opts)
+
+    with true <- attempt <= resends,
+         {:error, %Imp.LMError{} = error} <- result,
+         wait when is_integer(wait) <- resend_wait(error) do
+      Imp.Run.emit(:model_resend,
+        error: error,
+        metadata: %{
+          model_call_id: Imp.LM.model_call_id(),
+          attempt: attempt,
+          elapsed_ms: System.monotonic_time(:millisecond) - started,
+          retry_in_ms: wait
+        }
+      )
+
+      Process.sleep(wait)
+      send_attempts(lm, messages, opts, resends, attempt + 1)
+    else
+      _no_resend -> result
+    end
+  end
+
+  # How many times a failed call may be sent again: the call's `:max_retries`
+  # (ReqLLM's option, which it read the same way), or its Req options'
+  # `:max_retries`, or 3, ReqLLM's own default; none when its Req options say
+  # `retry: false`. The call itself goes to ReqLLM with `max_retries: 0`, in
+  # its Req options too when they name one, so ReqLLM sends each attempt once.
+  # (A caller's own explicit no-retry is also enforced at the adapter by
+  # `enforce_explicit_no_retry/1`, as before.)
+  defp transport_resends(opts) do
+    raw_http_opts = Keyword.get(opts, :req_http_options, [])
+    http_opts = if Keyword.keyword?(raw_http_opts), do: raw_http_opts, else: []
+    {max_retries, opts} = Keyword.pop(opts, :max_retries)
+
+    resends =
+      cond do
+        Keyword.get(http_opts, :retry) == false -> 0
+        not is_nil(max_retries) -> max_retries
+        true -> Keyword.get(http_opts, :max_retries, @default_transport_resends)
+      end
+
+    opts =
+      if Keyword.has_key?(http_opts, :max_retries),
+        do: Keyword.put(opts, :req_http_options, Keyword.put(http_opts, :max_retries, 0)),
+        else: opts
+
+    unless is_integer(resends) and resends >= 0 do
+      raise ArgumentError,
+            "#{inspect(__MODULE__)}: :max_retries must be a non-negative integer, " <>
+              "got #{inspect(resends)}"
+    end
+
+    {resends, Keyword.put(opts, :max_retries, 0)}
+  end
+
+  # The wait before a failed attempt is sent again, or `nil` to return the
+  # failure. These are the failures ReqLLM's retry step resent: a connection
+  # that closed or was refused, at once, and a 429 or 529 after the provider's
+  # `retry-after`, or a second. A timed-out attempt is not sent again here: the
+  # provider may have done, and billed, the work with no answer to show for
+  # it. A run's `request_retry:` may send it again, as a model call of its
+  # own. Under a deadline, a wait that would outlast it is not taken.
+  defp resend_wait(%Imp.LMError{status: status} = error) do
+    wait =
+      cond do
+        status in [429, 529] -> Imp.Clients.ReqLLMBatch.retry_after_ms(error) || 1_000
+        is_nil(status) and transport_reason(error.reason) in [:closed, :econnrefused] -> 0
+        true -> nil
+      end
+
+    case {wait, Imp.Deadline.remaining(Imp.Deadline.current())} do
+      {nil, _remaining} -> nil
+      {wait, :infinity} -> wait
+      {wait, remaining} when wait < remaining -> wait
+      _outlasts_deadline -> nil
+    end
   end
 
   defp send_generate(lm, messages, opts) do
