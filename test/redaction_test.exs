@@ -363,7 +363,7 @@ defmodule Imp.RedactionTest do
   # redacted, an id, a UUID, a map or a list is kept.
   test "a session field is redacted when it holds a token and kept otherwise" do
     flask = "eyJ1c2VyIjo0Mn0.ZxYz.sig"
-    phoenix = "SFMyNTY.g3QAAAABbQAAAAd1c2VyX2lkYQ.Xk2Pq9vY7cN4"
+    phoenix = "SFMyNTY.FAKEg3QAAAABbQAAAAd1c2Vy.FAKEXk2Pq9vY7cN4"
 
     input = %{
       :session => flask,
@@ -396,11 +396,63 @@ defmodule Imp.RedactionTest do
     assert Imp.Redaction.drop_credentials(%{session: phoenix, model: "m"}) == %{model: "m"}
   end
 
+  # A cookie read from a header or a file often keeps its line ending, and a
+  # field can hold bytes that are not UTF-8; neither may let a token through.
+  test "a session field holding a token with surrounding whitespace or invalid UTF-8 is redacted" do
+    token = "eyJ1c2VyIjo0Mn0.ZxYz.sig"
+    rails = "abc123def456ghi789--sig42"
+
+    for value <- [
+          token <> "\n",
+          token <> "\r\n",
+          " " <> token,
+          rails <> " ",
+          "_myapp_session=" <> rails <> "\n",
+          <<0xFF, 0xFE>> <> String.duplicate("a", 20)
+        ] do
+      assert Imp.Redaction.redact(%{session: value}) == %{session: "[REDACTED]"},
+             "kept #{inspect(value)}"
+    end
+
+    assert Imp.Redaction.drop_credentials(%{session: rails <> "\n", model: "m"}) == %{model: "m"}
+    assert Imp.Redaction.redact(%{session: "  abc-123\n"}) == %{session: "  abc-123\n"}
+  end
+
   test "a session cookie is redacted in a string, also under a prefixed name" do
     assert Imp.Redaction.redact("session=F4keSessionF4ke") == "[REDACTED]"
     assert Imp.Redaction.redact("Cookie: _myapp_session=F4keSessionF4ke; path=/") == "[REDACTED]"
     assert Imp.Redaction.redact("cookie: a=1; my.app-session=F4keSessionF4ke") == "[REDACTED]"
     assert Imp.Redaction.redact("the session = good") == "the session = good"
+  end
+
+  # Rails, Laravel and Rack percent-encode the cookie value; Django, Java,
+  # PHP, Express and ASP.NET name the cookie without `session=`; Phoenix
+  # names it `_app_key` and signs or encrypts it in a format of its own.
+  test "a framework session cookie is redacted in a string" do
+    for cookie <- [
+          "Cookie: _myapp_session=Wm9vYmFyYmF6cXV4%2Bc29tZQ%3D%3D--a1b2c3d4e5f6",
+          "Cookie: laravel_session=eyJpdiI6IlZ5aW1sYWJjIn0%3D",
+          "Cookie: rack.session=BAh7BkkiD3Nlc3Npb25faWQGOgZFVA%3D%3D--abc",
+          "Cookie: sessionid=k3j4h5g6f7d8s9a0p1o2i3u4y5t6r7e8",
+          "Cookie: JSESSIONID=8A3F2C1B9D7E6F5A4B3C2D1E0F9A8B7C",
+          "Cookie: PHPSESSID=q1w2e3r4t5y6u7i8o9p0a1s2d3",
+          "Cookie: connect.sid=s%3AabcDEF123.xyzSig456",
+          "Cookie: ASP.NET_SessionId=abcdefghijklmnopqrstuvwx",
+          "Cookie: _hello_key=SFMyNTY.FAKEg3QAAAABbQAAAAd1c2Vy.FAKEXk2Pq9vY7cN4",
+          "Cookie: _hello_key=QTEyOEdDTQ.FAKEaGVsbG8gd29ybGQ.FAKEc2lnbmF0dXJl"
+        ] do
+      assert Imp.Redaction.redact(cookie) == "[REDACTED]", "kept #{inspect(cookie)}"
+    end
+  end
+
+  test "a command-line session flag is not a cookie" do
+    for text <- [
+          "imp run --session=nightly-run-2026",
+          "imp run -session=nightly-run-2026",
+          "session_id=nightly-run-2026"
+        ] do
+      assert Imp.Redaction.redact(text) == text
+    end
   end
 
   test "redacts credential boundaries recursively without redacting semantic IDs or paths" do

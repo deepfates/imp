@@ -253,10 +253,14 @@ defmodule Imp.Redaction do
 
   # A field named `session` (`session`, `chat_session`, `userSession`) holds a
   # cookie value as often as it holds an id or a whole conversation, so its
-  # value decides: a string that looks like a token (16 or more characters, no
-  # whitespace, not a UUID) is redacted, and an id, a map or a list is kept. A
-  # credential named for what it is (`session_token`, `session_key`) is
-  # redacted whatever it holds.
+  # value decides: a string that looks like a token (16 or more characters
+  # once surrounding whitespace is trimmed, none inside, not a UUID) is
+  # redacted, and an id, a map or a list is kept. Bytes that are not UTF-8
+  # are redacted: they are no id or text. A shorter id is kept; a longer
+  # whitespace-free id (a ULID, a hex digest) is redacted, since nothing
+  # tells it apart from a server-side session cookie. A credential named for
+  # what it is (`session_token`, `session_key`) is redacted whatever it
+  # holds.
   defp session_only_key?(key) when is_atom(key) or is_binary(key),
     do: List.last(key_tokens(key)) == "session"
 
@@ -274,8 +278,14 @@ defmodule Imp.Redaction do
   defp session_token_value?("[REDACTED]"), do: true
 
   defp session_token_value?(value) when is_binary(value) do
-    String.length(value) >= 16 and not String.match?(value, ~r/\s/u) and
-      not String.match?(value, @uuid)
+    if String.valid?(value) do
+      value = String.trim(value)
+
+      String.length(value) >= 16 and not String.match?(value, ~r/\s/u) and
+        not String.match?(value, @uuid)
+    else
+      true
+    end
   end
 
   defp session_token_value?(_value), do: false
@@ -322,8 +332,11 @@ defmodule Imp.Redaction do
       one of 16 or more characters with a digit in it wherever it ends (a
       token without a digit, followed by more text, reads as prose: `Bearer
       token-based-auth`, `Bearer authentication is ...`); or a `Basic` credential that ends the string;
-    * a `session=` value, also under a prefixed cookie name
-      (`_myapp_session=`), or a long hex value assigned to a credential name
+    * a session cookie: a `session=` value, also under a prefixed name
+      (`_myapp_session=`, `rack.session=`) or a framework's own (`sessionid`,
+      `JSESSIONID`, `PHPSESSID`, `connect.sid`, `ASP.NET_SessionId`), or a
+      Phoenix signed or encrypted cookie (`SFMyNTY.`, `QTEyOEdDTQ.`);
+    * a long hex value assigned to a credential name
       (`token=<hex>`, `api_key: <hex>`);
     * a URL with a password in its user info, or a signed URL's signature or
       security token (`X-Amz-Signature`, `X-Amz-Security-Token`,
@@ -986,7 +999,14 @@ defmodule Imp.Redaction do
       ~r/(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\./,
       ~r/(*NO_START_OPT)(?:\A|[\s:;,"'=({\[])Bearer[ \t]+(?:[A-Za-z0-9._~+\/-]{12,}={0,2}(?=\z|["'`}\]),;])|(?=[A-Za-z._~+\/-]*[0-9])[A-Za-z0-9._~+\/-]{16,}={0,2}(?![A-Za-z0-9._~+\/=-]))/i,
       {:basic, ~r/(*NO_START_OPT)(?:\A|[\s:;,])Basic[ \t]+([A-Za-z0-9+\/]+={0,2})\z/i},
-      ~r/(?:\A|[?&;,\s])[A-Za-z0-9_.-]*session\s*=\s*[A-Za-z0-9._~+\/-]{8,}={0,2}(?=\z|[?&;,\s])/i,
+      # A session cookie: a name ending in `session` (`session`,
+      # `_myapp_session`, `rack.session`) or a framework's own name, and a
+      # value, percent-encoded or not. A name starts with a letter, a digit,
+      # `_` or `.`, so a command-line flag (`--session=nightly`) is no cookie.
+      ~r/(?:\A|[?&;,\s])(?:(?:[A-Za-z0-9_.][A-Za-z0-9_.-]*)?session|sessionid|jsessionid|phpsessid|connect\.sid|asp\.net_sessionid)\s*=\s*[A-Za-z0-9._~+\/%-]{8,}={0,2}(?=\z|[?&;,\s])/i,
+      # Phoenix signed (`SFMyNTY.`, HS256) and encrypted (`QTEyOEdDTQ.`,
+      # A128GCM) cookies and tokens: an algorithm, a payload and a signature.
+      ~r/(?<![A-Za-z0-9_-])(?:SFMyNTY|QTEyOEdDTQ)\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/,
       # Long hex strings alone are not credentials: Imp passes SHA-1 and
       # SHA-256 digests around as cache keys and git identities. One is a
       # credential in an explicit assignment (`token=<hex>`, `secret: <hex>`),
