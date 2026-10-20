@@ -194,6 +194,115 @@ defmodule TaskSupervisionTest do
     assert Task.await(runner) == [ok: :item]
   end
 
+  # A row's `:timeout` is its own running time: the wait for a place in the
+  # pool does not count, as DSPy's ParallelExecutor starts a task's timeout
+  # when a worker picks it up.
+  test "a row's timeout does not count its wait for a pool place" do
+    Imp.configure(async_max_workers: 1)
+    parent = self()
+
+    blocker =
+      Imp.Tasks.async_nolink(fn ->
+        send(parent, :holding)
+        receive(do: (:go -> :ok))
+      end)
+
+    assert_receive :holding
+    spawn(fn -> Process.sleep(200) && send(blocker.pid, :go) end)
+
+    assert [ok: :ran] ==
+             [:row]
+             |> Imp.Tasks.async_stream(fn _ -> :ran end, timeout: 50, on_timeout: :kill_task)
+             |> Enum.to_list()
+  end
+
+  test "a row that runs past its timeout once it has a place is still killed" do
+    parent = self()
+
+    results =
+      [:slow, :fast]
+      |> Imp.Tasks.async_stream(
+        fn
+          :slow ->
+            send(parent, {:slow, self()})
+            Process.sleep(:infinity)
+
+          :fast ->
+            :done
+        end,
+        timeout: 50,
+        on_timeout: :kill_task,
+        ordered: true
+      )
+      |> Enum.to_list()
+
+    assert results == [exit: :timeout, ok: :done]
+    assert_receive {:slow, slow}
+    refute Process.alive?(slow)
+    assert wait_for_status(%{active: 0, queued: 0})
+
+    assert [exit: {:slow, :timeout}] ==
+             [:slow]
+             |> Imp.Tasks.async_stream(fn _ -> Process.sleep(:infinity) end,
+               timeout: 20,
+               on_timeout: :kill_task,
+               zip_input_on_exit: true
+             )
+             |> Enum.to_list()
+
+    # The default `on_timeout: :exit` exits the caller, as Task.async_stream does.
+    caught =
+      catch_exit(
+        [:slow]
+        |> Imp.Tasks.async_stream(fn _ -> Process.sleep(:infinity) end, timeout: 20)
+        |> Enum.to_list()
+      )
+
+    assert {:timeout, {Task.Supervised, :stream, [20]}} = caught
+  end
+
+  # A timed row's work runs in a process of its own while the row waits for
+  # it, so that process lends the row's place to a stream it reads, as the
+  # row itself would.
+  test "streaming inside a timed row reuses its sole worker without deadlock" do
+    Imp.configure(async_max_workers: 1)
+
+    program =
+      Imp.predict("question -> answer",
+        lm: Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "pong"} end)
+      )
+
+    assert [ok: [%Imp.Prediction{} = prediction]] =
+             [:row]
+             |> Imp.Tasks.async_stream(
+               fn _ ->
+                 program
+                 |> Imp.stream(%{question: "say pong"}, provider_stream: true)
+                 |> Enum.to_list()
+               end,
+               timeout: 1_000,
+               on_timeout: :kill_task
+             )
+             |> Enum.to_list()
+
+    assert Imp.get(prediction, :answer) == "pong"
+    assert wait_for_status(%{active: 0, queued: 0})
+  end
+
+  test "a row that crashes still ends the stream's caller with its reason" do
+    Process.flag(:trap_exit, true)
+
+    runner =
+      spawn_link(fn ->
+        [:row]
+        |> Imp.Tasks.async_stream(fn _ -> exit(:boom) end, timeout: 1_000)
+        |> Enum.to_list()
+      end)
+
+    assert_receive {:EXIT, ^runner, reason}
+    assert reason == :boom or match?({:boom, _}, reason)
+  end
+
   test "directly nested async_stream reuses one admission slot without deadlocking" do
     Imp.configure(async_max_workers: 1)
 
