@@ -197,6 +197,9 @@ defmodule Imp.Tasks do
   @machine_pool {__MODULE__, :machine}
 
   @row_timed_out :"$imp_tasks_row_timed_out"
+  # The admission a timed row's work process holds for the row, which waits
+  # on it synchronously (see `run_timed/3`).
+  @waited_on_key {__MODULE__, :waited_on_admission}
 
   @async_stream_option_schema [
     max_concurrency: [type: :pos_integer],
@@ -276,8 +279,13 @@ defmodule Imp.Tasks do
 
   @doc false
   def async_nolink_borrowed(fun) when is_function(fun, 0) do
-    case current_admission() do
-      {token, owner} when owner == self() ->
+    admission = current_admission()
+    waited_on = Process.get(@waited_on_key)
+
+    # The owner itself, or a process the owner waits on synchronously, as a
+    # timed row's work process is.
+    case admission do
+      {token, owner} when owner == self() or admission == waited_on ->
         ensure_runtime!()
 
         if @admission.owned_by?(token, owner) do
@@ -481,10 +489,16 @@ defmodule Imp.Tasks do
     {token, owner} = current_admission()
     context = capture_context(Imp.Settings.snapshot())
 
-    task =
-      Task.Supervisor.async(@unlinked_supervisor, fn ->
-        with_admission(token, owner, fn -> with_runtime_context(context, fun) end)
-      end)
+    work = fn ->
+      # The row only waits for this process, so a stream this process reads
+      # may run on the row's place, as one the row read itself would.
+      Process.put(@waited_on_key, {token, owner})
+      with_admission(token, owner, fn -> with_runtime_context(context, fun) end)
+    end
+
+    # Started with the item as an argument, so that a crash report names the
+    # row it came from.
+    task = Task.Supervisor.async(@unlinked_supervisor, __MODULE__, :run_row, [work, item])
 
     case Task.yield(task, timeout) || Task.shutdown(task, :brutal_kill) do
       {:ok, value} -> value
@@ -492,6 +506,9 @@ defmodule Imp.Tasks do
       nil -> {@row_timed_out, item}
     end
   end
+
+  @doc false
+  def run_row(work, _item), do: work.()
 
   @doc false
   # What a task carries from the process that starts it, for a caller that

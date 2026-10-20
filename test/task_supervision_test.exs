@@ -261,6 +261,34 @@ defmodule TaskSupervisionTest do
     assert {:timeout, {Task.Supervised, :stream, [20]}} = caught
   end
 
+  # A timed row's work runs in a process of its own while the row waits for
+  # it, so that process lends the row's place to a stream it reads, as the
+  # row itself would.
+  test "streaming inside a timed row reuses its sole worker without deadlock" do
+    Imp.configure(async_max_workers: 1)
+
+    program =
+      Imp.predict("question -> answer",
+        lm: Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "pong"} end)
+      )
+
+    assert [ok: [%Imp.Prediction{} = prediction]] =
+             [:row]
+             |> Imp.Tasks.async_stream(
+               fn _ ->
+                 program
+                 |> Imp.stream(%{question: "say pong"}, provider_stream: true)
+                 |> Enum.to_list()
+               end,
+               timeout: 1_000,
+               on_timeout: :kill_task
+             )
+             |> Enum.to_list()
+
+    assert Imp.get(prediction, :answer) == "pong"
+    assert wait_for_status(%{active: 0, queued: 0})
+  end
+
   test "a row that crashes still ends the stream's caller with its reason" do
     Process.flag(:trap_exit, true)
 
