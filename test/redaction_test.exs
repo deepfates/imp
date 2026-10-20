@@ -436,6 +436,88 @@ defmodule Imp.RedactionTest do
     assert Imp.Redaction.redact(%{session: "  abc-123\n"}) == %{session: "  abc-123\n"}
   end
 
+  # Java, PHP, Express and ASP.NET name the session cookie for themselves, and
+  # the value under that name is the cookie whatever it looks like. Django's
+  # `sessionid` is also a common name for an ordinary id, so, as for
+  # `session`, the value decides. `session_id` and `sessionId` stay ids.
+  test "a framework session cookie under its own name as a key is redacted whatever it holds" do
+    names = [
+      "JSESSIONID",
+      :JSESSIONID,
+      "jsessionid",
+      "__Host-JSESSIONID",
+      "PHPSESSID",
+      :phpsessid,
+      "PhpSessId",
+      "connect.sid",
+      :"connect.sid",
+      "Connect.SID",
+      "ASP.NET_SessionId",
+      :"asp.net_sessionid",
+      "AspNet_SessionId"
+    ]
+
+    for name <- names,
+        value <- ["8A3F2C1B9D7E6F5A4B3C2D1E0F9A8B7C", "s%3AabcDEF123.xyzSig456", "abc123"] do
+      assert Imp.Redaction.redact(%{name => value}) == %{name => "[REDACTED]"},
+             "#{inspect(name)} => #{inspect(value)}"
+
+      assert Imp.Redaction.redact([{name, value}]) == [{name, "[REDACTED]"}]
+      assert Imp.Redaction.drop_credentials(%{name => value, model: "m"}) == %{model: "m"}
+    end
+
+    jar = %{
+      cookies: %{
+        "PHPSESSID" => "q1w2e3r4t5y6u7i8o9p0a1s2d3",
+        "connect.sid" => "s%3AabcDEF123.xyzSig456",
+        "theme" => "dark"
+      }
+    }
+
+    assert Imp.Redaction.redact(jar) == %{
+             cookies: %{
+               "PHPSESSID" => "[REDACTED]",
+               "connect.sid" => "[REDACTED]",
+               "theme" => "dark"
+             }
+           }
+
+    assert Imp.Redaction.drop_credentials(jar) == %{cookies: %{"theme" => "dark"}}
+
+    keyword = [JSESSIONID: "8A3F2C1B9D7E6F5A4B3C2D1E0F9A8B7C", path: "/"]
+    assert Imp.Redaction.redact(keyword) == [JSESSIONID: "[REDACTED]", path: "/"]
+    assert Imp.Redaction.drop_credentials(keyword) == [path: "/"]
+  end
+
+  test "a sessionid key is judged by its value, and session_id stays an id" do
+    django = "k3j4h5g6f7d8s9a0p1o2i3u4y5t6r7e8"
+
+    for name <- ["sessionid", :sessionid, "SESSIONID", "Sessionid", "django_sessionid"] do
+      assert Imp.Redaction.redact(%{name => django}) == %{name => "[REDACTED]"},
+             inspect(name)
+
+      assert Imp.Redaction.redact([{name, django}]) == [{name, "[REDACTED]"}]
+      assert Imp.Redaction.drop_credentials(%{name => django, model: "m"}) == %{model: "m"}
+
+      for value <- ["abc-123", "6f1c2a7e-3b4d-4e5f-8a9b-0c1d2e3f4a5b", %{id: "chat-7"}] do
+        assert Imp.Redaction.redact(%{name => value}) == %{name => value}
+        assert Imp.Redaction.drop_credentials(%{name => value}) == %{name => value}
+      end
+    end
+
+    assert Imp.Redaction.redact(%{cookies: %{"sessionid" => django, "csrftoken" => "x"}}) ==
+             %{cookies: %{"sessionid" => "[REDACTED]", "csrftoken" => "x"}}
+
+    assert Imp.Redaction.redact(sessionid: django, user: "u") == [
+             sessionid: "[REDACTED]",
+             user: "u"
+           ]
+
+    kept = %{"session-id" => django, session_id: django, sessionId: django}
+    assert Imp.Redaction.redact(kept) == kept
+    assert Imp.Redaction.drop_credentials(kept) == kept
+  end
+
   test "a session cookie is redacted in a string, also under a prefixed name" do
     assert Imp.Redaction.redact("session=F4keSessionF4ke") == "[REDACTED]"
     assert Imp.Redaction.redact("Cookie: _myapp_session=F4keSessionF4ke; path=/") == "[REDACTED]"
