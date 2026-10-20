@@ -289,6 +289,106 @@ defmodule TaskSupervisionTest do
     assert wait_for_status(%{active: 0, queued: 0})
   end
 
+  # Every process working on a place its holder lends while waiting for it
+  # lends it in turn to a stream it reads, so whether a streaming row can run
+  # at a pool of one does not depend on whether it has a timeout, or on
+  # which kind of process reads the stream.
+  test "an untimed row inside a timed row streams on the row's sole worker" do
+    Imp.configure(async_max_workers: 1)
+
+    assert [ok: [ok: [%Imp.Prediction{}]]] =
+             [:outer]
+             |> Imp.Tasks.async_stream(
+               fn _ ->
+                 [:inner]
+                 |> Imp.Tasks.async_stream(fn _ -> stream_pong() end, timeout: :infinity)
+                 |> Enum.to_list()
+               end,
+               timeout: 2_000,
+               on_timeout: :kill_task
+             )
+             |> Enum.to_list()
+
+    assert wait_for_status(%{active: 0, queued: 0})
+  end
+
+  test "untimed rows inside an Imp task stream on its sole worker" do
+    Imp.configure(async_max_workers: 1)
+
+    task =
+      Imp.Tasks.async(fn ->
+        [:a, :b]
+        |> Imp.Tasks.async_stream(fn _ -> stream_pong() end, timeout: :infinity)
+        |> Enum.to_list()
+      end)
+
+    assert [ok: [%Imp.Prediction{}], ok: [%Imp.Prediction{}]] = Task.await(task, 2_000)
+    assert wait_for_status(%{active: 0, queued: 0})
+  end
+
+  test "an Avatar tool that streams a program runs on its caller's sole worker" do
+    Imp.configure(async_max_workers: 1)
+
+    lm =
+      Imp.LM.Static.new(
+        handler: fn messages, _opts ->
+          prompt = Enum.map_join(messages, "\n", & &1.content)
+
+          cond do
+            prompt =~ "Do not request another tool." -> %{answer: "done"}
+            prompt =~ "pong" -> %{action: %{tool_name: "Finish", tool_input_query: %{}}}
+            true -> %{action: %{tool_name: "ask", tool_input_query: %{q: "ping"}}}
+          end
+        end
+      )
+
+    ask =
+      Imp.tool(:ask, "streams a program", fn _arguments ->
+        [%Imp.Prediction{} = prediction] = stream_pong()
+        Imp.get(prediction, :answer)
+      end)
+
+    avatar = Imp.avatar("question -> answer", [ask], lm: lm, max_iters: 3, tool_timeout_ms: 2_000)
+
+    task = Imp.Tasks.async(fn -> Imp.call(avatar, %{question: "q"}) end)
+    assert {:ok, prediction} = Task.await(task, 5_000)
+
+    assert [%{tool_name: :ask, tool_output: "pong", error?: false}] =
+             Imp.get(prediction, :actions)
+  end
+
+  test "a timed-out row's stream producer stops with the row" do
+    Imp.configure(async_max_workers: 1)
+    parent = self()
+
+    slow =
+      Imp.predict("question -> answer",
+        lm:
+          Imp.LM.Static.new(
+            handler: fn _messages, _opts ->
+              send(parent, {:producer, self()})
+              Process.sleep(2_000)
+              %{answer: "late"}
+            end
+          )
+      )
+
+    assert [exit: :timeout] =
+             [:row]
+             |> Imp.Tasks.async_stream(
+               fn _ ->
+                 slow |> Imp.stream(%{question: "q"}, provider_stream: true) |> Enum.to_list()
+               end,
+               timeout: 200,
+               on_timeout: :kill_task
+             )
+             |> Enum.to_list()
+
+    assert_receive {:producer, producer}
+    assert wait_until(fn -> not Process.alive?(producer) end)
+    assert wait_for_status(%{active: 0, queued: 0})
+  end
+
   test "a row that crashes still ends the stream's caller with its reason" do
     Process.flag(:trap_exit, true)
 
@@ -464,6 +564,26 @@ defmodule TaskSupervisionTest do
     assert wait_for_status(%{active: 0, queued: 0})
     refute Process.alive?(run.task.pid)
   end
+
+  defp stream_pong do
+    "question -> answer"
+    |> Imp.predict(lm: Imp.LM.Static.new(handler: fn _messages, _opts -> %{answer: "pong"} end))
+    |> Imp.stream(%{question: "say pong"}, provider_stream: true)
+    |> Enum.to_list()
+  end
+
+  defp wait_until(check, attempts \\ 100)
+
+  defp wait_until(check, attempts) when attempts > 0 do
+    if check.() do
+      true
+    else
+      Process.sleep(5)
+      wait_until(check, attempts - 1)
+    end
+  end
+
+  defp wait_until(_check, 0), do: false
 
   defp wait_for_active(expected, attempts \\ 100)
 

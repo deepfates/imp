@@ -197,9 +197,6 @@ defmodule Imp.Tasks do
   @machine_pool {__MODULE__, :machine}
 
   @row_timed_out :"$imp_tasks_row_timed_out"
-  # The admission a timed row's work process holds for the row, which waits
-  # on it synchronously (see `run_timed/3`).
-  @waited_on_key {__MODULE__, :waited_on_admission}
 
   @async_stream_option_schema [
     max_concurrency: [type: :pos_integer],
@@ -279,13 +276,11 @@ defmodule Imp.Tasks do
 
   @doc false
   def async_nolink_borrowed(fun) when is_function(fun, 0) do
-    admission = current_admission()
-    waited_on = Process.get(@waited_on_key)
-
-    # The owner itself, or a process the owner waits on synchronously, as a
-    # timed row's work process is.
-    case admission do
-      {token, owner} when owner == self() or admission == waited_on ->
+    # The place's owner itself, or a process the owner lent its place to
+    # (see `with_admission/3`): a borrowed stream row, a timed row's work, a
+    # stream's producer, a process bound with `with_context/2`.
+    case current_admission() do
+      {token, owner} ->
         ensure_runtime!()
 
         if @admission.owned_by?(token, owner) do
@@ -439,14 +434,39 @@ defmodule Imp.Tasks do
   # additional fan-out: its consumer is waiting while the producer owns the
   # next step. Reuse that lease without transferring or releasing it. This is
   # intentionally narrower than making arbitrary nested async work reentrant.
+  #
+  # The task works on a place lent by the process that reads it, so it ends
+  # when that process does: a timed-out row or tool process is killed, and
+  # the row then gives its place back, but a producer left running would go
+  # on calling the model with no place in the pool and no one to read it.
   defp start_borrowed_task(token, owner, fun) do
     context = capture_context(Imp.Settings.snapshot())
+    borrower = self()
 
     wrapped = fn ->
+      watch_caller(borrower)
       with_admission(token, owner, fn -> with_runtime_context(context, fun) end)
     end
 
     Task.Supervisor.async_nolink(@unlinked_supervisor, wrapped)
+  end
+
+  @doc false
+  # Links a process to the calling task that kills the task when `caller`
+  # dies, even a task that traps exits, and exits quietly when the task ends
+  # first. The link ends the watcher with the task.
+  def watch_caller(caller) do
+    task = self()
+
+    spawn_link(fn ->
+      caller_monitor = Process.monitor(caller)
+      task_monitor = Process.monitor(task)
+
+      receive do
+        {:DOWN, ^caller_monitor, :process, ^caller, _reason} -> Process.exit(task, :kill)
+        {:DOWN, ^task_monitor, :process, ^task, _reason} -> :ok
+      end
+    end)
   end
 
   defp spawn_task(supervisor, link, wrapped, token) do
@@ -489,12 +509,9 @@ defmodule Imp.Tasks do
     {token, owner} = current_admission()
     context = capture_context(Imp.Settings.snapshot())
 
-    work = fn ->
-      # The row only waits for this process, so a stream this process reads
-      # may run on the row's place, as one the row read itself would.
-      Process.put(@waited_on_key, {token, owner})
-      with_admission(token, owner, fn -> with_runtime_context(context, fun) end)
-    end
+    # The row only waits for this process, so a stream this process reads
+    # may run on the row's place, as one the row read itself would.
+    work = fn -> with_admission(token, owner, fn -> with_runtime_context(context, fun) end) end
 
     # Started with the item as an argument, so that a crash report names the
     # row it came from.
@@ -576,6 +593,23 @@ defmodule Imp.Tasks do
       self() in Task.Supervisor.children(supervisor)
   end
 
+  # Runs `fun` on the place `token` that `owner` holds. A process other than
+  # the owner gets the place only from a process that holds it and then reads
+  # from it: a borrowed stream row, a timed row's work, a stream's producer,
+  # a process bound with `with_context/2`. Any of them may lend it in turn to
+  # a stream it reads (`async_nolink_borrowed/1`), so a provider stream read
+  # by one of these Imp processes runs at a pool of one, as one read by the
+  # owner does. A process Imp did not start this way, such as a plain `Task`
+  # an optimizer or RLM starts, holds no place, and a stream it reads waits
+  # for one of its own.
+  #
+  # Sharing a place is not the same as taking turns on it. A reader that
+  # consumes a stream lazily leaves its producer paused with its provider
+  # stream open while the reader does more work on the same place, so
+  # `Stream.zip/1` of five program streams has five model calls open at once
+  # at a pool of one. An open provider stream is not counted against the
+  # pool; the place bounds the work that holds it, not every call open
+  # under it.
   defp with_admission(token, owner, fun) do
     previous = Process.get(@admission_token_key)
     Process.put(@admission_token_key, {token, owner})

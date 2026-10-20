@@ -34,6 +34,15 @@ User-visible changes to Imp are recorded here.
   runs past its timeout once it has a place is still killed, with the same
   result as before.
 
+- `Imp.stream/3` with `provider_stream: true` no longer waits forever for a
+  second pool place under `async_max_workers: 1` when it is read by a row
+  with `timeout: :infinity` nested inside another Imp task or row (the
+  default for `Imp.Evaluate`), or by an `Imp.Predict.Avatar` tool. Only a
+  row with a timeout lent its place to the stream before; now every Imp
+  process that was lent a place lends it on. A stream whose reader is killed, such as a row that timed out, now
+  stops its program too; before, the program kept running, and calling the
+  model, after the row had given its place back.
+
 - `Imp.Trajectory.to_atif/2` no longer refuses a run in which the model sent
   a tool call whose arguments were not a JSON object. It raised
   `ArgumentError` ("tool arguments must be a captured map"), so the one run

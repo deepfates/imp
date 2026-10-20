@@ -218,7 +218,7 @@ defmodule Imp.Predict.Avatar do
 
     task =
       Task.Supervisor.async_nolink(Imp.Tasks.unlinked_supervisor(), fn ->
-        watch_caller(caller)
+        Imp.Tasks.watch_caller(caller)
         Imp.Tasks.with_context(context, fn -> safe_tool_call(tool, arguments) end)
       end)
 
@@ -237,23 +237,6 @@ defmodule Imp.Predict.Avatar do
     error -> {{:error, {:tool_task_error, tool.name, error}}, true, nil, :unknown}
   catch
     kind, reason -> {{:error, {:tool_task_error, tool.name, {kind, reason}}}, true, nil, :unknown}
-  end
-
-  # Links a process to the calling tool task that kills the task when
-  # `caller` dies, even a tool that traps exits, and exits quietly when the
-  # task ends first. The link ends the watcher with the task.
-  defp watch_caller(caller) do
-    task = self()
-
-    spawn_link(fn ->
-      caller_monitor = Process.monitor(caller)
-      task_monitor = Process.monitor(task)
-
-      receive do
-        {:DOWN, ^caller_monitor, :process, ^caller, _reason} -> Process.exit(task, :kill)
-        {:DOWN, ^task_monitor, :process, ^task, _reason} -> :ok
-      end
-    end)
   end
 
   defp safe_tool_call(tool, arguments) do
