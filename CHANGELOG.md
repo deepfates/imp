@@ -25,6 +25,14 @@ User-visible changes to Imp are recorded here.
   (`SFMyNTY.`, `QTEyOEdDTQ.`). A command-line flag (`--session=nightly`) is
   not taken for a cookie.
 
+- A row's per-row `:timeout` (evaluation, optimizer trajectories, SIMBA,
+  Search, RLM, BootstrapFinetune, the GEPA adapter, `Imp.parallel/3`) counts
+  from when the row has a place in Imp's task pool, not from when its task
+  was spawned. Before, a row queued behind other Imp work on the node could
+  be killed with `{:task_exit, :timeout}` without having run. A row that
+  runs past its timeout once it has a place is still killed, with the same
+  result as before.
+
 - `Imp.Trajectory.to_atif/2` no longer refuses a run in which the model sent
   a tool call whose arguments were not a JSON object. It raised
   `ArgumentError` ("tool arguments must be a captured map"), so the one run
