@@ -1129,11 +1129,20 @@ defmodule Imp.Clients.ReqLLM do
     end
   end
 
+  # Every model spec ReqLLM accepts: a model struct or map, a
+  # `{provider, id, opts}` or `{provider, opts}` tuple, and a
+  # `"provider:id"` or `"id@provider"` string. A spec this misses is sent
+  # as if it were another provider's: a replayed step's reasoning goes out
+  # twice, among other things.
   defp openrouter_model?(%{provider: provider}) when provider in [:openrouter, "openrouter"],
     do: true
 
+  defp openrouter_model?(%{"provider" => "openrouter"}), do: true
+  defp openrouter_model?({:openrouter, _id, _opts}), do: true
+  defp openrouter_model?({:openrouter, opts}) when is_list(opts), do: true
+
   defp openrouter_model?(model) when is_binary(model),
-    do: String.starts_with?(model, "openrouter:")
+    do: String.starts_with?(model, "openrouter:") or String.ends_with?(model, "@openrouter")
 
   defp openrouter_model?(_model), do: false
 

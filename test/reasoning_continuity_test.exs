@@ -135,20 +135,29 @@ defmodule ReasoningContinuityTest do
       %{"role" => "tool", "content" => "found", "tool_calls" => [%{"id" => "call_1"}]}
     ]
 
-    lm =
-      Imp.req_llm("openrouter:fixture/model",
-        api_key: "fixture",
-        cache: false,
-        req_http_options: [plug: plug, retry: false]
-      )
+    # Every form of OpenRouter model spec ReqLLM accepts.
+    for spec <- [
+          "openrouter:fixture/model",
+          "fixture/model@openrouter",
+          {:openrouter, "fixture/model", []},
+          {:openrouter, id: "fixture/model"},
+          %{provider: :openrouter, id: "fixture/model"}
+        ] do
+      lm =
+        Imp.req_llm(spec,
+          api_key: "fixture",
+          cache: false,
+          req_http_options: [plug: plug, retry: false]
+        )
 
-    assert {:ok, _} = Imp.Clients.ReqLLM.generate(lm, messages, [])
-    assert_received {:wire, body}
-    assert length(String.split(body, reasoning)) - 1 == 1
+      assert {:ok, _} = Imp.Clients.ReqLLM.generate(lm, messages, [])
+      assert_received {:wire, body}
+      assert length(String.split(body, reasoning)) - 1 == 1, "sent twice for #{inspect(spec)}"
 
-    %{"messages" => [_user, step, _result]} = JSON.decode!(body)
-    assert [%{"type" => "reasoning.text", "text" => ^reasoning}] = step["reasoning_details"]
-    refute Map.has_key?(step, "reasoning_content")
+      %{"messages" => [_user, step, _result]} = JSON.decode!(body)
+      assert [%{"type" => "reasoning.text", "text" => ^reasoning}] = step["reasoning_details"]
+      refute Map.has_key?(step, "reasoning_content")
+    end
   end
 
   # A provider can issue the same tool call ID twice in one conversation. The

@@ -4,6 +4,17 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Fixed
+
+- `Imp.Clients.ReqLLM` recognises an OpenRouter model in every spec form
+  ReqLLM accepts (`"id@openrouter"`, `{:openrouter, id, opts}`,
+  `{:openrouter, id: id}`, a string-keyed map), not only `"openrouter:id"`
+  and a model map or struct. With the other forms, a replayed assistant step
+  carried its reasoning twice, in `reasoning_content` and
+  `reasoning_details`; it is now sent once, as `reasoning_details`, which
+  OpenRouter documents as the preserved form. The same recognition applies
+  to OpenRouter's output-limit omission and `openrouter_reasoning_wire:`.
+
 ## 0.17.0 — 2026-10-18
 
 ### Added
