@@ -94,7 +94,7 @@ inside a process that serializes other work, such as a GenServer whose
 mailbox other callers wait on. Run it in the request's own process, or in a
 supervised task as the deployment example's `ProgramServer` does.
 
-Two bounds apply:
+Three bounds apply:
 
 - **Imp's own fan-out.** Everything Imp runs concurrently, from
   `Imp.parallel/3` and evaluation to optimizers and runs, shares one pool per
@@ -104,8 +104,30 @@ Two bounds apply:
   application's decision. `Imp.start_run(program, inputs, admission: {pool,
   limit})` answers `{:error, :busy}` when a named pool is full; a
   `Task.Supervisor` with `max_children:` does the same for plain calls.
+- **ReqLLM's connection pool.** Every model call through ReqLLM takes an
+  HTTP connection from one Finch pool and holds it until the answer has
+  arrived, which for a reasoning model can be minutes. By default the pool
+  is HTTP/1 with 8 shards of one connection each (`stream_pool_count: 8`,
+  `stream_pool_size: 1`), and each call picks a shard at random, so two
+  concurrent calls already share a connection one time in eight. A call
+  that finds its shard's connection taken waits for it, 5 seconds by
+  default for a call that is not streamed, and then fails with Finch's
+  "excess queuing" error without having been sent. Imp's default fan-out
+  of 8 workers can hit this on its own.
 
-Size both to what your provider's rate limit allows.
+Size the first two to what your provider's rate limit allows, and the
+connection pool to at least the number of model calls you admit at once.
+One shard avoids the random collisions:
+
+~~~elixir
+# config/config.exs
+import Config
+
+config :req_llm, stream_pool_count: 1, stream_pool_size: 64
+~~~
+
+ReqLLM reads these settings once, when its application starts, so set them
+in your config files rather than with `Application.put_env/3` at run time.
 [Runs and supervision](diving-deeper/runs-and-supervision.md) covers runs,
 pools and cancellation.
 
