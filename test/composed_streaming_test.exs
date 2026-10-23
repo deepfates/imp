@@ -130,7 +130,13 @@ defmodule Imp.ComposedStreamingTest do
         end)
       end)
 
-    assert_receive {:consumer_event, %StreamResponse{chunk: "[[ ## answer ## ]]\npartial"}}
+    # The consumer is a plain process, so its program task waits for a place
+    # in the machine pool, which other async tests may hold for a while. The
+    # early-halt test above waits for this same event in `Enum.take/2` with
+    # no timeout; this one allows seconds rather than ExUnit's default 100 ms.
+    assert_receive {:consumer_event, %StreamResponse{chunk: "[[ ## answer ## ]]\npartial"}},
+                   5_000
+
     Process.exit(consumer, :kill)
 
     assert_receive :provider_opened
