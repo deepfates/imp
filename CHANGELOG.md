@@ -24,11 +24,15 @@ User-visible changes to Imp are recorded here.
   encoded document went from 29 MB to 2.2 MB. A reader of `extra.model_requests[n]["messages"]` reads
   `message_ids` through `extra.model_messages` instead.
 - Imp requires ExMCP `~> 1.7 and >= 1.7.2` (was `~> 1.5`). Every ExMCP
-  release before 1.7.2 is retired on Hex for security fixes, and Imp now
-  relies on ExMCP's own `Inspect` for `ExMCP.Client` and
-  `ExMCP.Transport.HTTP`, which hides their credentials since 1.6.0; Imp's
-  implementations for those two structs are removed, since a second one
-  redefines ExMCP's. Breaking for an application that locks an older ExMCP:
+  release before 1.7.2 is retired on Hex for security fixes. Since 1.6.0
+  ExMCP implements `Inspect` for `ExMCP.Client` and `ExMCP.Transport.HTTP`
+  itself, and Imp then defines none for them, since a second implementation
+  redefines ExMCP's; under an application that overrides ExMCP with an
+  earlier release, Imp's own still applies. ExMCP's hides header values,
+  tokens and the session id, but prints the transport's `base_url` whole, so
+  a key carried in a server URL's query or userinfo shows when such a struct
+  is inspected (`Imp.Redaction.redact/1` still hides it). Breaking for an
+  application that locks an older ExMCP:
   resolution fails until it moves to 1.7.2. An application that uses ExMCP
   directly should read ExMCP's 1.6.0 changelog, which changes several
   behaviours.

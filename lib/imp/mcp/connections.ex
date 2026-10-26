@@ -1419,9 +1419,9 @@ defmodule Imp.MCP.Connections do
   # `:timeout`, which is also the client's wait for a request made without one;
   # Imp passes one on every request), and the request itself. The request
   # bound is the host's `:timeout`, so a call it allows is not cut off by
-  # ExMCP's own 30 s default, and never less than that default: a request its
-  # caller stopped waiting for is left to finish on the server (see
-  # `Imp.MCP.Clients`).
+  # ExMCP's own 30 s default, and never less than that default. ExMCP gives up
+  # on a request once its caller's deadline passes, but the server may still
+  # be running it (see `Imp.MCP.Clients`).
   defp http_bounds(opts) do
     [
       dns_timeout_ms: @http_dns_timeout,
