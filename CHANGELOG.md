@@ -34,8 +34,9 @@ User-visible changes to Imp are recorded here.
   release, Imp's own still applies. ExMCP's hides header values, tokens and
   the session id, but prints the transport's `base_url` whole, so a key
   carried in a server URL's query or userinfo shows when such a struct is
-  inspected (`Imp.Redaction.redact/1` still hides it). An application that
-  locks an older ExMCP no longer resolves until it moves to 1.7.2. An
+  inspected (`Imp.Redaction.redact/1` still hides it). Breaking for an
+  application that locks an older ExMCP: resolution fails until it moves to
+  1.7.2. An
   application that uses ExMCP directly should read ExMCP's 1.6.0 changelog,
   which changes several behaviours.
 - With ExMCP 1.6.0 and later, a server that refuses ExMCP's opening probe with

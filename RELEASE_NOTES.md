@@ -69,9 +69,10 @@ later (below).
   run event kinds exhaustively should accept `:model_resend`.
 - **Changed: a non-streamed call with no deadline waits up to 10 minutes.**
   With no deadline and no `receive_timeout:`, a non-streamed
-  `Imp.Clients.ReqLLM` call (and a `ReqLLMBatch` dispatcher call) waited
-  ReqLLM's 30 seconds; it now waits 10 minutes. Set `receive_timeout:` or
-  run under a deadline to wait less.
+  `Imp.Clients.ReqLLM` call waited ReqLLM's 30 seconds; it now waits 10
+  minutes. Set `receive_timeout:` or run under a deadline to wait less. A
+  `ReqLLMBatch` dispatch gets the same `receive_timeout`, but is still ended
+  by the batch's own `:timeout`, 30 seconds by default.
 - **Fixed: a row's `:timeout` counts from when it has a pool place.** A row
   queued behind other Imp work was killed with `{:task_exit, :timeout}`
   without having run.
@@ -101,9 +102,12 @@ later (below).
 - **Fixed: `Imp.MCP.Trust`** logs no error when a connection ends during VM
   shutdown.
 
-Rollback means restoring `{:imp, "~> 0.17.0"}` and `0.17.0` in the lock;
-exports then list every request's messages again, and resends go back to
-ReqLLM, unrecorded. ExMCP 1.7.2 can stay. See the [changelog](CHANGELOG.md) for every change.
+Rollback means restoring `{:imp, "~> 0.17.0"}` and `0.17.0` in the lock,
+with ExMCP back on 1.5.0: Imp 0.17.0 defines its own `Inspect` for ExMCP's
+client and transport, which redefines ExMCP 1.6.0's and later. Exports then
+list every request's messages again, resends go back to ReqLLM, unrecorded,
+and a non-streamed call with no deadline waits 30 seconds again. See the
+[changelog](CHANGELOG.md) for every change.
 
 ## Known limits
 
