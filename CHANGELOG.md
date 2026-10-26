@@ -4,7 +4,14 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
-## 0.18.0 — 2026-10-25
+## 0.18.1 — 2026-10-26
+
+The library is 0.18.0's, which was tagged but never published to Hex: a
+release gate failed on the tag because the deployment example's lock did not
+match what `mix deps.get` writes. Only that lock differs, with the build
+tools `mix deps.get` records for cowboy and plug_crypto.
+
+## 0.18.0 — 2026-10-25 (not published)
 
 ### Changed
 
