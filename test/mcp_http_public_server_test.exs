@@ -123,17 +123,22 @@ defmodule Imp.MCPHTTPPublicServerTest do
     refute_received {:request, "/mcp", "server/discover", _origin}
   end
 
-  # The import gives up on its helper only past the time every dial it may
-  # make could take, and a refused probe costs the server a second dial.
+  # ExMCP falls back to initialize by itself, inside the same dial, only when
+  # the probe is refused with 400, 404 or 405; Imp dials once more for any
+  # other 4xx. The import gives up on its helper only past the time every dial
+  # it may make could take, and such a refusal costs the server a second dial.
   @tag timeout: 60_000
   test "a server slow both to refuse the era probe and to initialize is still reached" do
-    url = public_server(mount: "/mcp", probe_status: 404, delay: 5_500) <> "/mcp"
+    url = public_server(mount: "/mcp", probe_status: 403, delay: 5_500) <> "/mcp"
     server = %{"name" => "public", "type" => "http", "url" => url}
 
     assert {:ok, imported} =
              Imp.MCP.connect([server], trusted_servers: [server], timeout: 6_000)
 
     imported.cleanup.()
+
+    assert_received {:request, "/mcp", "server/discover", _origin}
+    assert_received {:request, "/mcp", "initialize", _origin}
   end
 
   # The bridge an import's cleanup stops, read from the cleanup's closure.

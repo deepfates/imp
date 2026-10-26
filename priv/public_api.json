@@ -940,16 +940,6 @@
     },
     {
       "category": "internal",
-      "module": "Inspect.ExMCP.Client",
-      "source": "lib/imp/redaction.ex"
-    },
-    {
-      "category": "internal",
-      "module": "Inspect.ExMCP.Transport.HTTP",
-      "source": "lib/imp/redaction.ex"
-    },
-    {
-      "category": "internal",
       "module": "Inspect.Imp.Clients.HTTPTrainer",
       "source": "lib/imp/clients/training.ex"
     },

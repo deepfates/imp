@@ -1194,10 +1194,27 @@ defmodule Imp.BenchmarkTruth.MultimodalRunner do
     cond do
       request.options[:plug] != nil -> "local_plug"
       request.options[:finch_request] != nil -> "custom_finch_request"
-      default_finch_adapter?(request.adapter) -> "finch"
+      default_finch_adapter?(sending_adapter(request)) -> "finch"
       true -> "custom_adapter"
     end
   end
+
+  # ReqLLM 1.27 and later put their own adapter, `ReqLLM.Transport`, in front
+  # of the request's adapter, to report a Finch pool timeout as an API error.
+  # It keeps the adapter it wraps in the request's private data and hands the
+  # request to it, so that adapter is the one that sends.
+  defp sending_adapter(request) do
+    if req_llm_transport?(request.adapter),
+      do: Req.Request.get_private(request, :req_llm_transport_adapter, request.adapter),
+      else: request.adapter
+  end
+
+  defp req_llm_transport?(ReqLLM.Transport), do: true
+
+  defp req_llm_transport?(adapter) when is_function(adapter, 1),
+    do: Function.info(adapter, :module) == {:module, ReqLLM.Transport}
+
+  defp req_llm_transport?(_adapter), do: false
 
   # Req 0.7 names the default adapter with the `Req.Finch` module; Req 0.6 and
   # earlier used the captured `&Req.Steps.run_finch/1`. Either way the request

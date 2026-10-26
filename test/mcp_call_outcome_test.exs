@@ -295,17 +295,21 @@ defmodule Imp.MCPCallOutcomeTest do
     end
 
     # ExMCP's client makes a plain HTTP POST inside its own process, so a second
-    # call on the same client waits for the first. A call that times out while
-    # waiting has not left yet, but its request is still in the client's queue
-    # and is sent when the first finishes. So a timeout is never "not sent".
-    # Imp does not put one HTTP call behind another on a client (each call
-    # borrows a client of its own, and one whose call timed out is replaced),
-    # so this is shown on ExMCP's client directly, borrowed from the import.
-    # The wait is over five seconds because ExMCP's pre-flight check before
-    # each call waits up to five seconds for the busy client, outside the
-    # call's own timeout.
+    # call on the same client waits for the first. A call made with a timeout
+    # carries its caller's deadline, and the client does not send one whose
+    # deadline passed while it waited (`ExMCP.Client.RequestHandler`, since
+    # ExMCP 1.6.0). The caller still gets a plain `:timeout`, the same as for a
+    # request that went out and is still running (the test above), so the
+    # timeout cannot say which happened and stays `:unknown`. Imp does not put
+    # one HTTP call behind another on a client (each call borrows a client of
+    # its own, and one whose call timed out is replaced), so this is shown on
+    # ExMCP's client directly, borrowed from the import. The hold is over five
+    # seconds because, with `http_stream_retry: :safe_only`, ExMCP asks the
+    # busy client whether it is in conformance mode before each call, waiting
+    # up to five seconds outside the call's own timeout; the call's deadline
+    # starts after that.
     @tag timeout: 30_000
-    test "a call that timed out waiting behind another on one client is sent afterwards" do
+    test "a call that timed out waiting behind another on one client is not sent, and is unknown" do
       Process.register(self(), :mcp_outcome_probe)
       server = http_server()
       {imported, _tools} = http_tools(server, timeout: 300)
@@ -314,8 +318,13 @@ defmodule Imp.MCPCallOutcomeTest do
       {:env, env} = Function.info(imported.cleanup, :env)
       {:ok, client} = Imp.MCP.Clients.checkout(Enum.find(env, &is_pid/1), 0, 1_000)
       options = [format: :map, retry_policy: false, http_stream_retry: :safe_only]
+      test = self()
 
-      spawn(fn -> ExMCP.Client.call_tool(client, "slow", %{}, [timeout: 10_000] ++ options) end)
+      spawn(fn ->
+        result = ExMCP.Client.call_tool(client, "slow", %{}, [timeout: 10_000] ++ options)
+        send(test, {:slow_done, result})
+      end)
+
       Process.sleep(100)
 
       assert {:error, :timeout = reason} =
@@ -327,8 +336,11 @@ defmodule Imp.MCPCallOutcomeTest do
                  reason
                )
 
-      refute_received {:ran, "answer"}
-      assert_receive {:ran, "answer"}, 5_000
+      # The client is free again once the slow call is answered; the queued
+      # call would go out then, and does not.
+      assert_receive {:slow_done, {:ok, _result}}, 10_000
+      assert_received {:ran, "slow"}
+      refute_receive {:ran, "answer"}, 1_000
     end
 
     test "a server error status after the request arrived is unknown" do
