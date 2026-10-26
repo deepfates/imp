@@ -1,8 +1,8 @@
 # Imp v0.18.1
 
 Imp is a framework for typed, optimizable language-model programs on the BEAM.
-Imp 0.18.1 is the 0.18.0 release as published to Hex: 0.18.0 was tagged but
-never published, because a release gate failed on the tag (the deployment
+Imp 0.18.1 is the 0.18.0 library as published to Hex (only the deployment
+example's lock differs): 0.18.0 was tagged but never published, because a release gate failed on the tag (the deployment
 example's lock did not match what `mix deps.get` writes). Everything below
 describes the upgrade from 0.17.0.
 
