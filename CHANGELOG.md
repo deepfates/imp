@@ -4,7 +4,13 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
-## 0.18.0 — 2026-10-25
+## 0.18.1 — 2026-10-25
+
+The package is 0.18.0's, which was tagged but never published to Hex: a
+release gate failed on the tag because the deployment example's lock did not
+match what `mix deps.get` writes. There is no change to Imp itself.
+
+## 0.18.0 — 2026-10-25 (not published)
 
 ### Changed
 

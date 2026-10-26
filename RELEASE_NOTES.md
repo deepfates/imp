@@ -1,6 +1,11 @@
-# Imp v0.18.0
+# Imp v0.18.1
 
 Imp is a framework for typed, optimizable language-model programs on the BEAM.
+Imp 0.18.1 is the 0.18.0 release as published to Hex: 0.18.0 was tagged but
+never published, because a release gate failed on the tag (the deployment
+example's lock did not match what `mix deps.get` writes). Everything below
+describes the upgrade from 0.17.0.
+
 This release changes the shape of the ATIF document's `extra.model_requests`,
 so that an export of a long run no longer grows as the number of requests
 times the length of the history. It also puts every resend of a model call
