@@ -4,25 +4,28 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+## 0.18.0 — 2026-10-25
+
 ### Changed
 
-- `Imp.Trajectory.to_atif/2` no longer lists every model request's messages
-  in full. `extra.model_messages` holds each distinct message the run sent
-  once, redacted and JSON-safe, and each entry of `extra.model_requests` names
-  the messages it sent, in order, as `message_ids` (positions in
+- Breaking: `Imp.Trajectory.to_atif/2` no longer lists every model request's
+  messages in full. `extra.model_messages` holds each distinct message the run
+  sent once, redacted and JSON-safe, and each entry of `extra.model_requests`
+  names the messages it sent, in order, as `message_ids` (positions in
   `extra.model_messages`, from 0) in place of `messages`. Request N sent the
   messages at its `message_ids`, in order, exactly as the full list had them;
   read them through a tuple (`elem(List.to_tuple(model_messages), id)`), since
   `Enum.at/2` per id is quadratic on a long run. Messages are told apart after
-  redaction, so two that differed only in a redacted secret share one
-  position and the positions reveal nothing redaction removed. A request whose
-  input was not a list keeps it as `messages`. A request repeats the history
-  before it, so the full lists made the document, and the redaction over it,
-  grow as the number of requests times the length of the history. On a
-  synthetic 65-request run whose requests sent 27 MB in all, `to_atif` alone
-  (not the host's own reads before it) took 4.2 s and now takes 0.41 s; the
-  encoded document went from 29 MB to 2.2 MB. A reader of `extra.model_requests[n]["messages"]` reads
-  `message_ids` through `extra.model_messages` instead.
+  redaction, so two that differed only in a redacted secret share one position
+  and the positions reveal nothing redaction removed. A request whose input
+  was not a list keeps it as `messages`. A request repeats the history before
+  it, so the full lists made the document, and the redaction over it, grow as
+  the number of requests times the length of the history. On a synthetic
+  65-request run whose requests sent 27 MB in all, `to_atif` alone (not the
+  host's own reads before it) took 4.2 s and now takes 0.41 s; the encoded
+  document went from 29 MB to 2.2 MB. A reader of
+  `extra.model_requests[n]["messages"]` reads `message_ids` through
+  `extra.model_messages` instead.
 
 ### Fixed
 
@@ -67,13 +70,13 @@ User-visible changes to Imp are recorded here.
   result as before.
 
 - `Imp.stream/3` with `provider_stream: true` no longer waits forever for a
-  second pool place under `async_max_workers: 1` when it is read by a row
-  with `timeout: :infinity` nested inside another Imp task or row (the
-  default for `Imp.Evaluate`), or by an `Imp.Predict.Avatar` tool. Only a
-  row with a timeout lent its place to the stream before; now every Imp
-  process that was lent a place lends it on. A stream whose reader is killed, such as a row that timed out, now
-  stops its program too; before, the program kept running, and calling the
-  model, after the row had given its place back.
+  second pool place under `async_max_workers: 1` when it is read by a row with
+  `timeout: :infinity` nested inside another Imp task or row (the default for
+  `Imp.Evaluate`), or by an `Imp.Predict.Avatar` tool. Only a row with a
+  timeout lent its place to the stream before; now every Imp process that was
+  lent a place lends it on. A stream whose reader is killed, such as a row
+  that timed out, now stops its program too; before, the program kept running,
+  and calling the model, after the row had given its place back.
 
 - `Imp.Trajectory.to_atif/2` no longer refuses a run in which the model sent
   a tool call whose arguments were not a JSON object. It raised
@@ -97,17 +100,17 @@ User-visible changes to Imp are recorded here.
 
 - A streamed `Imp.Clients.ReqLLM` call (`Imp.stream/3` with
   `provider_stream: true`) is now sent again the same way as a non-streamed
-  one. ReqLLM's streaming retries had stayed on: an attempt that failed
-  before its first byte (a closed or refused connection, a 429)
-  was sent again up to three times with no `:model_resend` event, so one
-  `:model_request` could stand for four requests. ReqLLM's streaming retries
-  are now off; Imp opens the stream again itself after a refused
-  connection, a 429 or a 529, only before its first chunk, and records each
-  resend as a `:model_resend` event. A stream that timed out or whose
-  connection closed is not opened again: a provider may send keepalive bytes
-  while it works, so the close may come after work it bills. A streamed failure that wraps an HTTP error now
-  carries its status (`%Imp.LMError{status: 429}`), and its `retry-after`
-  is read like a non-streamed one's.
+  one. ReqLLM's streaming retries had stayed on: an attempt that failed before
+  its first byte (a closed or refused connection, a 429) was sent again up to
+  three times with no `:model_resend` event, so one `:model_request` could
+  stand for four requests. ReqLLM's streaming retries are now off; Imp opens
+  the stream again itself after a refused connection, a 429 or a 529, only
+  before its first chunk, and records each resend as a `:model_resend` event.
+  A stream that timed out or whose connection closed is not opened again: a
+  provider may send keepalive bytes while it works, so the close may come
+  after work it bills. A streamed failure that wraps an HTTP error now carries
+  its status (`%Imp.LMError{status: 429}`), and its `retry-after` is read like
+  a non-streamed one's.
 
 - A call through `Imp.Clients.ReqLLM`, streamed or not, no longer sleeps for
   a `retry-after` over a minute before sending again, which with no deadline

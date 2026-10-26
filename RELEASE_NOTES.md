@@ -1,21 +1,23 @@
-# Imp v0.17.0
+# Imp v0.18.0
 
 Imp is a framework for typed, optimizable language-model programs on the BEAM.
-This release sends a chat message's participant `name` (the OpenAI chat
-format's optional `name`) to the provider, where Imp used to drop it, and lets
-a program name the messages of its history turns and its request. A message
-without a name is sent exactly as before, so no caller that does not name
-messages sees any change. The new input keys are public API a caller can rely
-on, so under Imp's versioning rule this is a minor release.
+This release changes the shape of the ATIF document's `extra.model_requests`,
+so that an export of a long run no longer grows as the number of requests
+times the length of the history. It also puts every resend of a model call
+through `Imp.Clients.ReqLLM` in the run's record, changes the default wait for
+a non-streamed call from 30 seconds to 10 minutes, and fixes redaction, task
+pool timeouts, stream cleanup and an export that refused some runs. The ATIF
+change alters what a caller receives, so under Imp's versioning rule this is a
+minor release.
 
 ## Install
 
 ```elixir
-{:imp, "~> 0.17.0"}
+{:imp, "~> 0.18.0"}
 ```
 
-`~> 0.17.0` takes later 0.17 patch releases and nothing newer. The two-part
-form, `~> 0.17`, means `>= 0.17.0 and < 1.0.0` in Mix, so `mix deps.update
+`~> 0.18.0` takes later 0.18 patch releases and nothing newer. The two-part
+form, `~> 0.18`, means `>= 0.18.0 and < 1.0.0` in Mix, so `mix deps.update
 imp` under it takes every later 0.x release, including minor releases that
 change what callers receive.
 
@@ -28,43 +30,65 @@ in its release definition; see [releases that use MCP or
 ACP](docs/production.md#releases-that-use-mcp-or-acp).
 Ordinary Imp startup starts no protocol endpoint.
 
-## Changes and upgrading from 0.16.1
+## Changes and upgrading from 0.17.0
 
-Change the Imp dependency to `{:imp, "~> 0.17.0"}`, run `mix deps.update imp`,
-and commit `mix.lock`. No code or data migration is needed. A program that
-already puts `name` on a message it gives `Imp.LM`, or `:user_name` in its
-inputs, now sends it.
+Change the Imp dependency to `{:imp, "~> 0.18.0"}`, run `mix deps.update imp`,
+and commit `mix.lock`. No data migration is needed. Code that reads
+`extra.model_requests[n]["messages"]` from `Imp.Trajectory.to_atif/2` must
+read `message_ids` instead (below).
 
-- **Added: participant names reach the provider.** `Imp.Clients.ReqLLM`
-  copies a message's `name` (atom or string key) onto the message it sends,
-  for generated, streamed and batched requests. Before, `Imp.LM.generate(lm,
-  [%{role: "user", content: "hi", name: "alice"}])` went out with no `name`.
-  A provider whose format has no such field, such as Anthropic's Messages
-  API, does not receive it.
-- **Added: naming messages through the adapters.** With `Imp.Adapter.Chat`,
-  and the JSON, XML and PlanFirst adapters built on it, a history turn names
-  its user message with `:user_name` and its assistant message with
-  `:assistant_name`, beside its fields, and the request inputs name the final
-  user message with `:user_name`:
+- **Breaking: ATIF lists each message once.** `extra.model_messages` holds
+  each distinct message the run sent, once, and each entry of
+  `extra.model_requests` names its messages in order as `message_ids`,
+  positions in `extra.model_messages` counted from 0, in place of `messages`.
+  Request N sent exactly the messages at its `message_ids`. Since a request
+  repeats the history before it, the old lists made the document, and the
+  redaction over it, grow as requests times history: on a synthetic
+  65-request run, `to_atif` went from 4.2 s to 0.41 s and the encoded
+  document from 29 MB to 2.2 MB. Read the ids through a tuple
+  (`elem(List.to_tuple(model_messages), id)`); `Enum.at/2` per id is
+  quadratic on a long run. A request whose input was not a list keeps
+  `messages`.
+- **Fixed: ATIF keeps a tool call whose arguments are not a JSON object.**
+  `to_atif` raised `ArgumentError` on such a run. The call is now kept with
+  empty `arguments` and the recorded input in `extra.raw_arguments`.
+- **Changed: resends are Imp's and are recorded.** `Imp.Clients.ReqLLM`
+  turns ReqLLM's own retries off, for streamed and non-streamed calls, and
+  sends a failed attempt again itself: a closed or refused connection at
+  once, a 429 or 529 after its `retry-after`, up to `max_retries:` (3)
+  times. A request that timed out is never sent again, and a stream is
+  opened again only before its first chunk. Inside an `Imp.Run`, each
+  resend is a new `:model_resend` event naming the call's `model_call_id`,
+  so one `:model_request` no longer stands for several requests sent. A
+  `retry-after` over a minute is not slept on: the call fails with the 429.
+  Under a deadline, a resend that must wait is made only if 5 seconds would
+  be left after the wait. A host that matches run event kinds exhaustively
+  should accept `:model_resend`.
+- **Changed: a non-streamed call with no deadline waits up to 10 minutes.**
+  With no deadline and no `receive_timeout:`, a non-streamed
+  `Imp.Clients.ReqLLM` call (and a `ReqLLMBatch` dispatcher call) waited
+  ReqLLM's 30 seconds; it now waits 10 minutes. Set `receive_timeout:` or
+  run under a deadline to wait less.
+- **Fixed: a row's `:timeout` counts from when it has a pool place.** A row
+  queued behind other Imp work was killed with `{:task_exit, :timeout}`
+  without having run.
+- **Fixed: streams inside rows.** A provider stream read by a row with
+  `timeout: :infinity` inside another Imp task, or by an
+  `Imp.Predict.Avatar` tool, no longer waits forever for a second place
+  under `async_max_workers: 1`, and a stream whose reader is killed stops
+  its program.
+- **Fixed: redaction of session fields.** A key named `session` or ending in
+  `_session` is redacted only when it holds a token-shaped string, so ids,
+  titles and maps under it now survive in events, traces and reports. A
+  framework session cookie held under its cookie name as a map key
+  (`JSESSIONID`, `PHPSESSID`, `connect.sid`, `ASP.NET_SessionId`) is now
+  redacted, and so is `session_key`.
+- **Fixed: `Imp.MCP.Trust`** logs no error when a connection ends during VM
+  shutdown.
 
-  ```elixir
-  history = Imp.History.new([%{question: "Who won?", answer: "Blue.", user_name: "alice"}])
-  Imp.call(predict, %{question: "Rematch?", history: history, user_name: "bob"})
-  ```
-
-  The keys are never rendered as fields, and tool results and notes are
-  never named. A signature that declares a field called `user_name` or
-  `assistant_name` keeps it as an ordinary field. `Imp.Predict` does not warn
-  about `:user_name` as an extra input under those adapters. ReActV2 names
-  the turns of a history it is given, but not its request message.
-- **Not every model sees the name.** Many upstreams accept `name` and drop
-  it, among them Google's, DeepSeek's, Kimi's, Mistral's and Grok's, and
-  open-weight models served through hosts such as DeepInfra. When the model
-  must know who is speaking, say so in the content too.
-
-Rollback means restoring `{:imp, "~> 0.16.0"}` and `0.16.1` in the lock;
-names are then dropped again and `:user_name` in the inputs warns as an
-extra input. See the [changelog](CHANGELOG.md) for every change.
+Rollback means restoring `{:imp, "~> 0.17.0"}` and `0.17.0` in the lock;
+exports then list every request's messages again, and resends go back to
+ReqLLM, unrecorded. See the [changelog](CHANGELOG.md) for every change.
 
 ## Known limits
 
