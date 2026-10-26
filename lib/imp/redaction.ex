@@ -1090,10 +1090,16 @@ end
 # client's `api_key` or headers, a retriever's or tracker's headers. A program
 # prints its LM, so a program in IEx, a log line or a crash report would
 # otherwise carry the key. ExMCP's client and HTTP transport implement Inspect
-# themselves, hiding the same credentials (header values, tokens, the session
-# id), and a second implementation here would redefine theirs.
+# themselves since 1.6.0, hiding the same credentials (header values, tokens,
+# the session id), and a second implementation here would redefine theirs. An
+# application that overrides ExMCP with an earlier release, or a fork of one,
+# has no such implementation and gets Imp's; `format_status/1` arrived in the
+# same release and tells the two apart.
+exmcp_inspects_itself? =
+  Code.ensure_loaded?(ExMCP.Client) and function_exported?(ExMCP.Client, :format_status, 1)
+
 for module <- Imp.Redaction.connection_structs(),
-    module not in [ExMCP.Client, ExMCP.Transport.HTTP] do
+    not (exmcp_inspects_itself? and module in [ExMCP.Client, ExMCP.Transport.HTTP]) do
   defimpl Inspect, for: module do
     def inspect(struct, opts), do: Inspect.Any.inspect(Imp.Redaction.redact(struct), opts)
   end
