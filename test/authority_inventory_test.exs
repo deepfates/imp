@@ -165,7 +165,7 @@ defmodule AuthorityInventoryTest do
     assert pins["ax_typescript"]["source_manifest"]["file_count"] == 11
     assert length(pins["ax_typescript"]["source_paths"]) == 11
     assert pins["req_llm"]["role"] == "beam_runtime_dependency"
-    assert pins["req_llm"]["commit"] == "fd9e079fddf253e9b719b2d2c6920f4306592809"
+    assert pins["req_llm"]["commit"] == "00a9ec987ce8af2dcc0563ce3de5765391e415ba"
 
     {:hex, :req_llm, locked_version, hex_package, _, _, "hexpm", hex_registry} =
       Mix.Dep.Lock.read()[:req_llm]
