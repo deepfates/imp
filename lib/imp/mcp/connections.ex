@@ -138,6 +138,9 @@ defmodule Imp.MCP.Connections do
 
   Each dial is bounded by `:timeout` on its own, so a host that accepts the
   connection and then answers nothing costs that server its timeout and no more.
+  A dial is the whole opening of a connection: when ExMCP's opening probe is
+  refused with HTTP 400, 404 or 405, or times out, ExMCP sends `initialize`
+  within the same dial, so the probe and `initialize` share its `:timeout`.
 
   ## Calls to one server at once
 
@@ -155,7 +158,8 @@ defmodule Imp.MCP.Connections do
   lists its tools. The others are dialed at once, the way the first connected,
   so a server costs the import at most about three `:timeout`s (the first
   dial, a second one with the standard handshake only when a server refuses
-  ExMCP's opening probe, and the extras) whatever `pool_size` is. Each holds the server's origin in the trusted origins for as
+  ExMCP's opening probe with a 4xx status ExMCP does not fall back on itself,
+  and the extras) whatever `pool_size` is. Each holds the server's origin in the trusted origins for as
   long as it lives, and one that cannot be opened leaves the server with fewer
   connections and is logged.
 
@@ -251,7 +255,7 @@ defmodule Imp.MCP.Connections do
     :pool_size
   ]
 
-  # ExMCP 1.5.0's own defaults for an HTTP connection, set explicitly so the
+  # ExMCP's own defaults for an HTTP connection, set explicitly so the
   # bound on a request can be read from the options it was dialed with.
   @http_dns_timeout 1_000
   @http_connect_timeout 5_000
@@ -401,12 +405,13 @@ defmodule Imp.MCP.Connections do
     end)
   end
 
-  # Killing a process that opened MCP clients does not close them: an
-  # `ExMCP.Client` traps exits and its catch-all `handle_info/2` swallows the
-  # `EXIT` from the process that started it, so an abandoned dial's clients
-  # would stay alive holding their sockets. A client whose `start_link/1` has
-  # not returned has no pid anybody holds, so the links are the only handle on
-  # it and must be read before the kill. The chain is at most
+  # Killing a process that opened MCP clients does not close them at once: an
+  # `ExMCP.Client` traps exits, and one whose `start_link/1` has not returned
+  # is still inside its handshake, which reads no `EXIT` until it finishes or
+  # reaches ExMCP's own establishment deadline, so an abandoned dial's clients
+  # would stay alive holding their sockets until then. Such a client has no
+  # pid anybody holds, so the links are the only handle on it and must be read
+  # before the kill. The chain is at most
   # helper -> dial -> client -> transport and every link in it was opened by
   # this import. A helper abandoned while handing its clients to the bridge
   # reaches the bridge through them; that bridge is this import's own, and the
@@ -509,16 +514,18 @@ defmodule Imp.MCP.Connections do
   end
 
   # One dial, bounded on its own. `ExMCP.Client.start_link/1` returns only when
-  # the handshake has finished, and a host that accepts the connection and then
-  # answers nothing — a firewall dropping packets, a wedged proxy — returns
-  # within neither `:handshake_timeout` nor `:era_probe_timeout` on this path.
-  # The bound here is what keeps silence costing one server rather than the
-  # whole import.
+  # the handshake has finished. ExMCP bounds the probe by `:era_probe_timeout`
+  # and `initialize` by `:handshake_timeout`, but it falls back from a probe
+  # that timed out to `initialize`, so a host that accepts the connection and
+  # then answers nothing — a firewall dropping packets, a wedged proxy — holds
+  # `start_link/1` for both (ExMCP's `:establish_timeout` defaults to their
+  # sum). The bound here keeps that silence to one `:timeout`, costing one
+  # server rather than the whole import.
   #
   # A failed dial leaves nothing behind: `start_link/1` answers with an error
   # only after the client process has exited. A dial abandoned at the deadline
   # is killed along with the half-open client it is still linked to, which does
-  # not die of the link alone (see `abandon/1`).
+  # not die of the link alone while its handshake runs (see `abandon/1`).
   defp dial(options, deadline) do
     options |> start_dial() |> await_dial(System.monotonic_time(:millisecond) + deadline)
   end
@@ -610,16 +617,16 @@ defmodule Imp.MCP.Connections do
   end
 
   # ExMCP opens an HTTP connection with a `server/discover` probe and falls back
-  # to the standard `initialize` only when the probe fails with a JSON-RPC error
-  # or an HTTP 400. Public servers that do not know the probe answer it with
-  # other 4xx statuses (Scry answers 404), and the connection then fails without
-  # `initialize` ever being sent. One more dial asks for the standard handshake
-  # only. A 401 is reported as `:unauthorized`, not as an HTTP error, and is not
-  # retried: it is about credentials, not the protocol. ExMCP reports this
-  # failure as a string, so the status is read from its text. This retires if
-  # ExMCP falls back on any 4xx to the probe. The options that connected are
-  # returned with the client, so further connections to the server are dialed
-  # the way that worked.
+  # to the standard `initialize` by itself, within the same dial, when the probe
+  # times out, fails with a JSON-RPC error, or is refused with HTTP 400, 404 or
+  # 405. Public servers that do not know the probe may answer it with another
+  # 4xx status, and the connection then fails without `initialize` ever being
+  # sent. One more dial asks for the standard handshake only. A 401 is reported
+  # as `:unauthorized`, not as an HTTP error, and is not retried: it is about
+  # credentials, not the protocol. ExMCP reports this failure as a string, so
+  # the status is read from its text. This retires if ExMCP falls back on any
+  # 4xx to the probe. The options that connected are returned with the client,
+  # so further connections to the server are dialed the way that worked.
   defp dial_http_fallback(options, deadline) do
     case dial(options, deadline) do
       {:ok, client} ->
@@ -1412,9 +1419,9 @@ defmodule Imp.MCP.Connections do
   # `:timeout`, which is also the client's wait for a request made without one;
   # Imp passes one on every request), and the request itself. The request
   # bound is the host's `:timeout`, so a call it allows is not cut off by
-  # ExMCP's own 30 s default, and never less than that default: a request its
-  # caller stopped waiting for is left to finish on the server (see
-  # `Imp.MCP.Clients`).
+  # ExMCP's own 30 s default, and never less than that default. ExMCP gives up
+  # on a request once its caller's deadline passes, but the server may still
+  # be running it (see `Imp.MCP.Clients`).
   defp http_bounds(opts) do
     [
       dns_timeout_ms: @http_dns_timeout,

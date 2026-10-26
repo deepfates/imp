@@ -96,10 +96,11 @@ defmodule Imp.Redaction do
 
   # Structs that hold a connection's headers and URLs. ExMCP's client and HTTP
   # transport keep an `Authorization` bearer or an API-key header in their
-  # process state, which is printed when the process crashes or is inspected
-  # with `:sys.get_state/1`; ExMCP 1.5 has no `Inspect` implementation for
-  # either, so Imp gives them its own. That entry goes when ExMCP redacts its
-  # own state; if ExMCP adds an implementation, the two conflict.
+  # process state. Since ExMCP 1.6.0 they implement `Inspect` and
+  # `format_status/1` themselves, so a crash report or `:sys.get_state/1`
+  # prints them redacted and Imp gives them no `Inspect` of its own (see the
+  # end of this file); they stay here so that `redact/1` hides the same fields
+  # in a term that holds one.
   @connection_structs [
     Imp.Clients.ReqLLM,
     Imp.Retrievers.HTTP,
@@ -1088,8 +1089,17 @@ end
 # A connection struct prints as `Imp.Redaction.redact/1` leaves it: an LM
 # client's `api_key` or headers, a retriever's or tracker's headers. A program
 # prints its LM, so a program in IEx, a log line or a crash report would
-# otherwise carry the key.
-for module <- Imp.Redaction.connection_structs() do
+# otherwise carry the key. ExMCP's client and HTTP transport implement Inspect
+# themselves since 1.6.0, hiding the same credentials (header values, tokens,
+# the session id), and a second implementation here would redefine theirs. An
+# application that overrides ExMCP with an earlier release, or a fork of one,
+# has no such implementation and gets Imp's; `format_status/1` arrived in the
+# same release and tells the two apart.
+exmcp_inspects_itself? =
+  Code.ensure_loaded?(ExMCP.Client) and function_exported?(ExMCP.Client, :format_status, 1)
+
+for module <- Imp.Redaction.connection_structs(),
+    not (exmcp_inspects_itself? and module in [ExMCP.Client, ExMCP.Transport.HTTP]) do
   defimpl Inspect, for: module do
     def inspect(struct, opts), do: Inspect.Any.inspect(Imp.Redaction.redact(struct), opts)
   end

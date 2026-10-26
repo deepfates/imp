@@ -16,8 +16,9 @@ defmodule Imp.MCP.Clients do
   # been sent.
   #
   # A client whose call timed out, or whose borrower died during the call, may
-  # still be waiting on that request: ExMCP's client makes the request inside
-  # its own process. Lent again, it would hold the next call behind that one.
+  # still be busy with that request until ExMCP gives up on it at the call's
+  # deadline: ExMCP's client makes the request inside its own process. Lent
+  # again, it would hold the next call behind that one.
   # Such a client is retired instead (`retire/2`): closed once that request is
   # done, and a replacement dialed in the background by the function the
   # import gave for its server. Calls wait for the replacement. One that cannot be dialed leaves the server

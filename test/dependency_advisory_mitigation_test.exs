@@ -1,7 +1,6 @@
 defmodule DependencyAdvisoryMitigationTest do
   @moduledoc """
-  Locks the claims that `.audit_ignore` makes about the three open cowlib
-  advisories. Each ignore entry there says why the advisory cannot reach imp;
+  Locks the claims that `.audit_ignore` makes about the cowlib advisories. Each ignore entry there says why the advisory cannot reach imp;
   these tests fail if that stops being true, so the reasons cannot rot into
   prose.
   """
@@ -9,7 +8,8 @@ defmodule DependencyAdvisoryMitigationTest do
   use ExUnit.Case, async: true
 
   @vulnerable_functions [
-    # EEF-CVE-2026-43969: unvalidated encoder, still unfixed in cowlib 2.20.0.
+    # EEF-CVE-2026-43969: unvalidated encoder, fixed in cowlib 2.21.0, kept
+    # here as a floor.
     {:cow_cookie, :cookie, 1},
     # EEF-CVE-2026-43971: fixed in cowlib 2.20.0, kept here as a floor.
     {:cow_link, :link, 1}
