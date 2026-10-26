@@ -54,16 +54,17 @@ read `message_ids` instead (below).
   empty `arguments` and the recorded input in `extra.raw_arguments`.
 - **Changed: resends are Imp's and are recorded.** `Imp.Clients.ReqLLM`
   turns ReqLLM's own retries off, for streamed and non-streamed calls, and
-  sends a failed attempt again itself: a closed or refused connection at
-  once, a 429 or 529 after its `retry-after`, up to `max_retries:` (3)
-  times. A request that timed out is never sent again, and a stream is
-  opened again only before its first chunk. Inside an `Imp.Run`, each
-  resend is a new `:model_resend` event naming the call's `model_call_id`,
-  so one `:model_request` no longer stands for several requests sent. A
-  `retry-after` over a minute is not slept on: the call fails with the 429.
-  Under a deadline, a resend that must wait is made only if 5 seconds would
-  be left after the wait. A host that matches run event kinds exhaustively
-  should accept `:model_resend`.
+  sends a failed attempt again itself, up to `max_retries:` (3) times: a
+  closed or refused connection at once, and a 429 or 529 after its
+  `retry-after`. A request that timed out is never sent again. A stream is
+  opened again only after a refused connection, a 429 or a 529, and only
+  before its first chunk; one whose connection closed is not. Inside an
+  `Imp.Run`, each resend is a new `:model_resend` event naming the call's
+  `model_call_id`, so one `:model_request` no longer stands for several
+  requests sent. A `retry-after` over a minute is not slept on: the call
+  fails with the 429 or 529. Under a deadline, a resend that must wait is
+  made only if 5 seconds would be left after the wait. A host that matches
+  run event kinds exhaustively should accept `:model_resend`.
 - **Changed: a non-streamed call with no deadline waits up to 10 minutes.**
   With no deadline and no `receive_timeout:`, a non-streamed
   `Imp.Clients.ReqLLM` call (and a `ReqLLMBatch` dispatcher call) waited
