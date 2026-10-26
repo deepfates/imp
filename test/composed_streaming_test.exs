@@ -130,7 +130,12 @@ defmodule Imp.ComposedStreamingTest do
         end)
       end)
 
-    assert_receive {:consumer_event, %StreamResponse{chunk: "[[ ## answer ## ]]\npartial"}}
+    # The stream's program waits for a place in the machine-wide task pool,
+    # which the other async tests share, so the first chunk can take as long
+    # as their work does. The bound only says when to give up waiting.
+    assert_receive {:consumer_event, %StreamResponse{chunk: "[[ ## answer ## ]]\npartial"}},
+                   5_000
+
     Process.exit(consumer, :kill)
 
     assert_receive :provider_opened
