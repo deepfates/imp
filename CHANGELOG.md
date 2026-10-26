@@ -23,6 +23,21 @@ User-visible changes to Imp are recorded here.
   (not the host's own reads before it) took 4.2 s and now takes 0.41 s; the
   encoded document went from 29 MB to 2.2 MB. A reader of `extra.model_requests[n]["messages"]` reads
   `message_ids` through `extra.model_messages` instead.
+- Imp requires ExMCP `~> 1.7 and >= 1.7.2` (was `~> 1.5`). Every ExMCP
+  release before 1.7.2 is retired on Hex for security fixes, and Imp now
+  relies on ExMCP's own `Inspect` for `ExMCP.Client` and
+  `ExMCP.Transport.HTTP`, which hides their credentials since 1.6.0; Imp's
+  implementations for those two structs are removed, since a second one
+  redefines ExMCP's. Breaking for an application that locks an older ExMCP:
+  resolution fails until it moves to 1.7.2. An application that uses ExMCP
+  directly should read ExMCP's 1.6.0 changelog, which changes several
+  behaviours.
+- With ExMCP 1.6.0 and later, a server that refuses ExMCP's opening probe with
+  HTTP 400, 404 or 405 is sent `initialize` within the same dial, so the probe
+  and `initialize` share that dial's `:timeout` in `Imp.MCP.connect/2`. Before,
+  a 404 or 405 cost the server a second dial with a `:timeout` of its own. A
+  server that refuses the probe with another 4xx status (401 aside) still gets
+  the second dial.
 
 ### Fixed
 

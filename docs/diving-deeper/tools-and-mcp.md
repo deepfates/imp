@@ -358,8 +358,8 @@ Imp.Tool.call(read, %{"path" => Path.join(notes, "squads.md")}) |> Imp.Tool.outc
 #=> :not_sent
 ```
 
-A timeout is always `:unknown`: the request may still be delivered after the
-caller stopped waiting. Imported calls are never retried by the transport,
+A timeout is always `:unknown`: the request may have reached the server and
+still be running when the caller stopped waiting. Imported calls are never retried by the transport,
 and a broken stream is not replayed, so an ambiguous write is not repeated.
 `Imp.MCP.failure_text/1` is the sentence the model reads for a failed call;
 a program's record keeps the whole term.

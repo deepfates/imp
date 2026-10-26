@@ -41,13 +41,15 @@ defmodule Imp.MCP.CallFailure do
   builds those itself, including after the first round of a multi-round call
   has reached the server.
 
-  A timeout is `:unknown` even when the request was still waiting in the
+  A timeout is `:unknown` even though the request may never have left the
   client: ExMCP's client sends a plain HTTP request from inside its own
-  process, so a call behind a slow one on the same client waits, and when its
-  caller gives up the request stays queued and is sent later. Imp lends each
-  call to an HTTP server a client of its own (`pool_size:` in
-  `Imp.MCP.Connections`), so a call waits for a client rather than inside one,
-  and a call that never got one is `:not_sent`.
+  process, so a call behind a slow one on the same client waits, and ExMCP
+  drops a request whose caller's deadline passed while it waited. Its caller
+  gets the same `:timeout` as one whose request went out and is still running,
+  so the timeout cannot say which happened. Imp lends each call to an HTTP
+  server a client of its own (`pool_size:` in `Imp.MCP.Connections`), so a
+  call waits for a client rather than inside one, and a call that never got
+  one is `:not_sent`.
 
   An answer from the tool itself, including an MCP error result
   (`{:mcp_tool_error, envelope}`, where `isError` is true), is not a
