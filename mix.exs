@@ -125,7 +125,10 @@ defmodule Imp.MixProject do
       # erlexec owns the process group of each local MCP server
       # (`Imp.MCP.OwnedStdio`); its application starts a port program, which is
       # why it is started on the first stdio connection and not at boot.
-      {:ex_mcp, "~> 1.5", runtime: false},
+      # ExMCP 1.6.0 is the first release whose client and HTTP transport
+      # redact their own credentials when inspected, which Imp relies on
+      # (`Imp.Redaction`); every release before 1.7.2 is retired.
+      {:ex_mcp, "~> 1.7 and >= 1.7.2", runtime: false},
       {:erlexec, "~> 2.2", runtime: false},
       # Imp.Core reads a cost reported as a Decimal when the provider library
       # returns one; Imp creates none itself, so it needs Decimal only when
@@ -512,10 +515,10 @@ defmodule Imp.MixProject do
         "dialyzer"
       ],
       # Dependency advisories run through mix_audit, whose database records a
-      # fixed range per advisory. mix hex.audit serves the ERLEF feed, where the
-      # three open cowlib records are open-ended (introduced 2.9.0, no fixed
-      # version), so it flags every cowlib release that exists including the one
-      # carrying the fix. hex.audit stays in the gate for retired packages,
+      # fixed range per advisory. mix hex.audit serves the ERLEF feed, where a
+      # cowlib record can be open-ended (introduced 2.9.0, no fixed version)
+      # while the fix ships elsewhere, so it flags every cowlib release that
+      # exists. hex.audit stays in the gate for retired packages,
       # which mix_audit does not check, with those ids ignored from
       # .audit_ignore -- one file holding each id next to what was verified and
       # what retires it. Both run as child invocations: mix deps.audit stops the

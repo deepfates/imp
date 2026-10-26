@@ -6,9 +6,10 @@ so that an export of a long run no longer grows as the number of requests
 times the length of the history. It also puts every resend of a model call
 through `Imp.Clients.ReqLLM` in the run's record, changes the default wait for
 a non-streamed call from 30 seconds to 10 minutes, and fixes redaction, task
-pool timeouts, stream cleanup and an export that refused some runs. The ATIF
-change alters what a caller receives, so under Imp's versioning rule this is a
-minor release.
+pool timeouts, stream cleanup and an export that refused some runs. It
+requires ExMCP 1.7.2, since every earlier release is retired for security
+fixes. The ATIF change and the ExMCP requirement alter what a caller
+receives, so under Imp's versioning rule this is a minor release.
 
 ## Install
 
@@ -35,7 +36,8 @@ Ordinary Imp startup starts no protocol endpoint.
 Change the Imp dependency to `{:imp, "~> 0.18.0"}`, run `mix deps.update imp`,
 and commit `mix.lock`. No data migration is needed. Code that reads
 `extra.model_requests[n]["messages"]` from `Imp.Trajectory.to_atif/2` must
-read `message_ids` instead (below).
+read `message_ids` instead, and an application must resolve ExMCP 1.7.2 or
+later (below).
 
 - **Breaking: ATIF lists each message once.** `extra.model_messages` holds
   each distinct message the run sent, once, and each entry of
@@ -84,12 +86,24 @@ read `message_ids` instead (below).
   framework session cookie held under its cookie name as a map key
   (`JSESSIONID`, `PHPSESSID`, `connect.sid`, `ASP.NET_SessionId`) is now
   redacted, and so is `session_key`.
+- **Breaking: Imp requires ExMCP `~> 1.7 and >= 1.7.2`** (was `~> 1.5`).
+  Every ExMCP release before 1.7.2 is retired on Hex for security fixes. An
+  application that uses ExMCP directly should read ExMCP's 1.6.0 changelog.
+  ExMCP now implements `Inspect` for its client and HTTP transport itself,
+  and Imp defines none for them unless ExMCP is overridden with an earlier
+  release. ExMCP's prints the transport's `base_url` whole, so a key in a
+  server URL's query or userinfo shows when such a struct is inspected.
+- **Changed: a refused opening probe shares one dial.** With ExMCP 1.6.0 and
+  later, a server that refuses ExMCP's opening probe with HTTP 400, 404 or
+  405 is sent `initialize` within the same dial, so in `Imp.MCP.connect/2`
+  the probe and `initialize` share that dial's `:timeout`. Before, a 404 or
+  405 got a second dial with a `:timeout` of its own.
 - **Fixed: `Imp.MCP.Trust`** logs no error when a connection ends during VM
   shutdown.
 
 Rollback means restoring `{:imp, "~> 0.17.0"}` and `0.17.0` in the lock;
 exports then list every request's messages again, and resends go back to
-ReqLLM, unrecorded. See the [changelog](CHANGELOG.md) for every change.
+ReqLLM, unrecorded. ExMCP 1.7.2 can stay. See the [changelog](CHANGELOG.md) for every change.
 
 ## Known limits
 
