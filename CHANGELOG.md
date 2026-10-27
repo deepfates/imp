@@ -4,6 +4,25 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Changed
+
+- `Imp.Adapter.Chat` gives a ReAct loop that ends with `submit`, and whose
+  tools the provider holds natively, a plain system message in place of
+  DSPy's layout. Nothing is parsed from the text the model writes in that
+  loop, yet the request carried the input and output field lists, a
+  `[[ ## name ## ]]` template with `{placeholders}` ending
+  `[[ ## completed ## ]]`, and "In adhering to this structure, your objective
+  is:", and some models read that scaffold as the harness of a graded test
+  and said so in their reasoning. The message now gives the program's
+  instructions first, as written; then the parts of each message, with their
+  descriptions; that text the model writes is not sent and stays as its own
+  note; how to finish, with each output's description; and the tools. The
+  default "You are an Agent..." line is left out there, and a host's
+  `agent_line` follows the instructions. Demos and stored turns in that loop
+  show the thought as plain text, without markers. Loops whose model writes
+  its tool calls as text, `finish: :tools` loops, plain-text-answer loops and
+  the JSON and XML adapters are unchanged.
+
 ## 0.18.1 — 2026-10-26
 
 The library is 0.18.0's, which was tagged but never published to Hex: a

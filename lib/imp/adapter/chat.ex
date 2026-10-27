@@ -145,6 +145,8 @@ defmodule Imp.Adapter.Chat do
     # <outputs> from <inputs>." (in a plain-text loop: "You are an Agent.
     # Produce <outputs> from <inputs>, using the supplied tools to gather
     # information and take actions."). A string replaces it; nil leaves it out.
+    # A native tool loop with a finish tool shows no default line, and a
+    # string follows the instructions (`native_finish_tool_system/2`).
     agent_line: [type: {:or, [:string, nil]}],
     # Drop the trailing user message when it is blank. A native tool loop has
     # nothing left to ask once every input is in the history, and an empty
@@ -155,7 +157,7 @@ defmodule Imp.Adapter.Chat do
   @impl true
   def format(signature, inputs, opts) do
     outputs =
-      if plain_text_answer?(signature, opts),
+      if plain_text_answer?(signature, opts) or native_finish_tool_loop?(signature, opts),
         do: &plain_text_outputs/3,
         else: &default_outputs/3
 
@@ -718,30 +720,137 @@ defmodule Imp.Adapter.Chat do
   # fields: the answer is the message, not a field written inside it, and the
   # guidance describes that message once (`with_guidance/5`).
   defp default_system(signature, opts) do
-    if plain_text_answer?(signature, opts) do
-      """
-      Your input fields are:
-      #{render_field_list(signature.inputs)}
-      Inputs will be structured in the following way, with the appropriate values filled in.
-
-      #{render_input_template(signature)}
-
-      In adhering to this structure, your objective is: #{objective(signature, Keyword.put(opts, :plain_text_answer, true))}
-      """
-    else
-      """
-      Your input fields are:
-      #{render_field_list(signature.inputs)}
-      Your output fields are:
-      #{render_field_list(signature.outputs)}
-      All interactions will be structured in the following way, with the appropriate values filled in.
-
-      #{render_interaction_template(signature)}
-      In adhering to this structure, your objective is: #{objective(signature, opts)}
-      """
+    cond do
+      plain_text_answer?(signature, opts) -> plain_text_answer_system(signature, opts)
+      native_finish_tool_loop?(signature, opts) -> native_finish_tool_system(signature, opts)
+      true -> dspy_system(signature, opts)
     end
+  end
+
+  defp plain_text_answer_system(signature, opts) do
+    """
+    Your input fields are:
+    #{render_field_list(signature.inputs)}
+    Inputs will be structured in the following way, with the appropriate values filled in.
+
+    #{render_input_template(signature)}
+
+    In adhering to this structure, your objective is: #{objective(signature, Keyword.put(opts, :plain_text_answer, true))}
+    """
     |> String.trim()
   end
+
+  defp dspy_system(signature, opts) do
+    """
+    Your input fields are:
+    #{render_field_list(signature.inputs)}
+    Your output fields are:
+    #{render_field_list(signature.outputs)}
+    All interactions will be structured in the following way, with the appropriate values filled in.
+
+    #{render_interaction_template(signature)}
+    In adhering to this structure, your objective is: #{objective(signature, opts)}
+    """
+    |> String.trim()
+  end
+
+  # A tool loop whose tools the provider holds natively and which ends with a
+  # finish tool (`Imp.Predict.ReActV2` with `submit`): the model answers with
+  # tool calls, and nothing is parsed from the text it writes, which is read
+  # whole as the step's text output (`metadata[:text_field]`). DSPy's layout
+  # (field lists, a `[[ ## name ## ]]` template with `{placeholders}` ending
+  # `[[ ## completed ## ]]`, "In adhering to this structure, your objective
+  # is:") describes a reply format that this request does not use, and models
+  # read it as the scaffold of a benchmark harness and reasoned that they were
+  # being graded. So this request says what is true here, in plain words: the
+  # program's instructions first, as written; the parts of each message; what
+  # becomes of text the model writes; how to finish; the tools.
+  #
+  # With written tool calls the reply is parsed from its markers, so that
+  # loop keeps DSPy's layout, as does a `finish: :tools` loop.
+  defp native_finish_tool_loop?(signature, opts) do
+    guidance = if Keyword.keyword?(opts), do: Keyword.get(opts, :guidance)
+
+    case guidance do
+      %{submit_tool: tool} when not is_nil(tool) ->
+        is_nil(Map.get(guidance, :finish_tools)) and native_text_step?(signature)
+
+      _other ->
+        false
+    end
+  end
+
+  # The step's only output is its text, and the tool-calls output it names
+  # was taken out of the request because the LM calls tools natively
+  # (`Imp.Predict`).
+  defp native_text_step?(signature) do
+    text = output_field(signature, meta_field(signature, :text_field))
+    calls_name = meta_field(signature, :tool_calls_field)
+
+    not is_nil(text) and signature.outputs == [text] and not is_nil(calls_name) and
+      is_nil(output_field(signature, calls_name))
+  end
+
+  defp native_finish_tool_system(signature, opts) do
+    guidance = Keyword.fetch!(opts, :guidance)
+    quoted = fn names -> Enum.map(names, &"`#{&1}`") end
+
+    instructions =
+      case Imp.Adapter.Instructions.plain_text(signature.instructions) do
+        "" -> nil
+        text -> text
+      end
+
+    # The default "You are an Agent..." line is DSPy's and is left out here;
+    # a host's own line is kept, after the instructions.
+    agent_line =
+      case Keyword.fetch(opts, :agent_line) do
+        {:ok, line} when is_binary(line) and line != "" -> line
+        _other -> nil
+      end
+
+    parts =
+      case signature.inputs do
+        [] ->
+          nil
+
+        [first | _] = inputs ->
+          "Each message to you has these parts, each under its heading, such as " <>
+            "[[ ## #{first.name} ## ]]. A part that doesn't apply to a message is left out.\n" <>
+            render_field_list(inputs)
+      end
+
+    working =
+      "Use the tools to read and to act, as many times as you need. " <>
+        "Text you write is not sent. It stays in this conversation as your own note."
+
+    finish =
+      case {Map.get(guidance, :output_names, []), Map.get(guidance, :outputs, [])} do
+        {[], _fields} ->
+          "To finish, call `#{guidance.submit_tool}`."
+
+        {names, []} ->
+          "To finish, call `#{guidance.submit_tool}` with #{and_list(quoted.(names))}."
+
+        {names, fields} ->
+          "To finish, call `#{guidance.submit_tool}` with #{and_list(quoted.(names))}:\n" <>
+            render_field_list(fields)
+      end
+
+    tools =
+      case Map.get(guidance, :tool_names, []) do
+        [] -> nil
+        names -> "The tools you have: " <> Enum.join(quoted.(names), ", ") <> "."
+      end
+
+    [instructions, agent_line, parts, working, finish, tools]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.join("\n\n")
+  end
+
+  defp and_list([one]), do: one
+  defp and_list([a, b]), do: a <> " and " <> b
+  defp and_list(items), do: Enum.join(Enum.drop(items, -1), ", ") <> ", and " <> List.last(items)
 
   # A tool loop with no finish tool, whose tools the provider holds natively
   # and whose only output is the text field: `Imp.Predict.ReActV2` for one
@@ -753,11 +862,7 @@ defmodule Imp.Adapter.Chat do
   # reply is fields under markers, as everywhere else.
   defp plain_text_answer?(signature, opts) do
     guidance = if Keyword.keyword?(opts), do: Keyword.get(opts, :guidance)
-    text = output_field(signature, meta_field(signature, :text_field))
-    calls_name = meta_field(signature, :tool_calls_field)
-
-    submit_is_text?(guidance) and not is_nil(text) and signature.outputs == [text] and
-      not is_nil(calls_name) and is_nil(output_field(signature, calls_name))
+    submit_is_text?(guidance) and native_text_step?(signature)
   end
 
   # The assistant side of a demo or stored turn in a plain-text loop: the

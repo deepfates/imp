@@ -36,9 +36,24 @@ defmodule Imp.Adapter.Instructions do
     |> Enum.join("\n        ")
   end
 
+  @doc """
+  The instructions cleaned as `objective_text/1` cleans them, without the
+  leading line break and the 8-space indent: the Chat adapter's system message
+  for a native tool loop with a finish tool puts them first, as written.
+  """
+  def plain_text(instructions) do
+    instructions
+    |> to_string()
+    |> cleandoc()
+    |> dedent()
+    |> splitlines()
+    |> Enum.join("\n")
+  end
+
   @doc false
   def rendered_objective?(instructions, rendered) when is_binary(rendered) do
-    String.contains?(rendered, objective_text(instructions))
+    String.contains?(rendered, objective_text(instructions)) or
+      String.starts_with?(rendered, plain_text(instructions) <> "\n")
   end
 
   def rendered_objective?(instructions, messages) when is_list(messages) do
