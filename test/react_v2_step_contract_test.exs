@@ -153,6 +153,44 @@ defmodule ReActV2StepContractTest do
     end
   end
 
+  # With `submit` the system message has no reply template (see
+  # ReActV2RequestShapeTest), so a demo and a stored step show the thought as
+  # the model wrote it, with no markers either.
+  test "with submit, a demo and a stored step are replayed as plain text" do
+    reply = %{tool_calls: [%{name: "submit", arguments: %{answer: "done.", confidence: 1.0}}]}
+    agent = Imp.react("intent -> answer, confidence: float", [look()], lm: lm(true, [reply]))
+    agent = %{agent | react: %{agent.react | demos: [demo()]}}
+
+    history =
+      Imp.History.new([
+        %{
+          "intent" => "earlier",
+          "next_thought" => "noted",
+          "tool_calls" => [
+            %{
+              "id" => "c0",
+              "name" => "submit",
+              "arguments" => %{"answer" => "a", "confidence" => 1}
+            }
+          ],
+          "tool_call_results" => [%{"id" => "c0", "name" => "submit", "result" => "a"}]
+        }
+      ])
+
+    assert {:ok, prediction} = Imp.call(agent, %{intent: "what?", history: history})
+    assert Imp.get(prediction, :answer) == "done."
+
+    [{[system | _] = messages, _opts}] = requests()
+    assistant = messages |> Enum.filter(&(&1.role == :assistant)) |> Enum.map(& &1.content)
+
+    assert system.content =~ "To finish, call `submit`"
+    assert "I will look" in assistant
+    assert "noted" in assistant
+    refute text(messages) =~ "[[ ## next_thought ## ]]"
+    refute text(messages) =~ "[[ ## completed ## ]]"
+    assert List.last(messages) == %{role: :user, content: "[[ ## intent ## ]]\nwhat?"}
+  end
+
   describe "an LM that cannot call tools" do
     test "Chat" do
       [request] =

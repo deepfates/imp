@@ -129,13 +129,16 @@ defmodule ReActV2PlainTextAnswerTest do
     assert system =~ "write it in `answer`, and leave `tool_calls` empty."
   end
 
-  test "a signature with submit still gets the marker template" do
+  # A native loop with `submit` has its own plain layout
+  # (ReActV2RequestShapeTest): no marker template there either, and the
+  # answer is what `submit` carries.
+  test "a native loop with submit is told to finish with submit, without a marker template" do
     reply = %{tool_calls: [%{name: "submit", arguments: %{answer: "cat", confidence: 1.0}}]}
     program = Imp.react("intent -> answer, confidence: float", [look()], lm: lm(reply))
     assert {:ok, _prediction} = Imp.call(program, %{intent: "what is it?"})
     system = system_message()
 
-    assert system =~ "[[ ## completed ## ]]"
-    assert system =~ "When the final answer is ready, call `submit` with `answer`, `confidence`."
+    refute system =~ "[[ ## completed ## ]]"
+    assert system =~ "To finish, call `submit` with `answer` and `confidence`:"
   end
 end

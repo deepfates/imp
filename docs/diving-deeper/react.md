@@ -127,8 +127,39 @@ change: pass `adapter_opts: [agent_line: "..."]` for your own text, or
 `agent_line: nil` to leave it out. A reply that still writes
 `[[ ## answer ## ]]` sections, as replies did before, is read as before.
 When the model writes its tool calls as text instead (an LM without native
-tool calling), and for every signature with `submit`, the step keeps the
-`[[ ## field ## ]]` layout and its `[[ ## completed ## ]]` marker.
+tool calling), the step keeps the `[[ ## field ## ]]` layout and its
+`[[ ## completed ## ]]` marker, since its reply is parsed from them.
+
+With `submit` and native tool calls, nothing is parsed from the text the
+model writes: it is the step's thought, kept in the conversation and sent
+nowhere. So the system message leaves out DSPy's layout (the field lists,
+the template with its placeholders, "In adhering to this structure, your
+objective is:"), which some models read as the harness of a graded test.
+For `Imp.react("intent -> answer, confidence: float", [look])` it reads:
+
+```text
+--- system
+Given the fields `intent`, produce the fields `answer`, `confidence`.
+
+Each message to you has these parts, each under its heading, such as [[ ## intent ## ]]. A part that doesn't apply to a message is left out.
+1. `intent` (string):
+
+Use the tools to read and to act, as many times as you need. Text you write is not sent. It stays in this conversation as your own note.
+
+To finish, call `submit` with `answer` and `confidence`:
+1. `answer` (string):
+2. `confidence` (number):
+
+The tools you have: `look`, `submit`.
+--- user
+[[ ## intent ## ]]
+What is in the box?
+```
+
+The program's instructions come first, unindented. The default "You are an
+Agent..." line is left out here; your own `agent_line` follows the
+instructions. Demos and stored turns show the thought as plain text. A
+`finish: :tools` loop keeps DSPy's layout.
 
 ### 3. An interrupted turn gets one last request
 

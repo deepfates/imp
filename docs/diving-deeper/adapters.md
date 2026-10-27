@@ -89,6 +89,17 @@ In adhering to this structure, your objective is:
 Its demos and stored turns are shown the same way, as plain text. A reply
 written in markers is still read.
 
+A ReAct loop that ends with `submit`, whose tools the provider holds
+natively, shows no DSPy layout at all. Nothing is parsed from the text the
+model writes there, so a reply template would describe a format the request
+does not use, and some models read that scaffold as the harness of a graded
+test. Its system message gives the program's instructions first, as written,
+then the parts of each message, what becomes of text the model writes, how
+to finish, and the tools ([ReAct](react.md) shows it whole). Its demos and
+stored turns are plain text too. When the model writes its tool calls as
+text, the step keeps DSPy's layout, since its reply is parsed from the
+markers.
+
 ## API walkthrough
 
 ### The adapters

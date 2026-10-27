@@ -1,6 +1,17 @@
 defmodule ReActV2RequestShapeTest do
   use ExUnit.Case, async: true
 
+  defmodule TextOnlyLM do
+    @behaviour Imp.LM
+    defstruct [:handler]
+
+    @impl true
+    def generate(%__MODULE__{handler: handler}, messages, opts),
+      do: {:ok, handler.(messages, opts)}
+
+    def tool_calling_capability(%__MODULE__{}), do: false
+  end
+
   # What a provider's prompt cache is keyed on: each step's request must be the
   # previous step's request plus the newest exchange, with the tool roster sent
   # once, natively, and never rendered as text after the history.
@@ -77,21 +88,131 @@ defmodule ReActV2RequestShapeTest do
     refute program.signature.instructions =~ "You are an Agent"
   end
 
-  # With `submit`, the guidance is DSPy ReActV2's text.
-  test "a signature with submit is told to call it, in DSPy's words" do
-    submit_lm =
-      Imp.LM.Static.new(
-        handler: fn messages, _opts ->
-          send(self(), {:system, hd(messages)})
-          %{tool_calls: [%{name: "submit", arguments: %{answer: "ok", confidence: 1.0}}]}
-        end
+  defp submitting_lm(owner, arguments) do
+    Imp.LM.Static.new(
+      handler: fn messages, _opts ->
+        send(owner, {:messages, messages})
+        %{tool_calls: [%{name: "submit", arguments: arguments}]}
+      end
+    )
+  end
+
+  defp routing_signature do
+    Imp.Signature.new(%{
+      instructions: "Route the ticket.\n  Keep it short.",
+      inputs: [
+        %{name: :ticket, desc: "A customer's support ticket"},
+        %{name: :priority, desc: "How urgent it is"}
+      ],
+      outputs: [
+        %{
+          name: :team,
+          type: :string,
+          constraints: %{enum: ["atlas", "harbor"]},
+          desc: "atlas owns money; harbor owns outages"
+        },
+        %{name: :confidence, type: :float, desc: "From 0 to 1"}
+      ]
+    })
+  end
+
+  # With native tool calls and `submit`, nothing is parsed from the text the
+  # model writes, so the system message says what is true in plain words and
+  # leaves out DSPy's reply template, which models read as a benchmark
+  # harness. Every step says what each output means, with its type and
+  # description: otherwise an output's description reaches the model only
+  # inside `submit`'s parameter schema.
+  test "a native loop with submit is told the task, the message parts, how to finish and the tools" do
+    lm = submitting_lm(self(), %{team: "atlas", confidence: 1.0})
+    program = Imp.react(routing_signature(), [look()], lm: lm)
+    assert {:ok, _} = Imp.call(program, %{ticket: "We were charged twice."})
+    assert_received {:messages, [system, user]}
+
+    assert system.content ==
+             """
+             Route the ticket.
+             Keep it short.
+
+             Each message to you has these parts, each under its heading, such as [[ ## ticket ## ]]. A part that doesn't apply to a message is left out.
+             1. `ticket` (string): A customer's support ticket
+             2. `priority` (string): How urgent it is
+
+             Use the tools to read and to act, as many times as you need. Text you write is not sent. It stays in this conversation as your own note.
+
+             To finish, call `submit` with `team` and `confidence`:
+             1. `team` (one of: atlas, harbor): atlas owns money; harbor owns outages
+             2. `confidence` (number): From 0 to 1
+
+             The tools you have: `look`, `submit`.\
+             """
+
+    for scaffold <- [
+          "Your input fields are",
+          "Your output fields are",
+          "next_thought",
+          "{ticket}",
+          "[[ ## completed ## ]]",
+          "In adhering to this structure",
+          "You are an Agent"
+        ] do
+      refute system.content =~ scaffold
+    end
+
+    # A part with no value is left out, as the system message says.
+    assert user.content == "[[ ## ticket ## ]]\nWe were charged twice."
+  end
+
+  test "a host's agent line follows the instructions, and nil leaves it out" do
+    lm = submitting_lm(self(), %{answer: 1})
+
+    program =
+      Imp.react("intent -> answer: int", [look()],
+        lm: lm,
+        adapter_opts: [agent_line: "You keep the town's lamps."]
       )
 
-    program = Imp.react("intent -> answer, confidence: float", [look()], lm: submit_lm)
     assert {:ok, _} = Imp.call(program, %{intent: "hello"})
-    assert_received {:system, system}
+    assert_received {:messages, [system | _]}
+
+    assert system.content =~
+             "Given the fields `intent`, produce the fields `answer`.\n\n" <>
+               "You keep the town's lamps.\n\nEach message to you has these parts"
+
+    program =
+      Imp.react("intent -> answer: int", [look()], lm: lm, adapter_opts: [agent_line: nil])
+
+    assert {:ok, _} = Imp.call(program, %{intent: "hello"})
+    assert_received {:messages, [system | _]}
+
+    assert system.content =~
+             "Given the fields `intent`, produce the fields `answer`.\n\nEach message to you has"
+
+    assert system.content =~ "To finish, call `submit` with `answer`:\n1. `answer` (integer):"
+  end
+
+  # Written tool calls are parsed from the reply's markers, so that loop keeps
+  # DSPy's layout and its words.
+  test "a loop whose model writes its tool calls keeps DSPy's layout" do
+    owner = self()
+
+    lm = %TextOnlyLM{
+      handler: fn messages, _opts ->
+        send(owner, {:messages, messages})
+
+        "[[ ## next_thought ## ]]\nDone.\n\n[[ ## tool_calls ## ]]\n" <>
+          ~s([{"name": "submit", "arguments": {"answer": "ok", "confidence": 1.0}}]) <>
+          "\n\n[[ ## completed ## ]]"
+      end
+    }
+
+    program = Imp.react("intent -> answer, confidence: float", [look()], lm: lm)
+    assert {:ok, _} = Imp.call(program, %{intent: "hello"})
+    assert_received {:messages, [system | _]}
 
     for line <- [
+          "Your input fields are:",
+          "[[ ## tool_calls ## ]]",
+          "In adhering to this structure, your objective is: ",
           "You are an Agent. Use the supplied tools to produce `answer`, `confidence` from `intent`.",
           "Call tools when more information is needed.",
           "When the final answer is ready, call `submit` with `answer`, `confidence`.",
@@ -99,46 +220,6 @@ defmodule ReActV2RequestShapeTest do
         ] do
       assert system.content =~ line
     end
-  end
-
-  # Without this list an output's description reached the model only inside
-  # `submit`'s parameter schema, which a model reads when it calls `submit`,
-  # not while it decides which tools to call.
-  test "every step says what each output means, with its type and description" do
-    owner = self()
-
-    lm =
-      Imp.LM.Static.new(
-        handler: fn messages, _opts ->
-          send(owner, {:system, hd(messages)})
-          %{tool_calls: [%{name: "submit", arguments: %{team: "atlas", confidence: 1.0}}]}
-        end
-      )
-
-    signature =
-      Imp.Signature.new(%{
-        instructions: "Route the ticket.",
-        inputs: [%{name: :ticket, desc: "A customer's support ticket"}],
-        outputs: [
-          %{
-            name: :team,
-            type: :string,
-            constraints: %{enum: ["atlas", "harbor"]},
-            desc: "atlas owns money; harbor owns outages"
-          },
-          %{name: :confidence, type: :float, desc: "From 0 to 1"}
-        ]
-      })
-
-    program = Imp.react(signature, [look()], lm: lm)
-    assert {:ok, _} = Imp.call(program, %{ticket: "We were charged twice."})
-    assert_received {:system, system}
-
-    assert system.content =~
-             "The outputs to produce are:\n" <>
-               "        1. `team` (one of: atlas, harbor): atlas owns money; harbor owns outages\n" <>
-               "        2. `confidence` (number): From 0 to 1\n" <>
-               "        Call tools when more information is needed."
   end
 
   test "a host can replace the system message and keep parsing" do
@@ -181,17 +262,6 @@ defmodule ReActV2RequestShapeTest do
     assert {:ok, prediction} = Imp.call(program, %{intent: "what is in it?"})
     assert Imp.get(prediction, :answer) == "The thing holds 1, 2 and 3.\n\nThat is all."
     assert prediction.metadata.termination_reason == :answered
-  end
-
-  defmodule TextOnlyLM do
-    @behaviour Imp.LM
-    defstruct [:handler]
-
-    @impl true
-    def generate(%__MODULE__{handler: handler}, messages, opts),
-      do: {:ok, handler.(messages, opts)}
-
-    def tool_calling_capability(%__MODULE__{}), do: false
   end
 
   test "tool calling is the LM's to declare" do

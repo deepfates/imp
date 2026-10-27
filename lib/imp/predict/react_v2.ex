@@ -362,7 +362,8 @@ defmodule Imp.Predict.ReActV2 do
         "Options handed to the adapter beside the loop's own guidance; a host " <>
           "injects its renderers here, such as `Imp.Adapter.Chat`'s `:system_renderer`, " <>
           "and its own `:agent_line` (the guidance's \"You are an Agent...\" line; a " <>
-          "string replaces it, nil leaves it out)."
+          "string replaces it, nil leaves it out; a native loop with `submit` shows " <>
+          "only a host's string, after the instructions)."
     ],
     metadata: [
       type: {:map, :any, :any},
