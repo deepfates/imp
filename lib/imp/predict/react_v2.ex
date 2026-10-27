@@ -201,6 +201,14 @@ defmodule Imp.Predict.ReActV2 do
   not sent to the extractor, which no policy checks: the turn ends
   `:incomplete`.
 
+  A provider that refuses the named choice is asked once more with
+  `tool_choice: "required"` and `submit` as the only tool, and one that
+  refuses that too leaves the turn to the extractor. Those refusals are
+  remembered for the client that received them, for the life of the node: a
+  later forced `submit` on the same client starts at the first choice its
+  provider has not refused, and goes straight to the extractor when it has
+  refused both.
+
   The last request says nothing about why it is being made unless
   `:last_request_note` is given: one line of host text put in front of it as a
   user message and kept in the returned history like any other turn. It is
@@ -1299,43 +1307,28 @@ defmodule Imp.Predict.ReActV2 do
   end
 
   defp forced_submit_prediction(react, history, pending) do
+    model = refusal_key(react)
+
+    if :named in refused_tool_choices(model) do
+      required_submit_prediction(react, history, pending, model, :forced_tool_choice_refused)
+    else
+      named_submit_prediction(react, history, pending, model)
+    end
+  end
+
+  defp named_submit_prediction(react, history, pending, model) do
     forced = forced_submit_program(react, %{type: "tool", name: "submit"})
 
     case predict(forced, react, history, pending) do
       {:error, reason, history} = error ->
-        # A full context window or a safety guard refuses any request, so
-        # neither is read as a refusal of the named choice.
-        if named_tool_choice_unsupported?(reason) and
-             not Imp.Errors.context_window_exceeded?(reason) and not safety_error?(reason) do
-          # Some endpoints take only the string none/auto/required subset,
-          # and some only "auto". Restrict both the provider tools and the
-          # rendered tool inventory to submit before requiring a call; using
-          # "required" while other tools remain visible would not force final
-          # submission.
-          submit = Map.fetch!(react.tools, :submit)
-          submit_only = %{react | tools: %{submit: submit}}
-          fallback = forced_submit_program(submit_only, "required")
+        if tool_choice_refusal?(reason) do
+          remember_refused_tool_choice(model, :named)
 
           # No request is sent once the deadline has passed; the refusal is
           # then the last request's failure, which names the deadline.
-          retry =
-            if deadline_passed?(),
-              do: :deadline_passed,
-              else: predict(fallback, submit_only, history, pending)
-
-          case retry do
-            :deadline_passed ->
-              error
-
-            {:ok, prediction, history} ->
-              {:ok, prediction, history}
-
-            {:error, fallback_error, history} ->
-              if Imp.Errors.context_window_exceeded?(fallback_error) or
-                   safety_error?(fallback_error),
-                 do: {:error, fallback_error, history},
-                 else: {:extract, fallback_error, history}
-          end
+          if deadline_passed?(),
+            do: error,
+            else: required_submit_prediction(react, history, pending, model, reason)
         else
           error
         end
@@ -1343,6 +1336,89 @@ defmodule Imp.Predict.ReActV2 do
       {:ok, prediction, history} ->
         {:ok, prediction, history}
     end
+  end
+
+  # Some endpoints take only the string none/auto/required subset, and some
+  # only "auto". Restrict both the provider tools and the rendered tool
+  # inventory to submit before requiring a call; using "required" while other
+  # tools remain visible would not force final submission. A model whose
+  # provider has refused "required" too goes to the extractor without asking
+  # again; `reason` is then what the turn's metadata names as the forced
+  # request's failure.
+  defp required_submit_prediction(react, history, pending, model, reason) do
+    if :required in refused_tool_choices(model) do
+      {:extract, reason, history}
+    else
+      submit = Map.fetch!(react.tools, :submit)
+      submit_only = %{react | tools: %{submit: submit}}
+      fallback = forced_submit_program(submit_only, "required")
+
+      case predict(fallback, submit_only, history, pending) do
+        {:ok, prediction, history} ->
+          {:ok, prediction, history}
+
+        {:error, fallback_error, history} ->
+          cond do
+            Imp.Errors.context_window_exceeded?(fallback_error) or
+                safety_error?(fallback_error) ->
+              {:error, fallback_error, history}
+
+            named_tool_choice_unsupported?(fallback_error) ->
+              remember_refused_tool_choice(model, :required)
+              {:extract, fallback_error, history}
+
+            true ->
+              {:extract, fallback_error, history}
+          end
+      end
+    end
+  end
+
+  # A full context window or a safety guard refuses any request, so neither
+  # is read as a refusal of the forced choice.
+  defp tool_choice_refusal?(reason),
+    do:
+      named_tool_choice_unsupported?(reason) and
+        not Imp.Errors.context_window_exceeded?(reason) and not safety_error?(reason)
+
+  # Which forced `tool_choice` values (`:named`, `:required`) a model's
+  # provider has refused in this node, so a later forced `submit` on the same
+  # model does not send a request the provider has already said it will not
+  # take. The model registry cannot say this: it records whether a model
+  # takes tools and `tool_choice`, not which values (an endpoint that takes
+  # only "auto" lists `tool_choice` as supported). The provider's refusal is
+  # the evidence, and it is kept for the life of the node: a provider that
+  # starts accepting a forced choice is forced again after a restart.
+  #
+  # The model is the client as configured: its module, its model spec and a
+  # hash of the whole client, so two clients for one model that differ in
+  # endpoint, options or transport are told apart, and the client's key is not
+  # kept. A client with no model spec (a static or scripted LM) is not
+  # remembered.
+  defp refusal_key(react) do
+    lm = if react.react.dynamic_lm?, do: Imp.Settings.get().lm, else: react.react.lm
+
+    case lm do
+      %module{model: model} when not is_nil(model) -> {module, model, :erlang.phash2(lm)}
+      _other -> nil
+    end
+  end
+
+  defp refused_tool_choices(nil), do: []
+
+  defp refused_tool_choices(model),
+    do: :persistent_term.get({__MODULE__, :refused_tool_choice, model}, [])
+
+  defp remember_refused_tool_choice(nil, _choice), do: :ok
+
+  defp remember_refused_tool_choice(model, choice) do
+    key = {__MODULE__, :refused_tool_choice, model}
+    refused = :persistent_term.get(key, [])
+
+    # Written once per model and choice: a `persistent_term` update makes
+    # every process copy the old term, so it is not rewritten unchanged.
+    unless choice in refused, do: :persistent_term.put(key, [choice | refused])
+    :ok
   end
 
   defp finish_forced_submit(

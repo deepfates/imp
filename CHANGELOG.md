@@ -4,6 +4,17 @@ User-visible changes to Imp are recorded here.
 
 ## Unreleased
 
+### Changed
+
+- ReActV2 remembers a provider's refusal of a forced `tool_choice`. A forced
+  `submit` whose provider refused the named choice, and then `"required"`,
+  used to send both again on every later forced request before the extractor
+  answered: two refused requests each time for an endpoint that accepts only
+  `"auto"`. The refusals are now kept per client for the life of the node, so
+  the next forced `submit` on that client starts at the first choice not
+  refused, or goes straight to the extractor. A provider that accepts the
+  named choice is unaffected.
+
 ## 0.18.1 — 2026-10-26
 
 The library is 0.18.0's, which was tagged but never published to Hex: a

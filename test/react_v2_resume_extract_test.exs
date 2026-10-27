@@ -125,6 +125,119 @@ defmodule ReActV2ResumeExtractTest do
            ] = wire()
   end
 
+  # A provider that refused the forced choices for a model refuses them again:
+  # the refusal is a property of the model's endpoint, not of the request.
+  # Once both have been refused, a later forced `submit` on the same model
+  # goes to the extractor without asking again. A provider that refuses only
+  # the named choice is asked for "required" alone the next time.
+  for {name, refuses, again} <- [
+        {:refuses_both, [:named, :required], [{[], nil}]},
+        {:refuses_named, [:named], [{["submit"], "required"}]}
+      ] do
+    @refuses refuses
+    @again again
+
+    test "#{name}: a later resume on the same model does not repeat a refused choice" do
+      owner = self()
+      refuses = @refuses
+
+      base_url =
+        Imp.Test.LocalHTTP.start(fn request ->
+          body = Jason.decode!(request.body)
+          tools = for tool <- body["tools"] || [], do: tool["function"]["name"]
+          send(owner, {:wire, tools, body["tool_choice"], List.last(body["messages"])["role"]})
+
+          refused =
+            case body["tool_choice"] do
+              %{"function" => _} -> :named in refuses
+              "required" -> :required in refuses
+              _other -> false
+            end
+
+          cond do
+            refused -> {400, @meta_refusal}
+            tools == [] -> {200, completion(@extracted)}
+            true -> {200, submit_completion(@recap)}
+          end
+        end)
+
+      lm =
+        Imp.req_llm(%{provider: :openrouter, id: "fixture/model", base_url: base_url},
+          api_key: "fixture",
+          max_retries: 0,
+          cache: false
+        )
+
+      assert {:ok, first} = resume(lm)
+      assert Imp.get(first, :reply) == @recap
+      _first_requests = wire()
+
+      assert {:ok, second} = resume(lm)
+      assert Imp.get(second, :reply) == @recap
+
+      assert Enum.map(wire(), fn {tools, choice, _role} -> {tools, choice} end) == @again
+    end
+  end
+
+  test "another model on the same provider is still forced by name" do
+    owner = self()
+
+    serve = fn refuse? ->
+      Imp.Test.LocalHTTP.start(fn request ->
+        body = Jason.decode!(request.body)
+        send(owner, {:wire, [], body["tool_choice"], nil})
+
+        cond do
+          refuse? and body["tool_choice"] not in [nil, "auto"] -> {400, @meta_refusal}
+          body["tools"] in [nil, []] -> {200, completion(@extracted)}
+          true -> {200, submit_completion(@recap)}
+        end
+      end)
+    end
+
+    lm = fn base_url, id ->
+      Imp.req_llm(%{provider: :openrouter, id: id, base_url: base_url},
+        api_key: "fixture",
+        max_retries: 0,
+        cache: false
+      )
+    end
+
+    assert {:ok, _} = resume(lm.(serve.(true), "fixture/refuses"))
+    _refused = wire()
+
+    assert {:ok, prediction} = resume(lm.(serve.(false), "fixture/accepts"))
+    assert prediction.metadata.termination_reason == :forced_submit
+
+    assert [{[], %{"function" => %{"name" => "submit"}}, nil}] = wire()
+  end
+
+  defp submit_completion(reply),
+    do: %{
+      "id" => "r",
+      "model" => "fixture/model",
+      "choices" => [
+        %{
+          "index" => 0,
+          "message" => %{
+            "role" => "assistant",
+            "content" => nil,
+            "tool_calls" => [
+              %{
+                "id" => "s2",
+                "type" => "function",
+                "function" => %{
+                  "name" => "submit",
+                  "arguments" => Jason.encode!(%{"reply" => reply})
+                }
+              }
+            ]
+          },
+          "finish_reason" => "tool_calls"
+        }
+      ]
+    }
+
   defp completion(content),
     do: %{
       "id" => "r",
