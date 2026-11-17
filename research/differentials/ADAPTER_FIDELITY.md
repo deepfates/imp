@@ -41,6 +41,46 @@ trying to byte-match Python prompt templates.
 | Tool formatting | Provider-native tools flow through `Imp.Clients.ReqLLM`; iterative tool use flows through `Imp.Predict.ReAct`, `CodeAct`, and `RLM` | `test/req_llm_client_test.exs`, `test/golden_trace_test.exs`, `test/integration/local_service_e2e_test.exs` |
 | Streaming chunks | `Imp.Streaming.Messages.StreamListener` incrementally frames Chat, JSON, and XML fields with bounded parser state; custom adapters may provide bounded exact delimiters | `test/stream_listener_incremental_test.exs`, `test/completion_surface_test.exs` |
 
+## Golden-trace LM compatibility (DSPy 3.2.1 and 3.5.0)
+
+`scripts/dspy_golden_trace_runner.py` supports both LM interfaces. It detects
+an explicit `engine` constructor parameter on `BaseLM`, not a version string.
+On 3.2.1 it retains the legacy `forward`/`FakeResponse` path. On 3.5.0 a
+private fixture engine implements `complete(Request) -> Response`, sharing the
+LM's response queue and declaring capability tiers on the engine where DSPy's
+capability planner reads them. DSPy's BaseLM still owns history recording;
+`normalize_history` and report `schema_version: 1` are unchanged. Neither path
+uses a provider or rewrites prompts to emulate another release.
+
+This is **LM compatibility, not a new parity claim**. The Imp differential and
+its prompt/envelope claim below remain pinned to DSPy 3.2.1. With the same
+unmodified fixtures, the 3.2.1 runner has 39 successful cases and 3 expected
+errors; its report is unchanged apart from provenance (`git_sha`/`python`).
+The 3.5.0 compatibility tests record 31 successful cases and 11 errors, with
+no `LMUnsupportedFeatureError`. New upstream ChainOfThought/ReAct output
+contracts account for additional parse/queue-exhaustion failures. Those errors,
+rendered prompts, and request envelopes stay in the report as measured: passing
+the LM tests does not mean 3.5.0 matches 3.2.1 prompt bytes or Imp behavior.
+
+The Python-only `golden-trace-lm` CI matrix uses the retained parity environment
+for 3.2.1 and an exact `dspy==3.5.0` install for the engine path. Reproduce
+locally (substitute either environment's Python):
+
+```sh
+scripts/setup_dspy_parity_env.sh
+python3 -m venv tmp/dspy35-venv
+tmp/dspy35-venv/bin/python -m pip install 'dspy==3.5.0'
+env -u PYTHONPATH -u VIRTUAL_ENV tmp/dspy-parity-venv/bin/python -m unittest discover -s scripts -p test_dspy_golden_trace_runner.py
+env -u PYTHONPATH -u VIRTUAL_ENV tmp/dspy35-venv/bin/python -m unittest discover -s scripts -p test_dspy_golden_trace_runner.py
+env -u PYTHONPATH -u VIRTUAL_ENV tmp/dspy35-venv/bin/python scripts/dspy_golden_trace_runner.py --fixtures test/fixtures/golden_trace/cases.json --out tmp/reports/golden-dspy350.json
+```
+
+The tests cover the engine protocol, capability tiers (including aliases and
+invalid tiers), queue order/exhaustion, uncached replay, history/envelope shape,
+shared TwoStep history, and the actual success/error sets on both releases.
+The runner deliberately returns a report even for failing cases; the tests,
+not its exit status, enforce these measured outcomes.
+
 ## Declared Divergences (registered as gaps, not conformance)
 
 The completed current-stable audit repaired output defaults, recursive XML, MCP

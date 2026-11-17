@@ -4,16 +4,20 @@
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 import platform
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import dspy
 import pydantic
+
+if TYPE_CHECKING:
+    from dspy.lm15 import Request, Response
 
 
 @dataclass
@@ -35,13 +39,46 @@ _CAPABILITY_TIERS = {
 }
 
 
+# Older BaseLM accepts arbitrary kwargs, so detect an explicit engine parameter
+# rather than trying engine= and silently passing it as a generation option.
+_ENGINE_BASED_LM = "engine" in inspect.signature(dspy.BaseLM.__init__).parameters
+
+
+class _FixtureEngine:
+    """One-attempt DSPy Engine protocol; BaseLM owns history and execution."""
+
+    def __init__(self, responses: List[str], supported_params: set, supports_response_schema: bool) -> None:
+        self.responses = responses
+        self.supported_params = set(supported_params)
+        self.supports_response_schema = supports_response_schema
+
+    def complete(self, request: Request) -> Response:
+        # Keep lm15 optional: DSPy 3.2.1 has no engine/Request/Response API.
+        from dspy.lm15 import Message, Response, TextPart, Usage
+
+        if not self.responses:
+            raise RuntimeError("fixture response queue exhausted")
+        return Response(
+            id=None,
+            model=request.model,
+            message=Message(role="assistant", parts=(TextPart(text=self.responses.pop(0)),)),
+            finish_reason="stop",
+            usage=Usage(),
+        )
+
+
 class FixtureLM(dspy.BaseLM):
     def __init__(self, responses: List[str], capability: Optional[str] = None) -> None:
-        super().__init__(model="fake/golden", cache=False)
         self.responses = list(responses)
         if capability not in _CAPABILITY_TIERS:
             raise ValueError(f"unknown lm_capability tier: {capability!r}")
         self._supported_params, self._supports_response_schema = _CAPABILITY_TIERS[capability]
+        if _ENGINE_BASED_LM:
+            # capabilities reads custom-engine hints directly, not LM overrides.
+            engine = _FixtureEngine(self.responses, self._supported_params, self._supports_response_schema)
+            super().__init__(model="fake/golden", cache=False, engine=engine)
+        else:
+            super().__init__(model="fake/golden", cache=False)
 
     # The two properties dspy.JSONAdapter gates response_format on. Declaring
     # them here lets one fixture exercise a specific capability tier so the
