@@ -120,7 +120,7 @@ defmodule TutorialTicketRoutingExperiment do
       "git_sha" => git_sha(),
       "script" => "research/tutorial_ticket_routing_experiment.exs",
       "tutorial" => "docs/getting-started/measuring.md",
-      "model" => "openai:gpt-5.4-mini",
+      "model" => model_identity(model),
       "provider_route" => model,
       "dataset" => %{
         "path" => @dataset_relative,
@@ -294,7 +294,7 @@ defmodule TutorialTicketRoutingExperiment do
         {"openai:gpt-5.4-mini", System.fetch_env!("OPENAI_API_KEY")}
 
       present?(System.get_env("OPENROUTER_API_KEY")) ->
-        {"openrouter:openai/gpt-5.4-mini", System.fetch_env!("OPENROUTER_API_KEY")}
+        {"openrouter:" <> openrouter_model(), System.fetch_env!("OPENROUTER_API_KEY")}
 
       true ->
         raise "OPENAI_API_KEY or OPENROUTER_API_KEY is required"
@@ -302,6 +302,37 @@ defmodule TutorialTicketRoutingExperiment do
   end
 
   defp present?(value), do: is_binary(value) and String.trim(value) != ""
+
+  @default_openrouter_model "openai/gpt-5.4-mini"
+
+  defp openrouter_model do
+    case System.get_env("OPENROUTER_MODEL") do
+      value when is_binary(value) ->
+        case String.trim(value) do
+          "" -> @default_openrouter_model
+          route -> route
+        end
+
+      _other ->
+        @default_openrouter_model
+    end
+  end
+
+  # `provider_route` is the transport that served the run, so it moves when the
+  # model is overridden. `model` stays the model's own identity, comparable
+  # across rows regardless of which route carried it.
+  defp model_identity(route) do
+    case String.split(route, ":", parts: 2) do
+      ["openrouter", rest] ->
+        case String.split(rest, "/", parts: 2) do
+          [provider, model] -> provider <> ":" <> model
+          [_no_provider] -> rest
+        end
+
+      _other ->
+        route
+    end
+  end
 
   defp to_examples(rows) do
     for %{"ticket" => ticket, "team" => team} <- rows do
