@@ -51,10 +51,7 @@ defmodule TutorialTicketRoutingExperiment do
     trainset = to_examples(data["train"])
     testset = to_examples(data["test"])
 
-    lm =
-      model
-      |> Imp.req_llm(api_key: api_key)
-      |> Imp.budgeted_lm(budget, max_output_tokens: @max_output_tokens)
+    lm = build_lm(model, api_key, budget)
 
     router = router(lm)
 
@@ -197,10 +194,7 @@ defmodule TutorialTicketRoutingExperiment do
         default_max_output_tokens: @max_output_tokens
       )
 
-    lm =
-      model
-      |> Imp.req_llm(api_key: api_key)
-      |> Imp.budgeted_lm(budget, max_output_tokens: @max_output_tokens)
+    lm = build_lm(model, api_key, budget)
 
     selected =
       artifact_path
@@ -288,6 +282,49 @@ defmodule TutorialTicketRoutingExperiment do
     |> Imp.predict(lm: lm, adapter: Imp.Adapter.JSON, config: [json_retries: 1])
   end
 
+  defp build_lm(model, api_key, budget) do
+    opts =
+      case System.get_env("IMP_LM_BASE_URL") do
+        url when is_binary(url) ->
+          case String.trim(url) do
+            "" -> [api_key: api_key]
+            base_url -> [api_key: api_key, base_url: base_url]
+          end
+
+        _other ->
+          [api_key: api_key]
+      end
+
+    opts =
+      case http_headers() do
+        [] -> opts
+        headers -> Keyword.put(opts, :req_http_options, headers: headers)
+      end
+
+    model
+    |> Imp.req_llm(opts)
+    |> Imp.budgeted_lm(budget, max_output_tokens: @max_output_tokens)
+  end
+
+  # `name=value,name=value` — lets a gateway that wants routing headers
+  # (OpenCode Go requires `x-opencode-session`) be used without touching Imp.
+  defp http_headers do
+    case System.get_env("IMP_LM_HEADERS") do
+      value when is_binary(value) ->
+        value
+        |> String.split(",", trim: true)
+        |> Enum.flat_map(fn pair ->
+          case String.split(pair, "=", parts: 2) do
+            [name, header] -> [{String.trim(name), String.trim(header)}]
+            _other -> []
+          end
+        end)
+
+      _other ->
+        []
+    end
+  end
+
   defp live_provider! do
     cond do
       present?(System.get_env("OPENAI_API_KEY")) ->
@@ -296,10 +333,15 @@ defmodule TutorialTicketRoutingExperiment do
       present?(System.get_env("OPENROUTER_API_KEY")) ->
         {"openrouter:" <> openrouter_model(), System.fetch_env!("OPENROUTER_API_KEY")}
 
+      present?(System.get_env("IMP_LM_KEY_FILE")) ->
+        {"openrouter:" <> openrouter_model(), key_from_file!(System.get_env("IMP_LM_KEY_FILE"))}
+
       true ->
         raise "OPENAI_API_KEY or OPENROUTER_API_KEY is required"
     end
   end
+
+  defp key_from_file!(path), do: path |> File.read!() |> String.trim()
 
   defp present?(value), do: is_binary(value) and String.trim(value) != ""
 
