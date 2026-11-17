@@ -51,10 +51,7 @@ defmodule TutorialTicketRoutingExperiment do
     trainset = to_examples(data["train"])
     testset = to_examples(data["test"])
 
-    lm =
-      model
-      |> Imp.req_llm(api_key: api_key)
-      |> Imp.budgeted_lm(budget, max_output_tokens: @max_output_tokens)
+    lm = build_lm(model, api_key, budget)
 
     router = router(lm)
 
@@ -120,8 +117,9 @@ defmodule TutorialTicketRoutingExperiment do
       "git_sha" => git_sha(),
       "script" => "research/tutorial_ticket_routing_experiment.exs",
       "tutorial" => "docs/getting-started/measuring.md",
-      "model" => "openai:gpt-5.4-mini",
+      "model" => model_identity(model),
       "provider_route" => model,
+      "provider_base_url" => provider_base_url(model),
       "dataset" => %{
         "path" => @dataset_relative,
         "sha256" => sha256(dataset_bytes),
@@ -197,10 +195,7 @@ defmodule TutorialTicketRoutingExperiment do
         default_max_output_tokens: @max_output_tokens
       )
 
-    lm =
-      model
-      |> Imp.req_llm(api_key: api_key)
-      |> Imp.budgeted_lm(budget, max_output_tokens: @max_output_tokens)
+    lm = build_lm(model, api_key, budget)
 
     selected =
       artifact_path
@@ -288,20 +283,117 @@ defmodule TutorialTicketRoutingExperiment do
     |> Imp.predict(lm: lm, adapter: Imp.Adapter.JSON, config: [json_retries: 1])
   end
 
+  # The route spec says `openrouter`, but a base_url override means the calls
+  # went somewhere else. The receipt records the host actually called.
+  defp provider_base_url(model) do
+    case System.get_env("IMP_LM_BASE_URL") do
+      url when is_binary(url) ->
+        case String.trim(url) do
+          "" -> default_base_url(model)
+          base_url -> base_url
+        end
+
+      _other ->
+        default_base_url(model)
+    end
+  end
+
+  defp default_base_url("openrouter:" <> _), do: "https://openrouter.ai/api/v1"
+  defp default_base_url(_other), do: "https://api.openai.com/v1"
+
+  defp build_lm(model, api_key, budget) do
+    opts =
+      case System.get_env("IMP_LM_BASE_URL") do
+        url when is_binary(url) ->
+          case String.trim(url) do
+            "" -> [api_key: api_key]
+            base_url -> [api_key: api_key, base_url: base_url]
+          end
+
+        _other ->
+          [api_key: api_key]
+      end
+
+    opts =
+      case http_headers() do
+        [] -> opts
+        headers -> Keyword.put(opts, :req_http_options, headers: headers)
+      end
+
+    model
+    |> Imp.req_llm(opts)
+    |> Imp.budgeted_lm(budget, max_output_tokens: @max_output_tokens)
+  end
+
+  # `name=value,name=value` — lets a gateway that wants routing headers
+  # (OpenCode Go requires `x-opencode-session`) be used without touching Imp.
+  defp http_headers do
+    case System.get_env("IMP_LM_HEADERS") do
+      value when is_binary(value) ->
+        value
+        |> String.split(",", trim: true)
+        |> Enum.flat_map(fn pair ->
+          case String.split(pair, "=", parts: 2) do
+            [name, header] -> [{String.trim(name), String.trim(header)}]
+            _other -> []
+          end
+        end)
+
+      _other ->
+        []
+    end
+  end
+
   defp live_provider! do
     cond do
       present?(System.get_env("OPENAI_API_KEY")) ->
         {"openai:gpt-5.4-mini", System.fetch_env!("OPENAI_API_KEY")}
 
       present?(System.get_env("OPENROUTER_API_KEY")) ->
-        {"openrouter:openai/gpt-5.4-mini", System.fetch_env!("OPENROUTER_API_KEY")}
+        {"openrouter:" <> openrouter_model(), System.fetch_env!("OPENROUTER_API_KEY")}
+
+      present?(System.get_env("IMP_LM_KEY_FILE")) ->
+        {"openrouter:" <> openrouter_model(), key_from_file!(System.get_env("IMP_LM_KEY_FILE"))}
 
       true ->
         raise "OPENAI_API_KEY or OPENROUTER_API_KEY is required"
     end
   end
 
+  defp key_from_file!(path), do: path |> File.read!() |> String.trim()
+
   defp present?(value), do: is_binary(value) and String.trim(value) != ""
+
+  @default_openrouter_model "openai/gpt-5.4-mini"
+
+  defp openrouter_model do
+    case System.get_env("OPENROUTER_MODEL") do
+      value when is_binary(value) ->
+        case String.trim(value) do
+          "" -> @default_openrouter_model
+          route -> route
+        end
+
+      _other ->
+        @default_openrouter_model
+    end
+  end
+
+  # `provider_route` is the transport that served the run, so it moves when the
+  # model is overridden. `model` stays the model's own identity, comparable
+  # across rows regardless of which route carried it.
+  defp model_identity(route) do
+    case String.split(route, ":", parts: 2) do
+      ["openrouter", rest] ->
+        case String.split(rest, "/", parts: 2) do
+          [provider, model] -> provider <> ":" <> model
+          [_no_provider] -> rest
+        end
+
+      _other ->
+        route
+    end
+  end
 
   defp to_examples(rows) do
     for %{"ticket" => ticket, "team" => team} <- rows do
