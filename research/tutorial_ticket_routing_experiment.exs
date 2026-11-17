@@ -119,6 +119,7 @@ defmodule TutorialTicketRoutingExperiment do
       "tutorial" => "docs/getting-started/measuring.md",
       "model" => model_identity(model),
       "provider_route" => model,
+      "provider_base_url" => provider_base_url(model),
       "dataset" => %{
         "path" => @dataset_relative,
         "sha256" => sha256(dataset_bytes),
@@ -281,6 +282,24 @@ defmodule TutorialTicketRoutingExperiment do
     )
     |> Imp.predict(lm: lm, adapter: Imp.Adapter.JSON, config: [json_retries: 1])
   end
+
+  # The route spec says `openrouter`, but a base_url override means the calls
+  # went somewhere else. The receipt records the host actually called.
+  defp provider_base_url(model) do
+    case System.get_env("IMP_LM_BASE_URL") do
+      url when is_binary(url) ->
+        case String.trim(url) do
+          "" -> default_base_url(model)
+          base_url -> base_url
+        end
+
+      _other ->
+        default_base_url(model)
+    end
+  end
+
+  defp default_base_url("openrouter:" <> _), do: "https://openrouter.ai/api/v1"
+  defp default_base_url(_other), do: "https://api.openai.com/v1"
 
   defp build_lm(model, api_key, budget) do
     opts =
